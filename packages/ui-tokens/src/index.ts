@@ -1,0 +1,32 @@
+/**
+ * @ui/tokens — 平台无关的设计令牌(色/间距/圆角/字号)。
+ * 跨端视觉一致性来自共享 tokens,而非组件复用(web 用 DOM、ios 用 RN)。
+ */
+export const colors = {
+  bg: "#0f1115",
+  surface: "#171a21",
+  text: "#e7e9ee",
+  textMuted: "#9aa3b2",
+  primary: "#7c5cff",
+  success: "#39d98a",
+  warning: "#ffb020",
+  danger: "#ff5c5c",
+  // 宠物阶段配色(蛋→幼体→成体)
+  stageEgg: "#9aa3b2",
+  stageBaby: "#7c5cff",
+  stageAdult: "#39d98a",
+  // 收藏稀有度
+  rarityCommon: "#9aa3b2",
+  rarityUncommon: "#39d98a",
+  rarityRare: "#3aa0ff",
+  rarityEpic: "#a85cff",
+  rarityLegendary: "#ffb020",
+} as const;
+
+export const space = { xs: 4, sm: 8, md: 16, lg: 24, xl: 40 } as const;
+export const radius = { sm: 6, md: 10, lg: 16, pill: 999 } as const;
+export const fontSize = { xs: 12, sm: 14, md: 16, lg: 20, xl: 28, xxl: 40 } as const;
+export const fontWeight = { regular: 400, medium: 500, bold: 700 } as const;
+
+export const tokens = { colors, space, radius, fontSize, fontWeight } as const;
+export type Tokens = typeof tokens;

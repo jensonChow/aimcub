@@ -1,0 +1,26 @@
+# deps
+node_modules/
+.pnpm-store/
+
+# build output
+dist/
+.next/
+.turbo/
+out/
+*.tsbuildinfo
+
+# test / coverage
+coverage/
+
+# env / secrets
+.env
+.env.*
+!.env.example
+
+# deploy
+.vercel/
+.wrangler/
+
+# os / editor
+.DS_Store
+*.log

@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint (includes @core/* purity: no-restricted-imports)
+        run: pnpm lint
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      # 核心纯度护栏:@core/domain 与 @core/types 必须在「无 DOM / 无 node 类型」下编译通过。
+      # 任何平台依赖偷偷漏进内核都会在这里红灯 ——「四端共享 core」不沦为口号的命门。
+      - name: Core purity guard
+        run: pnpm core:purity

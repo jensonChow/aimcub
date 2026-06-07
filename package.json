@@ -1,0 +1,33 @@
+{
+  "name": "goalpet",
+  "private": true,
+  "version": "0.0.0",
+  "description": "GoalPet — 通用目标/里程碑追踪器 + 证据摄取层,套上电子宠物/数字收藏/主动伴侣外壳。四端共享核心(Web / iOS / MCP / Chrome)。",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "core:purity": "pnpm --filter @core/domain --filter @core/types run purity"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.18.0",
+    "@types/node": "^22.10.5",
+    "eslint": "^9.18.0",
+    "turbo": "^2.3.4",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.20.0",
+    "vitest": "^2.1.8"
+  },
+  "pnpm": {
+    "overrides": {
+      "react": "18.3.1",
+      "react-dom": "18.3.1"
+    }
+  }
+}

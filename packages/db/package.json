@@ -1,0 +1,6 @@
+{
+  "name": "@core/db",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Supabase schema (migrations + RLS). 数据真相源。生成的 TS 类型(generate_typescript_types)将与 @core/types 用 CI 校验对齐。无构建脚本,Turbo 跳过。"
+}
