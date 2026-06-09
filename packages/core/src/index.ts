@@ -1,6 +1,6 @@
 /**
- * @core/domain — 四端唯一逻辑源(纯 TS、零平台依赖)。
- * 重新导出领域类型,便于消费方一处 import。
+ * @core/domain — the single source of logic shared across all four clients (pure TS, zero platform dependencies).
+ * Re-exports the domain types so consumers can import everything from one place.
  */
 export * from "@core/types";
 

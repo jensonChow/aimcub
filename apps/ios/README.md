@@ -1,5 +1,5 @@
-# apps/ios — v2 占位
+# apps/ios — v2 placeholder
 
-iOS 端在 **v2** 激活。届时:Expo(React Native,New Architecture)+ EAS,直接复用 `@core/*`(TS 核心),接 APNs 推送。
+The iOS client comes online in **v2**. At that point: Expo (React Native, New Architecture) + EAS, reusing `@core/*` (the TS core) directly, wired up to APNs push notifications.
 
-现在只是占位,不进 CI、不写实现 —— 但目录已在 monorepo 终态结构中登记,接 iOS 时不必重组仓库。
+For now this is just a placeholder — it stays out of CI and has no implementation — but the directory is already registered in the monorepo's final structure, so adding iOS won't require reorganizing the repo.

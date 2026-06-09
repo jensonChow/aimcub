@@ -1,6 +1,7 @@
 /**
- * @ui/tokens — 平台无关的设计令牌(色/间距/圆角/字号)。
- * 跨端视觉一致性来自共享 tokens,而非组件复用(web 用 DOM、ios 用 RN)。
+ * @ui/tokens — platform-agnostic design tokens (color/spacing/radius/font size).
+ * Cross-platform visual consistency comes from shared tokens, not component reuse
+ * (web uses DOM, iOS uses RN).
  */
 export const colors = {
   bg: "#0f1115",
@@ -11,11 +12,11 @@ export const colors = {
   success: "#39d98a",
   warning: "#ffb020",
   danger: "#ff5c5c",
-  // 宠物阶段配色(蛋→幼体→成体)
+  // Pet stage colors (egg -> baby -> adult)
   stageEgg: "#9aa3b2",
   stageBaby: "#7c5cff",
   stageAdult: "#39d98a",
-  // 收藏稀有度
+  // Collection rarity
   rarityCommon: "#9aa3b2",
   rarityUncommon: "#39d98a",
   rarityRare: "#3aa0ff",

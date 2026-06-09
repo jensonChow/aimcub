@@ -1,7 +1,7 @@
 /**
- * 极简 glob → RegExp(零依赖,保持 core 纯净)。
- * 支持的通配:双星加斜杠 = 零或多段目录;双星 = 跨段任意;单星 = 段内任意;问号 = 单字符。
- * 路径分隔符 `/` 按字面处理。
+ * Minimal glob → RegExp (zero dependencies, keeping core pure).
+ * Supported wildcards: double-star plus slash = zero or more directory segments; double-star = anything across segments; single star = anything within a segment; question mark = a single character.
+ * The path separator `/` is treated literally.
  */
 export function globToRegExp(glob: string): RegExp {
   let re = "";
@@ -12,14 +12,14 @@ export function globToRegExp(glob: string): RegExp {
       if (glob.charAt(i + 1) === "*") {
         // '**'
         if (glob.charAt(i + 2) === "/") {
-          re += "(?:.*/)?"; // '**/' → 零或多段目录(含零段)
+          re += "(?:.*/)?"; // '**/' → zero or more directory segments (including zero)
           i += 3;
         } else {
-          re += ".*"; // '**' → 跨段任意
+          re += ".*"; // '**' → anything across segments
           i += 2;
         }
       } else {
-        re += "[^/]*"; // '*' → 段内任意
+        re += "[^/]*"; // '*' → anything within a segment
         i += 1;
       }
     } else if (c === "?") {
@@ -36,7 +36,7 @@ export function globToRegExp(glob: string): RegExp {
   return new RegExp("^" + re + "$");
 }
 
-/** 把 pattern 当正则源测试 text;非法正则降级为子串包含。 */
+/** Test `text` against `pattern` as a regex source; on an invalid regex, fall back to substring containment. */
 export function matchesPattern(pattern: string, text: string): boolean {
   try {
     return new RegExp(pattern).test(text);

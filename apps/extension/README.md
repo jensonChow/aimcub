@@ -1,5 +1,5 @@
-# apps/extension — v3 占位
+# apps/extension — v3 placeholder
 
-Chrome 插件在 **v3** 激活。届时:MV3 + Vite + CRXJS + React,作为轻证据源 + 应用内提醒载体;鉴权用 PKCE + `chrome.identity` + `chrome.storage.local`。
+The Chrome extension goes live in **v3**. At that point: MV3 + Vite + CRXJS + React, serving as a lightweight evidence source plus an in-app reminder surface; authentication uses PKCE + `chrome.identity` + `chrome.storage.local`.
 
-现在只是占位,不进 CI、不写实现。
+For now this is just a placeholder — not part of CI, no implementation yet.

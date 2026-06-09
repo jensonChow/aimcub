@@ -1,7 +1,7 @@
 /**
- * @core/api-client — 数据访问契约(implementation-agnostic)。
- * 四端禁止各自拼 query —— 都经此契约访问,保证 query 形态/错误处理一致。
- * v0:定义 GoalPetRepo 接口(用领域类型);具体 supabase-js 实现在 v1a 接入。
+ * @core/api-client — data-access contract (implementation-agnostic).
+ * No client may build its own queries — all access goes through this contract, ensuring consistent query shapes and error handling.
+ * v0: defines the GoalPetRepo interface (using domain types); the concrete supabase-js implementation lands in v1a.
  */
 import type {
   Collectible,
@@ -21,7 +21,7 @@ export interface CreateGoalInput {
   targetDate?: string | null;
 }
 
-/** 摄取入口写入的归一化证据(id/owner 由实现补齐前的形态)。 */
+/** Normalized evidence written by the ingestion entry point (shape before the implementation fills in id/owner). */
 export interface IngestEvidenceInput {
   ownerId: string;
   goalId: string;
@@ -36,27 +36,27 @@ export interface IngestEvidenceInput {
 }
 
 /**
- * 四端共享的数据访问契约。读路径(用户身份 + RLS)与机器写路径(service_role)分离:
- * 创建目标 = 用户路径;插入里程碑 / 摄取证据 / 成长宠物 = 服务端路径。
+ * Data-access contract shared across all clients. The read path (user identity + RLS) is separated from the machine write path (service_role):
+ * creating goals = user path; inserting milestones / ingesting evidence / growing pets = server path.
  */
 export interface GoalPetRepo {
-  // 用户路径(RLS 下读写)
+  // User path (reads/writes under RLS)
   createGoal(input: CreateGoalInput): Promise<Goal>;
   getGoal(id: string): Promise<Goal | null>;
   listGoals(ownerId: string): Promise<Goal[]>;
   listMilestones(goalId: string): Promise<Milestone[]>;
   getPet(goalId: string): Promise<Pet | null>;
   listCollectibles(ownerId: string): Promise<Collectible[]>;
-  /** agent_inbox 渠道:宠物给用户的主动消息(Claude Code 经 MCP get_inbox 拉取)。 */
+  /** agent_inbox channel: proactive messages from the pet to the user (Claude Code pulls these via the MCP get_inbox call). */
   listInbox(ownerId: string, since?: string): Promise<Notification[]>;
 
-  // 服务端路径(service_role)
+  // Server path (service_role)
   insertMilestones(milestones: Milestone[]): Promise<Milestone[]>;
   ingestEvidence(input: IngestEvidenceInput): Promise<Evidence>;
 }
 
 export interface SupabaseClientConfig {
   url: string;
-  /** anon key(客户端)或 service_role key(仅服务端)。 */
+  /** anon key (client side) or service_role key (server side only). */
   key: string;
 }

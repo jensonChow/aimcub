@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Models, routeModel } from "./index";
 
-describe("routeModel · 精简模型路由", () => {
+describe("routeModel · lean model routing", () => {
   it("uses Sonnet for decompose/replan/celebrate", () => {
     expect(routeModel("decompose")).toBe(Models.sonnet);
     expect(routeModel("replan")).toBe(Models.sonnet);

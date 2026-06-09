@@ -1,10 +1,11 @@
 /**
- * 宠物成长(每目标一只):纯数值 + 派生阶段。无事件溯源 —— 宠物表是物化缓存,
- * 真正事实源是 milestone_completions,坏了重算即可。
+ * Pet growth (one per goal): pure numeric XP + derived stage. No event sourcing —
+ * the pet table is a materialized cache; the true source of truth is
+ * milestone_completions, so if it breaks we just recompute it.
  */
 import { type EstEffort, type PetBranch, type PetStage, type Rarity } from "@core/types";
 
-/** v1 三阶段阈值(蛋 → 幼体 → 成体)。后续阶段加阈值即可扩展。 */
+/** v1 three-stage thresholds (egg → baby → adult). Extend by adding more thresholds later. */
 export const STAGE_THRESHOLDS: ReadonlyArray<{ stage: PetStage; minXp: number }> = [
   { stage: "egg", minXp: 0 },
   { stage: "baby", minXp: 100 },
@@ -22,11 +23,11 @@ export function stageForXp(xp: number): PetStage {
 export interface PetGrowth {
   xp: number;
   stage: PetStage;
-  /** 本次是否发生阶段跃迁(用于触发庆祝动画 / 主动消息)。 */
+  /** Whether this gain crossed a stage boundary (used to trigger a celebration animation / proactive message). */
   stagedUp: boolean;
 }
 
-/** 施加一次 XP 增益,返回新的 xp/stage 与是否跃迁。 */
+/** Apply a single XP gain; returns the new xp/stage and whether a stage transition occurred. */
 export function applyXpGain(currentXp: number, deltaXp: number): PetGrowth {
   const before = stageForXp(currentXp);
   const xp = currentXp + deltaXp;
@@ -34,7 +35,7 @@ export function applyXpGain(currentXp: number, deltaXp: number): PetGrowth {
   return { xp, stage, stagedUp: stage !== before };
 }
 
-/** 进化分支:由该 goal 完成里程碑的领域标签分布决定(后端多→龙,前端多→鸟)。 */
+/** Evolution branch: determined by the distribution of domain tags across the goal's completed milestones (mostly backend → dragon, mostly frontend → bird). */
 const BRANCH_BY_TAG: Readonly<Record<string, PetBranch>> = {
   backend: "dragon",
   frontend: "bird",
@@ -55,7 +56,7 @@ export function computeBranch(tagCounts: Record<string, number>): PetBranch {
   return best;
 }
 
-/** 确定性稀有度:由里程碑难度(est_effort)直接决定,不随机(价值来自难度而非抽卡)。 */
+/** Deterministic rarity: derived directly from milestone difficulty (est_effort), never random (value comes from difficulty, not gacha rolls). */
 export function rarityForEffort(effort: EstEffort): Rarity {
   switch (effort) {
     case "xs":

@@ -49,7 +49,7 @@ describe("evaluate · logic=all", () => {
   });
 
   it("fails when one clause unmatched", () => {
-    const r = evaluate(rule, [migrationCommit]); // 缺 CI
+    const r = evaluate(rule, [migrationCommit]); // missing CI
     expect(r.passed).toBe(false);
     expect(r.clauseSatisfied).toEqual([true, false]);
   });
@@ -83,11 +83,11 @@ describe("evaluate · logic=any / weighted", () => {
       ],
     });
     expect(evaluate(rule, [migrationCommit]).passed).toBe(false); // 0.3 < 0.8
-    expect(evaluate(rule, [migrationCommit, ciPass]).passed).toBe(true); // 0.9 ≥ 0.8
+    expect(evaluate(rule, [migrationCommit, ciPass]).passed).toBe(true); // 0.9 >= 0.8
   });
 });
 
-describe("evaluate · 防伪(auto_verifiable)", () => {
+describe("evaluate · anti-spoofing (auto_verifiable)", () => {
   it("rejects low-trust evidence for an auto_verifiable clause", () => {
     const rule = AcceptanceRule.parse({
       logic: "all",
@@ -96,10 +96,10 @@ describe("evaluate · 防伪(auto_verifiable)", () => {
     const lowTrust = ev({
       id: "m1",
       kind: "git_commit",
-      trust_score: 0.5, // 裸 / 低可信来源
+      trust_score: 0.5, // unattested / low-trust source
       payload: { sha: "x", message: "m", files: ["db/migrations/x.sql"] },
     });
     expect(evaluate(rule, [lowTrust]).passed).toBe(false);
-    expect(evaluate(rule, [migrationCommit]).passed).toBe(true); // 同样 glob,但 trust=1
+    expect(evaluate(rule, [migrationCommit]).passed).toBe(true); // same glob, but trust=1
   });
 });

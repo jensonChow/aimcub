@@ -1,50 +1,50 @@
 # GoalPet
 
-> 通用目标/里程碑追踪器 + 证据摄取层,套上「电子宠物 + 数字收藏 + 主动伴侣」的情感外壳。
-> 你照常干活,宠物替你记录每一次真实进展,并在你松懈时来找你。
+> A general-purpose goal/milestone tracker + evidence ingestion layer, wrapped in an emotional shell of "virtual pet + digital collectibles + proactive companion."
+> You work as usual; the pet records every real bit of progress for you, and comes to find you when you slack off.
 
-**核心定位**:coding agent(Claude Code 等)只是众多「证据发射器(emitter)」之一,通过 MCP 上报;git/CI webhook 是另一类 emitter。系统本质是通用目标追踪器,开发者场景是第一个被点亮的子集。
+**Core positioning**: a coding agent (Claude Code, etc.) is just one of many "evidence emitters," reporting in via MCP; git/CI webhooks are another class of emitter. At its core the system is a general-purpose goal tracker, and the developer scenario is simply the first subset to light up.
 
-## 架构原则
+## Architecture principles
 
-- **后端唯一事实源 = Supabase**(Postgres + Auth + RLS + Realtime + Storage)。
-- **证据 append-only + 幂等**;里程碑完成 / 宠物 / 收藏都是从证据流派生的状态。
-- **`@core/*` 是四端唯一逻辑源**(纯 TS、零平台依赖、可单测)。各 app 壳只做 I/O、渲染、平台桥接。
-- 精简优先:v1 用 jobs 表 + pg_cron(非 pgmq)、线性里程碑(非 DAG)、单表记忆(无向量)、精灵图(非 Rive)。复杂度按触发条件加回。
+- **The backend's single source of truth = Supabase** (Postgres + Auth + RLS + Realtime + Storage).
+- **Evidence is append-only + idempotent**; milestone completion / pets / collectibles are all state derived from the evidence stream.
+- **`@core/*` is the single logic source for all four clients** (pure TS, zero platform dependencies, unit-testable). Each app shell handles only I/O, rendering, and platform bridging.
+- Lean-first: v1 uses a jobs table + pg_cron (not pgmq), linear milestones (not a DAG), a single-table memory (no vectors), and sprite sheets (not Rive). Complexity is added back only when a trigger condition demands it.
 
-## Monorepo 布局
+## Monorepo layout
 
 ```
 packages/
-  core/        @core/domain      纯 TS 内核:evaluate / stageForXp / planMerge / normalizeEvidence / validatePlan
-  types/       @core/types       zod 领域模型(单一事实源)
+  core/        @core/domain      Pure TS kernel: evaluate / stageForXp / planMerge / normalizeEvidence / validatePlan
+  types/       @core/types       zod domain models (single source of truth)
   db/          @core/db          Supabase migrations + RLS
-  api/         @core/api-client  supabase-js 封装
-  llm/         @core/llm         Claude gateway(模型路由 + 计量)
-  proactive/   @core/proactive   触发规则 + 渠道 adapter 接口
+  api/         @core/api-client  supabase-js wrapper
+  llm/         @core/llm         Claude gateway (model routing + metering)
+  proactive/   @core/proactive   Trigger rules + channel adapter interface
   ui-tokens/   @ui/tokens        design tokens
 apps/
-  web/         Next.js @ Vercel              — v1(激活)
-  mcp/         MCP server (Streamable HTTP)  — v1(激活)
-  ios/         Expo RN                       — v2(占位)
-  extension/   Chrome MV3                    — v3(占位)
+  web/         Next.js @ Vercel              — v1 (active)
+  mcp/         MCP server (Streamable HTTP)  — v1 (active)
+  ios/         Expo RN                       — v2 (placeholder)
+  extension/   Chrome MV3                    — v3 (placeholder)
 ```
 
-## 开发
+## Development
 
 ```bash
 corepack enable pnpm
 pnpm install
-pnpm build        # turbo 全量构建
-pnpm test         # @core/domain 单测
-pnpm core:purity  # 校验 core 零平台依赖
+pnpm build        # turbo full build
+pnpm test         # @core/domain unit tests
+pnpm core:purity  # verify core has zero platform dependencies
 ```
 
-## 路线图(带可证伪闸门)
+## Roadmap (with falsifiable gates)
 
-- **v0** 地基:monorepo + `@core` + Supabase schema。DoD = core 被 web/mcp 同时 import + 零依赖构建通过。
-- **v1a** 验证 H1(零摩擦自动证据):Web 设 goal → 拆解 → MCP/GitHub 证据 → 里程碑**自动点亮**。无宠物。
-- **v1b** 验证 H2(情感外壳提升留存):叠加宠物成长 + 收藏 + 宠物口吻 nudge。
-- **v2** iOS + APNs;**v3** Chrome + 通用目标泛化;**v4** 商业化(Stripe + iOS IAP)。
+- **v0** Foundation: monorepo + `@core` + Supabase schema. DoD = core imported by both web and mcp + zero-dependency build passes.
+- **v1a** Validate H1 (frictionless automatic evidence): set a goal on the web → break it down → MCP/GitHub evidence → milestones **light up automatically**. No pets.
+- **v1b** Validate H2 (the emotional shell boosts retention): layer on pet growth + collectibles + pet-voiced nudges.
+- **v2** iOS + APNs; **v3** Chrome + generalization to arbitrary goals; **v4** monetization (Stripe + iOS IAP).
 
-详见 `/Users/jenson/.claude/plans/coding-agent-goal-goal-proactive-ios-mc-encapsulated-stonebraker.md`。
+See `/Users/jenson/.claude/plans/coding-agent-goal-goal-proactive-ios-mc-encapsulated-stonebraker.md` for details.

@@ -1,13 +1,14 @@
 /**
- * 证据归一化:把异构来源(git commit / CI run / ...)映射成统一信封。
- * 纯函数 —— occurred_at 由调用方传入,保持确定性可测。
- * id / owner_id / emitter_id 由调用方(Edge Function)补齐。
+ * Evidence normalization: maps heterogeneous sources (git commit / CI run / ...)
+ * into a uniform envelope.
+ * Pure function — occurred_at is supplied by the caller to keep it deterministic and testable.
+ * id / owner_id / emitter_id are filled in by the caller (Edge Function).
  */
 import { type EvidenceKind } from "@core/types";
 
 export interface NormalizedEvidence {
   kind: EvidenceKind;
-  /** 上游事件原生 id;与 emitter_id 组成幂等键。 */
+  /** Native id of the upstream event; combined with emitter_id to form the idempotency key. */
   source_event_id: string;
   occurred_at: string;
   summary: string;
@@ -22,7 +23,7 @@ export interface RawCommit {
   files?: string[];
   additions?: number;
   deletions?: number;
-  /** GitHub 验签状态。verified 提升可信度。 */
+  /** GitHub signature verification status. A verified signature raises the trust score. */
   verified?: boolean;
 }
 
@@ -42,7 +43,7 @@ export function normalizeCommitEvidence(commit: RawCommit, occurredAt: string): 
       deletions: commit.deletions,
       verified: commit.verified,
     },
-    // 注意:GitHub verified 只证明签名密钥归属某账户,不证明代码有意义。
+    // Note: GitHub's "verified" flag only proves the signing key belongs to some account; it does not prove the code is meaningful.
     trust_score: commit.verified ? 1 : 0.7,
   };
 }
@@ -67,7 +68,7 @@ export function normalizeCiEvidence(run: RawCiRun, occurredAt: string): Normaliz
       run_id: run.runId,
       branch: run.branch,
     },
-    // 来自已验签 CI webhook,可信度高。
+    // Comes from a signature-verified CI webhook, so the trust score is high.
     trust_score: 1,
   };
 }

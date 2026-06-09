@@ -1,36 +1,36 @@
-# @core/db — Supabase schema(数据真相源)
+# @core/db — Supabase schema (source of truth for data)
 
-`supabase/migrations/` 下是按序号命名的 SQL 迁移。
+`supabase/migrations/` contains the SQL migrations named by sequence number.
 
-## 应用迁移
+## Applying migrations
 
 ```bash
-# 本地开发(需 Docker):
+# Local development (requires Docker):
 supabase start
-supabase db reset          # 重放全部迁移到本地 stack
+supabase db reset          # replay all migrations into the local stack
 
-# 远程项目:
+# Remote project:
 supabase link --project-ref <ref>
 supabase db push
 ```
 
-或通过 Supabase MCP 工具 `apply_migration` 直接应用到远程项目。
+Or apply them directly to the remote project via the Supabase MCP tool `apply_migration`.
 
-## 生成共享类型
+## Generating shared types
 
-应用迁移后,用 `generate_typescript_types` 产出 DB 类型,并与 `@core/types`(zod 单一事实源)
-在 CI 校验漂移。
+After applying migrations, use `generate_typescript_types` to emit DB types, and check them for drift
+against `@core/types` (the single source of truth in zod) in CI.
 
-## 安全分组(RLS)
+## Security groups (RLS)
 
-- **组 A(用户可读写)**:`goals` / `emitters` / `memories`。
-- **组 B(用户只读,写入走 service_role)**:`milestones` / `evidence` / `milestone_completions` /
-  `pets` / `collectibles` / `notifications` / `subscriptions` —— 防止用户伪造完成/证据/XP/订阅等级。
-- **jobs**:内部表,用户无任何访问;`service_role` 绕过 RLS。`claim_jobs(batch)` 供 worker 原子取批。
+- **Group A (user read/write)**: `goals` / `emitters` / `memories`.
+- **Group B (user read-only, writes go through service_role)**: `milestones` / `evidence` / `milestone_completions` /
+  `pets` / `collectibles` / `notifications` / `subscriptions` — prevents users from forging completions/evidence/XP/subscription tiers.
+- **jobs**: internal table, no user access whatsoever; `service_role` bypasses RLS. `claim_jobs(batch)` lets a worker atomically claim a batch.
 
-## 关键不变量
+## Key invariants
 
-- `evidence` append-only,`(emitter_id, source_event_id)` 唯一 = 幂等键。
-- `milestone_completions.milestone_id` 唯一 = 一节点只完成一次。
-- `pets.goal_id` 唯一 = 每目标一只宠物。
-- `assert_evidence_emitter_owner` 触发器:证据的 emitter 必须属于同一 owner(防跨用户写入)。
+- `evidence` is append-only; `(emitter_id, source_event_id)` is unique = idempotency key.
+- `milestone_completions.milestone_id` is unique = a node can only be completed once.
+- `pets.goal_id` is unique = one pet per goal.
+- `assert_evidence_emitter_owner` trigger: the evidence's emitter must belong to the same owner (prevents cross-user writes).

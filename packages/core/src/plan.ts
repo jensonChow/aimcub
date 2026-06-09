@@ -1,7 +1,7 @@
 /**
- * 拆解校验 + 重规划合并。
- * - validatePlan:LLM 输出的语义校验(grammar 管不了的:无环 / id 唯一 / 数量上限)。
- * - planMerge:re-plan 的核心不变量 —— 已完成节点永久 freeze,绝不被覆盖/丢失。
+ * Decomposition validation + re-plan merge.
+ * - validatePlan: semantic validation of the LLM output (what the grammar cannot enforce: acyclic / unique ids / count limit).
+ * - planMerge: the core invariant of re-plan — completed nodes are frozen forever, never overwritten or lost.
  */
 import { type DecompositionOutput, type MilestoneStatus, type PlanEdge } from "@core/types";
 
@@ -10,7 +10,7 @@ export interface PlanValidation {
   errors: string[];
 }
 
-/** edge {from, to} 语义:from 必须先完成,to 才能开始(有向边 from→to)。检测有向环。 */
+/** edge {from, to} semantics: `from` must be completed before `to` can begin (directed edge from→to). Detects directed cycles. */
 function hasCycle(keys: string[], edges: PlanEdge[]): boolean {
   const adj = new Map<string, string[]>();
   for (const k of keys) adj.set(k, []);
@@ -62,7 +62,7 @@ export function validatePlan(output: DecompositionOutput): PlanValidation {
   return { ok: errors.length === 0, errors };
 }
 
-// ── re-plan 合并 ──────────────────────────────────────────────────────────
+// ── re-plan merge ──────────────────────────────────────────────────────────
 
 export type MergeAction = "freeze" | "update" | "add" | "skip";
 
@@ -82,10 +82,10 @@ export interface MergedItem {
 const norm = (s: string): string => s.trim().toLowerCase().replace(/\s+/g, " ");
 
 /**
- * 把新拆解结果合并进现有里程碑。硬不变量:
- *  - 已 completed 的节点 → 永远 freeze(即使 LLM 弃用也保留,完成的努力不丢)。
- *  - 标题语义匹配上的未完成节点 → update(沿用稳定 id)。
- *  - 新增节点 → add。 消失的未完成节点 → skip(软删,不物理删除)。
+ * Merge a new decomposition result into the existing milestones. Hard invariants:
+ *  - Completed nodes → always freeze (kept even if the LLM drops them; finished effort is never lost).
+ *  - Unfinished nodes matched by title → update (reuse the stable id).
+ *  - New nodes → add. Unfinished nodes that disappeared → skip (soft delete, not a physical delete).
  */
 export function planMerge(existing: ExistingMilestone[], next: DecompositionOutput): MergedItem[] {
   const byTitle = new Map<string, ExistingMilestone>();

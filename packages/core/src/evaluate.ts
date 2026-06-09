@@ -1,9 +1,11 @@
 /**
- * evaluate() —— 系统的真正内核。判定一组证据是否满足里程碑的 acceptance_rule。
- * 纯函数,四端 + Edge Function 共享同一份判定逻辑。
+ * evaluate() — the true kernel of the system. Decides whether a set of evidence
+ * satisfies a milestone's acceptance_rule.
+ * A pure function: all four clients + the Edge Function share the same decision logic.
  *
- * 防伪关键:`auto_verifiable` 子句只接受可信来源证据(trust_score ≥ 阈值)——
- * 裸 manual / 低可信上报无法单独触发自动完成。
+ * Anti-spoofing is key: an `auto_verifiable` clause only accepts evidence from
+ * trusted sources (trust_score >= threshold) — bare manual / low-trust reports
+ * cannot trigger auto-completion on their own.
  */
 import {
   type AcceptanceClause,
@@ -16,16 +18,16 @@ import {
 } from "@core/types";
 import { globToRegExp, matchesPattern } from "./glob";
 
-/** auto_verifiable 子句要求的最低来源可信度。 */
+/** Minimum source trust score required by an auto_verifiable clause. */
 export const AUTO_VERIFY_MIN_TRUST = 0.8;
 
 export interface EvaluateResult {
   passed: boolean;
-  /** 触发判定的去重证据 id。 */
+  /** Deduplicated ids of the evidence that triggered the decision. */
   matchedEvidenceIds: string[];
-  /** 命中证据的最弱可信度(无命中为 0)。 */
+  /** Lowest trust score among matched evidence (0 when nothing matched). */
   trustScore: number;
-  /** 逐子句是否被满足(便于调试与 UI 展示进度)。 */
+  /** Whether each clause was satisfied, by index (for debugging and showing progress in the UI). */
   clauseSatisfied: boolean[];
 }
 
@@ -48,7 +50,7 @@ function ciMatches(m: CiStatusMatch, p: CiPayload): boolean {
 }
 
 function evidenceMatchesClause(clause: AcceptanceClause, ev: Evidence): boolean {
-  // 可验证子句:必须来自可信来源(验签 webhook / 鉴权 MCP)。
+  // Verifiable clause: must come from a trusted source (signature-verified webhook / authenticated MCP).
   if (clause.auto_verifiable && ev.trust_score < AUTO_VERIFY_MIN_TRUST) return false;
 
   switch (clause.evaluator) {
@@ -62,7 +64,7 @@ function evidenceMatchesClause(clause: AcceptanceClause, ev: Evidence): boolean 
       const parsed = CiPayload.safeParse(ev.payload);
       return parsed.success && ciMatches(clause.match, parsed.data);
     }
-    // v3 预留的 evaluator 在 v1 尚未实现 —— 不匹配任何证据。
+    // Evaluators reserved for v3 are not yet implemented in v1 — match no evidence.
     case "manual_confirm":
     case "file_uploaded":
     case "url":
@@ -83,7 +85,7 @@ export function evaluate(rule: AcceptanceRule, evidence: Evidence[]): EvaluateRe
   } else if (rule.logic === "any") {
     passed = clauseSatisfied.some(Boolean);
   } else {
-    // weighted:累计满足子句的权重 ≥ threshold
+    // weighted: sum of the weights of satisfied clauses must be >= threshold
     const sum = rule.clauses.reduce(
       (acc, clause, i) => acc + ((clauseSatisfied[i] ?? false) ? (clause.weight ?? 1) : 0),
       0,

@@ -13,12 +13,12 @@ describe("withinQuietHours", () => {
 describe("localHour", () => {
   it("applies tz offset and wraps", () => {
     const utc = Date.parse("2026-06-07T23:30:00Z");
-    expect(localHour(utc, 60)).toBe(0); // +1h → 00:30 当地
-    expect(localHour(utc, -120)).toBe(21); // -2h → 21:30 当地
+    expect(localHour(utc, 60)).toBe(0); // +1h → 00:30 local time
+    expect(localHour(utc, -120)).toBe(21); // -2h → 21:30 local time
   });
 });
 
-describe("decideDelivery · 打扰预算闸门", () => {
+describe("decideDelivery · interruption budget gate", () => {
   const base = {
     channel: "in_app" as const,
     localHour: 12,

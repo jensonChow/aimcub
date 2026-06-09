@@ -43,7 +43,7 @@ describe("validatePlan", () => {
   });
 });
 
-describe("planMerge · re-plan 保留已完成节点", () => {
+describe("planMerge · re-plan preserves completed nodes", () => {
   const existing: ExistingMilestone[] = [
     { id: "1", title: "Design schema", status: "completed" },
     { id: "2", title: "Write API", status: "pending" },
@@ -55,11 +55,11 @@ describe("planMerge · re-plan 保留已完成节点", () => {
 
     const byTitle = (t: string) => merged.find((m) => m.title.toLowerCase() === t.toLowerCase());
 
-    // 已完成 "Design schema" → freeze,沿用稳定 id "1",标题不被新拆解覆盖
+    // Completed "Design schema" → freeze; reuse stable id "1"; title is not overwritten by the new decomposition
     expect(byTitle("Design schema")).toMatchObject({ action: "freeze", existingId: "1" });
-    // 新节点 Deploy → add
+    // New node Deploy → add
     expect(byTitle("Deploy")).toMatchObject({ action: "add", existingId: null });
-    // 未完成且被丢弃的 "Write API" → skip(软删)
+    // Unfinished and dropped "Write API" → skip (soft delete)
     expect(byTitle("Write API")).toMatchObject({ action: "skip", existingId: "2" });
   });
 

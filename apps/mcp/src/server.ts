@@ -1,10 +1,12 @@
 /**
- * goalpet-mcp — 对外 MCP server(Streamable HTTP)。
- * v0:无状态(stateless)骨架,暴露 ping + pet_stage_preview(后者调用 @core/domain,
- * 证明「四端共享核心」成立 —— MCP 端与 web 端用同一份宠物成长逻辑)。
+ * goalpet-mcp — public-facing MCP server (Streamable HTTP).
+ * v0: stateless skeleton exposing ping + pet_stage_preview (the latter calls into @core/domain,
+ * proving the "shared core across all four clients" holds — the MCP client and the web client
+ * run the same pet-growth logic).
  *
- * v1a 将补:OAuth 2.1 资源服务器(校验 aud、token 不透传)+ set_goal / submit_evidence /
- * report_progress / complete_milestone / get_status / get_inbox 等工具。
+ * v1a will add: an OAuth 2.1 resource server (validates aud, never forwards the token) plus
+ * set_goal / submit_evidence / report_progress / complete_milestone / get_status / get_inbox
+ * and other tools.
  */
 import express from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -38,7 +40,7 @@ function buildServer(): McpServer {
 const app = express();
 app.use(express.json());
 
-// Streamable HTTP,单端点 /mcp(SSE 已淘汰,不实现)。无状态模式:每请求新建 server+transport。
+// Streamable HTTP, single endpoint /mcp (SSE is deprecated and not implemented). Stateless mode: a fresh server+transport per request.
 app.post("/mcp", async (req, res) => {
   const server = buildServer();
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });

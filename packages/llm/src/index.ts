@@ -1,10 +1,10 @@
 /**
- * @core/llm — Claude 调用网关:模型路由 + 计量 + 缓存策略(接口先行)。
- * 计费决策:统一走 Anthropic API key 直连(不用 Agent SDK 订阅额度),成本可计量、可缓存、可 Batch。
- * v0:模型路由 + 网关接口;具体 SDK 调用在 v1a 接入(避免 v0 引入网络依赖)。
+ * @core/llm — Claude invocation gateway: model routing + metering + caching strategy (interface-first).
+ * Billing decision: always connect directly via the Anthropic API key (not the Agent SDK subscription quota), so cost is meterable, cacheable, and batchable.
+ * v0: model routing + gateway interface; the concrete SDK calls are wired up in v1a (to avoid introducing a network dependency in v0).
  */
 
-/** 2026 模型 ID(精简优先:拆解/重规划/庆祝用 Sonnet,高频 nudge/分类用 Haiku;Opus 仅高光时刻)。 */
+/** 2026 model IDs (lean-first: decompose/replan/celebrate use Sonnet, high-frequency nudge/classify use Haiku; Opus only for highlight moments). */
 export const Models = {
   opus: "claude-opus-4-8",
   sonnet: "claude-sonnet-4-6",
@@ -13,15 +13,15 @@ export const Models = {
 export type ModelId = (typeof Models)[keyof typeof Models];
 
 export type LlmTask =
-  | "decompose" // 首次拆解
-  | "replan" // 增量重规划
-  | "celebrate" // 节点达成庆祝(高情感价值)
-  | "goal_complete" // 目标完成大庆祝(罕见高光)
-  | "nudge" // 日常主动消息(高频)
-  | "classify" // 分类/估分/措辞
-  | "extract_memory"; // 记忆抽取
+  | "decompose" // initial decomposition
+  | "replan" // incremental replanning
+  | "celebrate" // milestone-reached celebration (high emotional value)
+  | "goal_complete" // goal-completion grand celebration (rare highlight)
+  | "nudge" // routine proactive message (high frequency)
+  | "classify" // classification/scoring/phrasing
+  | "extract_memory"; // memory extraction
 
-/** 任务 → 模型路由。精简版:Opus 只留给 goal_complete;其余 Sonnet/Haiku。 */
+/** Task -> model routing. Lean version: Opus is reserved only for goal_complete; everything else uses Sonnet/Haiku. */
 export function routeModel(task: LlmTask): ModelId {
   switch (task) {
     case "goal_complete":
@@ -45,7 +45,7 @@ export interface LlmUsage {
   cacheWriteTokens?: number;
 }
 
-/** 计量钩子:每次调用上报 usage,供额度/熔断使用。 */
+/** Metering hook: reports usage on every call, for quota/circuit-breaker purposes. */
 export interface UsageMeter {
   record(ownerId: string, task: LlmTask, usage: LlmUsage): Promise<void>;
 }
@@ -54,9 +54,9 @@ export interface LlmRequest {
   task: LlmTask;
   system?: string;
   prompt: string;
-  /** 强制 structured output 的 JSON Schema(拆解用扁平 nodes+edges)。 */
+  /** JSON Schema enforcing structured output (decomposition uses flat nodes+edges). */
   schema?: unknown;
-  /** 覆盖路由(罕见)。 */
+  /** Override the routing (rare). */
   model?: ModelId;
 }
 
@@ -65,7 +65,7 @@ export interface LlmResponse<T = string> {
   usage: LlmUsage;
 }
 
-/** 网关接口。具体实现(Anthropic SDK + prompt caching)在 v1a 接入。 */
+/** Gateway interface. The concrete implementation (Anthropic SDK + prompt caching) is wired up in v1a. */
 export interface LlmGateway {
   complete(req: LlmRequest): Promise<LlmResponse<string>>;
   completeStructured<T>(req: LlmRequest & { schema: unknown }): Promise<LlmResponse<T>>;

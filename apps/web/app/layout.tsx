@@ -3,12 +3,12 @@ import { colors, fontSize } from "@ui/tokens";
 
 export const metadata = {
   title: "GoalPet",
-  description: "照常干活,宠物替你记录每一次真实进展。",
+  description: "Keep doing your work, and your pet records every real bit of progress for you.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="zh-CN">
+    <html lang="en">
       <body
         style={{
           margin: 0,

@@ -1,20 +1,22 @@
 /**
- * @core/types — GoalPet 领域模型的「单一事实源」。
+ * @core/types — the single source of truth for the GoalPet domain model.
  *
- * 纯 zod schema + 推导出的 TS 类型。零平台依赖(只依赖 zod,一个纯校验库)。
- * 四端(web / ios / mcp / extension)与 Edge Function 全部从这里取类型。
- * DB schema(packages/db)与本文件用 CI 校验对齐(generate_typescript_types)。
+ * Pure zod schemas + the TS types inferred from them. Zero platform dependencies
+ * (depends only on zod, a pure validation library). All four clients
+ * (web / ios / mcp / extension) and the Edge Functions pull their types from here.
+ * The DB schema (packages/db) is kept aligned with this file via a CI check
+ * (generate_typescript_types).
  */
 import { z } from "zod";
 
 // ──────────────────────────────────────────────────────────────────────────
-// 基础枚举
+// Base enums
 // ──────────────────────────────────────────────────────────────────────────
 
 export const GoalStatus = z.enum(["draft", "active", "paused", "achieved", "abandoned"]);
 export type GoalStatus = z.infer<typeof GoalStatus>;
 
-/** 目标领域 —— MVP 只填 software,其余为「先开发者后通用」预留。 */
+/** Goal domain — the MVP only uses `software`; the rest are reserved for the "developers first, then general" rollout. */
 export const GoalDomain = z.enum(["software", "career", "learning", "health", "creative", "custom"]);
 export type GoalDomain = z.infer<typeof GoalDomain>;
 
@@ -44,11 +46,11 @@ export type EstEffort = z.infer<typeof EstEffort>;
 export const Rarity = z.enum(["common", "uncommon", "rare", "epic", "legendary"]);
 export type Rarity = z.infer<typeof Rarity>;
 
-/** v1 三阶段:蛋 → 幼体 → 成体。其余阶段为后续预留(stageForXp 暂不产出)。 */
+/** v1 has three stages: egg → baby → adult. The remaining stages are reserved for later (stageForXp does not produce them yet). */
 export const PetStage = z.enum(["egg", "baby", "adult", "juvenile", "elder", "ascended"]);
 export type PetStage = z.infer<typeof PetStage>;
 
-/** 进化分支:由该 goal 完成里程碑的领域分布决定(后端多→龙,前端多→鸟)。 */
+/** Evolution branch: determined by the domain distribution of the goal's completed milestones (mostly backend → dragon, mostly frontend → bird). */
 export const PetBranch = z.enum(["unset", "dragon", "bird", "turtle", "fox"]);
 export type PetBranch = z.infer<typeof PetBranch>;
 
@@ -83,29 +85,29 @@ export const DecidedBy = z.enum(["rule_auto", "user_confirm", "agent_suggest"]);
 export type DecidedBy = z.infer<typeof DecidedBy>;
 
 // ──────────────────────────────────────────────────────────────────────────
-// AcceptanceRule —— 统一判定 DSL(评审强制收敛:三份文档的同一概念)
-// 取并集:logic(any/all/weighted) + clauses[evaluator + auto_verifiable] + completion_mode
+// AcceptanceRule — the unified evaluation DSL (forced to converge during review: the same concept across all three design docs)
+// Taken as the union: logic(any/all/weighted) + clauses[evaluator + auto_verifiable] + completion_mode
 // ──────────────────────────────────────────────────────────────────────────
 
-/** v1 实现的 evaluator。`manual_*` 等为通用化(v3)预留。 */
+/** Evaluators implemented in v1. `manual_*` and friends are reserved for the generalization phase (v3). */
 export const Evaluator = z.enum([
   "commit_pattern", // v1
   "ci_status", // v1
-  "manual_confirm", // v3 预留
-  "file_uploaded", // v3 预留
-  "url", // v3 预留
-  "llm_judge", // v3 预留
+  "manual_confirm", // reserved for v3
+  "file_uploaded", // reserved for v3
+  "url", // reserved for v3
+  "llm_judge", // reserved for v3
 ]);
 export type Evaluator = z.infer<typeof Evaluator>;
 
 export const CommitPatternMatch = z.object({
-  /** glob,匹配 commit 改动的文件路径(例:匹配 migrations 目录下的迁移文件)。 */
+  /** glob matched against the file paths changed by the commit (e.g. match migration files under the migrations directory). */
   path_glob: z.string().optional(),
-  /** 至少改动 N 个匹配文件 —— 防「空提交刷分」。 */
+  /** Require at least N matching files to be changed — guards against "empty-commit XP farming". */
   min_files: z.number().int().positive().optional(),
-  /** commit message 须匹配的(子串/正则源)。 */
+  /** Pattern the commit message must match (substring / regex source). */
   message_pattern: z.string().optional(),
-  /** 限定分支。 */
+  /** Restrict to a specific branch. */
   branch: z.string().optional(),
 });
 export type CommitPatternMatch = z.infer<typeof CommitPatternMatch>;
@@ -117,16 +119,16 @@ export const CiStatusMatch = z.object({
 export type CiStatusMatch = z.infer<typeof CiStatusMatch>;
 
 const clauseBase = {
-  /** 该子句是否可由验签 webhook / 鉴权 MCP 自动确认(驱动防伪:弱来源不单独触发自动完成)。 */
+  /** Whether this clause can be auto-confirmed by a signature-verified webhook / authenticated MCP (anti-spoofing: weak sources cannot trigger auto-completion on their own). */
   auto_verifiable: z.boolean().default(true),
-  /** weighted 逻辑下的权重(0~1)。 */
+  /** Weight under the `weighted` logic (0~1). */
   weight: z.number().min(0).optional(),
 };
 
 export const AcceptanceClause = z.discriminatedUnion("evaluator", [
   z.object({ evaluator: z.literal("commit_pattern"), ...clauseBase, match: CommitPatternMatch }),
   z.object({ evaluator: z.literal("ci_status"), ...clauseBase, match: CiStatusMatch }),
-  // ↓ v3 预留:schema 先存在以保持前向兼容,evaluate() 暂未实现这些 evaluator。
+  // ↓ Reserved for v3: the schema exists up front for forward compatibility; evaluate() does not implement these evaluators yet.
   z.object({ evaluator: z.literal("manual_confirm"), ...clauseBase, auto_verifiable: z.literal(false).default(false), match: z.object({}).default({}) }),
   z.object({ evaluator: z.literal("file_uploaded"), ...clauseBase, match: z.object({ min_count: z.number().int().positive().default(1) }) }),
   z.object({ evaluator: z.literal("url"), ...clauseBase, match: z.object({ pattern: z.string().optional() }) }),
@@ -140,17 +142,17 @@ export type CompletionMode = z.infer<typeof CompletionMode>;
 export const AcceptanceRule = z.object({
   logic: z.enum(["any", "all", "weighted"]).default("all"),
   clauses: z.array(AcceptanceClause).min(1),
-  /** weighted 逻辑达成阈值(累计 weight ≥ threshold 即满足)。 */
+  /** Threshold for the `weighted` logic (satisfied once the accumulated weight ≥ threshold). */
   threshold: z.number().min(0).default(1),
   completion_mode: CompletionMode.default("auto_then_confirm"),
 });
 export type AcceptanceRule = z.infer<typeof AcceptanceRule>;
 
 // ──────────────────────────────────────────────────────────────────────────
-// Evidence —— append-only 事实流;归一化后的统一信封
+// Evidence — append-only stream of facts; the unified envelope after normalization
 // ──────────────────────────────────────────────────────────────────────────
 
-/** git_commit 证据的 payload 形态(归一化后)。 */
+/** Payload shape of `git_commit` evidence (after normalization). */
 export const GitCommitPayload = z.object({
   sha: z.string(),
   message: z.string().default(""),
@@ -162,7 +164,7 @@ export const GitCommitPayload = z.object({
 });
 export type GitCommitPayload = z.infer<typeof GitCommitPayload>;
 
-/** ci_passed / ci_failed 证据的 payload 形态。 */
+/** Payload shape of `ci_passed` / `ci_failed` evidence. */
 export const CiPayload = z.object({
   workflow: z.string().optional(),
   conclusion: z.string(),
@@ -178,20 +180,20 @@ export const Evidence = z.object({
   milestone_id: z.string().uuid().nullable().default(null),
   emitter_id: z.string().uuid().nullable(),
   kind: EvidenceKind,
-  /** 上游事件原生 ID;与 emitter_id 组成幂等键。 */
+  /** Native ID of the upstream event; together with emitter_id forms the idempotency key. */
   source_event_id: z.string().nullable(),
-  /** 事件真实发生时间(ISO 8601),非入库时间。 */
+  /** When the event actually occurred (ISO 8601), not when it was persisted. */
   occurred_at: z.string(),
   summary: z.string().default(""),
   payload: z.record(z.unknown()).default({}),
-  /** 来源可信度:verified commit / CI > MCP 自报 > manual。 */
+  /** Source trustworthiness: verified commit / CI > MCP self-report > manual. */
   trust_score: z.number().min(0).max(1).default(1),
   created_at: z.string().optional(),
 });
 export type Evidence = z.infer<typeof Evidence>;
 
 // ──────────────────────────────────────────────────────────────────────────
-// Goal / Milestone / Plan(拆解)
+// Goal / Milestone / Plan (decomposition)
 // ──────────────────────────────────────────────────────────────────────────
 
 export const Goal = z.object({
@@ -202,7 +204,7 @@ export const Goal = z.object({
   domain: GoalDomain.default("software"),
   status: GoalStatus.default("draft"),
   target_date: z.string().nullable().default(null),
-  /** 当前拆解快照(代替重型 milestone_versions 表)。 */
+  /** Snapshot of the current decomposition (replaces a heavyweight milestone_versions table). */
   plan_json: z.unknown().nullable().default(null),
   metadata: z.record(z.unknown()).default({}),
   created_at: z.string().optional(),
@@ -217,7 +219,7 @@ export const Milestone = z.object({
   description: z.string().default(""),
   status: MilestoneStatus.default("pending"),
   order_index: z.number().int().nonnegative(),
-  /** 单父依赖(线性/浅树);v3 通用化再升 DAG 边表。null = 无前置。 */
+  /** Single-parent dependency (linear / shallow tree); upgraded to a DAG edge table during the v3 generalization. null = no prerequisite. */
   depends_on_id: z.string().uuid().nullable().default(null),
   acceptance_rule: AcceptanceRule,
   xp_reward: z.number().int().positive().default(10),
@@ -228,12 +230,13 @@ export const Milestone = z.object({
 export type Milestone = z.infer<typeof Milestone>;
 
 /**
- * LLM 拆解输出(Structured Output)。因 Anthropic Structured Outputs 不支持递归
- * schema,节点图用「扁平 nodes 数组 + edges 邻接表」而非嵌套自引用。
- * edge {from, to} 语义:from 必须先完成,to 才能开始(to 依赖 from)。
+ * LLM decomposition output (Structured Output). Because Anthropic Structured Outputs
+ * does not support recursive schemas, the node graph uses a "flat nodes array + edges
+ * adjacency list" instead of nested self-references.
+ * Semantics of edge {from, to}: `from` must complete before `to` can start (`to` depends on `from`).
  */
 export const PlanNode = z.object({
-  key: z.string().min(1), // plan 内局部 id(LLM 生成,后处理映射成稳定 milestone.id)
+  key: z.string().min(1), // local id within the plan (generated by the LLM, mapped to a stable milestone.id in post-processing)
   title: z.string().min(1),
   description: z.string().default(""),
   est_effort: EstEffort.default("m"),
@@ -286,13 +289,13 @@ export const MilestoneCompletion = z.object({
 export type MilestoneCompletion = z.infer<typeof MilestoneCompletion>;
 
 // ──────────────────────────────────────────────────────────────────────────
-// Pet(每目标一只)/ Collectible
+// Pet (one per goal) / Collectible
 // ──────────────────────────────────────────────────────────────────────────
 
 export const Pet = z.object({
   id: z.string().uuid(),
   owner_id: z.string().uuid(),
-  goal_id: z.string().uuid(), // ★ 每目标一只(UNIQUE)
+  goal_id: z.string().uuid(), // ★ one pet per goal (UNIQUE)
   species: z.string().default("default"),
   branch: PetBranch.default("unset"),
   stage: PetStage.default("egg"),
@@ -309,7 +312,7 @@ export const Collectible = z.object({
   goal_id: z.string().uuid().nullable().default(null),
   milestone_id: z.string().uuid().nullable().default(null),
   kind: z.enum(["milestone_badge", "goal_trophy", "achievement", "seasonal"]).default("milestone_badge"),
-  rarity: Rarity, // 确定性 = 该里程碑难度等级,不随机
+  rarity: Rarity, // deterministic = the milestone's difficulty tier, not random
   metadata: z.record(z.unknown()).default({}),
   image_url: z.string().nullable().default(null),
   minted_at: z.string().optional(),
@@ -362,7 +365,7 @@ export const Job = z.object({
   type: JobType,
   payload: z.record(z.unknown()).default({}),
   status: JobStatus.default("queued"),
-  /** 幂等键:同一逻辑事件只入一次。 */
+  /** Idempotency key: the same logical event is enqueued only once. */
   dedup_key: z.string().nullable().default(null),
   run_after: z.string().optional(),
   attempts: z.number().int().nonnegative().default(0),

@@ -48,6 +48,6 @@ describe("globToRegExp", () => {
 describe("matchesPattern", () => {
   it("treats valid regex as regex and falls back to substring", () => {
     expect(matchesPattern("^feat:", "feat: x")).toBe(true);
-    expect(matchesPattern("[", "has [ bracket")).toBe(true); // 非法正则 → 子串包含
+    expect(matchesPattern("[", "has [ bracket")).toBe(true); // invalid regex -> substring match
   });
 });
