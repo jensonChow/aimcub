@@ -1,0 +1,148 @@
+/**
+ * runJob — the pure, dependency-injected core of the jobs worker.
+ *
+ * v1a implements the `judge_evidence` job: load the milestone's acceptance_rule
+ * plus the evidence relevant to it, run the @core `evaluate()` kernel, and — when
+ * the rule passes AND `completion_mode` permits auto-completion — write an
+ * idempotent `milestone_completion` (`decided_by = 'rule_auto'`, `awarded_xp`
+ * taken from the milestone) and enqueue the follow-up jobs (`grow_pet`,
+ * `mint_collectible`, `deliver_notification`).
+ *
+ * No I/O of its own: `deps` carries the repo and a `now()` clock. The follow-up
+ * jobs (pet growth, collectible mint, notification) are owned by other worktrees;
+ * here we only enqueue them with dedup keys derived from the completion.
+ */
+import { AcceptanceRule } from "@core/types";
+import { evaluate } from "@core/domain";
+import type { Job, MilestoneCompletion } from "@core/types";
+import type { WorkerRepo } from "./ports.ts";
+
+export interface WorkerDeps {
+  repo: WorkerRepo;
+  now: () => Date;
+}
+
+/** Discriminated outcome so the entry wrapper (and tests) can branch precisely. */
+export type JobOutcome =
+  | { kind: "skipped"; reason: string }
+  | { kind: "evaluated"; passed: boolean; completed: false; reason: string }
+  | {
+      kind: "completed";
+      completion: MilestoneCompletion;
+      created: boolean;
+      enqueued: Job[];
+    }
+  | { kind: "error"; error: string };
+
+/** Follow-up jobs fanned out after an auto-completion. */
+const FOLLOW_UP_JOBS = ["grow_pet", "mint_collectible", "deliver_notification"] as const;
+
+export function followUpDedupKey(
+  type: (typeof FOLLOW_UP_JOBS)[number],
+  completionId: string,
+): string {
+  return `${type}:${completionId}`;
+}
+
+function whichJobType(job: Job): string {
+  return job.type;
+}
+
+export async function runJob(deps: WorkerDeps, job: Job): Promise<JobOutcome> {
+  switch (whichJobType(job)) {
+    case "judge_evidence":
+      return judgeEvidence(deps, job);
+    // grow_pet / mint_collectible / deliver_notification / extract_memory are
+    // handled by other worktrees' workers; this worktree only enqueues them.
+    default:
+      return { kind: "skipped", reason: `unhandled job type: ${job.type}` };
+  }
+}
+
+async function judgeEvidence(deps: WorkerDeps, job: Job): Promise<JobOutcome> {
+  const milestoneId = job.payload?.milestone_id;
+  if (typeof milestoneId !== "string" || milestoneId.length === 0) {
+    // Evidence may have arrived untriaged (no milestone yet). Nothing to judge.
+    return { kind: "skipped", reason: "no milestone_id on job payload" };
+  }
+
+  const milestone = await deps.repo.getMilestone(milestoneId);
+  if (!milestone) {
+    return { kind: "skipped", reason: `milestone ${milestoneId} not found` };
+  }
+
+  // Short-circuit: a milestone completes exactly once. If it's already done, do
+  // not re-judge or re-award. (The DB UNIQUE constraint is the hard guarantee;
+  // this just avoids needless work and duplicate follow-up enqueues.)
+  const already = await deps.repo.getCompletion(milestoneId);
+  if (already) {
+    return { kind: "skipped", reason: "milestone already completed" };
+  }
+
+  // The acceptance_rule is stored as jsonb; parse it through the @core schema so
+  // defaults (logic, threshold, completion_mode, clause defaults) are applied.
+  const parsedRule = AcceptanceRule.safeParse(milestone.acceptance_rule);
+  if (!parsedRule.success) {
+    return { kind: "error", error: `invalid acceptance_rule: ${parsedRule.error.message}` };
+  }
+  const rule = parsedRule.data;
+
+  const evidence = await deps.repo.listEvidenceForMilestone(milestoneId);
+
+  // The kernel decides. It enforces anti-spoofing internally: an `auto_verifiable`
+  // clause rejects evidence with trust_score < AUTO_VERIFY_MIN_TRUST (0.8), so a
+  // 0.7-trust unverified commit cannot satisfy it on its own.
+  const result = evaluate(rule, evidence);
+
+  if (!result.passed) {
+    return {
+      kind: "evaluated",
+      passed: false,
+      completed: false,
+      reason: "acceptance rule not satisfied",
+    };
+  }
+
+  // The rule passed. Only `auto` and `auto_then_confirm` may auto-complete; pure
+  // `manual` milestones require an explicit user confirmation elsewhere.
+  if (rule.completion_mode === "manual") {
+    return {
+      kind: "evaluated",
+      passed: true,
+      completed: false,
+      reason: "completion_mode=manual: awaiting user confirmation",
+    };
+  }
+
+  // Idempotent completion write (decided_by = rule_auto). awarded_xp comes from
+  // the milestone — never from the caller — so it cannot be inflated.
+  const { completion, created } = await deps.repo.insertCompletion({
+    milestoneId,
+    ownerId: milestone.owner_id,
+    decidedBy: "rule_auto",
+    triggeringEvidenceIds: result.matchedEvidenceIds,
+    awardedXp: milestone.xp_reward,
+  });
+
+  // Only fan out follow-up jobs on first creation, so a re-judge that loses the
+  // short-circuit race does not double-enqueue (jobs.dedup_key is the backstop).
+  const enqueued: Job[] = [];
+  if (created) {
+    for (const type of FOLLOW_UP_JOBS) {
+      const enqueuedJob = await deps.repo.enqueueJob({
+        type,
+        payload: {
+          completion_id: completion.id,
+          milestone_id: milestoneId,
+          owner_id: milestone.owner_id,
+          goal_id: milestone.goal_id,
+          awarded_xp: completion.awarded_xp,
+        },
+        dedupKey: followUpDedupKey(type, completion.id),
+      });
+      enqueued.push(enqueuedJob);
+    }
+  }
+
+  return { kind: "completed", completion, created, enqueued };
+}
