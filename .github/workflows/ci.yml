@@ -24,7 +24,7 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Lint (includes @core/* purity: no-restricted-imports)
+      - name: "Lint (includes @core/* purity: no-restricted-imports)"
         run: pnpm lint
 
       - name: Test
