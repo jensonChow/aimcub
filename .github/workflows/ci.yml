@@ -11,12 +11,15 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # pnpm must exist before setup-node: setup-node@v5 detects the
+      # packageManager field (pnpm) and the cache: pnpm store path needs it.
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-
-      - name: Enable pnpm
-        run: corepack enable
+          cache: pnpm
 
       - name: Install
         run: pnpm install --frozen-lockfile
