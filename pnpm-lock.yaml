@@ -40,6 +40,9 @@ importers:
 
   apps/mcp:
     dependencies:
+      '@core/api-client':
+        specifier: workspace:*
+        version: link:../../packages/api
       '@core/domain':
         specifier: workspace:*
         version: link:../../packages/core
@@ -49,6 +52,9 @@ importers:
       express:
         specifier: ^4.21.2
         version: 4.22.2
+      jose:
+        specifier: ^6.2.3
+        version: 6.2.3
       zod:
         specifier: ^3.24.1
         version: 3.25.76
@@ -65,6 +71,9 @@ importers:
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.20)
 
   apps/web:
     dependencies:
