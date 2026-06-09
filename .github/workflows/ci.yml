@@ -14,7 +14,7 @@ jobs:
       # pnpm must exist before setup-node: setup-node@v5 detects the
       # packageManager field (pnpm) and the cache: pnpm store path needs it.
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
       - uses: actions/setup-node@v5
         with:
