@@ -21,6 +21,9 @@ coverage/
 .vercel/
 .wrangler/
 
+# parallel dev worktrees (linked git worktrees live here)
+worktrees/
+
 # os / editor
 .DS_Store
 *.log
