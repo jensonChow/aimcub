@@ -70,3 +70,15 @@ export interface LlmGateway {
   complete(req: LlmRequest): Promise<LlmResponse<string>>;
   completeStructured<T>(req: LlmRequest & { schema: unknown }): Promise<LlmResponse<T>>;
 }
+
+// ── v1a wiring ───────────────────────────────────────────────────────────────
+// Concrete Anthropic-backed gateway + the goal-decomposition pipeline.
+export { AnthropicLlmGateway } from "./anthropic-gateway";
+export type {
+  AnthropicGatewayOptions,
+  AnthropicClientPort,
+} from "./anthropic-gateway";
+export { decompose } from "./decompose";
+export type { DecomposeInput, DecomposeResult } from "./decompose";
+export { decompositionJsonSchema } from "./decomposition-schema";
+export type { DecompositionJsonSchema } from "./decomposition-schema";
