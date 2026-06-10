@@ -30,6 +30,18 @@ apps/
   extension/   Chrome MV3                    — v3 (placeholder)
 ```
 
+## Live deployment (v1a)
+
+| Surface | Where | Notes |
+|---|---|---|
+| Web app | [aimcub.com](https://aimcub.com) | Next.js @ Vercel; email+password auth; milestones light up via Realtime |
+| MCP server | `https://mcp.aimcub.com` | Cloudflare Workers; OAuth 2.1 resource server (Supabase AS, Path A); RFC 9728 metadata at `/.well-known/oauth-protected-resource` |
+| Database | Supabase `gtasruxwmcsxicyujlfu` (us-west-1) | migrations 0001-0007; RLS verified (users cannot forge milestones) |
+| Evidence ingest | Edge Functions `ingest` (emitter tokens) + `github-webhook` (HMAC) | both feed the same idempotent `handleIngest` pipeline |
+| Judging | Edge Function `jobs-worker`, pg_cron every minute | `claim_jobs` batch → `evaluate()` → auto-completion + follow-up jobs; goal-level evidence fans out across open milestones |
+| Passive evidence | GitHub App [Aimcub](https://github.com/apps/aimcub) | push / workflow_run events; secrets in Vault |
+| Goal decomposition | Claude Sonnet 4.6 structured output | all-required + nullable schema (the optional-property grammar blowup is real); deterministic local fallback |
+
 ## Development
 
 ```bash
