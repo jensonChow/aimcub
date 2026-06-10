@@ -32,6 +32,7 @@ export type JobOutcome =
       created: boolean;
       enqueued: Job[];
     }
+  | { kind: "fanout"; judged: number; completed: number }
   | { kind: "error"; error: string };
 
 /** Follow-up jobs fanned out after an auto-completion. */
@@ -61,11 +62,31 @@ export async function runJob(deps: WorkerDeps, job: Job): Promise<JobOutcome> {
 
 async function judgeEvidence(deps: WorkerDeps, job: Job): Promise<JobOutcome> {
   const milestoneId = job.payload?.milestone_id;
-  if (typeof milestoneId !== "string" || milestoneId.length === 0) {
-    // Evidence may have arrived untriaged (no milestone yet). Nothing to judge.
-    return { kind: "skipped", reason: "no milestone_id on job payload" };
+  if (typeof milestoneId === "string" && milestoneId.length > 0) {
+    return judgeOneMilestone(deps, milestoneId);
   }
 
+  // Goal-level evidence (e.g. a webhook push that names no milestone): judge every
+  // open milestone of the goal. evaluate() filters per-rule, so a commit only
+  // completes the milestones whose acceptance clauses it actually satisfies.
+  const goalId = job.payload?.goal_id;
+  if (typeof goalId !== "string" || goalId.length === 0) {
+    return { kind: "skipped", reason: "no milestone_id or goal_id on job payload" };
+  }
+  const open = await deps.repo.listPendingMilestones(goalId);
+  if (open.length === 0) {
+    return { kind: "skipped", reason: "no open milestones for goal" };
+  }
+  let completed = 0;
+  for (const m of open) {
+    const outcome = await judgeOneMilestone(deps, m.id);
+    if (outcome.kind === "error") return outcome;
+    if (outcome.kind === "completed" && outcome.created) completed += 1;
+  }
+  return { kind: "fanout", judged: open.length, completed };
+}
+
+async function judgeOneMilestone(deps: WorkerDeps, milestoneId: string): Promise<JobOutcome> {
   const milestone = await deps.repo.getMilestone(milestoneId);
   if (!milestone) {
     return { kind: "skipped", reason: `milestone ${milestoneId} not found` };

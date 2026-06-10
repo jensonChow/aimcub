@@ -43,6 +43,17 @@ const repo: WorkerRepo = {
     return data;
   },
 
+  async listPendingMilestones(goalId: string) {
+    const { data, error } = await supabase
+      .from("milestones")
+      .select("*")
+      .eq("goal_id", goalId)
+      .in("status", ["pending", "in_progress"])
+      .order("order_index", { ascending: true });
+    if (error) throw new Error(`listPendingMilestones: ${error.message}`);
+    return data ?? [];
+  },
+
   async listEvidenceForMilestone(milestoneId: string) {
     // Directly-attached evidence…
     const attached = await supabase

@@ -119,6 +119,12 @@ export interface WorkerRepo {
   getMilestone(milestoneId: string): Promise<Milestone | null>;
 
   /**
+   * Open (pending / in_progress) milestones of a goal — the judging targets for
+   * goal-level evidence that arrived without a milestone (e.g. webhook pushes).
+   */
+  listPendingMilestones(goalId: string): Promise<Milestone[]>;
+
+  /**
    * Evidence considered for judging a milestone. The worker passes the milestone
    * id; the impl returns the milestone's directly-attached evidence plus any
    * goal-level evidence still awaiting triage that the kernel should weigh.

@@ -135,6 +135,12 @@ export function createMemoryRepo(now: () => Date = () => new Date()): MemoryRepo
       return state.milestones.get(milestoneId) ?? null;
     },
 
+    async listPendingMilestones(goalId: string) {
+      return [...state.milestones.values()].filter(
+        (m) => m.goal_id === goalId && (m.status === "pending" || m.status === "in_progress"),
+      );
+    },
+
     async listEvidenceForMilestone(milestoneId: string) {
       return state.evidenceByMilestone.get(milestoneId) ?? [];
     },

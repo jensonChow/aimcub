@@ -179,7 +179,7 @@ describe("runJob — idempotency & guards", () => {
     expect(repo.state.jobs.filter((j) => j.type === "grow_pet")).toHaveLength(1);
   });
 
-  it("skips when the job has no milestone_id (untriaged evidence)", async () => {
+  it("skips goal-level evidence when the goal has no open milestones", async () => {
     const repo = createMemoryRepo(() => FIXED_NOW);
     const outcome = await runJob(depsWith(repo), judgeJob(null));
     expect(outcome.kind).toBe("skipped");
@@ -208,5 +208,33 @@ describe("runJob — idempotency & guards", () => {
     repo.seedEvidenceForMilestone(MILESTONE, [commitEvidence(1.0, "ev")]);
     const outcome = await runJob(depsWith(repo), judgeJob());
     expect(outcome.kind).toBe("error");
+  });
+});
+
+describe("runJob — goal-level fan-out (webhook pushes name no milestone)", () => {
+  const MILESTONE_2 = "00000000-0000-4000-8000-0000000000c2";
+
+  it("judges every open milestone of the goal and completes only the satisfied ones", async () => {
+    const repo = createMemoryRepo(() => FIXED_NOW);
+    // m1: commit rule, satisfied by trusted evidence.
+    repo.seedMilestone(milestone(commitRule("auto"), 25));
+    repo.seedEvidenceForMilestone(MILESTONE, [commitEvidence(1.0, "ev-trusted")]);
+    // m2: ci rule, no matching evidence — must stay open.
+    const ciRule: AcceptanceRule = {
+      logic: "all",
+      threshold: 1,
+      completion_mode: "auto",
+      clauses: [{ evaluator: "ci_status", auto_verifiable: true, match: { conclusion: "success" } }],
+    };
+    repo.seedMilestone({ ...milestone(ciRule), id: MILESTONE_2 });
+
+    const outcome = await runJob(depsWith(repo), judgeJob(null));
+
+    expect(outcome.kind).toBe("fanout");
+    if (outcome.kind !== "fanout") return;
+    expect(outcome.judged).toBe(2);
+    expect(outcome.completed).toBe(1);
+    expect(repo.state.completions).toHaveLength(1);
+    expect(repo.state.completions[0]!.milestone_id).toBe(MILESTONE);
   });
 });
