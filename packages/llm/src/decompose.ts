@@ -53,6 +53,8 @@ const SYSTEM_PROMPT = [
   "- `est_effort` is one of xs|s|m|l|xl. `rarity` is one of common|uncommon|rare|epic|legendary;",
   "  scale rarity with difficulty. `xp_reward` is a positive integer; scale it with effort.",
   "- Keep titles short and imperative. Keep descriptions to one or two sentences.",
+  "- The output schema marks every field required: set any field that does not apply to null",
+  "  (e.g. a commit_pattern clause sets workflow/conclusion to null, and vice versa).",
 ].join("\n");
 
 /** Build the per-goal user prompt. */
@@ -94,7 +96,7 @@ export async function decompose(gateway: LlmGateway, input: DecomposeInput): Pro
   }
 
   // Parse + apply zod constraints (string min length, array 1..15, positive xp, etc.).
-  const parsed = DecompositionOutput.safeParse(raw.output);
+  const parsed = DecompositionOutput.safeParse(normalizeRawPlan(raw.output));
   if (!parsed.success) {
     return {
       output: null,
@@ -115,4 +117,67 @@ export async function decompose(gateway: LlmGateway, input: DecomposeInput): Pro
 function formatZodIssue(issue: { path: (string | number)[]; message: string }): string {
   const path = issue.path.length > 0 ? issue.path.join(".") : "(root)";
   return `${path}: ${issue.message}`;
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Raw-plan normalization: the structured-output schema is all-required +
+// nullable with FLAT clauses (see decomposition-schema.ts for why). Bring the
+// model's output back into the domain shape before the zod gate.
+// ──────────────────────────────────────────────────────────────────────────
+
+const COMMIT_MATCH_KEYS = ["path_glob", "min_files", "message_pattern", "branch"] as const;
+const CI_MATCH_KEYS = ["workflow", "conclusion"] as const;
+const ALL_MATCH_KEYS: readonly string[] = [...COMMIT_MATCH_KEYS, ...CI_MATCH_KEYS];
+
+/** Recursively drop null values (the schema expresses optionality as `T | null`). */
+function stripNulls(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stripNulls);
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value)) {
+      if (v !== null) out[k] = stripNulls(v);
+    }
+    return out;
+  }
+  return value;
+}
+
+/** Re-nest a flat clause into the domain's `{evaluator, match}` shape (idempotent). */
+function nestClause(clause: Record<string, unknown>): Record<string, unknown> {
+  if (clause.match && typeof clause.match === "object") return clause;
+  const matchKeys: readonly string[] =
+    clause.evaluator === "ci_status" ? CI_MATCH_KEYS : COMMIT_MATCH_KEYS;
+  const match: Record<string, unknown> = {};
+  const rest: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(clause)) {
+    if (matchKeys.includes(k)) match[k] = v;
+    else if (!ALL_MATCH_KEYS.includes(k)) rest[k] = v; // drop the other evaluator's strays
+  }
+  return { ...rest, match };
+}
+
+/** Strip nulls + re-nest clauses so the raw model output parses against `DecompositionOutput`. */
+export function normalizeRawPlan(raw: unknown): unknown {
+  const cleaned = stripNulls(raw);
+  if (!cleaned || typeof cleaned !== "object" || Array.isArray(cleaned)) return cleaned;
+  const plan = cleaned as Record<string, unknown>;
+  if (Array.isArray(plan.nodes)) {
+    plan.nodes = plan.nodes.map((node) => {
+      if (!node || typeof node !== "object" || Array.isArray(node)) return node;
+      const n = node as Record<string, unknown>;
+      const rule = n.acceptance_rule;
+      if (rule && typeof rule === "object" && !Array.isArray(rule)) {
+        const r = rule as Record<string, unknown>;
+        if (Array.isArray(r.clauses)) {
+          r.clauses = r.clauses.map((c) =>
+            c && typeof c === "object" && !Array.isArray(c)
+              ? nestClause(c as Record<string, unknown>)
+              : c,
+          );
+        }
+      }
+      return n;
+    });
+  }
+  return plan;
 }

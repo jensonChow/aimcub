@@ -10,6 +10,9 @@ import { signOutAction } from "./auth-actions";
 // Server component: reads goals through the injected DataPort (Supabase in live mode,
 // mock otherwise). Always render fresh so a newly created goal shows up in the list.
 export const dynamic = "force-dynamic";
+// The createGoalAction submitted from this page runs a ~20-30s Claude decomposition;
+// lift the serverless timeout above Vercel's default.
+export const maxDuration = 60;
 
 export default async function Home() {
   const user = await getSessionUser();
