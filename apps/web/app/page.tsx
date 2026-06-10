@@ -18,7 +18,7 @@ export default async function Home() {
   return (
     <main style={{ maxWidth: 760, margin: "0 auto", padding: space.xl }}>
       <header style={{ marginBottom: space.lg }}>
-        <h1 style={{ color: colors.primary, margin: 0 }}>GoalPet</h1>
+        <h1 style={{ color: colors.primary, margin: 0 }}>Aimcub</h1>
         <p style={{ color: colors.textMuted, marginTop: space.xs }}>
           Set a goal, watch it break down into milestones, then keep working — milestones
           light up by themselves as real evidence arrives.

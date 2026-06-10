@@ -1,5 +1,5 @@
 /**
- * goalpet-mcp — public-facing MCP server (Streamable HTTP).
+ * aimcub-mcp — public-facing MCP server (Streamable HTTP).
  *
  * v1a: an OAuth 2.1 resource server (verifies the access token's signature +
  * audience, never forwards the token) in front of port-driven tools:
@@ -25,12 +25,12 @@ import {
   type JWKSResolver,
 } from "./auth.js";
 import type { ToolDeps } from "./ports.js";
-import { registerGoalPetTools } from "./tools.js";
+import { registerAimcubTools } from "./tools.js";
 import { placeholderIngest, placeholderRepo } from "./placeholders.js";
 
 /** Build a fully-wired MCP server from injected dependencies. */
 export function buildServer(deps: ToolDeps): McpServer {
-  const server = new McpServer({ name: "goalpet-mcp", version: "0.1.0" });
+  const server = new McpServer({ name: "aimcub-mcp", version: "0.1.0" });
 
   server.registerTool(
     "ping",
@@ -49,7 +49,7 @@ export function buildServer(deps: ToolDeps): McpServer {
     }),
   );
 
-  registerGoalPetTools(server, deps);
+  registerAimcubTools(server, deps);
   return server;
 }
 
@@ -94,9 +94,9 @@ function productionDeps(): ToolDeps {
 }
 
 async function main(): Promise<void> {
-  const resource = process.env.MCP_RESOURCE_URI ?? "https://mcp.goalpet.app";
+  const resource = process.env.MCP_RESOURCE_URI ?? "https://mcp.aimcub.com";
   const issuer = process.env.OAUTH_ISSUER;
-  const jwksUri = process.env.OAUTH_JWKS_URI ?? "https://auth.goalpet.app/.well-known/jwks.json";
+  const jwksUri = process.env.OAUTH_JWKS_URI ?? "https://auth.aimcub.com/.well-known/jwks.json";
 
   // TODO(v1a-live): build the resolver from the real authorization server discovery doc.
   const jwks = await createRemoteJwksResolver(jwksUri);
@@ -126,7 +126,7 @@ async function main(): Promise<void> {
 
   const port = Number(process.env.PORT ?? 8787);
   app.listen(port, () => {
-    console.log(`goalpet-mcp listening on :${port}/mcp`);
+    console.log(`aimcub-mcp listening on :${port}/mcp`);
   });
 }
 

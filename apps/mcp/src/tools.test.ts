@@ -4,7 +4,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { Evidence, Goal, Milestone } from "@core/domain";
 import type { IngestEvidenceInput } from "@core/api-client";
 import { buildServer } from "./server";
-import type { EvidenceIngestPort, GoalPetReadPort, ToolDeps } from "./ports";
+import type { EvidenceIngestPort, AimcubReadPort, ToolDeps } from "./ports";
 import { normalizeReport, toIngestInput, type ReportEvidenceInput } from "./evidence-input";
 import { summarizeMilestones } from "./tools";
 
@@ -39,7 +39,7 @@ function makeIngestSpy(): EvidenceIngestPort & { calls: IngestEvidenceInput[] } 
   };
 }
 
-function makeRepoFake(milestones: Milestone[], goal: Goal | null): GoalPetReadPort {
+function makeRepoFake(milestones: Milestone[], goal: Goal | null): AimcubReadPort {
   return {
     async getGoal() {
       return goal;

@@ -11,7 +11,7 @@ The frozen `@core/types` + `@core/api-client` contract is how the worktrees stay
 
 | Dir | Branch | Owns | Responsibility |
 |---|---|---|---|
-| `worktrees/data` | `v1a/data` | `packages/db`, `packages/api` | supabase-js `GoalPetRepo` implementation, migrations evolution, RLS tests; research + document the aud-bound-token P0 (MCP auth) |
+| `worktrees/data` | `v1a/data` | `packages/db`, `packages/api` | supabase-js `AimcubRepo` implementation, migrations evolution, RLS tests; research + document the aud-bound-token P0 (MCP auth) |
 | `worktrees/decompose` | `v1a/decompose` | `packages/llm` | Anthropic `LlmGateway` implementation + goal→milestones decomposition pipeline (prompt + structured output → `validatePlan`) |
 | `worktrees/evidence` | `v1a/evidence` | `packages/db/supabase/functions/` | `ingest` Edge Function (auth → idempotent dedup → normalize → write evidence → enqueue jobs) + jobs worker (`claim_jobs` → `evaluate()` → completions) |
 | `worktrees/mcp` | `v1a/mcp` | `apps/mcp` | OAuth 2.1 resource server (JWT/JWKS verify + `aud`) + `report_evidence` tool + `get_inbox` |

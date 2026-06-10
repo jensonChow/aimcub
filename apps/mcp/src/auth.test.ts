@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { AuthError, bearerFromHeader, verifyAccessToken } from "./auth";
 import { makeTestSigner } from "./test-helpers";
 
-const RESOURCE = "https://mcp.goalpet.app";
-const ISSUER = "https://auth.goalpet.app";
+const RESOURCE = "https://mcp.aimcub.com";
+const ISSUER = "https://auth.aimcub.com";
 
 describe("verifyAccessToken", () => {
   it("accepts a token with a valid signature and the correct audience", async () => {

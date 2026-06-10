@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import type { Collectible, MilestoneCompletion, Notification, Pet } from "@core/types";
 
-import { InMemoryGoalPetRepo, InvariantError } from "./in-memory.js";
-import type { GoalPetRepo } from "./contract.js";
+import { InMemoryAimcubRepo, InvariantError } from "./in-memory.js";
+import type { AimcubRepo } from "./contract.js";
 
 const OWNER_A = "00000000-0000-0000-0000-00000000000a";
 const OWNER_B = "00000000-0000-0000-0000-00000000000b";
@@ -16,12 +16,12 @@ function seq() {
 }
 
 function makeRepo() {
-  return new InMemoryGoalPetRepo({ newId: seq(), now: () => "2026-06-09T00:00:00.000Z" });
+  return new InMemoryAimcubRepo({ newId: seq(), now: () => "2026-06-09T00:00:00.000Z" });
 }
 
-describe("InMemoryGoalPetRepo — structural conformance", () => {
-  it("satisfies the GoalPetRepo contract", () => {
-    const repo: GoalPetRepo = makeRepo();
+describe("InMemoryAimcubRepo — structural conformance", () => {
+  it("satisfies the AimcubRepo contract", () => {
+    const repo: AimcubRepo = makeRepo();
     expect(typeof repo.createGoal).toBe("function");
     expect(typeof repo.ingestEvidence).toBe("function");
   });

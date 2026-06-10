@@ -7,7 +7,7 @@
  * the DecompositionOutput into Milestone[] using @core/domain's validatePlan as the gate
  * — exactly the path the live LLM-backed implementation will follow.
  *
- * TODO(v1a-live): swap this for a supabase-js implementation of @core/api-client.GoalPetRepo.
+ * TODO(v1a-live): swap this for a supabase-js implementation of @core/api-client.AimcubRepo.
  */
 import type { CreateGoalInput } from "@core/api-client";
 import { validatePlan } from "@core/domain";

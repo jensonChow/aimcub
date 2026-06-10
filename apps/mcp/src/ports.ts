@@ -3,12 +3,12 @@
  * evidence writes) sits behind one of these interfaces so the tools are pure
  * with respect to I/O and fully mockable in tests.
  *
- * The read path reuses the shared data-access contract `GoalPetRepo` from
+ * The read path reuses the shared data-access contract `AimcubRepo` from
  * `@core/api-client`; the write path is a narrow `EvidenceIngestPort` so the MCP
  * tool layer never constructs queries itself (a locked project invariant).
  */
 import type { Evidence } from "@core/domain";
-import type { GoalPetRepo, IngestEvidenceInput } from "@core/api-client";
+import type { AimcubRepo, IngestEvidenceInput } from "@core/api-client";
 
 /**
  * Write side: persists a normalized Evidence envelope. Append-only + idempotent
@@ -19,10 +19,10 @@ export interface EvidenceIngestPort {
 }
 
 /** Read side reused verbatim from the shared contract. */
-export type GoalPetReadPort = Pick<GoalPetRepo, "listMilestones" | "getGoal" | "listInbox">;
+export type AimcubReadPort = Pick<AimcubRepo, "listMilestones" | "getGoal" | "listInbox">;
 
 /** The full dependency bundle the tool layer is wired with. */
 export interface ToolDeps {
-  repo: GoalPetReadPort;
+  repo: AimcubReadPort;
   ingest: EvidenceIngestPort;
 }

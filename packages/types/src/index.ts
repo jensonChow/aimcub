@@ -1,5 +1,5 @@
 /**
- * @core/types — the single source of truth for the GoalPet domain model.
+ * @core/types — the single source of truth for the Aimcub domain model.
  *
  * Pure zod schemas + the TS types inferred from them. Zero platform dependencies
  * (depends only on zod, a pure validation library). All four clients

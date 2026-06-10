@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import type { Evidence, Goal } from "@core/types";
 
-import type { GoalPetRepo } from "./contract.js";
+import type { AimcubRepo } from "./contract.js";
 import {
-  SupabaseGoalPetRepo,
+  SupabaseAimcubRepo,
   createSupabaseRepo,
   RepoError,
   type PostgrestResult,
@@ -20,9 +20,9 @@ function ok<T>(data: T): PostgrestResult<unknown> {
   return { data, error: null };
 }
 
-describe("SupabaseGoalPetRepo — structural conformance", () => {
-  it("satisfies the GoalPetRepo contract", () => {
-    const repo: GoalPetRepo = new SupabaseGoalPetRepo(new FakeSupabase(), new FakeSupabase());
+describe("SupabaseAimcubRepo — structural conformance", () => {
+  it("satisfies the AimcubRepo contract", () => {
+    const repo: AimcubRepo = new SupabaseAimcubRepo(new FakeSupabase(), new FakeSupabase());
     expect(typeof repo.createGoal).toBe("function");
     expect(typeof repo.ingestEvidence).toBe("function");
   });
@@ -37,7 +37,7 @@ describe("SupabaseGoalPetRepo — structural conformance", () => {
       { url: "https://x.supabase.co", anonKey: "anon", serviceRoleKey: "service" },
       factory,
     );
-    expect(repo).toBeInstanceOf(SupabaseGoalPetRepo);
+    expect(repo).toBeInstanceOf(SupabaseAimcubRepo);
     expect(seen.map((s) => s.key)).toEqual(["anon", "service"]);
   });
 });
@@ -48,7 +48,7 @@ describe("user path issues RLS-bound queries on the user client", () => {
       respond: () => ok<Goal>(goalRow()),
     });
     const server = new FakeSupabase();
-    const repo = new SupabaseGoalPetRepo(user, server);
+    const repo = new SupabaseAimcubRepo(user, server);
 
     const goal = await repo.createGoal({ ownerId: OWNER, title: "Ship v1" });
     expect(goal.id).toBe(GOAL);
@@ -64,7 +64,7 @@ describe("user path issues RLS-bound queries on the user client", () => {
 
   it("listGoals filters by owner and orders by created_at desc on the user client", async () => {
     const user = new FakeSupabase({ respond: () => ok<Goal[]>([goalRow()]) });
-    const repo = new SupabaseGoalPetRepo(user, new FakeSupabase());
+    const repo = new SupabaseAimcubRepo(user, new FakeSupabase());
     const out = await repo.listGoals(OWNER);
     expect(out).toHaveLength(1);
 
@@ -80,14 +80,14 @@ describe("user path issues RLS-bound queries on the user client", () => {
 
   it("getGoal / getPet use maybeSingle so a missing row is null, not an error", async () => {
     const user = new FakeSupabase({ respond: () => ok<Goal | null>(null) });
-    const repo = new SupabaseGoalPetRepo(user, new FakeSupabase());
+    const repo = new SupabaseAimcubRepo(user, new FakeSupabase());
     expect(await repo.getGoal(GOAL)).toBeNull();
     expect((user.calls[0] as RecordedCall).terminal).toBe("maybeSingle");
   });
 
   it("listInbox filters owner + contains(agent_inbox) and applies since", async () => {
     const user = new FakeSupabase({ respond: () => ok([]) });
-    const repo = new SupabaseGoalPetRepo(user, new FakeSupabase());
+    const repo = new SupabaseAimcubRepo(user, new FakeSupabase());
     await repo.listInbox(OWNER, "2026-06-01T00:00:00.000Z");
 
     const call = user.calls[0] as RecordedCall;
@@ -110,7 +110,7 @@ describe("server path uses the service_role client (bypasses RLS)", () => {
   it("insertMilestones writes on the SERVER client", async () => {
     const user = new FakeSupabase();
     const server = new FakeSupabase({ respond: () => ok([{}]) });
-    const repo = new SupabaseGoalPetRepo(user, server);
+    const repo = new SupabaseAimcubRepo(user, server);
     await repo.insertMilestones([
       {
         id: "m-1",
@@ -140,7 +140,7 @@ describe("server path uses the service_role client (bypasses RLS)", () => {
 
   it("insertMilestones short-circuits on an empty array (no query)", async () => {
     const server = new FakeSupabase();
-    const repo = new SupabaseGoalPetRepo(new FakeSupabase(), server);
+    const repo = new SupabaseAimcubRepo(new FakeSupabase(), server);
     expect(await repo.insertMilestones([])).toEqual([]);
     expect(server.calls).toHaveLength(0);
   });
@@ -150,7 +150,7 @@ describe("server path uses the service_role client (bypasses RLS)", () => {
     const server = new FakeSupabase({
       respond: (call) => (call.op === "upsert" ? ok<Evidence[]>([evidenceRow()]) : ok(null)),
     });
-    const repo = new SupabaseGoalPetRepo(new FakeSupabase(), server);
+    const repo = new SupabaseAimcubRepo(new FakeSupabase(), server);
     const ev = await repo.ingestEvidence({
       ownerId: OWNER,
       goalId: GOAL,
@@ -181,7 +181,7 @@ describe("server path uses the service_role client (bypasses RLS)", () => {
         return ok<Evidence>(evidenceRow());
       },
     });
-    const repo = new SupabaseGoalPetRepo(new FakeSupabase(), server);
+    const repo = new SupabaseAimcubRepo(new FakeSupabase(), server);
     const ev = await repo.ingestEvidence({
       ownerId: OWNER,
       goalId: GOAL,
@@ -204,7 +204,7 @@ describe("server path uses the service_role client (bypasses RLS)", () => {
 
   it("ingestEvidence without an idempotency key does a plain append insert", async () => {
     const server = new FakeSupabase({ respond: () => ok<Evidence>(evidenceRow()) });
-    const repo = new SupabaseGoalPetRepo(new FakeSupabase(), server);
+    const repo = new SupabaseAimcubRepo(new FakeSupabase(), server);
     await repo.ingestEvidence({
       ownerId: OWNER,
       goalId: GOAL,
@@ -223,7 +223,7 @@ describe("error mapping", () => {
     const user = new FakeSupabase({
       respond: () => ({ data: null, error: { message: "boom", code: "42501" } }),
     });
-    const repo = new SupabaseGoalPetRepo(user, new FakeSupabase());
+    const repo = new SupabaseAimcubRepo(user, new FakeSupabase());
     await expect(repo.listGoals(OWNER)).rejects.toBeInstanceOf(RepoError);
     await expect(repo.listGoals(OWNER)).rejects.toMatchObject({ code: "42501" });
   });

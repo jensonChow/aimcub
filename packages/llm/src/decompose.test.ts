@@ -42,7 +42,7 @@ function throwingGateway(message: string): LlmGateway {
 }
 
 const INPUT: DecomposeInput = {
-  title: "Ship the GoalPet MCP evidence ingester",
+  title: "Ship the Aimcub MCP evidence ingester",
   description: "Build the v1a evidence pipeline so MCP/GitHub events auto-light milestones.",
   domain: "software",
 };
@@ -124,7 +124,7 @@ describe("decompose · happy path", () => {
     const call = gw.calls[0]!;
     expect(call.task).toBe("decompose");
     expect(call.schema).toBeDefined();
-    expect(call.system).toContain("GoalPet");
+    expect(call.system).toContain("Aimcub");
     expect(call.prompt).toContain(INPUT.title);
   });
 

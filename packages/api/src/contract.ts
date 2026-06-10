@@ -1,7 +1,7 @@
 /**
  * @core/api-client — data-access contract (implementation-agnostic).
  * No client may build its own queries — all access goes through this contract, ensuring consistent query shapes and error handling.
- * v0: defines the GoalPetRepo interface (using domain types); the concrete supabase-js implementation lands in v1a.
+ * v0: defines the AimcubRepo interface (using domain types); the concrete supabase-js implementation lands in v1a.
  */
 import type {
   Collectible,
@@ -39,7 +39,7 @@ export interface IngestEvidenceInput {
  * Data-access contract shared across all clients. The read path (user identity + RLS) is separated from the machine write path (service_role):
  * creating goals = user path; inserting milestones / ingesting evidence / growing pets = server path.
  */
-export interface GoalPetRepo {
+export interface AimcubRepo {
   // User path (reads/writes under RLS)
   createGoal(input: CreateGoalInput): Promise<Goal>;
   getGoal(id: string): Promise<Goal | null>;

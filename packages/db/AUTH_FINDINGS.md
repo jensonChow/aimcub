@@ -123,7 +123,7 @@ token replay *to it*. What we consciously defer is request-driven `resource`-par
 
 ### Data-layer implication (this worktree)
 
-`SupabaseGoalPetRepo` is unaffected by the choice: it consumes an *already-authenticated* user
+`SupabaseAimcubRepo` is unaffected by the choice: it consumes an *already-authenticated* user
 client (RLS-bound) + a service_role client. The token's `aud`/`iss` are validated **before** any
 repo call (at the MCP server / edge function boundary). The only live seam on our side is wiring the
 verified user's access token into the user Supabase client so RLS sees the right `auth.uid()` — see

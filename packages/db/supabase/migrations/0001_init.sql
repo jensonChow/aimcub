@@ -1,4 +1,4 @@
--- GoalPet initial schema (lean MVP).
+-- Aimcub initial schema (lean MVP).
 -- Design principles:
 --  * Supabase is the single source of truth; evidence is append-only + idempotent; completions/pets/collectibles are derived state.
 --  * Every business table carries owner_id (the RLS anchor; denormalized to avoid joins inside RLS).

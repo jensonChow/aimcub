@@ -42,7 +42,7 @@ migrations, or any other worktree's package.
 
 > NOTE on decoupling: tests define a **local** minimal repo interface inline and do **not** import
 > `@core/api-client`. The shared functions are generic over a small `IngestRepo` / `WorkerRepo`
-> port defined in `_shared/ports.ts`, so they stay independent of the full `GoalPetRepo`.
+> port defined in `_shared/ports.ts`, so they stay independent of the full `AimcubRepo`.
 
 ## Mock strategy
 - **No real network or credentials.** `handleIngest` / `runJob` take a `deps` bag (`repo`,
@@ -71,5 +71,5 @@ migrations, or any other worktree's package.
 ## Live-integration TODOs (deferred to v1a-live, all tagged in code)
 - Real emitter-token verification (hash lookup against `emitters.token_hash`, revocation check).
 - Real service-role Supabase client + `claim_jobs` RPC polling loop (pg_cron trigger).
-- Real persistence of evidence / completions / jobs through the supabase-js `GoalPetRepo` impl.
+- Real persistence of evidence / completions / jobs through the supabase-js `AimcubRepo` impl.
 - HTTP request parsing / signature verification for GitHub & CI webhooks.

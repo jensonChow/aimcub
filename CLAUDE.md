@@ -1,4 +1,4 @@
-# GoalPet — Project Rules
+# Aimcub — Project Rules
 
 Universal goal/milestone tracker + evidence-ingestion layer, wrapped in a "digital pet + collectibles + proactive companion" shell. A coding agent (Claude Code) is just one of many evidence *emitters* (via MCP); git/CI webhooks are another. Positioning: developers first, general users second.
 
