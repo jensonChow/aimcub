@@ -80,9 +80,18 @@ importers:
       '@core/domain':
         specifier: workspace:*
         version: link:../../packages/core
+      '@core/llm':
+        specifier: workspace:^
+        version: link:../../packages/llm
       '@core/types':
         specifier: workspace:*
         version: link:../../packages/types
+      '@supabase/ssr':
+        specifier: ^0.12.0
+        version: 0.12.0(@supabase/supabase-js@2.108.0)
+      '@supabase/supabase-js':
+        specifier: ^2.108.0
+        version: 2.108.0
       '@ui/tokens':
         specifier: workspace:*
         version: link:../../packages/ui-tokens
@@ -977,6 +986,11 @@ packages:
   '@supabase/realtime-js@2.108.0':
     resolution: {integrity: sha512-N3xR0u7TNr+c5wuLSU60rcfu/H/8N0WBs7iHWwjI/NxKwY3XWSyLUbpbpU8bzmL0dA/Gk9Mupri8mxKUXBW+iw==}
     engines: {node: '>=20.0.0'}
+
+  '@supabase/ssr@0.12.0':
+    resolution: {integrity: sha512-d9XV5XzJvzzZbeAIM7fWTCUYxQJZ2Ru6ny3dJHmHGp/LIrJ+o9FpD7N9Rf/UhhWEvHXSoDe8SI32Z2ouOdMjBg==}
+    peerDependencies:
+      '@supabase/supabase-js': ^2.108.0
 
   '@supabase/storage-js@2.108.0':
     resolution: {integrity: sha512-zMYQmh87CId7d8i/1FIfv4fMDcXPutmIJSpoY58GLXi7M266MNzxWGNabDk4i555Oj1Nqtsu2i3Qo3rpWUXO6A==}
@@ -2654,6 +2668,11 @@ snapshots:
     dependencies:
       '@supabase/phoenix': 0.4.2
       tslib: 2.8.1
+
+  '@supabase/ssr@0.12.0(@supabase/supabase-js@2.108.0)':
+    dependencies:
+      '@supabase/supabase-js': 2.108.0
+      cookie: 1.1.1
 
   '@supabase/storage-js@2.108.0':
     dependencies:

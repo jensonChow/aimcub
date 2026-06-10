@@ -13,7 +13,10 @@
   "dependencies": {
     "@core/api-client": "workspace:*",
     "@core/domain": "workspace:*",
+    "@core/llm": "workspace:^",
     "@core/types": "workspace:*",
+    "@supabase/ssr": "^0.12.0",
+    "@supabase/supabase-js": "^2.108.0",
     "@ui/tokens": "workspace:*",
     "next": "^14.2.0",
     "react": "18.3.1",

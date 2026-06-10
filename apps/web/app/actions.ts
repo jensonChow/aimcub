@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { DEMO_OWNER_ID } from "../lib/mock-repo";
+import { getSessionUser } from "../lib/auth";
 import { getDataPort } from "../lib/wiring";
 
 export interface CreateGoalResult {
@@ -12,10 +12,9 @@ export interface CreateGoalResult {
 
 /**
  * Server action behind the New Goal form: creates the goal + its decomposition via the
- * injected DataPort (mock today), then returns the new goal id so the client can navigate.
- *
- * TODO(v1a-live): derive ownerId from the authenticated session instead of DEMO_OWNER_ID,
- * and let getDataPort() resolve to the Supabase-backed repo.
+ * injected DataPort (Supabase in live mode, mock otherwise), then returns the new goal
+ * id so the client can navigate. The owner is always derived from the session — never
+ * from the form.
  */
 export async function createGoalAction(formData: FormData): Promise<CreateGoalResult> {
   const title = String(formData.get("title") ?? "").trim();
@@ -24,9 +23,12 @@ export async function createGoalAction(formData: FormData): Promise<CreateGoalRe
 
   if (!title) return { ok: false, error: "Title is required." };
 
+  const user = await getSessionUser();
+  if (!user) return { ok: false, error: "Not signed in." };
+
   try {
     const { goal } = await getDataPort().createGoal({
-      ownerId: DEMO_OWNER_ID,
+      ownerId: user.id,
       title,
       description: description || undefined,
       targetDate: targetDateRaw || null,

@@ -1,24 +1,25 @@
 /**
- * Composition root: picks which DataPort the app uses. Today that is always the in-memory
- * mock; once a live backend is configured the SupabaseDataPort would take over here, and
- * nothing else in the app changes.
+ * Composition root: picks which DataPort the app uses.
  *
- * A module-level singleton keeps the mock's in-memory state stable across server-component
- * renders within a single process (good enough for a local demo; not multi-user).
+ * - Live (NEXT_PUBLIC_SUPABASE_* set): a fresh SupabaseDataPort PER REQUEST — the user
+ *   client is cookie-bound, so it must never be cached across requests.
+ * - Mock (no env): a module-level MockGoalRepo singleton keeps the in-memory state stable
+ *   across server-component renders within one process (zero-backend demo).
  *
- * TODO(v1a-live): if hasLiveBackend(), return a SupabaseDataPort instead of the mock.
+ * Nothing else in the app knows which one it got.
  */
 import type { DataPort } from "./data-port";
 import { hasLiveBackend } from "./env";
+import { SupabaseDataPort } from "./live-port";
 import { MockGoalRepo } from "./mock-repo";
+import { createAdminSupabase, createServerSupabase } from "./supabase/server-clients";
 
-let singleton: DataPort | null = null;
+let mockSingleton: DataPort | null = null;
 
 export function getDataPort(): DataPort {
-  if (singleton) return singleton;
   if (hasLiveBackend()) {
-    // TODO(v1a-live): singleton = new SupabaseDataPort(readEnv()); — falls through to mock for now.
+    return new SupabaseDataPort(createServerSupabase(), createAdminSupabase());
   }
-  singleton = new MockGoalRepo();
-  return singleton;
+  mockSingleton ??= new MockGoalRepo();
+  return mockSingleton;
 }

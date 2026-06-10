@@ -49,6 +49,8 @@ export interface AimcubRepo {
   listCollectibles(ownerId: string): Promise<Collectible[]>;
   /** agent_inbox channel: proactive messages from the pet to the user (Claude Code pulls these via the MCP get_inbox call). */
   listInbox(ownerId: string, since?: string): Promise<Notification[]>;
+  /** Persist the decomposition snapshot on the goal and (by default) activate it. RLS-scoped to the caller. */
+  updateGoalPlan(goalId: string, planJson: unknown, status?: Goal["status"]): Promise<Goal>;
 
   // Server path (service_role)
   insertMilestones(milestones: Milestone[]): Promise<Milestone[]>;

@@ -6,13 +6,23 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { MockRealtime } from "../lib/mock-realtime";
 import { computeProgress, isGoalComplete } from "../lib/progress";
 import type { RealtimePort } from "../lib/realtime-port";
+import { SupabaseRealtime } from "../lib/supabase-realtime";
 import { MilestoneCard } from "./MilestoneCard";
 import { ProgressBar } from "./ProgressBar";
+
+/** NEXT_PUBLIC_* env is inlined into the client bundle, so this is decidable in the browser. */
+function defaultRealtime(): RealtimePort {
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    return new SupabaseRealtime();
+  }
+  return new MockRealtime();
+}
 
 /**
  * Client view of a goal: renders the decomposition and subscribes to the RealtimePort so
  * milestones light up on their own — no user action — the moment an (evidence-derived)
- * completion event arrives. In v1a that event is produced by the MockRealtime driver.
+ * completion event arrives. Live mode subscribes to Supabase Realtime; mock mode drives
+ * the cascade locally.
  */
 export function GoalDetail({
   goal,
@@ -21,12 +31,12 @@ export function GoalDetail({
 }: {
   goal: Goal;
   initialMilestones: Milestone[];
-  // Injectable for testing / live swap. TODO(v1a-live): pass a SupabaseRealtime here.
+  /** Injectable for testing; defaults to SupabaseRealtime (live) or MockRealtime. */
   realtime?: RealtimePort;
 }) {
   const [milestones, setMilestones] = useState<Milestone[]>(initialMilestones);
   const [recentlyLit, setRecentlyLit] = useState<string | null>(null);
-  const port = useMemo<RealtimePort>(() => realtime ?? new MockRealtime(), [realtime]);
+  const port = useMemo<RealtimePort>(() => realtime ?? defaultRealtime(), [realtime]);
   // Subscribe once against the initial snapshot; the mock drives the cascade itself.
   const snapshotRef = useRef(initialMilestones);
 

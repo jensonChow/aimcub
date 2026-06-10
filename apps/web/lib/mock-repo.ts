@@ -23,8 +23,8 @@ function isoDaysFromNow(days: number): string {
   return new Date(Date.now() + days * 86_400_000).toISOString();
 }
 
-/** Materialize a validated DecompositionOutput into linear Milestone rows. */
-function materialize(
+/** Materialize a validated DecompositionOutput into linear Milestone rows. Shared by mock and live ports. */
+export function materialize(
   decomposition: DecompositionOutput,
   goalId: string,
   ownerId: string,

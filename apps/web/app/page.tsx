@@ -1,16 +1,21 @@
 import { colors, space } from "@ui/tokens";
+import { redirect } from "next/navigation";
 import { GoalListItem } from "../components/GoalListItem";
 import { NewGoalForm } from "../components/NewGoalForm";
-import { DEMO_OWNER_ID } from "../lib/mock-repo";
+import { getSessionUser } from "../lib/auth";
+import { hasLiveBackend } from "../lib/env";
 import { getDataPort } from "../lib/wiring";
+import { signOutAction } from "./auth-actions";
 
-// Server component: reads goals through the injected DataPort (mock in v1a).
-// Always render fresh so a newly created goal shows up in the list.
+// Server component: reads goals through the injected DataPort (Supabase in live mode,
+// mock otherwise). Always render fresh so a newly created goal shows up in the list.
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
+  const user = await getSessionUser();
+  if (!user) redirect("/login");
   const repo = getDataPort();
-  const goals = await repo.listGoals(DEMO_OWNER_ID);
+  const goals = await repo.listGoals(user.id);
   const withMilestones = await Promise.all(
     goals.map(async (goal) => ({ goal, milestones: await repo.listMilestones(goal.id) })),
   );
@@ -18,7 +23,28 @@ export default async function Home() {
   return (
     <main style={{ maxWidth: 760, margin: "0 auto", padding: space.xl }}>
       <header style={{ marginBottom: space.lg }}>
-        <h1 style={{ color: colors.primary, margin: 0 }}>Aimcub</h1>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+          <h1 style={{ color: colors.primary, margin: 0 }}>Aimcub</h1>
+          {hasLiveBackend() && user.email ? (
+            <form action={signOutAction} style={{ display: "flex", alignItems: "center", gap: space.sm }}>
+              <span style={{ color: colors.textMuted, fontSize: 13 }}>{user.email}</span>
+              <button
+                type="submit"
+                style={{
+                  background: "transparent",
+                  color: colors.textMuted,
+                  border: "1px solid #232733",
+                  borderRadius: 6,
+                  padding: "4px 10px",
+                  fontSize: 13,
+                  cursor: "pointer",
+                }}
+              >
+                Sign out
+              </button>
+            </form>
+          ) : null}
+        </div>
         <p style={{ color: colors.textMuted, marginTop: space.xs }}>
           Set a goal, watch it break down into milestones, then keep working — milestones
           light up by themselves as real evidence arrives.
@@ -44,8 +70,9 @@ export default async function Home() {
       </section>
 
       <p style={{ marginTop: space.xl, color: colors.textMuted, fontSize: 12 }}>
-        v1a demo — runs entirely on mocked data, no backend required. Open a goal to see a
-        milestone auto-complete on its own.
+        {hasLiveBackend()
+          ? "v1a — live: milestones light up the moment verified evidence lands."
+          : "v1a demo — running on mocked data, no backend required. Open a goal to see a milestone auto-complete on its own."}
       </p>
     </main>
   );
