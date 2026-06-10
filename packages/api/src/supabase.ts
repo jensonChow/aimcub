@@ -1,5 +1,5 @@
 /**
- * SupabaseGoalPetRepo — the production implementation of {@link GoalPetRepo} on top of
+ * SupabaseAimcubRepo — the production implementation of {@link AimcubRepo} on top of
  * `@supabase/supabase-js` (PostgREST + RLS).
  *
  * Two clients, two trust levels — this is the security spine of the whole product
@@ -30,7 +30,7 @@ import type {
 
 import type {
   CreateGoalInput,
-  GoalPetRepo,
+  AimcubRepo,
   IngestEvidenceInput,
 } from "./contract.js";
 
@@ -115,7 +115,7 @@ function unwrap<T>(res: PostgrestResult<T>): T {
   return res.data as T;
 }
 
-export class SupabaseGoalPetRepo implements GoalPetRepo {
+export class SupabaseAimcubRepo implements AimcubRepo {
   constructor(
     /** RLS-bound client authenticated as the end user. */
     private readonly user: SupabaseLike,
@@ -244,7 +244,7 @@ export class SupabaseGoalPetRepo implements GoalPetRepo {
 }
 
 /**
- * Build a {@link SupabaseGoalPetRepo} from config + a client factory.
+ * Build a {@link SupabaseAimcubRepo} from config + a client factory.
  *
  * In production, pass `createClient` from `@supabase/supabase-js` as `factory`:
  *
@@ -270,12 +270,12 @@ export class SupabaseGoalPetRepo implements GoalPetRepo {
 export function createSupabaseRepo(
   config: SupabaseRepoConfig,
   factory: SupabaseFactory,
-): SupabaseGoalPetRepo {
+): SupabaseAimcubRepo {
   const userClient = factory(config.url, config.anonKey);
   // TODO(v1a-live): when using the real client, construct it with
   //   createClient(url, anonKey, { global: { headers: { Authorization: `Bearer ${userAccessToken}` } } })
   // so RLS resolves auth.uid() to the calling user. The structural port above
   // intentionally omits header wiring; it lives in the live factory.
   const serverClient = factory(config.url, config.serviceRoleKey);
-  return new SupabaseGoalPetRepo(userClient, serverClient);
+  return new SupabaseAimcubRepo(userClient, serverClient);
 }

@@ -1,7 +1,7 @@
 # CHARTER — `@core/llm` (worktree: decompose)
 
 ## Subsystem
-LLM gateway + goal-decomposition pipeline for GoalPet v1a.
+LLM gateway + goal-decomposition pipeline for Aimcub v1a.
 
 ## Scope (what this worktree owns)
 - `packages/llm/**` only. Plus this `CHARTER.md` at the worktree root.

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { colors, fontSize } from "@ui/tokens";
 
 export const metadata = {
-  title: "GoalPet",
+  title: "Aimcub",
   description: "Keep doing your work, and your pet records every real bit of progress for you.",
 };
 

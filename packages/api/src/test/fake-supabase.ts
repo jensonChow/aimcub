@@ -2,7 +2,7 @@
  * A tiny in-process fake of the Supabase PostgREST builder used only by tests.
  *
  * It records the full call chain (table, op, filters, modifiers, terminal) so a test can
- * assert that {@link SupabaseGoalPetRepo} issues the right query shape, and it returns
+ * assert that {@link SupabaseAimcubRepo} issues the right query shape, and it returns
  * canned data so the repo's mapping logic runs. No network, no credentials.
  */
 import type {

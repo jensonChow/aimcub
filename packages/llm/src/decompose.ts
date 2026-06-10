@@ -37,7 +37,7 @@ export interface DecomposeResult {
 
 /** System prompt: frozen instructions. Kept stable so it stays cache-friendly. */
 const SYSTEM_PROMPT = [
-  "You are GoalPet's planning engine. You break a user's goal into a concrete, ordered set",
+  "You are Aimcub's planning engine. You break a user's goal into a concrete, ordered set",
   "of milestones that a software developer can verify automatically from their own activity.",
   "",
   "Rules:",

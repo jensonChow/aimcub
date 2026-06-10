@@ -8,15 +8,15 @@
  */
 import type { Evidence, Goal, Milestone, Notification } from "@core/domain";
 import type { IngestEvidenceInput } from "@core/api-client";
-import type { EvidenceIngestPort, GoalPetReadPort } from "./ports.js";
+import type { EvidenceIngestPort, AimcubReadPort } from "./ports.js";
 
 function notWired(method: string): never {
-  // TODO(v1a-live): replace with the supabase-js implementation of GoalPetRepo.
-  throw new Error(`GoalPet repo not wired: ${method}() needs the live supabase-js adapter`);
+  // TODO(v1a-live): replace with the supabase-js implementation of AimcubRepo.
+  throw new Error(`Aimcub repo not wired: ${method}() needs the live supabase-js adapter`);
 }
 
 /** Read-path placeholder. Every method throws until the live adapter is wired. */
-export const placeholderRepo: GoalPetReadPort = {
+export const placeholderRepo: AimcubReadPort = {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async getGoal(_id: string): Promise<Goal | null> {
     return notWired("getGoal");

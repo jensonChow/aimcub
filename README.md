@@ -1,4 +1,4 @@
-# GoalPet
+# Aimcub
 
 > A general-purpose goal/milestone tracker + evidence ingestion layer, wrapped in an emotional shell of "virtual pet + digital collectibles + proactive companion."
 > You work as usual; the pet records every real bit of progress for you, and comes to find you when you slack off.

@@ -1,10 +1,10 @@
-# Worktree Charter — `apps/mcp` (GoalPet MCP server)
+# Worktree Charter — `apps/mcp` (Aimcub MCP server)
 
 Branch: `v1a/mcp`. This worktree owns **only** `apps/mcp/**` (plus this `CHARTER.md`).
 
 ## Scope
 
-The MCP server is GoalPet's differentiated evidence emitter for coding agents
+The MCP server is Aimcub's differentiated evidence emitter for coding agents
 (Claude Code is one evidence *emitter* among many). v1a turns the v0 skeleton
 (`ping` + `pet_stage_preview`) into an authenticated, port-driven server:
 
@@ -23,7 +23,7 @@ The MCP server is GoalPet's differentiated evidence emitter for coding agents
      generic `mcp_report` normalizer), then handed to the injected
      `EvidenceIngestPort`. Returns an ack `{ accepted, evidenceId, kind }`.
    - `goal_status` / `list_milestones` — read milestones for a goal through the
-     injected `GoalPetRepo` (`@core/api-client`).
+     injected `AimcubRepo` (`@core/api-client`).
    - `get_inbox` — minimal stub returning `[]` (TODO v1b).
 3. **No real network / credentials.** All I/O is behind injected ports. Secrets
    are read from `process.env` only and never required for tests.
@@ -32,7 +32,7 @@ The MCP server is GoalPet's differentiated evidence emitter for coding agents
 
 - Modify only files under `apps/mcp/**` and this `CHARTER.md`.
 - `packages/types` is the frozen domain contract — never edited. `@core/domain`
-  re-exports it; `@core/api-client` defines the data-access contract (`GoalPetRepo`,
+  re-exports it; `@core/api-client` defines the data-access contract (`AimcubRepo`,
   `IngestEvidenceInput`). Both are consumed as-is.
 - All identifiers / comments / docs are English.
 
@@ -43,7 +43,7 @@ The MCP server is GoalPet's differentiated evidence emitter for coding agents
   local JWKS, sign genuine JWTs and exercise real signature verification — no
   crypto is mocked. Only the *remote* JWKS fetch is replaced (production factory
   marked `// TODO(v1a-live)`).
-- **Repo (read path)** — `GoalPetRepo` is injected; tests pass a hand-rolled fake.
+- **Repo (read path)** — `AimcubRepo` is injected; tests pass a hand-rolled fake.
   The production server wires a placeholder repo whose methods throw with a
   `// TODO(v1a-live)` until the supabase-js implementation lands.
 - **Ingest (write path)** — `EvidenceIngestPort` is injected; tests pass a spy
@@ -66,7 +66,7 @@ The MCP server is GoalPet's differentiated evidence emitter for coding agents
 ## Live-integration TODOs (`// TODO(v1a-live)`)
 
 - Real remote JWKS fetch (`createRemoteJWKSet`) + issuer/resource config from env.
-- Real `GoalPetRepo` (supabase-js, service_role on the write path / RLS on reads).
+- Real `AimcubRepo` (supabase-js, service_role on the write path / RLS on reads).
 - Real `EvidenceIngestPort` wiring to `repo.ingestEvidence` with idempotency on
   `(emitter_id, source_event_id)`.
 - Map the verified token's `sub` / emitter claims to `ownerId` / `emitterId`

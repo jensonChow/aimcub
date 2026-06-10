@@ -1,5 +1,5 @@
 /**
- * GoalPet MCP tool definitions, wired entirely through injected ports
+ * Aimcub MCP tool definitions, wired entirely through injected ports
  * ({@link ToolDeps}) so they are pure with respect to I/O and unit-testable.
  *
  * Tools:
@@ -42,8 +42,8 @@ export function summarizeMilestones(goalId: string, milestones: Milestone[]) {
   };
 }
 
-/** Register every GoalPet tool onto an McpServer using the injected ports. */
-export function registerGoalPetTools(server: McpServer, deps: ToolDeps): void {
+/** Register every Aimcub tool onto an McpServer using the injected ports. */
+export function registerAimcubTools(server: McpServer, deps: ToolDeps): void {
   // ── report_evidence ──────────────────────────────────────────────────────
   server.registerTool(
     "report_evidence",

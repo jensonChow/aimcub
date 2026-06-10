@@ -3,7 +3,7 @@
  * and the jobs worker.
  *
  * These are intentionally minimal interfaces — NOT the full `@core/api-client`
- * `GoalPetRepo` — so the pure handlers (`handleIngest`, `runJob`) stay decoupled
+ * `AimcubRepo` — so the pure handlers (`handleIngest`, `runJob`) stay decoupled
  * from the concrete supabase-js implementation. The real Deno entry wrappers adapt
  * a service-role Supabase client to these ports; tests adapt an in-memory fake.
  *

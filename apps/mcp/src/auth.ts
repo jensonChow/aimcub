@@ -1,5 +1,5 @@
 /**
- * OAuth 2.1 resource-server verification for the GoalPet MCP server.
+ * OAuth 2.1 resource-server verification for the Aimcub MCP server.
  *
  * The MCP server is a pure RESOURCE SERVER (RFC 6749 / RFC 9728 / the MCP auth
  * profile): it receives a bearer access token from the agent, verifies the JWT
