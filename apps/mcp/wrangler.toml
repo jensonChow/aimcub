@@ -1,0 +1,19 @@
+# aimcub-mcp — Cloudflare Workers deployment.
+# Custom domain mcp.aimcub.com is the canonical resource URI (= OAuth token `aud`);
+# the zone lives on Cloudflare, so the route below auto-provisions DNS + TLS.
+name = "aimcub-mcp"
+main = "src/worker.ts"
+compatibility_date = "2026-05-01"
+compatibility_flags = ["nodejs_compat"]
+
+routes = [
+  { pattern = "mcp.aimcub.com", custom_domain = true }
+]
+
+[vars]
+MCP_RESOURCE_URI = "https://mcp.aimcub.com"
+OAUTH_ISSUER = "https://gtasruxwmcsxicyujlfu.supabase.co/auth/v1"
+# OAUTH_JWKS_URI defaults to `${OAUTH_ISSUER}/.well-known/jwks.json` (see worker.ts).
+
+[observability]
+enabled = true
