@@ -82,3 +82,12 @@ export { decompose } from "./decompose";
 export type { DecomposeInput, DecomposeResult } from "./decompose";
 export { decompositionJsonSchema } from "./decomposition-schema";
 export type { DecompositionJsonSchema } from "./decomposition-schema";
+
+// ── v1b wiring ───────────────────────────────────────────────────────────────
+// Pet-voice pipelines (emotional shell): shared persona + celebrate/nudge.
+export { PERSONA_SYSTEM_PROMPT, PERSONA_MESSAGE_MAX_CHARS } from "./persona";
+export type { PersonaMessageResult } from "./persona";
+export { celebrate } from "./celebrate";
+export type { CelebrateInput } from "./celebrate";
+export { nudge } from "./nudge";
+export type { NudgeInput } from "./nudge";
