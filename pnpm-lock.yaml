@@ -148,6 +148,9 @@ importers:
       '@core/domain':
         specifier: workspace:*
         version: link:../core
+      '@core/llm':
+        specifier: workspace:*
+        version: link:../llm
       '@core/proactive':
         specifier: workspace:*
         version: link:../proactive
