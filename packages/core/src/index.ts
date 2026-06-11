@@ -7,5 +7,6 @@ export * from "@core/types";
 export * from "./glob";
 export * from "./evaluate";
 export * from "./pet";
+export * from "./collectible";
 export * from "./plan";
 export * from "./evidence";
