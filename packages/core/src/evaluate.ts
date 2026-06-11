@@ -45,7 +45,11 @@ function commitMatches(m: CommitPatternMatch, p: GitCommitPayload): boolean {
 }
 
 function ciMatches(m: CiStatusMatch, p: CiPayload): boolean {
-  if (m.workflow !== undefined && p.workflow !== m.workflow) return false;
+  // Workflow names are human-edited display names (GitHub: `name: CI`), so a plan
+  // that says "ci" must still match a workflow named "CI" — compare case-insensitively.
+  if (m.workflow !== undefined && p.workflow?.toLowerCase() !== m.workflow.toLowerCase()) {
+    return false;
+  }
   return p.conclusion === m.conclusion;
 }
 

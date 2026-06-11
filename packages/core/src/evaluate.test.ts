@@ -87,6 +87,29 @@ describe("evaluate · logic=any / weighted", () => {
   });
 });
 
+describe("evaluate · ci workflow name matching", () => {
+  it("matches workflow names case-insensitively (plan says 'ci', workflow is named 'CI')", () => {
+    const rule = AcceptanceRule.parse({
+      logic: "all",
+      clauses: [{ evaluator: "ci_status", match: { conclusion: "success", workflow: "ci" } }],
+    });
+    const upperCased = ev({
+      id: "ci2",
+      kind: "ci_passed",
+      payload: { workflow: "CI", conclusion: "success", run_id: "r2" },
+    });
+    expect(evaluate(rule, [upperCased]).passed).toBe(true);
+  });
+
+  it("still rejects a different workflow name", () => {
+    const rule = AcceptanceRule.parse({
+      logic: "all",
+      clauses: [{ evaluator: "ci_status", match: { conclusion: "success", workflow: "deploy" } }],
+    });
+    expect(evaluate(rule, [ciPass]).passed).toBe(false);
+  });
+});
+
 describe("evaluate · anti-spoofing (auto_verifiable)", () => {
   it("rejects low-trust evidence for an auto_verifiable clause", () => {
     const rule = AcceptanceRule.parse({
