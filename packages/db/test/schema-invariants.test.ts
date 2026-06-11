@@ -106,6 +106,11 @@ describe("0010_v1b_integrity_backstops.sql — race/retry backstops", () => {
     expect(flatBackstops).toMatch(
       /revoke execute on function upsert_pet_monotonic\(uuid, uuid, int, text\) from public, anon, authenticated/i,
     );
+    // Revoking PUBLIC drops the default grant for service_role too — it must be
+    // granted back or the worker's RPC call is denied (0007 pattern).
+    expect(flatBackstops).toMatch(
+      /grant execute on function upsert_pet_monotonic\(uuid, uuid, int, text\) to service_role/i,
+    );
   });
 
   it("jobs: claim_jobs reclaims stale 'running' jobs below the attempts cap", () => {

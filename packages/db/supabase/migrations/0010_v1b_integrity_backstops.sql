@@ -39,9 +39,13 @@ as $$
     updated_at = excluded.updated_at
   returning *;
 $$;
--- Service-role only (pets are Group B: derived state, anti-cheat).
+-- Service-role only (pets are Group B: derived state, anti-cheat). Revoking
+-- PUBLIC drops the default grant for every role, so service_role must be
+-- granted back explicitly (same pattern as 0007 get_app_secret).
 revoke execute on function upsert_pet_monotonic(uuid, uuid, int, text)
   from public, anon, authenticated;
+grant execute on function upsert_pet_monotonic(uuid, uuid, int, text)
+  to service_role;
 
 -- ── jobs: real retries (requeue + stale-running reclaim) ─────────────────────
 -- Without this, a transient error or a worker crash permanently loses the job's
