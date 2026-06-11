@@ -49,6 +49,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.29.0
         version: 1.29.0(zod@3.25.76)
+      '@supabase/supabase-js':
+        specifier: ^2.108.0
+        version: 2.108.0
       fetch-to-node:
         specifier: ^2.1.0
         version: 2.1.0

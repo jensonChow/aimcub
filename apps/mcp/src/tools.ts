@@ -6,7 +6,15 @@
  *  - report_evidence  — agent reports progress; validate → normalize → ingest.
  *  - goal_status      — summary of a goal's milestone progress (read path).
  *  - list_milestones  — raw milestone list for a goal (read path).
- *  - get_inbox        — proactive pet → user messages (stub in v1a).
+ *  - get_inbox        — proactive pet → user messages (empty until v1b ships the pet).
+ *
+ * Ownership: the Worker queries Supabase with service_role (RLS bypassed), so
+ * every tool scopes by `deps.identity.ownerId` — the verified OAuth token `sub` —
+ * here in the tool layer. Cross-user reads are indistinguishable from missing
+ * data (no existence leak); writes always belong to the token owner AND may only
+ * reference goals/milestones the token owner owns (pre-flight check before any
+ * write — the DB triggers `evidence_emitter_owner_guard` /
+ * `evidence_refs_owner_guard` stay a backstop, never the sole line of defense).
  */
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
@@ -63,8 +71,28 @@ export function registerAimcubTools(server: McpServer, deps: ToolDeps): void {
         return errorResult(`invalid report_evidence input: ${parsed.error.message}`);
       }
       const input = parsed.data;
+      // Pre-flight ownership check (mirrors goal_status): the target goal — and
+      // the milestone, when given — must belong to the verified caller BEFORE we
+      // touch the write path. Denial reads exactly like missing data (no
+      // existence leak), nothing is provisioned or enqueued, and the DB triggers
+      // (migrations 0001/0005) remain defense-in-depth instead of the only guard.
+      const goal = await deps.repo.getGoal(input.goalId);
+      if (!goal || goal.owner_id !== deps.identity.ownerId) {
+        return errorResult(`goal not found: ${input.goalId}`);
+      }
+      if (input.milestoneId != null) {
+        const milestone = (await deps.repo.listMilestones(input.goalId)).find(
+          (m) => m.id === input.milestoneId,
+        );
+        // Membership in the goal's list asserts milestone.goal_id === input.goalId;
+        // the owner compare mirrors the evidence_refs_owner_guard trigger exactly.
+        if (!milestone || milestone.owner_id !== deps.identity.ownerId) {
+          return errorResult(`milestone not found: ${input.milestoneId}`);
+        }
+      }
       const normalized = normalizeReport(input);
-      const ingestInput = toIngestInput(input, normalized);
+      // Owner = the verified token subject. Tool input cannot influence identity.
+      const ingestInput = toIngestInput(input, normalized, deps.identity.ownerId);
       const evidence = await deps.ingest.ingest(ingestInput);
       return jsonResult({
         accepted: true,
@@ -85,8 +113,16 @@ export function registerAimcubTools(server: McpServer, deps: ToolDeps): void {
     },
     async ({ goalId }) => {
       const goal = await deps.repo.getGoal(goalId);
-      if (!goal) return errorResult(`goal not found: ${goalId}`);
-      const milestones = await deps.repo.listMilestones(goalId);
+      // Service-role reads bypass RLS: a goal the caller does not own is
+      // reported exactly like a missing one, so existence never leaks.
+      if (!goal || goal.owner_id !== deps.identity.ownerId) {
+        return errorResult(`goal not found: ${goalId}`);
+      }
+      // Defense-in-depth: even behind the goal gate above, scope the rows by
+      // owner exactly like list_milestones does — a mislinked row never leaks.
+      const milestones = (await deps.repo.listMilestones(goalId)).filter(
+        (m) => m.owner_id === deps.identity.ownerId,
+      );
       return jsonResult({
         goal: { id: goal.id, title: goal.title, status: goal.status, domain: goal.domain },
         ...summarizeMilestones(goalId, milestones),
@@ -103,7 +139,11 @@ export function registerAimcubTools(server: McpServer, deps: ToolDeps): void {
       inputSchema: { goalId: z.string().uuid() },
     },
     async ({ goalId }) => {
-      const milestones = await deps.repo.listMilestones(goalId);
+      // Owner scoping without an extra goal read: every milestone row carries
+      // owner_id, so another user's goal yields an empty list (denial, no leak).
+      const milestones = (await deps.repo.listMilestones(goalId)).filter(
+        (m) => m.owner_id === deps.identity.ownerId,
+      );
       return jsonResult({
         goalId,
         milestones: milestones.map((m) => ({
@@ -125,12 +165,23 @@ export function registerAimcubTools(server: McpServer, deps: ToolDeps): void {
     {
       title: "Get inbox",
       description: "Pull proactive messages from the pet to the user (agent_inbox channel).",
-      inputSchema: { ownerId: z.string().uuid(), since: z.string().optional() },
+      inputSchema: { since: z.string().optional() },
     },
-    async () => {
-      // TODO(v1b): wire to deps.repo.listInbox once the proactive companion ships.
-      // v1a has no pet / nudges, so the inbox is intentionally empty.
-      return jsonResult({ messages: [] as unknown[] });
+    async ({ since }) => {
+      // Always the token owner's inbox — there is no ownerId input to spoof.
+      // v1a writes no notifications yet (the pet ships in v1b), so this is
+      // empty in practice, but the read path is live and owner-scoped.
+      const messages = await deps.repo.listInbox(deps.identity.ownerId, since);
+      return jsonResult({
+        messages: messages.map((n) => ({
+          id: n.id,
+          trigger: n.trigger,
+          message: n.persona_msg,
+          refGoalId: n.ref_goal_id,
+          refMilestoneId: n.ref_milestone_id,
+          createdAt: n.created_at ?? null,
+        })),
+      });
     },
   );
 }

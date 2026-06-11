@@ -21,8 +21,18 @@ export interface EvidenceIngestPort {
 /** Read side reused verbatim from the shared contract. */
 export type AimcubReadPort = Pick<AimcubRepo, "listMilestones" | "getGoal" | "listInbox">;
 
-/** The full dependency bundle the tool layer is wired with. */
+/**
+ * Caller identity derived from the VERIFIED OAuth access token (`sub` claim) in
+ * the Worker shell. This is the only owner identity the tools trust — tool input
+ * never carries an ownerId/emitterId, so a caller cannot act as another user.
+ */
+export interface CallerIdentity {
+  ownerId: string;
+}
+
+/** The full dependency bundle the tool layer is wired with (ports + per-request identity). */
 export interface ToolDeps {
   repo: AimcubReadPort;
   ingest: EvidenceIngestPort;
+  identity: CallerIdentity;
 }

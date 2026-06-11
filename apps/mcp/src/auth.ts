@@ -145,10 +145,9 @@ export function bearerFromHeader(authorization: string | undefined): string | un
  * module — and the tests — stay network-free.
  */
 export async function createRemoteJwksResolver(jwksUri: string): Promise<JWKSResolver> {
-  // TODO(v1a-live): point at the real authorization server's JWKS URI (from env,
-  // e.g. `${SUPABASE_URL}/auth/v1/.well-known/jwks.json` or the IdP discovery doc)
-  // and verify TLS / caching headers. This dynamic import keeps the network-touching
-  // jose subpath out of the resource-server hot path until live wiring.
+  // The URI comes from env (OAUTH_JWKS_URI, defaulting to the OAUTH_ISSUER's
+  // `/.well-known/jwks.json` — see worker.ts resolveConfig). The dynamic import
+  // keeps the network-touching jose subpath out of the verification hot path.
   const { createRemoteJWKSet } = await import("jose");
   return createRemoteJWKSet(new URL(jwksUri));
 }

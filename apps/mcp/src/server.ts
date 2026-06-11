@@ -10,7 +10,8 @@
  *   - get_inbox                 (stub; v1b)
  *
  * All external I/O sits behind injected ports so the tool layer is mockable; the
- * production adapters are placeholders marked `// TODO(v1a-live)`.
+ * production adapters live in `supabase-deps.ts` (service-role supabase-js), and
+ * the caller identity is the verified OAuth token subject threaded via ToolDeps.
  */
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
