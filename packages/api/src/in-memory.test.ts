@@ -72,6 +72,24 @@ describe("user path — RLS-shaped reads", () => {
     expect(since).toHaveLength(1);
     expect(since[0]?.created_at).toBe("2026-06-05T00:00:00.000Z");
   });
+
+  it("listNotifications only returns in_app notifications for the owner, newest first, limited", async () => {
+    const repo = makeRepo();
+    repo.addNotification(notification(OWNER_A, ["in_app"], "2026-06-01T00:00:00.000Z"));
+    repo.addNotification(notification(OWNER_A, ["agent_inbox"], "2026-06-02T00:00:00.000Z")); // wrong channel
+    repo.addNotification(notification(OWNER_B, ["in_app"], "2026-06-03T00:00:00.000Z")); // wrong owner
+    repo.addNotification(notification(OWNER_A, ["in_app", "agent_inbox"], "2026-06-05T00:00:00.000Z"));
+
+    const all = await repo.listNotifications(OWNER_A);
+    expect(all.map((n) => n.created_at)).toEqual([
+      "2026-06-05T00:00:00.000Z",
+      "2026-06-01T00:00:00.000Z",
+    ]);
+
+    const limited = await repo.listNotifications(OWNER_A, 1);
+    expect(limited).toHaveLength(1);
+    expect(limited[0]?.created_at).toBe("2026-06-05T00:00:00.000Z");
+  });
 });
 
 describe("invariant — evidence idempotency by (emitter_id, source_event_id)", () => {

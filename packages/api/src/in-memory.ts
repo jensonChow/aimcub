@@ -229,6 +229,13 @@ export class InMemoryAimcubRepo implements AimcubRepo {
       .sort((a, b) => (a.created_at ?? "").localeCompare(b.created_at ?? ""));
   }
 
+  async listNotifications(ownerId: string, limit = 20): Promise<Notification[]> {
+    return [...this.notifications.values()]
+      .filter((n) => n.owner_id === ownerId && n.channels.includes("in_app"))
+      .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""))
+      .slice(0, limit);
+  }
+
   async updateGoalPlan(goalId: string, planJson: unknown, status: Goal["status"] = "active"): Promise<Goal> {
     const goal = this.goals.get(goalId);
     if (!goal) throw new Error(`goal not found: ${goalId}`);
