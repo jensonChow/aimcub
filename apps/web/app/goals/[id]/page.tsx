@@ -1,19 +1,29 @@
 import { colors, space } from "@ui/tokens";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { GoalDetail } from "../../../components/GoalDetail";
+import { NotificationsPanel } from "../../../components/NotificationsPanel";
+import { getSessionUser } from "../../../lib/auth";
 import { getDataPort } from "../../../lib/wiring";
 
-// Server component: loads the goal + its decomposition, then hands off to the client
-// GoalDetail which subscribes to the RealtimePort and lights milestones up on its own.
+// Server component: loads the goal + its decomposition (+ derived pet & notifications),
+// then hands off to the client GoalDetail which subscribes to the RealtimePort and lights
+// milestones up — and grows the pet — on its own.
 export const dynamic = "force-dynamic";
 
 export default async function GoalPage({ params }: { params: { id: string } }) {
+  const user = await getSessionUser();
+  if (!user) redirect("/login");
+
   const repo = getDataPort();
   const goal = await repo.getGoal(params.id);
   if (!goal) notFound();
 
-  const milestones = await repo.listMilestones(goal.id);
+  const [milestones, pet, notifications] = await Promise.all([
+    repo.listMilestones(goal.id),
+    repo.getPet(goal.id),
+    repo.listNotifications(user.id, 10),
+  ]);
 
   return (
     <main style={{ maxWidth: 760, margin: "0 auto", padding: space.xl }}>
@@ -33,7 +43,9 @@ export default async function GoalPage({ params }: { params: { id: string } }) {
         ) : null}
       </header>
 
-      <GoalDetail goal={goal} initialMilestones={milestones} />
+      <GoalDetail goal={goal} initialMilestones={milestones} initialPet={pet} />
+
+      <NotificationsPanel notifications={notifications} />
     </main>
   );
 }

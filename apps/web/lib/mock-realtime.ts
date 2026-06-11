@@ -6,11 +6,16 @@
  * Realtime channel would deliver when the Edge Function writes a milestone_completions row.
  * This is what produces the "it lights up by itself" aha in the local demo.
  *
- * TODO(v1a-live): replace with a Supabase Realtime channel (see RealtimePort).
+ * Pet growth rides the same cascade: each flip recomputes the goal's derived pet
+ * (xp = sum of completed milestones' xp_reward, stage = stageForXp) and emits a
+ * PetChangeEvent to that goal's pet subscribers — mirroring the grow_pet job upserting
+ * the pets row, which the live SupabaseRealtime port would deliver via postgres_changes.
  */
+import { stageForXp } from "@core/domain";
 import { nextEligibleMilestone } from "./progress";
 import type {
   MilestoneCompletedHandler,
+  PetChangeHandler,
   RealtimePort,
   RealtimeSubscription,
 } from "./realtime-port";
@@ -28,6 +33,8 @@ export class MockRealtime implements RealtimePort {
   private readonly firstDelayMs: number;
   private readonly cascade: boolean;
   private readonly intervalMs: number;
+  /** Pet subscribers per goal, fed by the milestone cascade on the same port instance. */
+  private readonly petHandlers = new Map<string, Set<PetChangeHandler>>();
 
   constructor(opts: MockRealtimeOptions = {}) {
     this.firstDelayMs = opts.firstDelayMs ?? 3500;
@@ -58,6 +65,7 @@ export class MockRealtime implements RealtimePort {
         completedAt: new Date().toISOString(),
         awardedXp: next.xp_reward,
       });
+      this.emitPetGrowth(goalId, working);
       if (this.cascade && nextEligibleMilestone(working)) {
         timers.push(setTimeout(flipOne, this.intervalMs));
       }
@@ -71,5 +79,30 @@ export class MockRealtime implements RealtimePort {
         for (const t of timers) clearTimeout(t);
       },
     };
+  }
+
+  subscribePet(goalId: string, onChange: PetChangeHandler): RealtimeSubscription {
+    let handlers = this.petHandlers.get(goalId);
+    if (!handlers) {
+      handlers = new Set();
+      this.petHandlers.set(goalId, handlers);
+    }
+    handlers.add(onChange);
+    return {
+      unsubscribe: () => {
+        handlers.delete(onChange);
+      },
+    };
+  }
+
+  /** Recompute the derived pet from the working snapshot — same math as the grow_pet job. */
+  private emitPetGrowth(goalId: string, working: readonly Milestone[]): void {
+    const handlers = this.petHandlers.get(goalId);
+    if (!handlers || handlers.size === 0) return;
+    const xp = working
+      .filter((m) => m.status === "completed")
+      .reduce((sum, m) => sum + m.xp_reward, 0);
+    const event = { goalId, xp, stage: stageForXp(xp) };
+    for (const handler of handlers) handler(event);
   }
 }

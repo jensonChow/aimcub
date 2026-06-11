@@ -1,5 +1,6 @@
 import { colors, space } from "@ui/tokens";
 import { redirect } from "next/navigation";
+import { CollectibleCard } from "../components/CollectibleCard";
 import { GoalListItem } from "../components/GoalListItem";
 import { NewGoalForm } from "../components/NewGoalForm";
 import { getSessionUser } from "../lib/auth";
@@ -22,6 +23,7 @@ export default async function Home() {
   const withMilestones = await Promise.all(
     goals.map(async (goal) => ({ goal, milestones: await repo.listMilestones(goal.id) })),
   );
+  const collectibles = await repo.listCollectibles(user.id);
 
   return (
     <main style={{ maxWidth: 760, margin: "0 auto", padding: space.xl }}>
@@ -67,6 +69,27 @@ export default async function Home() {
           <div style={{ display: "flex", flexDirection: "column", gap: space.md }}>
             {withMilestones.map(({ goal, milestones }) => (
               <GoalListItem key={goal.id} goal={goal} milestones={milestones} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section style={{ marginTop: space.xl }}>
+        <h2 style={{ fontSize: 20, marginBottom: space.sm }}>Collection</h2>
+        {collectibles.length === 0 ? (
+          <p style={{ color: colors.textMuted }}>
+            Your first badge mints itself when a milestone lights up.
+          </p>
+        ) : (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+              gap: space.md,
+            }}
+          >
+            {collectibles.map((c) => (
+              <CollectibleCard key={c.id} collectible={c} />
             ))}
           </div>
         )}
