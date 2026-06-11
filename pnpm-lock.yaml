@@ -148,6 +148,9 @@ importers:
       '@core/domain':
         specifier: workspace:*
         version: link:../core
+      '@core/proactive':
+        specifier: workspace:*
+        version: link:../proactive
       '@core/types':
         specifier: workspace:*
         version: link:../types

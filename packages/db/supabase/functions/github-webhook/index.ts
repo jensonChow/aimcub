@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment -- Deno entry, see below */
 // @ts-nocheck — Deno Edge Function entry; typechecked under Deno, not the Node/tsc
 // build for this package. Excluded from `tsc` via tsconfig and never imported by tests.
 /**
