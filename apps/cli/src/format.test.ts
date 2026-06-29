@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import { localDecompose, type ClarifyOutput } from "@core/llm";
 
-import { formatPlanPretty, formatClarifyPretty, ruleSummary } from "./format";
+import type { MergedItem } from "@core/domain";
+import type { Goal } from "@core/types";
+
+import { formatPlanPretty, formatClarifyPretty, formatGoalList, formatMergeSummary, ruleSummary } from "./format";
 
 describe("formatPlanPretty", () => {
   it("renders the goal summary, milestone count, and each milestone", () => {
@@ -55,5 +58,38 @@ describe("formatClarifyPretty", () => {
   it("handles an empty question set", () => {
     const text = formatClarifyPretty("X", { questions: [], assumptions: [] });
     expect(text).toContain("no high-impact questions");
+  });
+});
+
+describe("formatGoalList", () => {
+  const goal = {
+    id: "abcd1234-0000-4000-8000-000000000000",
+    title: "Ship auth",
+    created_at: "2026-06-29T10:00:00.000Z",
+  } as unknown as Goal;
+
+  it("uses the provided milestone-row count (not plan_json) and a short id", () => {
+    const text = formatGoalList([{ goal, milestoneCount: 3 }]);
+    expect(text).toContain("abcd1234");
+    expect(text).toContain("Ship auth");
+    expect(text).toContain("3 milestones");
+    expect(text).toContain("2026-06-29");
+  });
+
+  it("singularizes a 1-milestone aim and handles the empty list", () => {
+    expect(formatGoalList([{ goal, milestoneCount: 1 }])).toMatch(/1 milestone[^s]/); // singular, not "milestones"
+    expect(formatGoalList([])).toContain("No aims yet");
+  });
+});
+
+describe("formatMergeSummary", () => {
+  it("counts each merge action", () => {
+    const merged: MergedItem[] = [
+      { action: "freeze", existingId: "a", nodeKey: "k1", title: "Done" },
+      { action: "update", existingId: "b", nodeKey: "k2", title: "Changed" },
+      { action: "add", existingId: null, nodeKey: "k3", title: "New" },
+      { action: "skip", existingId: "c", nodeKey: null, title: "Dropped" },
+    ];
+    expect(formatMergeSummary(merged)).toBe("re-plan: 1 added · 1 updated · 1 kept (done) · 1 skipped");
   });
 });

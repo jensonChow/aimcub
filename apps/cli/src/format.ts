@@ -3,6 +3,7 @@
  * The CLI shell (index.ts) does argv/env/network; these functions only render strings.
  */
 import type { AcceptanceRule, DecompositionOutput, Goal, Milestone } from "@core/types";
+import type { MergeAction, MergedItem } from "@core/domain";
 import type { ClarifyOutput } from "@core/llm";
 
 /** A terse one-line summary of an acceptance rule (which evaluators must fire). */
@@ -48,25 +49,31 @@ export function formatClarifyPretty(title: string, out: ClarifyOutput): string {
   return lines.join("\n").trimEnd();
 }
 
-function planNodeCount(goal: Goal): number {
-  const plan = goal.plan_json as DecompositionOutput | null | undefined;
-  return plan && Array.isArray(plan.nodes) ? plan.nodes.length : 0;
-}
-
 function shortId(id: string): string {
   return id.slice(0, 8);
 }
 
+/** A saved aim paired with its materialized milestone-row count (the source of truth for the count). */
+export interface GoalListItem {
+  goal: Goal;
+  milestoneCount: number;
+}
+
 /** Render the saved-aims list, one per line (id · title · #milestones · date). */
-export function formatGoalList(goals: Goal[]): string {
-  if (goals.length === 0) return "No aims yet. Create one with: aim new \"<title>\"";
-  return goals
-    .map((g) => {
-      const n = planNodeCount(g);
-      const date = g.created_at ? g.created_at.slice(0, 10) : "";
-      return `${shortId(g.id)}  ${g.title}  (${n} milestone${n === 1 ? "" : "s"}${date ? ` · ${date}` : ""})`;
+export function formatGoalList(items: GoalListItem[]): string {
+  if (items.length === 0) return "No aims yet. Create one with: aim new \"<title>\"";
+  return items
+    .map(({ goal, milestoneCount: n }) => {
+      const date = goal.created_at ? goal.created_at.slice(0, 10) : "";
+      return `${shortId(goal.id)}  ${goal.title}  (${n} milestone${n === 1 ? "" : "s"}${date ? ` · ${date}` : ""})`;
     })
     .join("\n");
+}
+
+/** One-line summary of a re-plan merge: how many milestones were added/updated/kept/skipped. */
+export function formatMergeSummary(merged: MergedItem[]): string {
+  const n = (a: MergeAction): number => merged.filter((m) => m.action === a).length;
+  return `re-plan: ${n("add")} added · ${n("update")} updated · ${n("freeze")} kept (done) · ${n("skip")} skipped`;
 }
 
 /** Render a saved aim + its materialized milestones. */

@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Aimcub CLI — the headless, scriptable face of @core (aim → plan / clarify). Reuses the same brain as the desktop app; provider from env. Stateless first cut.",
+  "description": "Aimcub CLI — the headless, scriptable face of @core: the planning loop (plan / clarify→refine), stored aims (new / ls / show / replan / edit / rm), and config, over the shared ~/.aimcub store. Reuses the same brain as the desktop app; provider from env.",
   "bin": {
     "aim": "./dist/index.js"
   },
