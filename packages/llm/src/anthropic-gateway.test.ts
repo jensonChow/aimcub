@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { AnthropicLlmGateway, type AnthropicClientPort } from "./anthropic-gateway";
+import { AnthropicLlmGateway, resolveAnthropicApiKey, type AnthropicClientPort } from "./anthropic-gateway";
 import { Models, type LlmTask, type LlmUsage, type UsageMeter } from "./index";
 
 // A fake SDK client implementing the minimal port — no network, no API key.
@@ -85,6 +85,20 @@ describe("AnthropicLlmGateway · model routing via routeModel", () => {
 
     const body = create.mock.calls[0]![0] as { model: string };
     expect(body.model).toBe(Models.haiku);
+  });
+});
+
+describe("resolveAnthropicApiKey · BYO-key precedence", () => {
+  it("prefers an explicit key over the env var", () => {
+    expect(resolveAnthropicApiKey("explicit", "from-env")).toBe("explicit");
+  });
+
+  it("falls back to the env var when no explicit key is given", () => {
+    expect(resolveAnthropicApiKey(undefined, "from-env")).toBe("from-env");
+  });
+
+  it("throws a clear error when neither is present", () => {
+    expect(() => resolveAnthropicApiKey(undefined, undefined)).toThrow(/no Anthropic API key/);
   });
 });
 

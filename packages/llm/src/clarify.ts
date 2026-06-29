@@ -9,8 +9,8 @@
  *
  * Like `decompose`, this is TOTAL: a transport/model failure or malformed output is
  * returned as `{ ok: false, errors }`, never thrown. Routed through the `classify`
- * task (Haiku) — cheap and high-frequency. A deterministic `localClarify` fallback
- * keeps the flow working with no API key.
+ * task (Haiku) — cheap and high-frequency. There is no offline fallback: with no
+ * provider configured the caller surfaces the error honestly (no templates).
  */
 import { type DecompositionOutput, type GoalDomain } from "@core/types";
 
@@ -257,42 +257,6 @@ export function validateClarify(output: ClarifyOutput): ClarifyValidation {
     ids.add(q.id);
   });
   return { ok: errors.length === 0, errors };
-}
-
-/**
- * Deterministic offline fallback (no API key) — mirrors `localDecompose`. Derives a
- * scope + involvement question from the draft, plus disclosed default assumptions.
- */
-export function localClarify(input: ClarifyInput): ClarifyOutput {
-  const questions: ClarifyQuestion[] = [
-    {
-      id: "scope",
-      question: "How polished does the result need to be?",
-      why_high_impact: "Scope changes how many milestones there are and how strict the acceptance bar is.",
-      kind: "scope",
-      allow_other: true,
-      options: [
-        { label: "Quick prototype", tradeoff: "Fewer, looser milestones — fastest, less rigor." },
-        { label: "Production-grade", tradeoff: "More milestones with strict commit/CI gates — slower, durable." },
-      ],
-    },
-    {
-      id: "involvement",
-      question: "How hands-on do you want to be?",
-      why_high_impact: "Decides which steps stay with you vs are handed to an agent later.",
-      kind: "involvement",
-      allow_other: true,
-      options: [
-        { label: "I'll do the work myself", tradeoff: "Full control; you execute every milestone." },
-        { label: "Delegate where possible", tradeoff: "Faster; an agent takes the automatable steps later." },
-      ],
-    },
-  ];
-  const assumptions: ClarifyAssumption[] = [
-    { statement: "Assumed a solo software project tracked via Git.", default_value: input.domain ?? "software" },
-    { statement: "Assumed GitHub commits + CI are the evidence source.", default_value: "github" },
-  ];
-  return { questions: questions.slice(0, clampMax(input.maxQuestions)), assumptions };
 }
 
 /**

@@ -31,7 +31,9 @@ export function routeModel(task: LlmTask): ModelId {
 }
 
 export interface LlmUsage {
-  model: ModelId;
+  /** The model that produced this usage. A free string — providers other than Anthropic
+   * (OpenAI-compatible deployments) report their own model ids, not `ModelId`. */
+  model: string;
   inputTokens: number;
   outputTokens: number;
   cacheReadTokens?: number;
@@ -65,12 +67,19 @@ export interface LlmGateway {
 }
 
 // ── v1a wiring ───────────────────────────────────────────────────────────────
-// Concrete Anthropic-backed gateway + the goal-decomposition pipeline.
+// Concrete gateways (Anthropic-native + any OpenAI-compatible endpoint) + the
+// goal-decomposition pipeline.
 export { AnthropicLlmGateway } from "./anthropic-gateway";
 export type {
   AnthropicGatewayOptions,
   AnthropicClientPort,
 } from "./anthropic-gateway";
+export { OpenAiCompatibleLlmGateway } from "./openai-gateway";
+export type {
+  OpenAiGatewayOptions,
+  OpenAiFetchPort,
+  OpenAiFetchResponse,
+} from "./openai-gateway";
 export { decompose } from "./decompose";
 export type { DecomposeInput, DecomposeResult } from "./decompose";
 export { localDecompose } from "./local-decompose";
@@ -78,8 +87,8 @@ export type { DecomposeRequest } from "./local-decompose";
 export { decompositionJsonSchema } from "./decomposition-schema";
 export type { DecompositionJsonSchema } from "./decomposition-schema";
 
-// Clarifying-questions step (the planning "feedback step") + its offline fallback.
-export { clarify, localClarify, validateClarify, buildRefinedDescription } from "./clarify";
+// Clarifying-questions step (the planning "feedback step").
+export { clarify, validateClarify, buildRefinedDescription } from "./clarify";
 export type {
   ClarifyInput,
   ClarifyResult,

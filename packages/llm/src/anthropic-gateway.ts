@@ -34,9 +34,15 @@ export interface AnthropicGatewayOptions {
   ownerId: string;
   /**
    * Pre-constructed SDK client. Optional — mainly an injection point for tests.
-   * In production this is omitted and a client is created from the env API key.
+   * In production this is omitted and a client is created from `apiKey` (or the env key).
    */
   client?: AnthropicClientPort;
+  /**
+   * Explicit API key (BYO-key). When provided, the client is built from it instead of
+   * reading `process.env.ANTHROPIC_API_KEY` — used by the desktop app, which stores the
+   * key itself rather than mutating the process env.
+   */
+  apiKey?: string;
   /** Max output tokens per request. Defaults to a value comfortably above a full plan. */
   maxTokens?: number;
 }
@@ -74,11 +80,24 @@ interface AnthropicMessageResponse {
 
 const DEFAULT_MAX_TOKENS = 8192;
 
+/**
+ * Resolve the API key: an explicit `opts.apiKey` (BYO-key) wins over the env var. Pure +
+ * exported so the precedence and the no-key error are unit-testable without the SDK.
+ */
+export function resolveAnthropicApiKey(explicit: string | undefined, env: string | undefined): string {
+  const apiKey = explicit ?? env;
+  if (!apiKey) {
+    throw new Error("no Anthropic API key (opts.apiKey or ANTHROPIC_API_KEY); cannot construct AnthropicLlmGateway client");
+  }
+  return apiKey;
+}
+
 export class AnthropicLlmGateway implements LlmGateway {
   private readonly meter: UsageMeter;
   private readonly ownerId: string;
   private readonly maxTokens: number;
   private readonly injectedClient?: AnthropicClientPort;
+  private readonly apiKey?: string;
   private cachedClient?: AnthropicClientPort;
 
   constructor(opts: AnthropicGatewayOptions) {
@@ -86,6 +105,7 @@ export class AnthropicLlmGateway implements LlmGateway {
     this.ownerId = opts.ownerId;
     this.maxTokens = opts.maxTokens ?? DEFAULT_MAX_TOKENS;
     this.injectedClient = opts.client;
+    this.apiKey = opts.apiKey;
   }
 
   /** Plain-text completion. */
@@ -151,10 +171,7 @@ export class AnthropicLlmGateway implements LlmGateway {
     if (this.cachedClient) return this.cachedClient;
 
     // TODO(v1a-live): read the key from a secrets manager rather than the raw env in prod.
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      throw new Error("ANTHROPIC_API_KEY is not set; cannot construct AnthropicLlmGateway client");
-    }
+    const apiKey = resolveAnthropicApiKey(this.apiKey, process.env.ANTHROPIC_API_KEY);
     // The real SDK client structurally satisfies AnthropicClientPort.
     this.cachedClient = new Anthropic({ apiKey }) as unknown as AnthropicClientPort;
     return this.cachedClient;

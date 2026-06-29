@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   clarify,
-  localClarify,
   buildRefinedDescription,
   type ClarifyInput,
   type ClarifyAnswer,
@@ -176,19 +175,6 @@ describe("clarify · malformed model output (returned, never thrown)", () => {
     const spy = vi.fn();
     await clarify(throwingGateway("x"), INPUT).then(spy);
     expect(spy).toHaveBeenCalledOnce();
-  });
-});
-
-describe("localClarify · deterministic offline fallback", () => {
-  it("returns valid questions (>=2 options each) + assumptions with no gateway", () => {
-    const out = localClarify(INPUT);
-    expect(out.questions.length).toBeGreaterThan(0);
-    expect(out.questions.every((q) => q.options.length >= 2)).toBe(true);
-    expect(out.assumptions.length).toBeGreaterThan(0);
-  });
-
-  it("respects maxQuestions", () => {
-    expect(localClarify({ ...INPUT, maxQuestions: 1 }).questions).toHaveLength(1);
   });
 });
 
