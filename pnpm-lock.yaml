@@ -45,6 +45,9 @@ importers:
       '@core/llm':
         specifier: workspace:*
         version: link:../../packages/llm
+      '@core/store':
+        specifier: workspace:*
+        version: link:../../packages/store
       '@core/types':
         specifier: workspace:*
         version: link:../../packages/types
@@ -70,6 +73,9 @@ importers:
       '@core/llm':
         specifier: workspace:*
         version: link:../../packages/llm
+      '@core/store':
+        specifier: workspace:*
+        version: link:../../packages/store
       '@core/types':
         specifier: workspace:*
         version: link:../../packages/types
@@ -239,6 +245,22 @@ importers:
         specifier: workspace:*
         version: link:../types
     devDependencies:
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.20)
+
+  packages/store:
+    dependencies:
+      '@core/domain':
+        specifier: workspace:*
+        version: link:../core
+      '@core/types':
+        specifier: workspace:*
+        version: link:../types
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.5
+        version: 22.19.20
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.19.20)

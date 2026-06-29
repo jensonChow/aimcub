@@ -2,7 +2,7 @@
  * Pure output formatters for the CLI — kept separate from I/O so they are unit-testable.
  * The CLI shell (index.ts) does argv/env/network; these functions only render strings.
  */
-import type { DecompositionOutput, AcceptanceRule } from "@core/types";
+import type { AcceptanceRule, DecompositionOutput, Goal, Milestone } from "@core/types";
 import type { ClarifyOutput } from "@core/llm";
 
 /** A terse one-line summary of an acceptance rule (which evaluators must fire). */
@@ -45,5 +45,42 @@ export function formatClarifyPretty(title: string, out: ClarifyOutput): string {
     lines.push("Assuming (override anything wrong):");
     out.assumptions.forEach((a) => lines.push(`   • ${a.statement}${a.default_value ? ` (${a.default_value})` : ""}`));
   }
+  return lines.join("\n").trimEnd();
+}
+
+function planNodeCount(goal: Goal): number {
+  const plan = goal.plan_json as DecompositionOutput | null | undefined;
+  return plan && Array.isArray(plan.nodes) ? plan.nodes.length : 0;
+}
+
+function shortId(id: string): string {
+  return id.slice(0, 8);
+}
+
+/** Render the saved-aims list, one per line (id · title · #milestones · date). */
+export function formatGoalList(goals: Goal[]): string {
+  if (goals.length === 0) return "No aims yet. Create one with: aim new \"<title>\"";
+  return goals
+    .map((g) => {
+      const n = planNodeCount(g);
+      const date = g.created_at ? g.created_at.slice(0, 10) : "";
+      return `${shortId(g.id)}  ${g.title}  (${n} milestone${n === 1 ? "" : "s"}${date ? ` · ${date}` : ""})`;
+    })
+    .join("\n");
+}
+
+/** Render a saved aim + its materialized milestones. */
+export function formatGoalDetail(goal: Goal, milestones: Milestone[]): string {
+  const lines: string[] = [];
+  lines.push(goal.title);
+  if (goal.description) lines.push(goal.description);
+  lines.push(`id: ${goal.id}`);
+  lines.push(`${milestones.length} milestone${milestones.length === 1 ? "" : "s"}`);
+  lines.push("");
+  milestones.forEach((m, i) => {
+    lines.push(`${i + 1}. ${m.title}  [${m.status}]  (+${m.xp_reward} xp)`);
+    if (m.description) lines.push(`   ${m.description}`);
+    lines.push(`   ✓ ${ruleSummary(m.acceptance_rule)}`);
+  });
   return lines.join("\n").trimEnd();
 }

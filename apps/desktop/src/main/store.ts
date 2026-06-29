@@ -1,67 +1,24 @@
 /**
- * Local-first persistence: a single JSON file in the app's userData dir. No Supabase,
- * no network. Shapes reuse @core/types 1:1 so a later Supabase sync is transform-free.
- * A sibling settings.json holds the LLM provider config (GUI launches don't inherit shell env).
+ * Desktop persistence = the shared `@core/store` (one JSON store under ~/.aimcub that the
+ * CLI also reads), plus a sibling settings.json for the LLM provider config. No Electron
+ * userData path and no business logic here anymore — the store lives in `@core/store` so
+ * the desktop app and the CLI are two faces over one local store.
  */
-import { app } from "electron";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
-import type { Goal, Memory, Milestone } from "@core/types";
+import { DEFAULT_OWNER, createJsonFileStore, defaultDataDir, type AimStore } from "@core/store";
 
 import type { ProviderConfig } from "../shared/ipc";
 
-/** Fixed local owner for the single-user desktop slice (matches the web demo owner). */
-export const LOCAL_OWNER = "00000000-0000-4000-8000-000000000001";
+/** Fixed local owner for the single-user local app. */
+export const LOCAL_OWNER = DEFAULT_OWNER;
 
-export interface LocalStore {
-  ownerId: string;
-  goals: Goal[];
-  milestonesByGoal: Record<string, Milestone[]>;
-  memories: Memory[];
-}
-
-function dataPath(): string {
-  return join(app.getPath("userData"), "aimcub-local.json");
-}
+/** The shared aim store (aims/milestones/memories), rooted at ~/.aimcub (or $AIMCUB_HOME). */
+export const aimStore: AimStore = createJsonFileStore(defaultDataDir());
 
 function settingsPath(): string {
-  return join(app.getPath("userData"), "settings.json");
-}
-
-function emptyStore(): LocalStore {
-  return { ownerId: LOCAL_OWNER, goals: [], milestonesByGoal: {}, memories: [] };
-}
-
-export function loadStore(): LocalStore {
-  try {
-    const p = dataPath();
-    if (!existsSync(p)) return emptyStore();
-    const parsed = JSON.parse(readFileSync(p, "utf8")) as Partial<LocalStore>;
-    return {
-      ownerId: parsed.ownerId ?? LOCAL_OWNER,
-      goals: parsed.goals ?? [],
-      milestonesByGoal: parsed.milestonesByGoal ?? {},
-      memories: parsed.memories ?? [],
-    };
-  } catch {
-    return emptyStore();
-  }
-}
-
-export function saveStore(store: LocalStore): void {
-  const p = dataPath();
-  mkdirSync(dirname(p), { recursive: true });
-  writeFileSync(p, JSON.stringify(store, null, 2), "utf8");
-}
-
-/** Remove a goal and its materialized milestones + derived memories. */
-export function deleteGoal(id: string): void {
-  const store = loadStore();
-  store.goals = store.goals.filter((g) => g.id !== id);
-  delete store.milestonesByGoal[id];
-  store.memories = store.memories.filter((m) => m.goal_id !== id);
-  saveStore(store);
+  return join(defaultDataDir(), "settings.json");
 }
 
 /**
@@ -96,6 +53,6 @@ export function loadSettings(): ProviderConfig | null {
 
 export function saveSettings(config: ProviderConfig): void {
   const p = settingsPath();
-  mkdirSync(dirname(p), { recursive: true });
+  mkdirSync(defaultDataDir(), { recursive: true });
   writeFileSync(p, JSON.stringify(config, null, 2), "utf8");
 }
