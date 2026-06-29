@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "Aimcub Mac desktop (Electron) — local-first Aim → decompose (with feedback step). Reuses the TS @core brain.",
+  "author": "Aimcub",
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
@@ -32,6 +33,7 @@
   "build": {
     "appId": "com.aimcub.desktop",
     "productName": "Aimcub",
+    "npmRebuild": false,
     "directories": { "output": "dist" },
     "mac": { "target": "dir", "identity": null }
   }
