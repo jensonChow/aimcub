@@ -14,7 +14,7 @@
  * so it may do node fs/os/path/crypto I/O. @core/domain must never import this.
  */
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -80,6 +80,72 @@ export interface AimStore {
 export function defaultDataDir(): string {
   const override = process.env.AIMCUB_HOME?.trim();
   return override && override.length > 0 ? override : join(homedir(), ".aimcub");
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Provider settings — the LLM config (which endpoint, which key, which model).
+//
+// Persisted to `settings.json` SIBLING to the aim store, so the desktop app and the CLI
+// (`aim setup` / `aim config`) read+write ONE provider config — the same "two faces over one
+// store" idea as the aims. Lives here (not in a shell) because it is local fs persistence,
+// the same class of thing `createJsonFileStore` does; `@core/domain` must never import it.
+// ──────────────────────────────────────────────────────────────────────────
+
+/** Persisted LLM provider config. Structurally the desktop's `ProviderConfig`. */
+export interface ProviderSettings {
+  provider: "anthropic" | "openai-compatible";
+  apiKey: string;
+  /** openai-compatible endpoint; omitted ⇒ the gateway default. */
+  baseURL?: string;
+  /** Model id (required for openai-compatible; optional for anthropic routing). */
+  model?: string;
+}
+
+/** Path to the provider settings file (sibling to the aim store). */
+export function settingsPath(dataDir: string = defaultDataDir()): string {
+  return join(dataDir, "settings.json");
+}
+
+/**
+ * Load provider settings from settings.json. Migrates the legacy `{ anthropicApiKey }` shape
+ * (the first key-only desktop slice) into the multi-provider shape. Returns null when nothing
+ * usable is on file (missing, unparsable, or an unknown provider).
+ */
+export function loadSettings(dataDir: string = defaultDataDir()): ProviderSettings | null {
+  try {
+    const p = settingsPath(dataDir);
+    if (!existsSync(p)) return null;
+    const s = JSON.parse(readFileSync(p, "utf8")) as Record<string, unknown>;
+
+    // Legacy migration: an Anthropic-only key blob from the first desktop slice.
+    if (typeof s.anthropicApiKey === "string" && s.anthropicApiKey.trim() && !s.provider) {
+      return { provider: "anthropic", apiKey: s.anthropicApiKey.trim() };
+    }
+
+    const provider = s.provider;
+    if (provider !== "anthropic" && provider !== "openai-compatible") return null;
+    return {
+      provider,
+      apiKey: typeof s.apiKey === "string" ? s.apiKey : "",
+      baseURL: typeof s.baseURL === "string" && s.baseURL.trim() ? s.baseURL.trim() : undefined,
+      model: typeof s.model === "string" && s.model.trim() ? s.model.trim() : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Persist provider settings to settings.json with owner-only (0600) perms — it holds a key. */
+export function saveSettings(config: ProviderSettings, dataDir: string = defaultDataDir()): void {
+  mkdirSync(dataDir, { recursive: true });
+  const p = settingsPath(dataDir);
+  writeFileSync(p, JSON.stringify(config, null, 2), { encoding: "utf8", mode: 0o600 });
+  // mode on writeFileSync only applies on create; enforce it on overwrite too.
+  try {
+    chmodSync(p, 0o600);
+  } catch {
+    /* best-effort (e.g. Windows) */
+  }
 }
 
 /**

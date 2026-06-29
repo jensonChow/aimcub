@@ -1,4 +1,4 @@
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -6,7 +6,16 @@ import { describe, expect, it } from "vitest";
 
 import type { DecompositionOutput } from "@core/types";
 
-import { createJsonFileStore, materialize, mergeMilestones, defaultDataDir } from "./index";
+import {
+  createJsonFileStore,
+  materialize,
+  mergeMilestones,
+  defaultDataDir,
+  loadSettings,
+  saveSettings,
+  settingsPath,
+  type ProviderSettings,
+} from "./index";
 
 /** A small, semantically valid plan (passes validatePlan: unique keys, acyclic, edges ref nodes). */
 const PLAN = {
@@ -240,5 +249,44 @@ describe("createJsonFileStore · round-trip", () => {
     const { goal } = await store.createGoal({ title: "x", plan: PLAN, memories: [{ content: "  " }] });
     // No assertion on memories via the public API (none exposed yet); just ensure no throw + goal created.
     expect(goal.id).toBeTruthy();
+  });
+});
+
+describe("provider settings (settings.json shared by desktop + CLI)", () => {
+  const freshDir = (): string => mkdtempSync(join(tmpdir(), "aimcub-settings-"));
+
+  it("returns null when nothing is on file", () => {
+    expect(loadSettings(freshDir())).toBeNull();
+  });
+
+  it("round-trips an openai-compatible config", () => {
+    const dir = freshDir();
+    const cfg: ProviderSettings = {
+      provider: "openai-compatible",
+      apiKey: "sk-file",
+      model: "deepseek/deepseek-chat",
+      baseURL: "https://openrouter.ai/api/v1",
+    };
+    saveSettings(cfg, dir);
+    expect(loadSettings(dir)).toEqual(cfg);
+  });
+
+  it("writes settings.json with owner-only (0600) perms — it holds a key", () => {
+    const dir = freshDir();
+    saveSettings({ provider: "anthropic", apiKey: "sk-ant" }, dir);
+    const mode = statSync(settingsPath(dir)).mode & 0o777;
+    expect(mode).toBe(0o600);
+  });
+
+  it("migrates the legacy { anthropicApiKey } blob", () => {
+    const dir = freshDir();
+    writeFileSync(settingsPath(dir), JSON.stringify({ anthropicApiKey: "sk-legacy" }), "utf8");
+    expect(loadSettings(dir)).toEqual({ provider: "anthropic", apiKey: "sk-legacy" });
+  });
+
+  it("returns null for an unknown provider on file", () => {
+    const dir = freshDir();
+    writeFileSync(settingsPath(dir), JSON.stringify({ provider: "gemini", apiKey: "k" }), "utf8");
+    expect(loadSettings(dir)).toBeNull();
   });
 });
