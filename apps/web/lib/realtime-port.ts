@@ -12,7 +12,7 @@
  * `milestones` (or `milestone_completions`) filtered by goal_id, using process.env
  * NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY.
  */
-import type { Milestone, PetStage } from "@core/types";
+import type { Milestone } from "@core/types";
 
 /** A single auto-completion event: a milestone flipped to `completed` server-side. */
 export interface MilestoneCompletedEvent {
@@ -23,15 +23,6 @@ export interface MilestoneCompletedEvent {
 }
 
 export type MilestoneCompletedHandler = (event: MilestoneCompletedEvent) => void;
-
-/** A pet growth event: the goal's pets row was inserted/updated by the grow_pet job. */
-export interface PetChangeEvent {
-  goalId: string;
-  xp: number;
-  stage: PetStage;
-}
-
-export type PetChangeHandler = (event: PetChangeEvent) => void;
 
 export interface RealtimeSubscription {
   unsubscribe(): void;
@@ -47,11 +38,4 @@ export interface RealtimePort {
     snapshot: readonly Milestone[],
     onCompleted: MilestoneCompletedHandler,
   ): RealtimeSubscription;
-
-  /**
-   * Subscribe to pet growth for a goal. Live: postgres_changes INSERT+UPDATE on `pets`
-   * filtered by goal_id (the jobs worker upserts the row after each completion).
-   * Mock: growth is emitted in lockstep with the demo milestone cascade.
-   */
-  subscribePet(goalId: string, onChange: PetChangeHandler): RealtimeSubscription;
 }

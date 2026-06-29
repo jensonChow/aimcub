@@ -19,7 +19,7 @@ export interface EvidenceIngestPort {
 }
 
 /** Read side reused verbatim from the shared contract. */
-export type AimcubReadPort = Pick<AimcubRepo, "listMilestones" | "getGoal" | "listInbox">;
+export type AimcubReadPort = Pick<AimcubRepo, "listMilestones" | "getGoal">;
 
 /**
  * Caller identity derived from the VERIFIED OAuth access token (`sub` claim) in

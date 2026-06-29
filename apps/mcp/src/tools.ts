@@ -6,7 +6,6 @@
  *  - report_evidence  — agent reports progress; validate → normalize → ingest.
  *  - goal_status      — summary of a goal's milestone progress (read path).
  *  - list_milestones  — raw milestone list for a goal (read path).
- *  - get_inbox        — proactive pet → user messages (empty until v1b ships the pet).
  *
  * Ownership: the Worker queries Supabase with service_role (RLS bypassed), so
  * every tool scopes by `deps.identity.ownerId` — the verified OAuth token `sub` —
@@ -153,33 +152,6 @@ export function registerAimcubTools(server: McpServer, deps: ToolDeps): void {
           orderIndex: m.order_index,
           dependsOnId: m.depends_on_id,
           xpReward: m.xp_reward,
-          rarity: m.rarity,
-        })),
-      });
-    },
-  );
-
-  // ── get_inbox ────────────────────────────────────────────────────────────
-  server.registerTool(
-    "get_inbox",
-    {
-      title: "Get inbox",
-      description: "Pull proactive messages from the pet to the user (agent_inbox channel).",
-      inputSchema: { since: z.string().optional() },
-    },
-    async ({ since }) => {
-      // Always the token owner's inbox — there is no ownerId input to spoof.
-      // v1a writes no notifications yet (the pet ships in v1b), so this is
-      // empty in practice, but the read path is live and owner-scoped.
-      const messages = await deps.repo.listInbox(deps.identity.ownerId, since);
-      return jsonResult({
-        messages: messages.map((n) => ({
-          id: n.id,
-          trigger: n.trigger,
-          message: n.persona_msg,
-          refGoalId: n.ref_goal_id,
-          refMilestoneId: n.ref_milestone_id,
-          createdAt: n.created_at ?? null,
         })),
       });
     },

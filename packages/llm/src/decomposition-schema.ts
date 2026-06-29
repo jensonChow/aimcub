@@ -30,7 +30,6 @@ const nullableEnum = (values: readonly string[], description?: string) => ({
 });
 
 const estEffortEnum = ["xs", "s", "m", "l", "xl"] as const;
-const rarityEnum = ["common", "uncommon", "rare", "epic", "legendary"] as const;
 const goalDomainEnum = ["software", "career", "learning", "health", "creative", "custom"] as const;
 const logicEnum = ["any", "all"] as const;
 const completionModeEnum = ["auto", "manual", "auto_then_confirm"] as const;
@@ -90,11 +89,10 @@ const planNodeSchema = {
     title: { type: "string" },
     description: nullableString(),
     est_effort: nullableEnum(estEffortEnum),
-    xp_reward: { type: ["integer", "null"], description: "Positive XP awarded on completion." },
-    rarity: nullableEnum(rarityEnum),
+    xp_reward: { type: ["integer", "null"], description: "Positive effort/contribution weight credited on completion." },
     acceptance_rule: acceptanceRuleSchema,
   },
-  required: ["key", "title", "description", "est_effort", "xp_reward", "rarity", "acceptance_rule"],
+  required: ["key", "title", "description", "est_effort", "xp_reward", "acceptance_rule"],
 } as const;
 
 const planEdgeSchema = {

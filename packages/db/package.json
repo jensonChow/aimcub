@@ -11,8 +11,6 @@
   },
   "dependencies": {
     "@core/domain": "workspace:*",
-    "@core/llm": "workspace:*",
-    "@core/proactive": "workspace:*",
     "@core/types": "workspace:*"
   },
   "devDependencies": {

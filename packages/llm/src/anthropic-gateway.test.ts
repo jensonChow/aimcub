@@ -43,7 +43,7 @@ describe("AnthropicLlmGateway · complete", () => {
     const { meter, records } = recordingMeter();
     const gw = new AnthropicLlmGateway({ meter, ownerId: "owner-1", client });
 
-    const res = await gw.complete({ task: "nudge", prompt: "say hi" });
+    const res = await gw.complete({ task: "classify", prompt: "say hi" });
 
     expect(res.output).toBe("hello world");
     expect(res.usage.inputTokens).toBe(10);
@@ -53,17 +53,14 @@ describe("AnthropicLlmGateway · complete", () => {
     expect(create).toHaveBeenCalledOnce();
     // metered
     expect(records).toHaveLength(1);
-    expect(records[0]).toMatchObject({ ownerId: "owner-1", task: "nudge" });
+    expect(records[0]).toMatchObject({ ownerId: "owner-1", task: "classify" });
   });
 });
 
 describe("AnthropicLlmGateway · model routing via routeModel", () => {
   const cases: Array<[LlmTask, string]> = [
-    ["goal_complete", Models.opus],
     ["decompose", Models.sonnet],
     ["replan", Models.sonnet],
-    ["celebrate", Models.sonnet],
-    ["nudge", Models.haiku],
     ["classify", Models.haiku],
     ["extract_memory", Models.haiku],
   ];

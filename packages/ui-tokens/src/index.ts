@@ -12,16 +12,6 @@ export const colors = {
   success: "#39d98a",
   warning: "#ffb020",
   danger: "#ff5c5c",
-  // Pet stage colors (egg -> baby -> adult)
-  stageEgg: "#9aa3b2",
-  stageBaby: "#7c5cff",
-  stageAdult: "#39d98a",
-  // Collection rarity
-  rarityCommon: "#9aa3b2",
-  rarityUncommon: "#39d98a",
-  rarityRare: "#3aa0ff",
-  rarityEpic: "#a85cff",
-  rarityLegendary: "#ffb020",
 } as const;
 
 export const space = { xs: 4, sm: 8, md: 16, lg: 24, xl: 40 } as const;

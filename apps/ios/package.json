@@ -2,5 +2,5 @@
   "name": "@app/ios",
   "private": true,
   "version": "0.0.0",
-  "description": "Placeholder — iOS app (Expo RN) activated in v2. No build/test scripts so Turbo skips it."
+  "description": "Native SwiftUI iOS app (Xcode/XcodeGen). No build/test scripts so Turbo/pnpm skip it; see README.md."
 }

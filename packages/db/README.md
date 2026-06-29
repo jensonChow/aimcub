@@ -25,12 +25,15 @@ against `@core/types` (the single source of truth in zod) in CI.
 
 - **Group A (user read/write)**: `goals` / `emitters` / `memories`.
 - **Group B (user read-only, writes go through service_role)**: `milestones` / `evidence` / `milestone_completions` /
-  `pets` / `collectibles` / `notifications` / `subscriptions` — prevents users from forging completions/evidence/XP/subscription tiers.
+  `subscriptions` — prevents users from forging completions/evidence/entitlement tiers (derived state is anti-cheat).
 - **jobs**: internal table, no user access whatsoever; `service_role` bypasses RLS. `claim_jobs(batch)` lets a worker atomically claim a batch.
+
+> The emotional-shell tables (`pets` / `collectibles` / `notifications`) were dropped in migration `0011`
+> when the product pivoted to pure aim management. Migrations `0001`-`0010` remain as immutable history.
 
 ## Key invariants
 
 - `evidence` is append-only; `(emitter_id, source_event_id)` is unique = idempotency key.
 - `milestone_completions.milestone_id` is unique = a node can only be completed once.
-- `pets.goal_id` is unique = one pet per goal.
 - `assert_evidence_emitter_owner` trigger: the evidence's emitter must belong to the same owner (prevents cross-user writes).
+- `jobs.type` is constrained to `judge_evidence` / `extract_memory` (the surviving job kinds).

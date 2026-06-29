@@ -9,8 +9,8 @@ The server spine that turns raw evidence into milestone completions:
 2. **Jobs worker** — claims `judge_evidence` jobs, loads the target milestone's `acceptance_rule`
    plus its evidence, runs the pure `@core` `evaluate()` kernel, and (when the rule passes AND the
    `completion_mode` allows auto) writes an **idempotent** `milestone_completion`
-   (`decided_by = 'rule_auto'`) and enqueues follow-up jobs (`grow_pet`, `mint_collectible`,
-   `deliver_notification`).
+   (`decided_by = 'rule_auto'`). A milestone completion is the end of the pipeline — no follow-up
+   jobs are enqueued.
 
 Both pieces are written as **pure, dependency-injected functions** (`handleIngest`, `runJob`) so
 they are unit-testable in Node/Vitest without Deno, Supabase, or any network. The Deno entry
@@ -61,7 +61,8 @@ migrations, or any other worktree's package.
    `source_event_id`, `summary`, and `trust_score`.
 3. **Judge AUTO-completes on trusted evidence**: a verified commit (trust 1.0) satisfying an
    `auto_verifiable` `commit_pattern` clause with `completion_mode: auto` writes a `rule_auto`
-   completion carrying the milestone's `xp_reward` and enqueues `grow_pet`.
+   completion carrying the milestone's `xp_reward` (the neutral effort/contribution weight), and
+   the pipeline ends there with no follow-up job.
 4. **Judge does NOT auto-complete on low-trust evidence**: an unverified commit (trust 0.7 <
    `AUTO_VERIFY_MIN_TRUST` 0.8) does not produce a completion.
 5. **Manual mode guard**: even when the rule passes, `completion_mode: manual` does not auto-complete.

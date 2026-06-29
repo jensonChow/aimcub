@@ -1,6 +1,6 @@
 # v1a Parallel Worktrees
 
-**v1a goal**: Web sets a goal → Sonnet decomposes it → MCP/GitHub evidence → milestone **auto-lights** (no pet yet). See `CLAUDE.md` and the plan doc for the full picture.
+**v1a goal**: Web sets a goal → Sonnet decomposes it → MCP/GitHub evidence → milestone **auto-lights**. See `CLAUDE.md` and `docs/vision.md` for the full picture.
 
 Linked git worktrees live under `./worktrees/` (gitignored), each on a `v1a/*` branch cut from `main`.
 
@@ -14,7 +14,7 @@ The frozen `@core/types` + `@core/api-client` contract is how the worktrees stay
 | `worktrees/data` | `v1a/data` | `packages/db`, `packages/api` | supabase-js `AimcubRepo` implementation, migrations evolution, RLS tests; research + document the aud-bound-token P0 (MCP auth) |
 | `worktrees/decompose` | `v1a/decompose` | `packages/llm` | Anthropic `LlmGateway` implementation + goal→milestones decomposition pipeline (prompt + structured output → `validatePlan`) |
 | `worktrees/evidence` | `v1a/evidence` | `packages/db/supabase/functions/` | `ingest` Edge Function (auth → idempotent dedup → normalize → write evidence → enqueue jobs) + jobs worker (`claim_jobs` → `evaluate()` → completions) |
-| `worktrees/mcp` | `v1a/mcp` | `apps/mcp` | OAuth 2.1 resource server (JWT/JWKS verify + `aud`) + `report_evidence` tool + `get_inbox` |
+| `worktrees/mcp` | `v1a/mcp` | `apps/mcp` | OAuth 2.1 resource server (JWT/JWKS verify + `aud`) + `report_evidence` / `goal_status` / `list_milestones` tools |
 | `worktrees/web` | `v1a/web` | `apps/web` | Goal-creation UI, decomposition view, Realtime milestone auto-light, progress bar |
 
 ## Dependency note

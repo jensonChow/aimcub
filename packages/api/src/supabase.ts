@@ -12,7 +12,7 @@
  *    as defense-in-depth and to make the query intent obvious.
  *  - **Server path** uses a client authenticated with the `service_role` key, which BYPASSES
  *    RLS. This is the only path allowed to write the derived / anti-cheat tables
- *    (milestones, evidence, completions, pets, collectibles). It must run server-side only.
+ *    (milestones, evidence, completions). It must run server-side only.
  *
  * To stay testable without a network or credentials, this module is written against a small
  * structural port ({@link SupabaseLike}) rather than importing the concrete client type. The
@@ -20,12 +20,9 @@
  * builds one from env. Tests inject a fake that records the query chain.
  */
 import type {
-  Collectible,
   Evidence,
   Goal,
   Milestone,
-  Notification,
-  Pet,
 } from "@core/types";
 
 import type {
@@ -158,44 +155,6 @@ export class SupabaseAimcubRepo implements AimcubRepo {
       .select()
       .eq("goal_id", goalId)
       .order("order_index", { ascending: true });
-    return unwrap(res) ?? [];
-  }
-
-  async getPet(goalId: string): Promise<Pet | null> {
-    const res = await this.user.from<Pet>("pets").select().eq("goal_id", goalId).maybeSingle();
-    return unwrap(res);
-  }
-
-  async listCollectibles(ownerId: string): Promise<Collectible[]> {
-    const res = await this.user
-      .from<Collectible>("collectibles")
-      .select()
-      .eq("owner_id", ownerId)
-      .order("minted_at", { ascending: false });
-    return unwrap(res) ?? [];
-  }
-
-  async listInbox(ownerId: string, since?: string): Promise<Notification[]> {
-    let q = this.user
-      .from<Notification>("notifications")
-      .select()
-      .eq("owner_id", ownerId)
-      // agent_inbox is a text[] column; `contains` → PostgREST `cs.{agent_inbox}`.
-      .contains("channels", ["agent_inbox"]);
-    if (since !== undefined) q = q.gte("created_at", since);
-    const res = await q.order("created_at", { ascending: true });
-    return unwrap(res) ?? [];
-  }
-
-  async listNotifications(ownerId: string, limit = 20): Promise<Notification[]> {
-    const res = await this.user
-      .from<Notification>("notifications")
-      .select()
-      .eq("owner_id", ownerId)
-      // in_app is the web surface; channels is a text[] column → PostgREST `cs.{in_app}`.
-      .contains("channels", ["in_app"])
-      .order("created_at", { ascending: false })
-      .limit(limit);
     return unwrap(res) ?? [];
   }
 

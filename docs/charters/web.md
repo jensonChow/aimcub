@@ -1,7 +1,7 @@
 # Worktree Charter — `v1a/web` (the Aimcub web app)
 
 ## Scope
-Deliver the v1a web experience: **set a goal → see it decompose → watch a milestone light up by itself**, fully demoable locally with mocked data and **no backend**. No pet (that is v1b).
+Deliver the v1a web experience: **set a goal → see it decompose → watch a milestone light up by itself**, fully demoable locally with mocked data and **no backend**. The web app renders goals + milestones + decomposition + progress + auth only.
 
 ## Owned paths
 - `apps/web/**`
@@ -11,7 +11,7 @@ I do **not** touch `packages/types` (frozen domain contract), `packages/core`, `
 
 ## Deliverables
 1. **New Goal form** (`title` / `description` / `target_date`) that calls an *injected* data layer to create a goal and immediately render its decomposition.
-2. **Decomposition / milestones view**: each milestone shows status, an acceptance-rule summary, `xp_reward`, plus a goal **progress bar** (completed / total).
+2. **Decomposition / milestones view**: each milestone shows status, an acceptance-rule summary, `xp_reward` (a neutral effort/contribution weight), plus a goal **progress bar** (completed / total).
 3. **Milestone auto-light** behind a `RealtimePort` interface. The mock implementation flips a `pending`/`in_progress` milestone to `completed` after a short delay so the "it lights up by itself" aha is demoable with zero backend. Real Supabase Realtime wiring is stubbed with `// TODO(v1a-live)`.
 4. **In-memory mock data layer** (`MockGoalRepo`) seeded with sample goals + milestones, conforming to the `AimcubRepo` read surface from `@core/api-client`. Reads secrets from `process.env` only; never hardcodes.
 5. **Unit tests** for pure helpers (progress calculation + acceptance-rule summary).
@@ -22,7 +22,7 @@ I do **not** touch `packages/types` (frozen domain contract), `packages/core`, `
 - Realtime is an **injected port** (`RealtimePort`) with a `MockRealtime` driver. Client component subscribes; server components stay pure.
 
 ## Mock strategy
-- `MockGoalRepo` implements the read slice of `AimcubRepo` (`listGoals`, `getGoal`, `listMilestones`) plus `createGoal`, holding state in module memory. Goal creation runs a deterministic local "decomposer" (no LLM call) that emits a `DecompositionOutput`-shaped plan and materializes `Milestone[]` via `@core/domain` validation + `rarityForEffort`.
+- `MockGoalRepo` implements the read slice of `AimcubRepo` (`listGoals`, `getGoal`, `listMilestones`) plus `createGoal`, holding state in module memory. Goal creation runs a deterministic local "decomposer" (no LLM call) that emits a `DecompositionOutput`-shaped plan and materializes `Milestone[]` via `@core/domain` validation.
 - `MockRealtime` simulates evidence-driven auto-completion: after subscribe, it flips the next eligible milestone to `completed` on a timer and notifies subscribers. This stands in for the Supabase Realtime channel that, in production, fires when the Edge Function writes a `milestone_completions` row.
 - No real network, no Supabase client, no Claude API call is made anywhere. `ANTHROPIC_API_KEY` / `NEXT_PUBLIC_SUPABASE_URL` are read from env only to demonstrate the wiring point and are never required.
 

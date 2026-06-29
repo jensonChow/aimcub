@@ -43,33 +43,14 @@ export type EmitterKind = z.infer<typeof EmitterKind>;
 export const EstEffort = z.enum(["xs", "s", "m", "l", "xl"]);
 export type EstEffort = z.infer<typeof EstEffort>;
 
-export const Rarity = z.enum(["common", "uncommon", "rare", "epic", "legendary"]);
-export type Rarity = z.infer<typeof Rarity>;
-
-/** v1 has three stages: egg → baby → adult. The remaining stages are reserved for later (stageForXp does not produce them yet). */
-export const PetStage = z.enum(["egg", "baby", "adult", "juvenile", "elder", "ascended"]);
-export type PetStage = z.infer<typeof PetStage>;
-
-/** Evolution branch: determined by the domain distribution of the goal's completed milestones (mostly backend → dragon, mostly frontend → bird). */
-export const PetBranch = z.enum(["unset", "dragon", "bird", "turtle", "fox"]);
-export type PetBranch = z.infer<typeof PetBranch>;
-
 export const MemoryKind = z.enum(["episodic", "semantic", "procedural"]);
 export type MemoryKind = z.infer<typeof MemoryKind>;
 
 export const MemoryStatus = z.enum(["active", "pending", "deleted"]);
 export type MemoryStatus = z.infer<typeof MemoryStatus>;
 
-export const NotificationChannel = z.enum(["in_app", "email", "agent_inbox", "push", "web_push"]);
-export type NotificationChannel = z.infer<typeof NotificationChannel>;
-
-export const NotificationStatus = z.enum(["queued", "sent", "delivered", "failed", "suppressed"]);
-export type NotificationStatus = z.infer<typeof NotificationStatus>;
-
-export const NotificationTrigger = z.enum(["milestone_done", "goal_done", "stale", "deadline_near", "scheduled"]);
-export type NotificationTrigger = z.infer<typeof NotificationTrigger>;
-
-export const JobType = z.enum(["judge_evidence", "grow_pet", "mint_collectible", "deliver_notification", "extract_memory"]);
+/** Background work derived from the evidence stream. `judge_evidence` evaluates milestones against their acceptance_rule; `extract_memory` distills durable context (the memory pillar). */
+export const JobType = z.enum(["judge_evidence", "extract_memory"]);
 export type JobType = z.infer<typeof JobType>;
 
 export const JobStatus = z.enum(["queued", "running", "done", "failed"]);
@@ -219,11 +200,11 @@ export const Milestone = z.object({
   description: z.string().default(""),
   status: MilestoneStatus.default("pending"),
   order_index: z.number().int().nonnegative(),
-  /** Single-parent dependency (linear / shallow tree); upgraded to a DAG edge table during the v3 generalization. null = no prerequisite. */
+  /** Single-parent dependency (linear / shallow tree); upgraded to a DAG edge table when goals generalize. null = no prerequisite. */
   depends_on_id: z.string().uuid().nullable().default(null),
   acceptance_rule: AcceptanceRule,
+  /** Neutral effort/contribution weight (sums into goal progress; an input to eval weighting). Not a gamification score. */
   xp_reward: z.number().int().positive().default(10),
-  rarity: Rarity.default("common"),
   completed_at: z.string().nullable().default(null),
   metadata: z.record(z.unknown()).default({}),
 });
@@ -241,7 +222,6 @@ export const PlanNode = z.object({
   description: z.string().default(""),
   est_effort: EstEffort.default("m"),
   xp_reward: z.number().int().positive().default(10),
-  rarity: Rarity.default("common"),
   acceptance_rule: AcceptanceRule,
 });
 export type PlanNode = z.infer<typeof PlanNode>;
@@ -282,45 +262,14 @@ export const MilestoneCompletion = z.object({
   owner_id: z.string().uuid(),
   decided_by: DecidedBy,
   triggering_evidence_ids: z.array(z.string().uuid()).default([]),
+  /** Effort/contribution weight credited by this completion (mirrors the milestone's xp_reward). */
   awarded_xp: z.number().int().nonnegative().default(0),
-  minted_collectible_id: z.string().uuid().nullable().default(null),
   created_at: z.string().optional(),
 });
 export type MilestoneCompletion = z.infer<typeof MilestoneCompletion>;
 
 // ──────────────────────────────────────────────────────────────────────────
-// Pet (one per goal) / Collectible
-// ──────────────────────────────────────────────────────────────────────────
-
-export const Pet = z.object({
-  id: z.string().uuid(),
-  owner_id: z.string().uuid(),
-  goal_id: z.string().uuid(), // ★ one pet per goal (UNIQUE)
-  species: z.string().default("default"),
-  branch: PetBranch.default("unset"),
-  stage: PetStage.default("egg"),
-  xp: z.number().int().nonnegative().default(0),
-  mood: z.number().min(0).max(1).default(0.7),
-  sprite_set: z.string().default("default"),
-  updated_at: z.string().optional(),
-});
-export type Pet = z.infer<typeof Pet>;
-
-export const Collectible = z.object({
-  id: z.string().uuid(),
-  owner_id: z.string().uuid(),
-  goal_id: z.string().uuid().nullable().default(null),
-  milestone_id: z.string().uuid().nullable().default(null),
-  kind: z.enum(["milestone_badge", "goal_trophy", "achievement", "seasonal"]).default("milestone_badge"),
-  rarity: Rarity, // deterministic = the milestone's difficulty tier, not random
-  metadata: z.record(z.unknown()).default({}),
-  image_url: z.string().nullable().default(null),
-  minted_at: z.string().optional(),
-});
-export type Collectible = z.infer<typeof Collectible>;
-
-// ──────────────────────────────────────────────────────────────────────────
-// Memory / Notification / Subscription / Job
+// Memory / Subscription / Job
 // ──────────────────────────────────────────────────────────────────────────
 
 export const Memory = z.object({
@@ -336,21 +285,6 @@ export const Memory = z.object({
   created_at: z.string().optional(),
 });
 export type Memory = z.infer<typeof Memory>;
-
-export const Notification = z.object({
-  id: z.string().uuid(),
-  owner_id: z.string().uuid(),
-  trigger: NotificationTrigger,
-  channels: z.array(NotificationChannel).default([]),
-  dedup_key: z.string().nullable().default(null),
-  ref_goal_id: z.string().uuid().nullable().default(null),
-  ref_milestone_id: z.string().uuid().nullable().default(null),
-  persona_msg: z.string().default(""),
-  status: NotificationStatus.default("queued"),
-  scheduled_for: z.string().optional(),
-  created_at: z.string().optional(),
-});
-export type Notification = z.infer<typeof Notification>;
 
 export const Subscription = z.object({
   owner_id: z.string().uuid(),

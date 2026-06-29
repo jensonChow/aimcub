@@ -353,7 +353,6 @@ describe("createLiveDeps", () => {
     const deps = createLiveDeps(new FakeSupabaseDb());
     expect(typeof deps.repo.getGoal).toBe("function");
     expect(typeof deps.repo.listMilestones).toBe("function");
-    expect(typeof deps.repo.listInbox).toBe("function");
     expect(deps.ingest).toBeInstanceOf(SupabaseEvidenceIngest);
   });
 });

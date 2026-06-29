@@ -4,13 +4,10 @@
  * v0: defines the AimcubRepo interface (using domain types); the concrete supabase-js implementation lands in v1a.
  */
 import type {
-  Collectible,
   Evidence,
   Goal,
   GoalDomain,
   Milestone,
-  Notification,
-  Pet,
 } from "@core/types";
 
 export interface CreateGoalInput {
@@ -37,7 +34,7 @@ export interface IngestEvidenceInput {
 
 /**
  * Data-access contract shared across all clients. The read path (user identity + RLS) is separated from the machine write path (service_role):
- * creating goals = user path; inserting milestones / ingesting evidence / growing pets = server path.
+ * creating goals = user path; inserting milestones / ingesting evidence = server path.
  */
 export interface AimcubRepo {
   // User path (reads/writes under RLS)
@@ -45,12 +42,6 @@ export interface AimcubRepo {
   getGoal(id: string): Promise<Goal | null>;
   listGoals(ownerId: string): Promise<Goal[]>;
   listMilestones(goalId: string): Promise<Milestone[]>;
-  getPet(goalId: string): Promise<Pet | null>;
-  listCollectibles(ownerId: string): Promise<Collectible[]>;
-  /** agent_inbox channel: proactive messages from the pet to the user (Claude Code pulls these via the MCP get_inbox call). */
-  listInbox(ownerId: string, since?: string): Promise<Notification[]>;
-  /** in_app channel: recent notifications for the web bell/panel, newest first. */
-  listNotifications(ownerId: string, limit?: number): Promise<Notification[]>;
   /** Persist the decomposition snapshot on the goal and (by default) activate it. RLS-scoped to the caller. */
   updateGoalPlan(goalId: string, planJson: unknown, status?: Goal["status"]): Promise<Goal>;
 

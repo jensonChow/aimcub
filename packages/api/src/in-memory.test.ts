@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { Collectible, MilestoneCompletion, Notification, Pet } from "@core/types";
+import type { MilestoneCompletion } from "@core/types";
 
 import { InMemoryAimcubRepo, InvariantError } from "./in-memory.js";
 import type { AimcubRepo } from "./contract.js";
@@ -58,38 +58,6 @@ describe("user path — RLS-shaped reads", () => {
     expect(ms.map((m) => m.order_index)).toEqual([1, 2]);
   });
 
-  it("listInbox only returns agent_inbox notifications for the owner, filtered by since", async () => {
-    const repo = makeRepo();
-    repo.addNotification(notification(OWNER_A, ["agent_inbox"], "2026-06-01T00:00:00.000Z"));
-    repo.addNotification(notification(OWNER_A, ["in_app"], "2026-06-02T00:00:00.000Z")); // wrong channel
-    repo.addNotification(notification(OWNER_B, ["agent_inbox"], "2026-06-03T00:00:00.000Z")); // wrong owner
-    repo.addNotification(notification(OWNER_A, ["agent_inbox"], "2026-06-05T00:00:00.000Z"));
-
-    const all = await repo.listInbox(OWNER_A);
-    expect(all).toHaveLength(2);
-
-    const since = await repo.listInbox(OWNER_A, "2026-06-04T00:00:00.000Z");
-    expect(since).toHaveLength(1);
-    expect(since[0]?.created_at).toBe("2026-06-05T00:00:00.000Z");
-  });
-
-  it("listNotifications only returns in_app notifications for the owner, newest first, limited", async () => {
-    const repo = makeRepo();
-    repo.addNotification(notification(OWNER_A, ["in_app"], "2026-06-01T00:00:00.000Z"));
-    repo.addNotification(notification(OWNER_A, ["agent_inbox"], "2026-06-02T00:00:00.000Z")); // wrong channel
-    repo.addNotification(notification(OWNER_B, ["in_app"], "2026-06-03T00:00:00.000Z")); // wrong owner
-    repo.addNotification(notification(OWNER_A, ["in_app", "agent_inbox"], "2026-06-05T00:00:00.000Z"));
-
-    const all = await repo.listNotifications(OWNER_A);
-    expect(all.map((n) => n.created_at)).toEqual([
-      "2026-06-05T00:00:00.000Z",
-      "2026-06-01T00:00:00.000Z",
-    ]);
-
-    const limited = await repo.listNotifications(OWNER_A, 1);
-    expect(limited).toHaveLength(1);
-    expect(limited[0]?.created_at).toBe("2026-06-05T00:00:00.000Z");
-  });
 });
 
 describe("invariant — evidence idempotency by (emitter_id, source_event_id)", () => {
@@ -156,26 +124,6 @@ describe("invariant — evidence idempotency by (emitter_id, source_event_id)", 
   });
 });
 
-describe("invariant — one pet per goal", () => {
-  it("rejects a second pet for the same goal", async () => {
-    const repo = makeRepo();
-    const g = await repo.createGoal({ ownerId: OWNER_A, title: "G" });
-    repo.upsertPet(pet("pet-1", OWNER_A, g.id));
-    expect(() => repo.upsertPet(pet("pet-2", OWNER_A, g.id))).toThrow(InvariantError);
-    expect((await repo.getPet(g.id))?.id).toBe("pet-1");
-  });
-
-  it("upserting the same pet id updates in place", async () => {
-    const repo = makeRepo();
-    const g = await repo.createGoal({ ownerId: OWNER_A, title: "G" });
-    repo.upsertPet(pet("pet-1", OWNER_A, g.id));
-    repo.upsertPet({ ...pet("pet-1", OWNER_A, g.id), xp: 50, stage: "baby" });
-    const p = await repo.getPet(g.id);
-    expect(p?.xp).toBe(50);
-    expect(p?.stage).toBe("baby");
-  });
-});
-
 describe("invariant — milestone_completions unique by milestone_id", () => {
   it("rejects completing the same milestone twice", () => {
     const repo = makeRepo();
@@ -184,17 +132,6 @@ describe("invariant — milestone_completions unique by milestone_id", () => {
       "milestone_completion_unique",
     );
     expect(repo.getCompletion("m-1")?.id).toBe("c-1");
-  });
-});
-
-describe("listCollectibles", () => {
-  it("isolates by owner and sorts newest first", async () => {
-    const repo = makeRepo();
-    repo.addCollectible(collectible("col-1", OWNER_A, "2026-06-01T00:00:00.000Z"));
-    repo.addCollectible(collectible("col-2", OWNER_A, "2026-06-03T00:00:00.000Z"));
-    repo.addCollectible(collectible("col-3", OWNER_B, "2026-06-02T00:00:00.000Z"));
-    const out = await repo.listCollectibles(OWNER_A);
-    expect(out.map((c) => c.id)).toEqual(["col-2", "col-1"]);
   });
 });
 
@@ -219,56 +156,8 @@ function milestone(goalId: string, ownerId: string, title: string, order: number
       completion_mode: "auto_then_confirm" as const,
     },
     xp_reward: 10,
-    rarity: "common" as const,
     completed_at: null,
     metadata: {},
-  };
-}
-
-function pet(id: string, ownerId: string, goalId: string): Pet {
-  return {
-    id,
-    owner_id: ownerId,
-    goal_id: goalId,
-    species: "default",
-    branch: "unset",
-    stage: "egg",
-    xp: 0,
-    mood: 0.7,
-    sprite_set: "default",
-  };
-}
-
-function collectible(id: string, ownerId: string, mintedAt: string): Collectible {
-  return {
-    id,
-    owner_id: ownerId,
-    goal_id: null,
-    milestone_id: null,
-    kind: "milestone_badge",
-    rarity: "common",
-    metadata: {},
-    image_url: null,
-    minted_at: mintedAt,
-  };
-}
-
-function notification(
-  ownerId: string,
-  channels: Notification["channels"],
-  createdAt: string,
-): Notification {
-  return {
-    id: `n-${createdAt}`,
-    owner_id: ownerId,
-    trigger: "milestone_done",
-    channels,
-    dedup_key: null,
-    ref_goal_id: null,
-    ref_milestone_id: null,
-    persona_msg: "",
-    status: "queued",
-    created_at: createdAt,
   };
 }
 
@@ -280,7 +169,6 @@ function completion(id: string, milestoneId: string, ownerId: string): Milestone
     decided_by: "rule_auto",
     triggering_evidence_ids: [],
     awarded_xp: 10,
-    minted_collectible_id: null,
   };
 }
 

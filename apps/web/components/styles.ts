@@ -4,7 +4,7 @@
  */
 import { colors, radius, type Tokens } from "@ui/tokens";
 import type { CSSProperties } from "react";
-import type { MilestoneStatus, PetStage, Rarity } from "@core/types";
+import type { MilestoneStatus } from "@core/types";
 
 export { colors, radius } from "@ui/tokens";
 export type { Tokens };
@@ -28,32 +28,5 @@ export function statusColor(status: MilestoneStatus): string {
       return colors.textMuted;
     case "pending":
       return colors.textMuted;
-  }
-}
-
-export function stageColor(stage: PetStage): string {
-  switch (stage) {
-    case "egg":
-      return colors.stageEgg;
-    case "baby":
-      return colors.stageBaby;
-    default:
-      // adult + any future stages (juvenile/elder/ascended) share the grown palette for now.
-      return colors.stageAdult;
-  }
-}
-
-export function rarityColor(rarity: Rarity): string {
-  switch (rarity) {
-    case "common":
-      return colors.rarityCommon;
-    case "uncommon":
-      return colors.rarityUncommon;
-    case "rare":
-      return colors.rarityRare;
-    case "epic":
-      return colors.rarityEpic;
-    case "legendary":
-      return colors.rarityLegendary;
   }
 }

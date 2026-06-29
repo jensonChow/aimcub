@@ -14,7 +14,7 @@
 import type { CreateGoalInput } from "@core/api-client";
 import { SupabaseAimcubRepo, type SupabaseLike } from "@core/api-client";
 import { AnthropicLlmGateway, decompose, type UsageMeter } from "@core/llm";
-import type { Collectible, DecompositionOutput, Goal, Milestone, Notification, Pet } from "@core/types";
+import type { DecompositionOutput, Goal, Milestone } from "@core/types";
 import type { DataPort } from "./data-port";
 import { localDecompose } from "./decompose";
 import { readEnv } from "./env";
@@ -45,18 +45,6 @@ export class SupabaseDataPort implements DataPort {
 
   listMilestones(goalId: string): Promise<Milestone[]> {
     return this.repo.listMilestones(goalId);
-  }
-
-  getPet(goalId: string): Promise<Pet | null> {
-    return this.repo.getPet(goalId);
-  }
-
-  listCollectibles(ownerId: string): Promise<Collectible[]> {
-    return this.repo.listCollectibles(ownerId);
-  }
-
-  listNotifications(ownerId: string, limit?: number): Promise<Notification[]> {
-    return this.repo.listNotifications(ownerId, limit);
   }
 
   async createGoal(input: CreateGoalInput): Promise<{ goal: Goal; milestones: Milestone[] }> {

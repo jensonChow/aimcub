@@ -34,9 +34,8 @@ LLM gateway + goal-decomposition pipeline for Aimcub v1a.
   `DecompositionOutput` and avoids recursion per the flat nodes+edges design).
 
 ## Model routing (locked by the v0 contract — not changed here)
-- `goal_complete` → Opus (`claude-opus-4-8`)
-- `decompose` / `replan` / `celebrate` → Sonnet (`claude-sonnet-4-6`)
-- `nudge` / `classify` / `extract_memory` → Haiku (`claude-haiku-4-5-...`)
+- `decompose` / `replan` → Sonnet (`claude-sonnet-4-6`)
+- `classify` / `extract_memory` → Haiku (`claude-haiku-4-5-...`)
 `decompose` therefore runs on Sonnet.
 
 ## Acceptance criteria

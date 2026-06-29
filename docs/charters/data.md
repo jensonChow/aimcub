@@ -18,15 +18,14 @@ if it looks wrong it goes in `result.blockers`, it is never edited.
    from the **machine write path** (service_role client) exactly as the interface doc and the
    RLS security groups in `0001_init.sql` describe:
    - User path (Group A read+write / Group B read-only under RLS):
-     `createGoal`, `getGoal`, `listGoals`, `listMilestones`, `getPet`, `listCollectibles`, `listInbox`.
+     `createGoal`, `getGoal`, `listGoals`, `listMilestones`.
    - Server path (service_role, bypasses RLS — writes Group B derived/anti-cheat state):
      `insertMilestones`, `ingestEvidence`.
 2. `InMemoryAimcubRepo` — full in-memory mock of the same interface, for tests and local dev.
    Enforces the three DB invariants in code:
    - evidence is idempotent/unique by `(emitter_id, source_event_id)` when `source_event_id` is non-null;
    - `milestone_completions` unique by `milestone_id` (modeled via the completion set; the repo
-     surface that touches it is evidence-driven, so we expose the invariant guard for the worker);
-   - one pet per goal (`pets.goal_id` unique).
+     surface that touches it is evidence-driven, so we expose the invariant guard for the worker).
 3. Vitest tests exercising the InMemory invariants + a mocked-client conformance test for Supabase.
 4. `packages/db/AUTH_FINDINGS.md` — the aud-bound-token (RFC 8707) P0 research + recommendation
    that feeds the `mcp` worktree.
@@ -46,7 +45,7 @@ if it looks wrong it goes in `result.blockers`, it is never edited.
 - `pnpm --filter @core/api-client --filter @core/db run test` is green.
 - `SupabaseAimcubRepo` and `InMemoryAimcubRepo` both structurally satisfy `AimcubRepo`
   (asserted by a `satisfies`/typed-construction test).
-- InMemory invariant tests cover: evidence idempotency dedup, one-pet-per-goal, RLS-scoped reads
+- InMemory invariant tests cover: evidence idempotency dedup, RLS-scoped reads
   (a user only sees their own rows), milestone-completion uniqueness guard.
 
 ## Live-integration TODOs (deferred to integration once credentials exist)
@@ -57,4 +56,4 @@ Marked in code with `// TODO(v1a-live): ...`:
   `AUTH_FINDINGS.md` once the `mcp` worktree picks an auth model.
 - `ingestEvidence` idempotency currently relies on the DB unique index returning a conflict; the
   live path must `upsert ... on conflict (emitter_id, source_event_id) do nothing` + re-select.
-- `getPet` / completions assume the jobs worker (other worktree) has materialized derived state.
+- Milestone completions assume the jobs worker (other worktree) has materialized derived state.

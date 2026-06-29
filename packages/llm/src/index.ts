@@ -4,7 +4,7 @@
  * v0: model routing + gateway interface; the concrete SDK calls are wired up in v1a (to avoid introducing a network dependency in v0).
  */
 
-/** 2026 model IDs (lean-first: decompose/replan/celebrate use Sonnet, high-frequency nudge/classify use Haiku; Opus only for highlight moments). */
+/** 2026 model IDs (lean-first: aim decompose/replan use Sonnet, high-frequency classify/extract use Haiku; Opus reserved for explicit overrides on hard reasoning). */
 export const Models = {
   opus: "claude-opus-4-8",
   sonnet: "claude-sonnet-4-6",
@@ -13,24 +13,17 @@ export const Models = {
 export type ModelId = (typeof Models)[keyof typeof Models];
 
 export type LlmTask =
-  | "decompose" // initial decomposition
+  | "decompose" // initial aim decomposition
   | "replan" // incremental replanning
-  | "celebrate" // milestone-reached celebration (high emotional value)
-  | "goal_complete" // goal-completion grand celebration (rare highlight)
-  | "nudge" // routine proactive message (high frequency)
-  | "classify" // classification/scoring/phrasing
-  | "extract_memory"; // memory extraction
+  | "classify" // classification / scoring / eval phrasing
+  | "extract_memory"; // memory extraction (the memory pillar)
 
-/** Task -> model routing. Lean version: Opus is reserved only for goal_complete; everything else uses Sonnet/Haiku. */
+/** Task -> model routing. Lean version: decompose/replan use Sonnet, the high-frequency classify/extract tasks use Haiku. */
 export function routeModel(task: LlmTask): ModelId {
   switch (task) {
-    case "goal_complete":
-      return Models.opus;
     case "decompose":
     case "replan":
-    case "celebrate":
       return Models.sonnet;
-    case "nudge":
     case "classify":
     case "extract_memory":
       return Models.haiku;
@@ -80,14 +73,23 @@ export type {
 } from "./anthropic-gateway";
 export { decompose } from "./decompose";
 export type { DecomposeInput, DecomposeResult } from "./decompose";
+export { localDecompose } from "./local-decompose";
+export type { DecomposeRequest } from "./local-decompose";
 export { decompositionJsonSchema } from "./decomposition-schema";
 export type { DecompositionJsonSchema } from "./decomposition-schema";
 
-// ── v1b wiring ───────────────────────────────────────────────────────────────
-// Pet-voice pipelines (emotional shell): shared persona + celebrate/nudge.
-export { PERSONA_SYSTEM_PROMPT, PERSONA_MESSAGE_MAX_CHARS } from "./persona";
-export type { PersonaMessageResult } from "./persona";
-export { celebrate } from "./celebrate";
-export type { CelebrateInput } from "./celebrate";
-export { nudge } from "./nudge";
-export type { NudgeInput } from "./nudge";
+// Clarifying-questions step (the planning "feedback step") + its offline fallback.
+export { clarify, localClarify, validateClarify, buildRefinedDescription } from "./clarify";
+export type {
+  ClarifyInput,
+  ClarifyResult,
+  ClarifyOutput,
+  ClarifyQuestion,
+  ClarifyOption,
+  ClarifyAnswer,
+  ClarifyAssumption,
+  ClarifyQuestionKind,
+  ClarifyValidation,
+} from "./clarify";
+export { clarifyJsonSchema } from "./clarify-schema";
+export type { ClarifyJsonSchema } from "./clarify-schema";

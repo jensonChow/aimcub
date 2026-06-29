@@ -3,7 +3,7 @@ import { colors, fontSize } from "@ui/tokens";
 
 export const metadata = {
   title: "Aimcub",
-  description: "Keep doing your work, and your pet records every real bit of progress for you.",
+  description: "Set a goal, watch it break into milestones, and let real evidence light them up.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

@@ -5,24 +5,20 @@
  *  - unit tests for the contract and for any consumer that wants a deterministic backend;
  *  - local dev without a Supabase project.
  *
- * It enforces, in plain TS, the three invariants that the DB enforces with constraints
+ * It enforces, in plain TS, the two invariants that the DB enforces with constraints
  * (see `packages/db/supabase/migrations/0001_init.sql`):
  *   1. evidence is idempotent — unique by `(emitter_id, source_event_id)` when
  *      `source_event_id` is non-null;
- *   2. `milestone_completions` is unique by `milestone_id` — a node completes only once;
- *   3. one pet per goal — `pets.goal_id` is unique.
+ *   2. `milestone_completions` is unique by `milestone_id` — a node completes only once.
  *
  * Reads are RLS-shaped: the user-path methods filter by `owner_id` exactly like the
  * `own_select` policy does, so test code sees the same isolation it would in production.
  */
 import type {
-  Collectible,
   Evidence,
   Goal,
   Milestone,
   MilestoneCompletion,
-  Notification,
-  Pet,
 } from "@core/types";
 
 import type {
@@ -43,9 +39,6 @@ export interface InMemoryDeps {
 export interface InMemorySeed {
   goals?: Goal[];
   milestones?: Milestone[];
-  pets?: Pet[];
-  collectibles?: Collectible[];
-  notifications?: Notification[];
   evidence?: Evidence[];
   completions?: MilestoneCompletion[];
 }
@@ -57,7 +50,6 @@ export class InvariantError extends Error {
     /** A stable machine-readable code so callers can branch without string matching. */
     public readonly code:
       | "evidence_idempotency"
-      | "one_pet_per_goal"
       | "milestone_completion_unique"
       | "emitter_owner_mismatch",
   ) {
@@ -76,10 +68,6 @@ const defaultNow = (): string => new Date().toISOString();
 export class InMemoryAimcubRepo implements AimcubRepo {
   private readonly goals = new Map<string, Goal>();
   private readonly milestones = new Map<string, Milestone>();
-  private readonly pets = new Map<string, Pet>(); // keyed by pet id
-  private readonly petByGoal = new Map<string, string>(); // goal_id -> pet id (one-pet-per-goal index)
-  private readonly collectibles = new Map<string, Collectible>();
-  private readonly notifications = new Map<string, Notification>();
   private readonly evidence = new Map<string, Evidence>();
   private readonly completions = new Map<string, MilestoneCompletion>(); // keyed by completion id
   private readonly completionByMilestone = new Map<string, string>(); // milestone_id -> completion id (uniqueness index)
@@ -96,12 +84,6 @@ export class InMemoryAimcubRepo implements AimcubRepo {
     this.now = deps.now ?? defaultNow;
     for (const g of seed.goals ?? []) this.goals.set(g.id, g);
     for (const m of seed.milestones ?? []) this.milestones.set(m.id, m);
-    for (const p of seed.pets ?? []) {
-      this.pets.set(p.id, p);
-      this.petByGoal.set(p.goal_id, p.id);
-    }
-    for (const c of seed.collectibles ?? []) this.collectibles.set(c.id, c);
-    for (const n of seed.notifications ?? []) this.notifications.set(n.id, n);
     for (const e of seed.evidence ?? []) {
       this.evidence.set(e.id, e);
       if (e.source_event_id != null && e.emitter_id != null) {
@@ -123,32 +105,6 @@ export class InMemoryAimcubRepo implements AimcubRepo {
    */
   registerEmitter(emitterId: string, ownerId: string): void {
     this.emitterOwner.set(emitterId, ownerId);
-  }
-
-  /** Upsert a pet directly (the jobs worker path materializes pets in production). */
-  upsertPet(pet: Pet): Pet {
-    const existingId = this.petByGoal.get(pet.goal_id);
-    if (existingId && existingId !== pet.id) {
-      throw new InvariantError(
-        `goal ${pet.goal_id} already has pet ${existingId}`,
-        "one_pet_per_goal",
-      );
-    }
-    this.pets.set(pet.id, pet);
-    this.petByGoal.set(pet.goal_id, pet.id);
-    return pet;
-  }
-
-  /** Insert a collectible directly (minting is a server/worker concern). */
-  addCollectible(c: Collectible): Collectible {
-    this.collectibles.set(c.id, c);
-    return c;
-  }
-
-  /** Queue a notification directly (the proactive worker writes these in production). */
-  addNotification(n: Notification): Notification {
-    this.notifications.set(n.id, n);
-    return n;
   }
 
   /**
@@ -205,35 +161,6 @@ export class InMemoryAimcubRepo implements AimcubRepo {
     return [...this.milestones.values()]
       .filter((m) => m.goal_id === goalId)
       .sort((a, b) => a.order_index - b.order_index);
-  }
-
-  async getPet(goalId: string): Promise<Pet | null> {
-    const id = this.petByGoal.get(goalId);
-    return id ? (this.pets.get(id) ?? null) : null;
-  }
-
-  async listCollectibles(ownerId: string): Promise<Collectible[]> {
-    return [...this.collectibles.values()]
-      .filter((c) => c.owner_id === ownerId)
-      .sort((a, b) => (b.minted_at ?? "").localeCompare(a.minted_at ?? ""));
-  }
-
-  async listInbox(ownerId: string, since?: string): Promise<Notification[]> {
-    return [...this.notifications.values()]
-      .filter(
-        (n) =>
-          n.owner_id === ownerId &&
-          n.channels.includes("agent_inbox") &&
-          (since === undefined || (n.created_at ?? "") >= since),
-      )
-      .sort((a, b) => (a.created_at ?? "").localeCompare(b.created_at ?? ""));
-  }
-
-  async listNotifications(ownerId: string, limit = 20): Promise<Notification[]> {
-    return [...this.notifications.values()]
-      .filter((n) => n.owner_id === ownerId && n.channels.includes("in_app"))
-      .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""))
-      .slice(0, limit);
   }
 
   async updateGoalPlan(goalId: string, planJson: unknown, status: Goal["status"] = "active"): Promise<Goal> {

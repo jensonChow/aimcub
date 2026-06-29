@@ -9,10 +9,9 @@
  * postgres_changes is RLS-filtered to the signed-in user's rows.
  */
 import { createBrowserClient } from "@supabase/ssr";
-import type { Milestone, Pet } from "@core/types";
+import type { Milestone } from "@core/types";
 import type {
   MilestoneCompletedHandler,
-  PetChangeHandler,
   RealtimePort,
   RealtimeSubscription,
 } from "./realtime-port";
@@ -44,40 +43,6 @@ export class SupabaseRealtime implements RealtimePort {
             });
           }
         },
-      )
-      .subscribe();
-
-    return {
-      unsubscribe() {
-        void supabase.removeChannel(channel);
-      },
-    };
-  }
-
-  subscribePet(goalId: string, onChange: PetChangeHandler): RealtimeSubscription {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!url || !anonKey) return { unsubscribe() {} };
-
-    const supabase = createBrowserClient(url, anonKey);
-    // The grow_pet job INSERTs the row on the first completion and UPDATEs it afterwards.
-    const emit = (payload: { new: Record<string, unknown> }): void => {
-      const next = payload.new as Partial<Pet>;
-      if (typeof next.xp === "number" && typeof next.stage === "string") {
-        onChange({ goalId, xp: next.xp, stage: next.stage });
-      }
-    };
-    const channel = supabase
-      .channel(`pets:${goalId}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "pets", filter: `goal_id=eq.${goalId}` },
-        emit,
-      )
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "pets", filter: `goal_id=eq.${goalId}` },
-        emit,
       )
       .subscribe();
 

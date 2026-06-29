@@ -2,7 +2,7 @@
   "name": "aimcub",
   "private": true,
   "version": "0.0.0",
-  "description": "Aimcub — a general-purpose goal/milestone tracker plus evidence ingestion layer, wrapped in a virtual pet / digital collectible / proactive companion experience. A shared core across four clients (Web / iOS / MCP / Chrome).",
+  "description": "Aimcub — a universal aim-management layer for the harness era: humans and agents are interchangeable tools for reaching a goal, and aimcub holds the aim, ingests evidence, judges progress (eval), and accrues context. A shared core across clients (Web / MCP / iOS / Chrome).",
   "packageManager": "pnpm@9.15.0",
   "engines": {
     "node": ">=20"

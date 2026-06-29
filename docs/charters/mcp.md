@@ -6,7 +6,7 @@ Branch: `v1a/mcp`. This worktree owns **only** `apps/mcp/**` (plus this `CHARTER
 
 The MCP server is Aimcub's differentiated evidence emitter for coding agents
 (Claude Code is one evidence *emitter* among many). v1a turns the v0 skeleton
-(`ping` + `pet_stage_preview`) into an authenticated, port-driven server:
+(`ping`) into an authenticated, port-driven server:
 
 1. **OAuth 2.1 resource-server verification** as injectable middleware.
    - `verifyAccessToken(token, deps)` validates a JWT signature against a JWKS
@@ -24,7 +24,6 @@ The MCP server is Aimcub's differentiated evidence emitter for coding agents
      `EvidenceIngestPort`. Returns an ack `{ accepted, evidenceId, kind }`.
    - `goal_status` / `list_milestones` — read milestones for a goal through the
      injected `AimcubRepo` (`@core/api-client`).
-   - `get_inbox` — minimal stub returning `[]` (TODO v1b).
 3. **No real network / credentials.** All I/O is behind injected ports. Secrets
    are read from `process.env` only and never required for tests.
 

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { AUTO_VERIFY_MIN_TRUST, type Evidence, type Goal, type Milestone, type Notification } from "@core/domain";
+import { AUTO_VERIFY_MIN_TRUST, type Evidence, type Goal, type Milestone } from "@core/domain";
 import type { IngestEvidenceInput } from "@core/api-client";
 import { buildServer } from "./server";
 import type { EvidenceIngestPort, AimcubReadPort, ToolDeps } from "./ports";
@@ -45,24 +45,14 @@ function makeIngestSpy(): EvidenceIngestPort & { calls: IngestEvidenceInput[] } 
   };
 }
 
-/** A repo fake that also records the ownerId every listInbox call was scoped to. */
-function makeRepoFake(
-  milestones: Milestone[],
-  goal: Goal | null,
-  inbox: Notification[] = [],
-): AimcubReadPort & { inboxCalls: Array<{ ownerId: string; since?: string }> } {
-  const inboxCalls: Array<{ ownerId: string; since?: string }> = [];
+/** A repo fake over the owner-scoped read path (goal + milestone reads). */
+function makeRepoFake(milestones: Milestone[], goal: Goal | null): AimcubReadPort {
   return {
-    inboxCalls,
     async getGoal() {
       return goal;
     },
     async listMilestones() {
       return milestones;
-    },
-    async listInbox(ownerId, since) {
-      inboxCalls.push({ ownerId, since });
-      return inbox.filter((n) => n.owner_id === ownerId);
     },
   };
 }
@@ -118,7 +108,6 @@ const milestone: Milestone = {
     completion_mode: "auto_then_confirm",
   },
   xp_reward: 20,
-  rarity: "uncommon",
   completed_at: null,
   metadata: {},
 };
@@ -258,7 +247,6 @@ describe("summarizeMilestones", () => {
       depends_on_id: null,
       acceptance_rule: { logic: "all", clauses: [{ evaluator: "commit_pattern", auto_verifiable: true, match: {} }], threshold: 1, completion_mode: "auto_then_confirm" },
       xp_reward: 10,
-      rarity: "common",
       completed_at: null,
       metadata: {},
     });
@@ -430,20 +418,7 @@ describe("report_evidence tool (end-to-end via in-memory transport)", () => {
   });
 });
 
-describe("goal_status / list_milestones / get_inbox tools (owner-scoped read path)", () => {
-  const notification: Notification = {
-    id: "55555555-5555-5555-5555-555555555555",
-    owner_id: OWNER,
-    trigger: "milestone_done",
-    channels: ["agent_inbox"],
-    dedup_key: null,
-    ref_goal_id: GOAL,
-    ref_milestone_id: MILE,
-    persona_msg: "Milestone done!",
-    status: "sent",
-    created_at: T,
-  };
-
+describe("goal_status / list_milestones tools (owner-scoped read path)", () => {
   it("goal_status returns a progress summary via the repo port", async () => {
     const client = await connectedClient(depsFor(makeRepoFake([milestone], goal), makeIngestSpy()));
     const result = await client.callTool({ name: "goal_status", arguments: { goalId: GOAL } });
@@ -504,29 +479,6 @@ describe("goal_status / list_milestones / get_inbox tools (owner-scoped read pat
     const result = await client.callTool({ name: "list_milestones", arguments: { goalId: GOAL } });
     const body = parseToolJson(result as { content: unknown });
     expect(body.milestones).toEqual([]);
-    await client.close();
-  });
-
-  it("get_inbox returns the token owner's messages", async () => {
-    const repo = makeRepoFake([], goal, [notification]);
-    const client = await connectedClient(depsFor(repo, makeIngestSpy()));
-    const result = await client.callTool({ name: "get_inbox", arguments: { since: T } });
-    const body = parseToolJson(result as { content: unknown });
-    expect(body.messages).toHaveLength(1);
-    expect(body.messages[0]).toMatchObject({ trigger: "milestone_done", message: "Milestone done!" });
-    expect(repo.inboxCalls).toEqual([{ ownerId: OWNER, since: T }]);
-    await client.close();
-  });
-
-  it("get_inbox ignores a spoofed ownerId argument — the inbox is always the token owner's", async () => {
-    const repo = makeRepoFake([], goal, [notification]);
-    // The caller is INTRUDER but claims to be OWNER via a (no longer existing) arg.
-    const client = await connectedClient(depsFor(repo, makeIngestSpy(), INTRUDER));
-    const result = await client.callTool({ name: "get_inbox", arguments: { ownerId: OWNER } });
-    const body = parseToolJson(result as { content: unknown });
-    // listInbox was scoped to the intruder's own (empty) inbox, not OWNER's.
-    expect(repo.inboxCalls).toEqual([{ ownerId: INTRUDER, since: undefined }]);
-    expect(body.messages).toEqual([]);
     await client.close();
   });
 });

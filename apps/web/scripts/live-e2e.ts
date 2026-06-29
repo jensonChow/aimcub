@@ -65,7 +65,7 @@ async function main(): Promise<void> {
   console.log(`     ${milestones.length} milestones:`);
   for (const m of milestones) {
     const evals = (m.acceptance_rule as { clauses?: Array<{ evaluator: string }> }).clauses?.map((c) => c.evaluator) ?? [];
-    console.log(`     ${m.order_index}. [${m.rarity}/${m.xp_reward}xp] ${m.title} — ${evals.join("+")}`);
+    console.log(`     ${m.order_index}. [${m.xp_reward}xp] ${m.title} — ${evals.join("+")}`);
   }
   if (milestones.length < 1) fail("no milestones materialized");
   if (process.env.E2E_SKIP_EVIDENCE) {
@@ -143,13 +143,6 @@ async function main(): Promise<void> {
     .eq("milestone_id", controlled.data.id)
     .single();
   console.log("PASS completion row:", JSON.stringify(completion.data));
-
-  const followUps = await admin
-    .from("jobs")
-    .select("type, status")
-    .like("dedup_key", "%:%")
-    .in("type", ["grow_pet", "mint_collectible", "deliver_notification"]);
-  console.log("PASS follow-up jobs:", JSON.stringify(followUps.data));
 
   console.log("ALL E2E CHECKS PASSED — goal", goal.id, "remains for UI inspection");
 }

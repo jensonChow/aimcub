@@ -16,7 +16,6 @@ function ms(partial: Partial<Milestone> & Pick<Milestone, "id" | "status" | "ord
       clauses: [{ evaluator: "commit_pattern", auto_verifiable: true, match: { min_files: 1 } }],
     },
     xp_reward: partial.xp_reward ?? 10,
-    rarity: "common",
     completed_at: null,
     metadata: {},
     ...partial,

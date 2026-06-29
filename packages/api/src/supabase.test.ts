@@ -78,51 +78,11 @@ describe("user path issues RLS-bound queries on the user client", () => {
     });
   });
 
-  it("getGoal / getPet use maybeSingle so a missing row is null, not an error", async () => {
+  it("getGoal uses maybeSingle so a missing row is null, not an error", async () => {
     const user = new FakeSupabase({ respond: () => ok<Goal | null>(null) });
     const repo = new SupabaseAimcubRepo(user, new FakeSupabase());
     expect(await repo.getGoal(GOAL)).toBeNull();
     expect((user.calls[0] as RecordedCall).terminal).toBe("maybeSingle");
-  });
-
-  it("listInbox filters owner + contains(agent_inbox) and applies since", async () => {
-    const user = new FakeSupabase({ respond: () => ok([]) });
-    const repo = new SupabaseAimcubRepo(user, new FakeSupabase());
-    await repo.listInbox(OWNER, "2026-06-01T00:00:00.000Z");
-
-    const call = user.calls[0] as RecordedCall;
-    expect(call.table).toBe("notifications");
-    expect(call.filters).toContainEqual({ kind: "eq", column: "owner_id", value: OWNER });
-    expect(call.filters).toContainEqual({
-      kind: "contains",
-      column: "channels",
-      value: ["agent_inbox"],
-    });
-    expect(call.filters).toContainEqual({
-      kind: "gte",
-      column: "created_at",
-      value: "2026-06-01T00:00:00.000Z",
-    });
-  });
-
-  it("listNotifications filters owner + contains(in_app), newest first, limited", async () => {
-    const user = new FakeSupabase({ respond: () => ok([]) });
-    const repo = new SupabaseAimcubRepo(user, new FakeSupabase());
-    await repo.listNotifications(OWNER, 5);
-
-    const call = user.calls[0] as RecordedCall;
-    expect(call.table).toBe("notifications");
-    expect(call.filters).toContainEqual({ kind: "eq", column: "owner_id", value: OWNER });
-    expect(call.filters).toContainEqual({
-      kind: "contains",
-      column: "channels",
-      value: ["in_app"],
-    });
-    expect(call.modifiers).toContainEqual({
-      kind: "order",
-      args: ["created_at", { ascending: false }],
-    });
-    expect(call.modifiers).toContainEqual({ kind: "limit", args: [5] });
   });
 });
 
@@ -148,7 +108,6 @@ describe("server path uses the service_role client (bypasses RLS)", () => {
           completion_mode: "auto_then_confirm",
         },
         xp_reward: 10,
-        rarity: "common",
         completed_at: null,
         metadata: {},
       },

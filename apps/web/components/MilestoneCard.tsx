@@ -2,10 +2,10 @@ import { colors, radius, space } from "@ui/tokens";
 import type { Milestone } from "@core/types";
 import { acceptanceSummary } from "../lib/acceptance";
 import { statusLabel } from "../lib/progress";
-import { rarityColor, statusColor } from "./styles";
+import { statusColor } from "./styles";
 
 /**
- * One milestone row: title, status pill, acceptance-rule summary, xp_reward, rarity.
+ * One milestone row: title, status pill, acceptance-rule summary, xp_reward.
  * `justCompleted` triggers a brief glow so the auto-light moment is visible.
  */
 export function MilestoneCard({
@@ -65,17 +65,6 @@ export function MilestoneCard({
             }}
           >
             {statusLabel(milestone.status)}
-          </span>
-          <span
-            style={{
-              fontSize: 12,
-              padding: "2px 8px",
-              borderRadius: radius.pill,
-              color: rarityColor(milestone.rarity),
-              border: `1px solid ${rarityColor(milestone.rarity)}`,
-            }}
-          >
-            {milestone.rarity}
           </span>
           <span style={{ marginLeft: "auto", fontSize: 13, color: colors.warning, fontWeight: 700 }}>
             +{milestone.xp_reward} XP

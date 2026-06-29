@@ -88,8 +88,8 @@ but it is **not a spec-complete RFC 8707 authorization server**: it does not acc
 
 **Adopt Path A now; keep Path B as the documented escape hatch.**
 
-For v1a we have **exactly one MCP resource server** and one tool surface (`report_evidence` +
-`get_inbox`). Lean-first (per CLAUDE.md) says do not stand up a second OAuth authorization server
+For v1a we have **exactly one MCP resource server** and one tool surface (`report_evidence` /
+`goal_status` / `list_milestones`). Lean-first (per CLAUDE.md) says do not stand up a second OAuth authorization server
 for a single resource. Path A gets us:
 
 - a JWKS-verifiable, asymmetrically-signed token,

@@ -26,7 +26,7 @@ const KERNEL_FORBIDDEN_PATTERNS = [
 
 export default tseslint.config(
   {
-    ignores: ["**/dist/**", "**/.next/**", "**/node_modules/**", "**/.turbo/**"],
+    ignores: ["**/dist/**", "**/.next/**", "**/out/**", "**/node_modules/**", "**/.turbo/**"],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

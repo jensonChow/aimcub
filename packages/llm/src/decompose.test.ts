@@ -60,7 +60,6 @@ function validPlan() {
         description: "Normalize git/CI events into the append-only evidence stream.",
         est_effort: "m",
         xp_reward: 30,
-        rarity: "uncommon",
         acceptance_rule: {
           logic: "all",
           clauses: [
@@ -80,7 +79,6 @@ function validPlan() {
         description: "The ingestion test workflow passes on main.",
         est_effort: "s",
         xp_reward: 15,
-        rarity: "common",
         acceptance_rule: {
           logic: "all",
           clauses: [
