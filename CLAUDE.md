@@ -3,7 +3,7 @@
 A universal **aim-management** layer for the harness era. Humans and agents are interchangeable tools for reaching a goal; aimcub is the architecture that holds the aim (愿景 = long-term vision, 任务 = short-term task), routes work across people and agents, and accrues the durable **context** + **eval** that make the system intelligent. A coding agent (Claude Code) is one of many evidence *emitters* via MCP; git/CI webhooks are another. Positioning: developers first, general users second.
 
 ## Working agreement
-- **Language**: the user gives instructions in Chinese and you may reply in Chinese, but **everything committed to the repo is English** — code, comments, identifiers, commit messages, docs, UI copy, SQL.
+- **Language**: the user gives instructions in Chinese and you may reply in Chinese, but **everything committed to the repo is English** — code, comments, identifiers, commit messages, docs, SQL. **Exception**: end-user UI is bilingual via i18n — English is the source-of-truth + a `zh` locale (only `zh` translation values are Chinese; keys/code/comments stay English).
 - **This file is the project's top-level rule set. Keep it ≤50 lines.** Detailed direction lives in `docs/vision.md` — never grow CLAUDE.md into it.
 - Verify before claiming "done": `pnpm build && pnpm test && pnpm typecheck && pnpm lint && pnpm core:purity` must stay green.
 

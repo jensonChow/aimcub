@@ -2,8 +2,7 @@ import { app, BrowserWindow } from "electron";
 import { join } from "node:path";
 
 import { registerIpc } from "./ipc";
-import { applyStoredKey } from "./gateway";
-import { loadStoredKey } from "./store";
+import { loadProviderConfig } from "./gateway";
 
 function createWindow(): void {
   const win = new BrowserWindow({
@@ -29,8 +28,8 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
-  // Seed the API key from settings.json if the shell didn't provide one, then wire IPC.
-  applyStoredKey(loadStoredKey());
+  // Load the persisted provider config into memory, then wire IPC.
+  loadProviderConfig();
   registerIpc();
   createWindow();
   app.on("activate", () => {

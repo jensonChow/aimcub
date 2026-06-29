@@ -12,39 +12,39 @@ import {
   IPC,
   type ClarifyRequest,
   type DraftRequest,
-  type KeyStatus,
+  type ProviderConfig,
+  type ProviderStatus,
   type RefineRequest,
   type SaveRequest,
   type SavedGoal,
 } from "../shared/ipc";
 import { runClarify, runDraft, runRefine } from "./planner";
 import { materialize } from "./materialize";
-import { LOCAL_OWNER, loadStore, saveStore, saveStoredKey } from "./store";
-import { hasApiKey, setApiKey } from "./gateway";
+import { LOCAL_OWNER, deleteGoal, loadStore, saveStore } from "./store";
+import { buildGateway, getProviderStatus, setProviderConfig } from "./gateway";
 
 export function registerIpc(): void {
-  ipcMain.handle(IPC.draft, (_e, req: DraftRequest) => runDraft(req.title, req.description));
+  ipcMain.handle(IPC.draft, (_e, req: DraftRequest) => runDraft(buildGateway(), req.title, req.description));
 
-  ipcMain.handle(IPC.clarify, (_e, req: ClarifyRequest) => runClarify(req.title, req.description, req.draft));
+  ipcMain.handle(IPC.clarify, (_e, req: ClarifyRequest) =>
+    runClarify(buildGateway(), req.title, req.description, req.draft),
+  );
 
   ipcMain.handle(IPC.refine, (_e, req: RefineRequest) =>
-    runRefine(req.title, req.description, req.draft, req.questions, req.answers),
+    runRefine(buildGateway(), req.title, req.description, req.draft, req.questions, req.answers),
   );
 
   ipcMain.handle(IPC.listGoals, async (): Promise<Goal[]> =>
     loadStore().goals.slice().sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? "")),
   );
 
-  ipcMain.handle(IPC.getKeyStatus, async (): Promise<KeyStatus> => ({ hasKey: hasApiKey() }));
+  ipcMain.handle(IPC.deleteGoal, async (_e, id: string): Promise<void> => deleteGoal(id));
 
-  ipcMain.handle(IPC.setKey, async (_e, key: string): Promise<KeyStatus> => {
-    const trimmed = typeof key === "string" ? key.trim() : "";
-    if (trimmed) {
-      setApiKey(trimmed);
-      saveStoredKey(trimmed);
-    }
-    return { hasKey: hasApiKey() };
-  });
+  ipcMain.handle(IPC.getProviderConfig, async (): Promise<ProviderStatus> => getProviderStatus());
+
+  ipcMain.handle(IPC.setProviderConfig, async (_e, config: ProviderConfig): Promise<ProviderStatus> =>
+    setProviderConfig(config),
+  );
 
   ipcMain.handle(IPC.saveGoal, async (_e, req: SaveRequest): Promise<SavedGoal> => {
     const store = loadStore();
