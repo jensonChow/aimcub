@@ -11,7 +11,7 @@
  *   - setup    — configure + persist the provider to settings.json (shared with the desktop).
  *   - config   — show the resolved provider + store path (API key redacted).
  *
- * No daemon, no agent-running. Provider config is read from settings.json (`aim setup`) with
+ * No daemon, no agent-running. Provider config is read from settings.json (`aimcub setup`) with
  * `AIMCUB_*` env vars overriding it. The store is a
  * local JSON file today, behind the async `AimStore` interface so a Supabase adapter can
  * swap in later without changing these call sites. Deeper verbs (`eval`/`route`/`why`) wait
@@ -62,34 +62,34 @@ function isInteractive(): boolean {
   return Boolean(process.stdin.isTTY && process.stdout.isTTY);
 }
 
-const HELP = `aim — Aimcub CLI: turn an aim into a verifiable plan.
+const HELP = `aimcub — Aimcub CLI: turn an aim into a verifiable plan.
 
 Planning (prints, stores nothing):
-  aim plan "<title>" [--desc "..."] [--json]       Decompose an aim into milestones
-  aim clarify "<title>" [opts]                      Draft → ask high-impact questions → refine
+  aimcub plan "<title>" [--desc "..."] [--json]       Decompose an aim into milestones
+  aimcub clarify "<title>" [opts]                      Draft → ask high-impact questions → refine
        [--answers <file|-|json>] [--yes] [--max N] [--save] [--json]
 
 Stored (shared ~/.aimcub store — the desktop app sees these too):
-  aim new "<title>" [--desc "..."] [--json]         Decompose AND save the aim
-  aim ls [--json]                                   List saved aims
-  aim show <id> [--json]                            Show a saved aim + milestones
-  aim replan <id> [--title "..."] [--desc "..."] [--json]
-                                                    Re-decompose a saved aim (keeps done work)
-  aim edit <id> [--plan <file|-|json>] [--json]     Edit a saved aim's plan ($EDITOR or --plan)
-  aim rm <id>                                       Delete a saved aim
+  aimcub new "<title>" [--desc "..."] [--json]         Decompose AND save the aim
+  aimcub ls [--json]                                   List saved aims
+  aimcub show <id> [--json]                            Show a saved aim + milestones
+  aimcub replan <id> [--title "..."] [--desc "..."] [--json]
+                                                       Re-decompose a saved aim (keeps done work)
+  aimcub edit <id> [--plan <file|-|json>] [--json]     Edit a saved aim's plan ($EDITOR or --plan)
+  aimcub rm <id>                                       Delete a saved aim
 
-  aim setup [--provider <p>] [--api-key <k|->] [--model <m>] [--base-url <u>]
-                                                    Configure + save the LLM provider (wizard)
-  aim config [--json]                               Show the resolved provider + store path
-  aim --help | --version
+  aimcub setup [--provider <p>] [--api-key <k|->] [--model <m>] [--base-url <u>]
+                                                       Configure + save the LLM provider (wizard)
+  aimcub config [--json]                               Show the resolved provider + store path
+  aimcub --help | --version
 
-Run \`aim setup\` with NO flags for the interactive wizard (the key is typed hidden). With flags
+Run \`aimcub setup\` with NO flags for the interactive wizard (the key is typed hidden). With flags
 each is optional; a literal --api-key <k> is recorded in your shell history — prefer the wizard,
-or pipe the key: echo "$KEY" | aim setup --provider anthropic --api-key -
+or pipe the key: echo "$KEY" | aimcub setup --provider anthropic --api-key -
 
-The title may be piped on stdin (use "-" or omit it): echo "ship auth" | aim plan -
+The title may be piped on stdin (use "-" or omit it): echo "ship auth" | aimcub plan -
 
-Provider config — run \`aim setup\` once; it saves to ~/.aimcub/settings.json (shared with the
+Provider config — run \`aimcub setup\` once; it saves to ~/.aimcub/settings.json (shared with the
 desktop app). Environment variables override the saved settings for one-off / CI use:
   AIMCUB_PROVIDER   anthropic | openai-compatible
   AIMCUB_API_KEY    API key (falls back to ANTHROPIC_API_KEY / OPENAI_API_KEY)
@@ -98,11 +98,11 @@ desktop app). Environment variables override the saved settings for one-off / CI
   AIMCUB_HOME       data dir for the shared store (default ~/.aimcub)
 
 Examples:
-  aim setup                                # interactive: pick provider, paste key (hidden)
-  aim new "Build a CLI todo app with tests + CI"
-  aim clarify "ship auth" --save           # guided: answer the forks, then save
-  aim ls && aim show 1a2b
-  aim replan 1a2b --desc "now mobile-first"`;
+  aimcub setup                                # interactive: pick provider, paste key (hidden)
+  aimcub new "Build a CLI todo app with tests + CI"
+  aimcub clarify "ship auth" --save           # guided: answer the forks, then save
+  aimcub ls && aimcub show 1a2b
+  aimcub replan 1a2b --desc "now mobile-first"`;
 
 const noopMeter = { async record(): Promise<void> {} };
 const OWNER = "cli-local";
@@ -151,11 +151,11 @@ function buildGateway(): LlmGateway {
     throw new UserError(`Unknown provider "${r.providerLabel}". Use "anthropic" or "openai-compatible".`);
   }
   if (!r.apiKey) {
-    throw new UserError(`No API key for the ${r.provider} provider. Run \`aim setup\` to configure one.`);
+    throw new UserError(`No API key for the ${r.provider} provider. Run \`aimcub setup\` to configure one.`);
   }
   if (r.provider === "openai-compatible") {
     if (!r.model) {
-      throw new UserError("No model for the openai-compatible provider. Run `aim setup` (or set AIMCUB_MODEL).");
+      throw new UserError("No model for the openai-compatible provider. Run `aimcub setup` (or set AIMCUB_MODEL).");
     }
     return new OpenAiCompatibleLlmGateway({
       meter: noopMeter,
@@ -175,7 +175,7 @@ async function resolveGoalId(prefix: string): Promise<string> {
   if (exact) return exact.id;
   const matches = goals.filter((g) => g.id.startsWith(prefix));
   if (matches.length === 1) return matches[0]!.id;
-  if (matches.length === 0) throw new UserError(`No aim matches id "${prefix}". Try \`aim ls\`.`);
+  if (matches.length === 0) throw new UserError(`No aim matches id "${prefix}". Try \`aimcub ls\`.`);
   throw new UserError(`Ambiguous id "${prefix}" (${matches.length} matches). Use more characters.`);
 }
 
@@ -294,8 +294,8 @@ async function runLs(json: boolean): Promise<void> {
     out(JSON.stringify(goals, null, 2));
     return;
   }
-  // Count the materialized milestone rows (not plan_json.nodes) so `aim ls` agrees with
-  // `aim show` after a replan/edit that froze or skipped a milestone. N+1 reads are fine for
+  // Count the materialized milestone rows (not plan_json.nodes) so `aimcub ls` agrees with
+  // `aimcub show` after a replan/edit that froze or skipped a milestone. N+1 reads are fine for
   // the local single-user JSON store.
   const items = await Promise.all(
     goals.map(async (goal) => ({ goal, milestoneCount: (await store.getGoal(goal.id))?.milestones.length ?? 0 })),
@@ -434,7 +434,7 @@ function runConfig(json: boolean): void {
   out(formatConfig(r, dataDir, version, settingsPath()));
 }
 
-/** `aim setup` — configure + persist the provider (interactive wizard, or flags). */
+/** `aimcub setup` — configure + persist the provider (interactive wizard, or flags). */
 async function runSetup(opts: {
   provider?: string;
   apiKey?: string;
@@ -460,7 +460,7 @@ async function runSetup(opts: {
     input = await promptSetup(current);
   } else {
     throw new UserError(
-      "aim setup needs a terminal, or pass flags: --provider <p> --api-key <k> [--model <m>] [--base-url <u>].",
+      "aimcub setup needs a terminal, or pass flags: --provider <p> --api-key <k> [--model <m>] [--base-url <u>].",
     );
   }
 
@@ -489,7 +489,7 @@ async function runSetup(opts: {
   out(`Saved provider settings to ${settingsPath()}`);
   out("");
   out(formatConfig(resolveProvider(process.env, result.settings), defaultDataDir(), readVersion(), settingsPath()));
-  out('\nTry it:  aim plan "ship auth"');
+  out('\nTry it:  aimcub plan "ship auth"');
 }
 
 /**
@@ -534,7 +534,7 @@ async function main(): Promise<number> {
     });
   } catch (e) {
     err(e instanceof Error ? e.message : String(e));
-    err("Run `aim --help` for usage.");
+    err("Run `aimcub --help` for usage.");
     return 2;
   }
 
@@ -587,19 +587,19 @@ async function main(): Promise<number> {
         await runLs(json);
         return 0;
       case "show":
-        if (!arg) throw new UserError("Missing aim id. Usage: aim show <id>");
+        if (!arg) throw new UserError("Missing aim id. Usage: aimcub show <id>");
         await runShow(arg, json);
         return 0;
       case "replan":
-        if (!arg) throw new UserError("Missing aim id. Usage: aim replan <id>");
+        if (!arg) throw new UserError("Missing aim id. Usage: aimcub replan <id>");
         await runReplan(arg, values.title, description, json);
         return 0;
       case "edit":
-        if (!arg) throw new UserError("Missing aim id. Usage: aim edit <id>");
+        if (!arg) throw new UserError("Missing aim id. Usage: aimcub edit <id>");
         await runEdit(arg, planRaw, json);
         return 0;
       case "rm":
-        if (!arg) throw new UserError("Missing aim id. Usage: aim rm <id>");
+        if (!arg) throw new UserError("Missing aim id. Usage: aimcub rm <id>");
         await runRm(arg);
         return 0;
       case "config":
@@ -608,7 +608,7 @@ async function main(): Promise<number> {
       case "setup":
         if (positionals.length > 1) {
           throw new UserError(
-            'aim setup takes no positional arguments. Run `aim setup` for the wizard, or use flags: --provider <p> --api-key <k> [--model <m>] [--base-url <u>].',
+            'aimcub setup takes no positional arguments. Run `aimcub setup` for the wizard, or use flags: --provider <p> --api-key <k> [--model <m>] [--base-url <u>].',
           );
         }
         await runSetup({
@@ -620,7 +620,7 @@ async function main(): Promise<number> {
         });
         return 0;
       default:
-        err(`Unknown command "${command}". Run \`aim --help\` for usage.`);
+        err(`Unknown command "${command}". Run \`aimcub --help\` for usage.`);
         return 2;
     }
   } catch (e) {

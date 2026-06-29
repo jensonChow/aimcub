@@ -61,7 +61,7 @@ export interface GoalListItem {
 
 /** Render the saved-aims list, one per line (id · title · #milestones · date). */
 export function formatGoalList(items: GoalListItem[]): string {
-  if (items.length === 0) return "No aims yet. Create one with: aim new \"<title>\"";
+  if (items.length === 0) return "No aims yet. Create one with: aimcub new \"<title>\"";
   return items
     .map(({ goal, milestoneCount: n }) => {
       const date = goal.created_at ? goal.created_at.slice(0, 10) : "";

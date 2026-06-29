@@ -107,16 +107,16 @@ describe("formatConfig", () => {
   it("renders a redacted view with provenance and never prints the raw key", () => {
     const r = resolveProvider({ ANTHROPIC_API_KEY: "sk-ant-secretkey" }, null);
     const text = formatConfig(r, "/home/me/.aimcub", "1.2.3", "/home/me/.aimcub/settings.json");
-    expect(text).toContain("aim 1.2.3");
+    expect(text).toContain("aimcub 1.2.3");
     expect(text).toContain("anthropic");
     expect(text).toContain("from env:ANTHROPIC_API_KEY");
     expect(text).toContain("/home/me/.aimcub/settings.json");
     expect(text).not.toContain("sk-ant-secretkey");
   });
 
-  it("nudges the user to run `aim setup` when no key resolves", () => {
+  it("nudges the user to run `aimcub setup` when no key resolves", () => {
     const r = resolveProvider({}, null);
-    expect(formatConfig(r, "/d", "1.0.0", "/d/settings.json")).toContain("aim setup");
+    expect(formatConfig(r, "/d", "1.0.0", "/d/settings.json")).toContain("aimcub setup");
   });
 });
 

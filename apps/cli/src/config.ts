@@ -1,17 +1,17 @@
 /**
  * Provider/store configuration for the CLI. Two layers, env wins:
  *   1. `AIMCUB_*` environment variables  (one-off / CI / scripts)
- *   2. the persisted `settings.json` written by `aim setup` (shared with the desktop app)
+ *   2. the persisted `settings.json` written by `aimcub setup` (shared with the desktop app)
  * `resolveProvider` is pure (takes an env record + the loaded settings) so it is
- * unit-testable, and records WHERE each value came from for `aim config`. The raw API key is
+ * unit-testable, and records WHERE each value came from for `aimcub config`. The raw API key is
  * never printed or returned for display — `formatConfig` redacts it. `buildSettingsFromInput`
- * is the pure validator behind `aim setup` (no I/O).
+ * is the pure validator behind `aimcub setup` (no I/O).
  */
 import type { ProviderSettings } from "@core/store";
 
 export type ProviderName = "anthropic" | "openai-compatible";
 
-/** Where a resolved value came from (for `aim config` provenance). */
+/** Where a resolved value came from (for `aimcub config` provenance). */
 export type Source = "env" | "settings.json" | "default";
 
 export interface ResolvedProvider {
@@ -107,11 +107,11 @@ export function redactKey(key: string): string {
   return `${key.slice(0, 3)}…${key.slice(-2)}`;
 }
 
-/** Render the resolved config for `aim config` (key redacted, with provenance). Pure. */
+/** Render the resolved config for `aimcub config` (key redacted, with provenance). Pure. */
 export function formatConfig(r: ResolvedProvider, dataDir: string, version: string, settingsFile: string): string {
   const src = (s: Source | string | null): string => (s ? `  (from ${s})` : "");
   const lines = [
-    `aim ${version}`,
+    `aimcub ${version}`,
     `provider:  ${r.providerLabel}${r.provider ? src(r.providerSource) : "  (unknown — use anthropic | openai-compatible)"}`,
     `api key:   ${r.keySource ? `${redactKey(r.apiKey)}${src(r.keySource)}` : "(not set)"}`,
   ];
@@ -123,12 +123,12 @@ export function formatConfig(r: ResolvedProvider, dataDir: string, version: stri
   }
   lines.push(`store:     ${dataDir}`);
   lines.push(`config:    ${settingsFile}`);
-  if (!r.apiKey) lines.push("\nNo API key yet — run `aim setup` to configure a provider.");
+  if (!r.apiKey) lines.push("\nNo API key yet — run `aimcub setup` to configure a provider.");
   return lines.join("\n");
 }
 
 // ──────────────────────────────────────────────────────────────────────────
-// aim setup — pure validation/merge of the wizard (or flag) input.
+// aimcub setup — pure validation/merge of the wizard (or flag) input.
 // ──────────────────────────────────────────────────────────────────────────
 
 export interface SetupInput {

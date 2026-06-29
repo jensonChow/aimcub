@@ -1,5 +1,5 @@
 /**
- * `aim setup` interactive wizard — the I/O half (the pure validation lives in
+ * `aimcub setup` interactive wizard — the I/O half (the pure validation lives in
  * `buildSettingsFromInput`, config.ts). Prompts for provider (validated + re-prompted), then
  * the model/base-URL the chosen provider needs, then the API key with echo SUPPRESSED, and
  * hands a {@link SetupInput} back to the caller to persist. Reached only on a TTY; the
@@ -75,7 +75,7 @@ export async function promptSetup(current: ProviderSettings | null): Promise<Set
   let model: string | undefined;
   let baseURL: string | undefined;
   try {
-    procStdout.write("aim setup — configure your LLM provider (saved to settings.json, shared with the desktop app)\n\n");
+    procStdout.write("aimcub setup — configure your LLM provider (saved to settings.json, shared with the desktop app)\n\n");
 
     // Provider first, validated + re-prompted, so a typo can't waste the rest of the wizard.
     const defProvider = current?.provider ?? "anthropic";
