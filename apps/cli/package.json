@@ -1,0 +1,28 @@
+{
+  "name": "@app/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Aimcub CLI — the headless, scriptable face of @core (aim → plan / clarify). Reuses the same brain as the desktop app; provider from env. Stateless first cut.",
+  "bin": {
+    "aim": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node18 --outfile=dist/index.js --external:@anthropic-ai/sdk --banner:js='#!/usr/bin/env node'",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.102.0",
+    "@core/domain": "workspace:*",
+    "@core/llm": "workspace:*",
+    "@core/types": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "esbuild": "^0.24.2",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}
