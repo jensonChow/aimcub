@@ -8,9 +8,11 @@
  *   - ls/show/rm — CRUD over the SHARED local store (`~/.aimcub`, what desktop reads too).
  *   - replan   — re-decompose a saved aim via the LLM, freezing completed milestones.
  *   - edit     — hand-edit a saved aim's plan JSON (in $EDITOR or via --plan), then validate.
+ *   - setup    — configure + persist the provider to settings.json (shared with the desktop).
  *   - config   — show the resolved provider + store path (API key redacted).
  *
- * No daemon, no agent-running. Provider config comes from the environment. The store is a
+ * No daemon, no agent-running. Provider config is read from settings.json (`aim setup`) with
+ * `AIMCUB_*` env vars overriding it. The store is a
  * local JSON file today, behind the async `AimStore` interface so a Supabase adapter can
  * swap in later without changing these call sites. Deeper verbs (`eval`/`route`/`why`) wait
  * on the eval pillar.
@@ -31,11 +33,12 @@ import {
   type LlmGateway,
   type ClarifyAnswer,
 } from "@core/llm";
-import { createJsonFileStore, defaultDataDir } from "@core/store";
+import { createJsonFileStore, defaultDataDir, loadSettings, saveSettings, settingsPath } from "@core/store";
 import type { DecompositionOutput, Goal, Milestone } from "@core/types";
 
-import { resolveProvider, formatConfig } from "./config";
+import { resolveProvider, formatConfig, buildSettingsFromInput, type SetupInput } from "./config";
 import { parseAnswers, answersToMemories, promptAnswers } from "./answers";
+import { promptSetup } from "./setup";
 import {
   formatPlanPretty,
   formatClarifyPretty,
@@ -75,19 +78,27 @@ Stored (shared ~/.aimcub store — the desktop app sees these too):
   aim edit <id> [--plan <file|-|json>] [--json]     Edit a saved aim's plan ($EDITOR or --plan)
   aim rm <id>                                       Delete a saved aim
 
-  aim config [--json]                               Show resolved provider + store path
+  aim setup [--provider <p>] [--api-key <k|->] [--model <m>] [--base-url <u>]
+                                                    Configure + save the LLM provider (wizard)
+  aim config [--json]                               Show the resolved provider + store path
   aim --help | --version
+
+Run \`aim setup\` with NO flags for the interactive wizard (the key is typed hidden). With flags
+each is optional; a literal --api-key <k> is recorded in your shell history — prefer the wizard,
+or pipe the key: echo "$KEY" | aim setup --provider anthropic --api-key -
 
 The title may be piped on stdin (use "-" or omit it): echo "ship auth" | aim plan -
 
-Provider (from environment):
-  AIMCUB_PROVIDER   anthropic | openai-compatible   (default: anthropic)
+Provider config — run \`aim setup\` once; it saves to ~/.aimcub/settings.json (shared with the
+desktop app). Environment variables override the saved settings for one-off / CI use:
+  AIMCUB_PROVIDER   anthropic | openai-compatible
   AIMCUB_API_KEY    API key (falls back to ANTHROPIC_API_KEY / OPENAI_API_KEY)
   AIMCUB_MODEL      model id (required for openai-compatible)
   AIMCUB_BASE_URL   endpoint (openai-compatible only; default https://api.openai.com/v1)
   AIMCUB_HOME       data dir for the shared store (default ~/.aimcub)
 
 Examples:
+  aim setup                                # interactive: pick provider, paste key (hidden)
   aim new "Build a CLI todo app with tests + CI"
   aim clarify "ship auth" --save           # guided: answer the forks, then save
   aim ls && aim show 1a2b
@@ -133,20 +144,18 @@ function loadTextArg(value: string): string {
   }
 }
 
-/** Build a gateway from environment variables, or throw a friendly UserError. */
-function buildGatewayFromEnv(): LlmGateway {
-  const r = resolveProvider(process.env);
+/** Build a gateway from the resolved config (env over settings.json), or a friendly UserError. */
+function buildGateway(): LlmGateway {
+  const r = resolveProvider(process.env, loadSettings());
   if (r.provider === null) {
-    throw new UserError(`Unknown AIMCUB_PROVIDER "${r.providerRaw}". Use "anthropic" or "openai-compatible".`);
+    throw new UserError(`Unknown provider "${r.providerLabel}". Use "anthropic" or "openai-compatible".`);
   }
   if (!r.apiKey) {
-    const hint =
-      r.provider === "anthropic" ? "AIMCUB_API_KEY or ANTHROPIC_API_KEY" : "AIMCUB_API_KEY (or OPENAI_API_KEY)";
-    throw new UserError(`No API key. Set ${hint} for the ${r.provider} provider.`);
+    throw new UserError(`No API key for the ${r.provider} provider. Run \`aim setup\` to configure one.`);
   }
   if (r.provider === "openai-compatible") {
     if (!r.model) {
-      throw new UserError("No model. Set AIMCUB_MODEL (e.g. deepseek/deepseek-chat) for the openai-compatible provider.");
+      throw new UserError("No model for the openai-compatible provider. Run `aim setup` (or set AIMCUB_MODEL).");
     }
     return new OpenAiCompatibleLlmGateway({
       meter: noopMeter,
@@ -171,7 +180,7 @@ async function resolveGoalId(prefix: string): Promise<string> {
 }
 
 async function decomposeOrThrow(title: string, description: string | undefined): Promise<DecompositionOutput> {
-  const gw = buildGatewayFromEnv();
+  const gw = buildGateway();
   const res = await decompose(gw, { title, description });
   if (!res.output) {
     throw new UserError(`Could not produce a valid plan:\n  - ${res.validation.errors.join("\n  - ")}`);
@@ -210,7 +219,7 @@ async function runPlan(title: string, description: string | undefined, json: boo
 }
 
 async function runClarify(title: string, description: string | undefined, opts: ClarifyOpts): Promise<void> {
-  const gw = buildGatewayFromEnv();
+  const gw = buildGateway();
   const draft = await decompose(gw, { title, description });
   if (!draft.output) {
     throw new UserError(`Could not draft a plan to clarify:\n  - ${draft.validation.errors.join("\n  - ")}`);
@@ -395,7 +404,7 @@ async function runRm(idPrefix: string): Promise<void> {
 }
 
 function runConfig(json: boolean): void {
-  const r = resolveProvider(process.env);
+  const r = resolveProvider(process.env, loadSettings());
   const dataDir = defaultDataDir();
   const version = readVersion();
   if (json) {
@@ -405,12 +414,16 @@ function runConfig(json: boolean): void {
         {
           version,
           provider: r.provider,
-          providerRaw: r.providerRaw,
+          providerLabel: r.providerLabel,
+          providerSource: r.providerSource,
           model: r.model,
+          modelSource: r.modelSource,
           baseURL: r.baseURL,
+          baseURLSource: r.baseURLSource,
           keySet: Boolean(r.apiKey),
           keySource: r.keySource,
           store: dataDir,
+          config: settingsPath(),
         },
         null,
         2,
@@ -418,7 +431,65 @@ function runConfig(json: boolean): void {
     );
     return;
   }
-  out(formatConfig(r, dataDir, version));
+  out(formatConfig(r, dataDir, version, settingsPath()));
+}
+
+/** `aim setup` — configure + persist the provider (interactive wizard, or flags). */
+async function runSetup(opts: {
+  provider?: string;
+  apiKey?: string;
+  model?: string;
+  baseURL?: string;
+  json: boolean;
+}): Promise<void> {
+  const current = loadSettings();
+  const hasFlags =
+    opts.provider !== undefined || opts.apiKey !== undefined || opts.model !== undefined || opts.baseURL !== undefined;
+
+  let input: SetupInput;
+  if (hasFlags) {
+    // `--api-key -` reads the key from stdin so it need not appear in argv / shell history.
+    const flagKey = opts.apiKey === "-" ? readStdin().trim() : opts.apiKey;
+    input = {
+      provider: opts.provider ?? current?.provider ?? "anthropic",
+      apiKey: flagKey ?? "",
+      model: opts.model,
+      baseURL: opts.baseURL,
+    };
+  } else if (isInteractive()) {
+    input = await promptSetup(current);
+  } else {
+    throw new UserError(
+      "aim setup needs a terminal, or pass flags: --provider <p> --api-key <k> [--model <m>] [--base-url <u>].",
+    );
+  }
+
+  const result = buildSettingsFromInput(input, current);
+  if (!result.settings) {
+    throw new UserError(`Could not save settings:\n  - ${result.errors.join("\n  - ")}`);
+  }
+  saveSettings(result.settings);
+
+  if (opts.json) {
+    out(
+      JSON.stringify(
+        {
+          saved: true,
+          provider: result.settings.provider,
+          model: result.settings.model ?? null,
+          baseURL: result.settings.baseURL ?? null,
+          config: settingsPath(),
+        },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+  out(`Saved provider settings to ${settingsPath()}`);
+  out("");
+  out(formatConfig(resolveProvider(process.env, result.settings), defaultDataDir(), readVersion(), settingsPath()));
+  out('\nTry it:  aim plan "ship auth"');
 }
 
 /**
@@ -450,6 +521,10 @@ async function main(): Promise<number> {
         answers: { type: "string" },
         plan: { type: "string" },
         max: { type: "string" },
+        provider: { type: "string" },
+        "api-key": { type: "string" },
+        model: { type: "string" },
+        "base-url": { type: "string" },
         save: { type: "boolean" },
         yes: { type: "boolean", short: "y" },
         json: { type: "boolean" },
@@ -529,6 +604,20 @@ async function main(): Promise<number> {
         return 0;
       case "config":
         runConfig(json);
+        return 0;
+      case "setup":
+        if (positionals.length > 1) {
+          throw new UserError(
+            'aim setup takes no positional arguments. Run `aim setup` for the wizard, or use flags: --provider <p> --api-key <k> [--model <m>] [--base-url <u>].',
+          );
+        }
+        await runSetup({
+          provider: values.provider,
+          apiKey: values["api-key"],
+          model: values.model,
+          baseURL: values["base-url"],
+          json,
+        });
         return 0;
       default:
         err(`Unknown command "${command}". Run \`aim --help\` for usage.`);

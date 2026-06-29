@@ -1,39 +1,97 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveProvider, redactKey, formatConfig } from "./config";
+import type { ProviderSettings } from "@core/store";
+
+import { resolveProvider, redactKey, formatConfig, buildSettingsFromInput } from "./config";
 
 describe("resolveProvider", () => {
   it("defaults to anthropic and reads ANTHROPIC_API_KEY", () => {
-    const r = resolveProvider({ ANTHROPIC_API_KEY: "sk-ant-123456" });
+    const r = resolveProvider({ ANTHROPIC_API_KEY: "sk-ant-123456" }, null);
     expect(r.provider).toBe("anthropic");
+    expect(r.providerSource).toBe("default");
     expect(r.apiKey).toBe("sk-ant-123456");
-    expect(r.keySource).toBe("ANTHROPIC_API_KEY");
+    expect(r.keySource).toBe("env:ANTHROPIC_API_KEY");
   });
 
   it("prefers AIMCUB_API_KEY over the provider-specific var", () => {
-    const r = resolveProvider({ AIMCUB_API_KEY: "winner", ANTHROPIC_API_KEY: "loser" });
+    const r = resolveProvider({ AIMCUB_API_KEY: "winner", ANTHROPIC_API_KEY: "loser" }, null);
     expect(r.apiKey).toBe("winner");
-    expect(r.keySource).toBe("AIMCUB_API_KEY");
+    expect(r.keySource).toBe("env:AIMCUB_API_KEY");
   });
 
   it("normalizes the 'openai' alias and reads model + base url", () => {
-    const r = resolveProvider({
-      AIMCUB_PROVIDER: "openai",
-      OPENAI_API_KEY: "sk-oai",
-      AIMCUB_MODEL: "deepseek/deepseek-chat",
-      AIMCUB_BASE_URL: "https://openrouter.ai/api/v1",
-    });
+    const r = resolveProvider(
+      {
+        AIMCUB_PROVIDER: "openai",
+        OPENAI_API_KEY: "sk-oai",
+        AIMCUB_MODEL: "deepseek/deepseek-chat",
+        AIMCUB_BASE_URL: "https://openrouter.ai/api/v1",
+      },
+      null,
+    );
     expect(r.provider).toBe("openai-compatible");
     expect(r.model).toBe("deepseek/deepseek-chat");
     expect(r.baseURL).toBe("https://openrouter.ai/api/v1");
-    expect(r.keySource).toBe("OPENAI_API_KEY");
+    expect(r.keySource).toBe("env:OPENAI_API_KEY");
   });
 
-  it("flags an unrecognized provider as null but keeps the raw value", () => {
-    const r = resolveProvider({ AIMCUB_PROVIDER: "gemini" });
+  it("flags an unrecognized provider as null but keeps the label", () => {
+    const r = resolveProvider({ AIMCUB_PROVIDER: "gemini" }, null);
     expect(r.provider).toBeNull();
-    expect(r.providerRaw).toBe("gemini");
+    expect(r.providerLabel).toBe("gemini");
     expect(r.apiKey).toBe(""); // no key vars consulted for an unknown provider
+  });
+
+  describe("settings.json fallback (env wins)", () => {
+    const settings: ProviderSettings = {
+      provider: "openai-compatible",
+      apiKey: "sk-file",
+      model: "gpt-4o-mini",
+      baseURL: "https://api.openai.com/v1",
+    };
+
+    it("falls back to settings when no env is set, tracking the source", () => {
+      const r = resolveProvider({}, settings);
+      expect(r.provider).toBe("openai-compatible");
+      expect(r.providerSource).toBe("settings.json");
+      expect(r.apiKey).toBe("sk-file");
+      expect(r.keySource).toBe("settings.json");
+      expect(r.model).toBe("gpt-4o-mini");
+      expect(r.modelSource).toBe("settings.json");
+    });
+
+    it("lets an env key override the settings key", () => {
+      const r = resolveProvider({ AIMCUB_API_KEY: "sk-env" }, settings);
+      expect(r.apiKey).toBe("sk-env");
+      expect(r.keySource).toBe("env:AIMCUB_API_KEY");
+      // provider still comes from settings (no AIMCUB_PROVIDER set)
+      expect(r.providerSource).toBe("settings.json");
+    });
+
+    it("lets env provider/model override settings", () => {
+      const r = resolveProvider({ AIMCUB_PROVIDER: "anthropic", AIMCUB_MODEL: "claude-x" }, settings);
+      expect(r.provider).toBe("anthropic");
+      expect(r.providerSource).toBe("env");
+      expect(r.model).toBe("claude-x");
+      expect(r.modelSource).toBe("env");
+    });
+
+    it("does NOT borrow the settings key/model when env selects a DIFFERENT provider", () => {
+      // settings.json holds an ANTHROPIC key; env forces openai-compatible with no env key.
+      const anthropicFile: ProviderSettings = { provider: "anthropic", apiKey: "sk-ant-FILE", model: "claude-3-7" };
+      const r = resolveProvider({ AIMCUB_PROVIDER: "openai-compatible" }, anthropicFile);
+      expect(r.provider).toBe("openai-compatible");
+      expect(r.apiKey).toBe(""); // the anthropic key must NOT leak to the openai endpoint
+      expect(r.keySource).toBeNull();
+      expect(r.model).toBeNull(); // nor the anthropic model
+    });
+
+    it("still does not borrow the settings model on a provider mismatch even when an env key is set", () => {
+      const anthropicFile: ProviderSettings = { provider: "anthropic", apiKey: "sk-ant-FILE", model: "claude-3-7" };
+      const r = resolveProvider({ AIMCUB_PROVIDER: "openai-compatible", AIMCUB_API_KEY: "sk-env" }, anthropicFile);
+      expect(r.apiKey).toBe("sk-env");
+      expect(r.model).toBeNull();
+    });
   });
 });
 
@@ -46,12 +104,67 @@ describe("redactKey", () => {
 });
 
 describe("formatConfig", () => {
-  it("renders a redacted view and never prints the raw key", () => {
-    const r = resolveProvider({ ANTHROPIC_API_KEY: "sk-ant-secretkey" });
-    const text = formatConfig(r, "/home/me/.aimcub", "1.2.3");
+  it("renders a redacted view with provenance and never prints the raw key", () => {
+    const r = resolveProvider({ ANTHROPIC_API_KEY: "sk-ant-secretkey" }, null);
+    const text = formatConfig(r, "/home/me/.aimcub", "1.2.3", "/home/me/.aimcub/settings.json");
     expect(text).toContain("aim 1.2.3");
     expect(text).toContain("anthropic");
-    expect(text).toContain("/home/me/.aimcub");
+    expect(text).toContain("from env:ANTHROPIC_API_KEY");
+    expect(text).toContain("/home/me/.aimcub/settings.json");
     expect(text).not.toContain("sk-ant-secretkey");
+  });
+
+  it("nudges the user to run `aim setup` when no key resolves", () => {
+    const r = resolveProvider({}, null);
+    expect(formatConfig(r, "/d", "1.0.0", "/d/settings.json")).toContain("aim setup");
+  });
+});
+
+describe("buildSettingsFromInput", () => {
+  it("builds anthropic settings from a fresh key", () => {
+    const { settings, errors } = buildSettingsFromInput({ provider: "anthropic", apiKey: "sk-ant-new" }, null);
+    expect(errors).toEqual([]);
+    expect(settings).toEqual({ provider: "anthropic", apiKey: "sk-ant-new", model: undefined, baseURL: undefined });
+  });
+
+  it("requires a model for openai-compatible", () => {
+    const { settings, errors } = buildSettingsFromInput({ provider: "openai-compatible", apiKey: "sk" }, null);
+    expect(settings).toBeUndefined();
+    expect(errors.join(" ")).toMatch(/model is required/i);
+  });
+
+  it("keeps the existing key on a blank key when the provider is unchanged", () => {
+    const current: ProviderSettings = { provider: "anthropic", apiKey: "sk-kept" };
+    const { settings } = buildSettingsFromInput({ provider: "anthropic", apiKey: "" }, current);
+    expect(settings?.apiKey).toBe("sk-kept");
+  });
+
+  it("does NOT carry a key across a provider switch", () => {
+    const current: ProviderSettings = { provider: "anthropic", apiKey: "sk-ant" };
+    const { settings, errors } = buildSettingsFromInput({ provider: "openai-compatible", apiKey: "", model: "m" }, current);
+    expect(settings).toBeUndefined();
+    expect(errors.join(" ")).toMatch(/api key is required/i);
+  });
+
+  it("rejects an unknown provider", () => {
+    const { settings, errors } = buildSettingsFromInput({ provider: "gemini", apiKey: "k" }, null);
+    expect(settings).toBeUndefined();
+    expect(errors.join(" ")).toMatch(/unknown provider/i);
+  });
+
+  it("never persists a baseURL for anthropic (the gateway ignores it)", () => {
+    const { settings } = buildSettingsFromInput(
+      { provider: "anthropic", apiKey: "sk-ant", baseURL: "https://nope.example" },
+      null,
+    );
+    expect(settings?.baseURL).toBeUndefined();
+  });
+
+  it("keeps the baseURL for openai-compatible", () => {
+    const { settings } = buildSettingsFromInput(
+      { provider: "openai-compatible", apiKey: "sk", model: "m", baseURL: "https://openrouter.ai/api/v1" },
+      null,
+    );
+    expect(settings?.baseURL).toBe("https://openrouter.ai/api/v1");
   });
 });
