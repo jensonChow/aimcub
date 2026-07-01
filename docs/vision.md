@@ -16,6 +16,22 @@ the instruments; the aim is the thing.
 An organization, then, is simply a collective of people + agents assembled around
 an aim. To connect them you need an architecture. **That architecture is aimcub.**
 
+## Open-source posture
+
+Aimcub should be open source as a local-first planning and agent-management
+product. This is not just distribution; it is part of the trust model. Users
+should be able to inspect how aims are decomposed, how context accrues, how eval
+signals are derived, how provider keys are handled, and how agents connect.
+
+The hosted Supabase-backed product can add sync, teams, sharing, and managed
+infrastructure, but the local desktop loop must not become a thin client to a
+closed service. Keep `@core/*` portable and platform-neutral so contributors can
+build new shells, agent adapters, and local workflows without rewriting the aim
+logic.
+
+The license is intentionally undecided until the business/community boundary is
+explicit.
+
 ## The AI-Native test
 
 The honest question to keep asking: *would aimcub still make sense without AI?*

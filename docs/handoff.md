@@ -5,6 +5,7 @@ Last updated: 2026-07-01
 ## Product Memory
 
 - Aimcub is an aim-management layer, not a task-list shell. The product manages aims across humans and agents, then accrues durable context and personalized eval from real work.
+- Aimcub is intended to be open source as a local-first planning and agent-management product. The license is still TBD; do not add a license file until the business/community boundary is explicit.
 - Desktop is now the primary product surface for agent orchestration. CLI remains important for setup, scripting, debugging, and automation, but new orchestration UX should land in Desktop first.
 - The current user rejects command-wall UX. Any shell surface should still answer "what can I do next?" rather than "what commands exist?", but it should not pull focus away from the Desktop cockpit.
 - First-time use must include setup. If provider config is incomplete and the terminal is interactive, `aimcub` should guide into setup; if non-interactive, it should print scriptable setup commands and exit cleanly.
@@ -60,4 +61,5 @@ Last updated: 2026-07-01
 - Continue Desktop-first: split the aim creation/refinement and plan review panels out of `App.tsx`, then design the orchestration cockpit around aims, agents, evidence, context, and eval.
 - Turn the Desktop home screen into a more useful cockpit: show the most recent active aim, pending context review, and the single best next action.
 - Keep CLI work incremental: split help into layers, preserve scriptability, and add command-dispatch smoke tests before adding more verbs.
+- Before a public open-source release, choose the license, add `CONTRIBUTING.md` and `SECURITY.md`, audit secrets/env examples, and separate public local-first docs from hosted deployment notes.
 - Keep refining aim decomposition around context capture: ask fewer but higher-value questions, prefer eval signals, and show why a question changes the plan.

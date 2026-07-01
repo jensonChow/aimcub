@@ -16,6 +16,17 @@ emitter. The MCP server is the human/agent connection point. The developer
 scenario is simply the first subset to light up. See [`docs/vision.md`](docs/vision.md)
 for the full direction.
 
+## Open-source posture
+
+Aimcub is intended to be open source as a local-first planning and agent
+orchestration product. The local desktop loop and shared `@core` packages should
+remain usable, inspectable, and hackable without relying on a closed hosted
+service.
+
+Hosted Supabase-backed surfaces can add sync, teams, and sharing, but the core
+aim/context/eval architecture should stay transparent. License choice is
+intentionally TBD before public release.
+
 ## Architecture principles
 
 - **The backend's single source of truth = Supabase** (Postgres + Auth + RLS + Realtime + Storage).
