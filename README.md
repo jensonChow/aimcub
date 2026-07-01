@@ -79,6 +79,22 @@ pnpm test         # @core/domain unit tests
 pnpm core:purity  # verify core has zero platform dependencies
 ```
 
+Optional live provider smoke tests:
+
+```bash
+# Runs real structured-output requests against selected providers.
+# Omit AIMCUB_LIVE_PROVIDERS to require all built-ins:
+# anthropic, openai, deepseek, minimax, zai, google, qwen.
+AIMCUB_LIVE_PROVIDERS=deepseek,qwen \
+DEEPSEEK_API_KEY=... \
+QWEN_API_KEY=... \
+pnpm test:live-providers
+```
+
+Provider-specific model/base URL overrides use
+`AIMCUB_LIVE_<PROVIDER>_MODEL` and `AIMCUB_LIVE_<PROVIDER>_BASE_URL`, for
+example `AIMCUB_LIVE_DEEPSEEK_MODEL=deepseek-v4-flash`.
+
 ## Roadmap (with falsifiable gates)
 
 - **v0** ✅ Foundation: monorepo + `@core` + Supabase schema. DoD = core imported by both web and mcp + zero-dependency build passes.

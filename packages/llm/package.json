@@ -19,7 +19,8 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:live-providers": "vitest run --config scripts/vitest.live.config.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.102.0",

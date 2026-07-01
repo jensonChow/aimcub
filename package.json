@@ -13,6 +13,7 @@
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",
     "test": "turbo run test",
+    "test:live-providers": "pnpm --filter @core/llm run test:live-providers",
     "core:purity": "pnpm --filter @core/domain --filter @core/types run purity"
   },
   "devDependencies": {
