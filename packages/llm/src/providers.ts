@@ -32,6 +32,7 @@ export interface LlmProviderDefinition {
   baseURLHint?: string;
   maxTokensParam?: MaxTokensParam;
   structuredOutputMode?: StructuredOutputMode;
+  requestBodyDefaults?: Record<string, unknown>;
 }
 
 export const LLM_PROVIDER_CATALOG = [
@@ -81,6 +82,7 @@ export const LLM_PROVIDER_CATALOG = [
     defaultModel: "deepseek-v4-pro",
     maxTokensParam: "max_tokens",
     structuredOutputMode: "json_object",
+    requestBodyDefaults: { thinking: { type: "disabled" } },
     models: [
       { id: "deepseek-v4-pro", label: "DeepSeek V4 Pro", description: "Reasoning-oriented default." },
       { id: "deepseek-v4-flash", label: "DeepSeek V4 Flash", description: "Lower-latency option." },

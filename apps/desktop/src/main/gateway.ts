@@ -12,6 +12,8 @@ import { LOCAL_OWNER, loadSettings, saveSettings } from "./store";
 import type { ProviderConfig, ProviderStatus, ProviderTestResult } from "../shared/ipc";
 
 const noopMeter = { async record(): Promise<void> {} };
+const DESKTOP_LLM_REQUEST_TIMEOUT_MS = 45_000;
+const DESKTOP_LLM_MAX_TOKENS = 16_384;
 
 /** In-memory current config. Seeded from disk on startup via {@link loadProviderConfig}. */
 let current: ProviderConfig | null = null;
@@ -66,6 +68,9 @@ function buildGatewayFromConfig(config: ProviderConfig): LlmGateway | null {
     baseURL: config.baseURL || def.baseURL,
     maxTokensParam: def.maxTokensParam,
     structuredOutputMode: def.structuredOutputMode,
+    requestBodyDefaults: def.requestBodyDefaults,
+    maxTokens: DESKTOP_LLM_MAX_TOKENS,
+    requestTimeoutMs: DESKTOP_LLM_REQUEST_TIMEOUT_MS,
   });
 }
 

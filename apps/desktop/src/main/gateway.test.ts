@@ -54,6 +54,8 @@ describe("desktop provider connection test", () => {
       model,
       baseURL,
       structuredOutputMode,
+      maxTokens: 16_384,
+      requestTimeoutMs: 45_000,
     });
   });
 
@@ -86,6 +88,9 @@ describe("desktop provider connection test", () => {
       baseURL: "https://api.deepseek.com",
       maxTokensParam: "max_tokens",
       structuredOutputMode: "json_object",
+      requestBodyDefaults: { thinking: { type: "disabled" } },
+      maxTokens: 16_384,
+      requestTimeoutMs: 45_000,
     });
   });
 
@@ -110,6 +115,9 @@ describe("desktop provider connection test", () => {
     });
     expect(gatewayMocks.openAiOptions[0]?.maxTokensParam).toBeUndefined();
     expect(gatewayMocks.openAiOptions[0]?.structuredOutputMode).toBeUndefined();
+    expect(gatewayMocks.openAiOptions[0]?.requestBodyDefaults).toBeUndefined();
+    expect(gatewayMocks.openAiOptions[0]?.maxTokens).toBe(16_384);
+    expect(gatewayMocks.openAiOptions[0]?.requestTimeoutMs).toBe(45_000);
   });
 
   it("reports missing keys without constructing a gateway", async () => {
@@ -133,6 +141,8 @@ describe("desktop provider connection test", () => {
     expect(gatewayMocks.openAiOptions[0]).toMatchObject({
       model: "glm-5.2",
       structuredOutputMode: "json_object",
+      maxTokens: 16_384,
+      requestTimeoutMs: 45_000,
     });
     gatewayMocks.failWith = null;
   });

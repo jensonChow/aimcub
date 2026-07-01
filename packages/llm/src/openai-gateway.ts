@@ -80,10 +80,15 @@ export interface OpenAiGatewayOptions {
    * `prompt`, which embeds the schema in the prompt and omits `response_format`.
    */
   structuredOutputMode?: StructuredOutputMode;
+  /** Provider-specific request body defaults, e.g. DeepSeek thinking mode. */
+  requestBodyDefaults?: Record<string, unknown>;
 }
 
 interface ChatCompletionResponse {
-  choices?: Array<{ message?: { content?: string | null; refusal?: string | null } }>;
+  choices?: Array<{
+    finish_reason?: string | null;
+    message?: { content?: string | null; refusal?: string | null };
+  }>;
   usage?: { prompt_tokens?: number; completion_tokens?: number };
 }
 
@@ -122,6 +127,17 @@ function inferCompatibleDefaults(baseURL: string): { maxTokensParam?: MaxTokensP
   return {};
 }
 
+function inferRequestBodyDefaults(baseURL: string): Record<string, unknown> | undefined {
+  let host = "";
+  try {
+    host = new URL(baseURL).hostname;
+  } catch {
+    host = baseURL;
+  }
+  if (host.includes("api.deepseek.com")) return { thinking: { type: "disabled" } };
+  return undefined;
+}
+
 function appendSchemaInstruction(prompt: string, schema: unknown): string {
   return [
     prompt,
@@ -154,6 +170,7 @@ export class OpenAiCompatibleLlmGateway implements LlmGateway {
   private readonly maxTokens: number;
   private readonly maxTokensParam: MaxTokensParam;
   private readonly structuredOutputMode: StructuredOutputMode;
+  private readonly requestBodyDefaults?: Record<string, unknown>;
   private readonly requestTimeoutMs: number;
   private readonly fetchImpl: OpenAiFetchPort;
 
@@ -172,6 +189,7 @@ export class OpenAiCompatibleLlmGateway implements LlmGateway {
       opts.structuredOutputMode ??
       inferred.structuredOutputMode ??
       (isDeepSeekBaseUrl(this.baseURL) ? "json_object" : DEFAULT_STRUCTURED_OUTPUT_MODE);
+    this.requestBodyDefaults = opts.requestBodyDefaults ?? inferRequestBodyDefaults(this.baseURL);
     this.fetchImpl = opts.client ?? fetch;
   }
 
@@ -214,6 +232,7 @@ export class OpenAiCompatibleLlmGateway implements LlmGateway {
     messages.push({ role: "user", content: prompt });
 
     const body: Record<string, unknown> = {
+      ...(this.requestBodyDefaults ?? {}),
       model: this.model,
       [this.maxTokensParam]: this.maxTokens,
       messages,
@@ -256,7 +275,11 @@ export class OpenAiCompatibleLlmGateway implements LlmGateway {
 
     // A strict-mode safety refusal arrives as `message.refusal` with null content. Surface
     // it as a real error rather than letting empty content become a confusing JSON-parse fail.
-    const message = data.choices?.[0]?.message;
+    const choice = data.choices?.[0];
+    if (choice?.finish_reason === "length") {
+      throw new Error("structured output was truncated by the provider (finish_reason=length); try again with a shorter aim or a larger output budget");
+    }
+    const message = choice?.message;
     if (message?.refusal) {
       throw new Error(`model refused: ${message.refusal}`);
     }

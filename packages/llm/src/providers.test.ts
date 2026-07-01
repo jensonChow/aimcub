@@ -27,6 +27,7 @@ describe("LLM provider catalog", () => {
       defaultModel: "deepseek-v4-pro",
       maxTokensParam: "max_tokens",
       structuredOutputMode: "json_object",
+      requestBodyDefaults: { thinking: { type: "disabled" } },
     });
     expect(getLlmProviderDefinition("minimax")).toMatchObject({
       protocol: "openai-compatible",

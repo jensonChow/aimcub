@@ -150,11 +150,13 @@ describe("OpenAiCompatibleLlmGateway · request shaping", () => {
       max_completion_tokens?: number;
       messages: Array<{ role: string; content: string }>;
       response_format?: { type: string; json_schema?: unknown };
+      thinking?: { type: string };
     };
     expect(body.model).toBe("deepseek-v4-pro");
     expect(body.max_tokens).toBeDefined();
     expect(body.max_completion_tokens).toBeUndefined();
     expect(body.response_format).toEqual({ type: "json_object" });
+    expect(body.thinking).toEqual({ type: "disabled" });
     expect(body.messages[0]!.content).toContain("The JSON must satisfy this JSON Schema:");
   });
 
@@ -265,6 +267,18 @@ describe("OpenAiCompatibleLlmGateway · transport errors", () => {
     const gw = new OpenAiCompatibleLlmGateway({ meter, ownerId: "o", apiKey: "k", model: "gpt-x", client });
 
     await expect(gw.complete({ task: "classify", prompt: "x" })).rejects.toThrow(/response was not valid JSON/);
+  });
+
+  it("surfaces provider truncation before JSON parsing", async () => {
+    const body = JSON.stringify({
+      choices: [{ finish_reason: "length", message: { content: "{\"unfinished\":\"json" } }],
+      usage: { prompt_tokens: 3, completion_tokens: 8192 },
+    });
+    const { client } = rawFetch(body);
+    const { meter } = recordingMeter();
+    const gw = new OpenAiCompatibleLlmGateway({ meter, ownerId: "o", apiKey: "k", model: "gpt-x", client });
+
+    await expect(gw.completeStructured({ task: "decompose", prompt: "x", schema: {} })).rejects.toThrow(/truncated/);
   });
 });
 
