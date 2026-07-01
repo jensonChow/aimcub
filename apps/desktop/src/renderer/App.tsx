@@ -55,9 +55,22 @@ import {
   secondaryButton,
 } from "./styles";
 
-type Step = "home" | "aim" | "drafting" | "questions" | "refining" | "plan";
+type Step = "home" | "aim" | "drafting" | "clarifying" | "questions" | "refining" | "plan";
 
 type AnswerMap = Record<string, { label: string | null; other: string }>;
+
+const DRAFT_UI_TIMEOUT_MS = 150_000;
+const CLARIFY_UI_TIMEOUT_MS = 75_000;
+
+function withUiTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
 
 export function App() {
   return (
@@ -325,7 +338,11 @@ function AppInner() {
     setError(null);
     setStep("drafting");
     try {
-      const d = await window.aimcub.draft({ title: title.trim(), description: description.trim() || undefined });
+      const d = await withUiTimeout(
+        window.aimcub.draft({ title: title.trim(), description: description.trim() || undefined }),
+        DRAFT_UI_TIMEOUT_MS,
+        t("err.draftTimeout", { seconds: Math.round(DRAFT_UI_TIMEOUT_MS / 1000) }),
+      );
       setAimIntake(d.intake ?? null);
       if (!d.ok || !d.output) throw new Error(d.errors.join("; ") || t("err.draft"));
       setDraft(d.output);
@@ -333,15 +350,25 @@ function AppInner() {
       setPlanReview(d.review ?? null);
       setPlanQualityRetry(d.qualityRetry ?? null);
       setPlanningContext(d.planningContext ?? null);
-      const c = await window.aimcub.clarify({
-        title: title.trim(),
-        description: description.trim() || undefined,
-        draft: d.output,
-      });
-      // Clarify is best-effort: if the model returns nothing usable, proceed with the draft
-      // and an empty question set rather than blocking — the draft is already valid.
-      setClarifyOut(c.output ?? { questions: [], assumptions: [] });
-      if (!c.ok) setError(c.errors.join("; ") || t("err.clarify"));
+      setStep("clarifying");
+      try {
+        const c = await withUiTimeout(
+          window.aimcub.clarify({
+            title: title.trim(),
+            description: description.trim() || undefined,
+            draft: d.output,
+          }),
+          CLARIFY_UI_TIMEOUT_MS,
+          t("err.clarifyTimeout", { seconds: Math.round(CLARIFY_UI_TIMEOUT_MS / 1000) }),
+        );
+        // Clarify is best-effort: if the model returns nothing usable, proceed with the draft
+        // and an empty question set rather than blocking — the draft is already valid.
+        setClarifyOut(c.output ?? { questions: [], assumptions: [] });
+        if (!c.ok) setError(c.errors.join("; ") || t("err.clarify"));
+      } catch (e) {
+        setClarifyOut({ questions: [], assumptions: [] });
+        setError(e instanceof Error ? e.message : String(e));
+      }
       setStep("questions");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -482,8 +509,10 @@ function AppInner() {
           </>
         )}
 
-        {(step === "drafting" || step === "refining") && (
-          <Notice tone="info">{step === "drafting" ? t("status.drafting") : t("status.refining")}</Notice>
+        {(step === "drafting" || step === "clarifying" || step === "refining") && (
+          <Notice tone="info">
+            {step === "drafting" ? t("status.drafting") : step === "clarifying" ? t("status.clarifying") : t("status.refining")}
+          </Notice>
         )}
 
         {step === "questions" && clarifyOut && (

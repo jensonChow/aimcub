@@ -71,7 +71,7 @@ describe("OpenAiCompatibleLlmGateway · request shaping", () => {
       meter,
       ownerId: "o",
       apiKey: "secret-key",
-      model: "deepseek-chat",
+      model: "custom-chat-model",
       baseURL: "https://openrouter.ai/api/v1/",
       client,
     });
@@ -83,7 +83,7 @@ describe("OpenAiCompatibleLlmGateway · request shaping", () => {
     expect(url).toBe("https://openrouter.ai/api/v1/chat/completions"); // trailing slash trimmed
     expect(init.headers.authorization).toBe("Bearer secret-key");
     const body = JSON.parse(init.body) as { model: string; messages: Array<{ role: string; content: string }> };
-    expect(body.model).toBe("deepseek-chat");
+    expect(body.model).toBe("custom-chat-model");
     expect(body.messages[0]).toEqual({ role: "system", content: "be terse" });
     expect(body.messages[1]).toEqual({ role: "user", content: "x" });
   });

@@ -15,6 +15,8 @@ import Anthropic from "@anthropic-ai/sdk";
 // (mirroring @core purity), so @types/node is not pulled in — we declare just `process.env`
 // rather than widening the type surface for the whole package.
 declare const process: { env: Record<string, string | undefined> };
+declare const setTimeout: (handler: () => void, timeoutMs: number) => unknown;
+declare const clearTimeout: (handle: unknown) => void;
 
 import {
   routeModel,
@@ -44,6 +46,8 @@ export interface AnthropicGatewayOptions {
   apiKey?: string;
   /** Max output tokens per request. Defaults to a value comfortably above a full plan. */
   maxTokens?: number;
+  /** Transport timeout. Defaults to 60s so UI callers never wait forever. */
+  requestTimeoutMs?: number;
   /** Optional fixed model selected by a UI/config; omitted keeps task-based routing. */
   model?: string;
 }
@@ -80,6 +84,19 @@ interface AnthropicMessageResponse {
 }
 
 const DEFAULT_MAX_TOKENS = 8192;
+const DEFAULT_REQUEST_TIMEOUT_MS = 60_000;
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: unknown;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`request timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer !== undefined) clearTimeout(timer);
+  });
+}
 
 /**
  * Resolve the API key: an explicit `opts.apiKey` (BYO-key) wins over the env var. Pure +
@@ -97,6 +114,7 @@ export class AnthropicLlmGateway implements LlmGateway {
   private readonly meter: UsageMeter;
   private readonly ownerId: string;
   private readonly maxTokens: number;
+  private readonly requestTimeoutMs: number;
   private readonly model?: string;
   private readonly injectedClient?: AnthropicClientPort;
   private readonly apiKey?: string;
@@ -106,6 +124,7 @@ export class AnthropicLlmGateway implements LlmGateway {
     this.meter = opts.meter;
     this.ownerId = opts.ownerId;
     this.maxTokens = opts.maxTokens ?? DEFAULT_MAX_TOKENS;
+    this.requestTimeoutMs = opts.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
     this.model = opts.model;
     this.injectedClient = opts.client;
     this.apiKey = opts.apiKey;
@@ -153,7 +172,7 @@ export class AnthropicLlmGateway implements LlmGateway {
 
     // TODO(v1a-live): this is the only real network call. Add retry / circuit-breaker /
     // prompt-caching breakpoints here once we are exercising it against the live API.
-    const response = await client.messages.create(body);
+    const response = await withTimeout(client.messages.create(body), this.requestTimeoutMs);
 
     const text = extractText(response);
     const usage: LlmUsage = {

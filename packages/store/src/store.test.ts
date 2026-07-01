@@ -594,7 +594,7 @@ describe("provider settings (settings.json shared by desktop + CLI)", () => {
     const cfg: ProviderSettings = {
       provider: "openai-compatible",
       apiKey: "sk-file",
-      model: "deepseek/deepseek-chat",
+      model: "custom-chat-model",
       baseURL: "https://openrouter.ai/api/v1",
     };
     saveSettings(cfg, dir);

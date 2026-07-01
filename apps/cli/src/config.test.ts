@@ -24,13 +24,13 @@ describe("resolveProvider", () => {
       {
         AIMCUB_PROVIDER: "openai",
         OPENAI_API_KEY: "sk-oai",
-        AIMCUB_MODEL: "deepseek/deepseek-chat",
+        AIMCUB_MODEL: "gpt-5.4-mini",
         AIMCUB_BASE_URL: "https://openrouter.ai/api/v1",
       },
       null,
     );
     expect(r.provider).toBe("openai");
-    expect(r.model).toBe("deepseek/deepseek-chat");
+    expect(r.model).toBe("gpt-5.4-mini");
     expect(r.baseURL).toBe("https://openrouter.ai/api/v1");
     expect(r.keySource).toBe("env:OPENAI_API_KEY");
   });

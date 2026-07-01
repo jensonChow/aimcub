@@ -241,6 +241,7 @@ export const STRINGS = {
   "aim.needProvider": { en: "Set up an LLM provider above to generate a plan.", zh: "先在上方设置模型提供方才能生成计划。" },
 
   "status.drafting": { en: "Sketching a first-pass plan…", zh: "正在起草初版计划…" },
+  "status.clarifying": { en: "Draft ready. Preparing clarifying questions…", zh: "初稿已生成，正在准备澄清问题…" },
   "status.refining": { en: "Refining with your answers…", zh: "正在根据你的回答优化…" },
 
   "q.intro": { en: "A rough plan is ready. Answer a couple of questions to sharpen it.", zh: "初步计划已就绪。回答几个问题让它更精准。" },
@@ -308,18 +309,6 @@ export const STRINGS = {
     zh: "选择提供方和模型。你的密钥只留在这台 Mac——永不离开主进程。",
   },
   "pf.providerLabel": { en: "Provider", zh: "提供方" },
-  "pf.anthropic": { en: "Anthropic (Claude)", zh: "Anthropic(Claude)" },
-  "pf.openai": { en: "OpenAI-compatible", zh: "OpenAI 兼容" },
-  "pf.anthropicDesc": { en: "Native Claude API.", zh: "原生 Claude API。" },
-  "pf.openaiDesc": { en: "OpenRouter, DeepSeek, Qwen, local Ollama/vLLM…", zh: "OpenRouter、DeepSeek、Qwen、本地 Ollama/vLLM…" },
-  "pf.presets": { en: "Endpoint presets", zh: "接口预设" },
-  "pf.openaiCompatibleHint": {
-    en: "Blank Base URL means OpenAI. If your key is from another provider, pick its preset or paste that provider's OpenAI-compatible /v1 endpoint.",
-    zh: "Base URL 留空会请求 OpenAI。如果密钥来自其他提供方,请选择对应预设,或填写该提供方的 OpenAI-compatible /v1 接口。",
-  },
-  "pf.baseUrl": { en: "Base URL (optional)", zh: "Base URL(可选)" },
-  "pf.useOpenRouter": { en: "Use OpenRouter", zh: "用 OpenRouter" },
-  "pf.baseUrlPlaceholder": { en: "https://api.openai.com/v1 (default)", zh: "https://api.openai.com/v1(默认)" },
   "pf.model": { en: "Model", zh: "模型" },
   "pf.customModel": { en: "Custom model ID", zh: "自定义模型 ID" },
   "pf.modelPlaceholder": { en: "e.g. deepseek-v4-pro, MiniMax-M3, glm-5.2, or qwen-plus", zh: "例如 deepseek-v4-pro、MiniMax-M3、glm-5.2 或 qwen-plus" },
@@ -338,7 +327,9 @@ export const STRINGS = {
   "pf.saveProvider": { en: "Save provider", zh: "保存提供方" },
 
   "err.draft": { en: "could not draft a plan", zh: "无法生成计划" },
+  "err.draftTimeout": { en: "draft request timed out after {seconds}s — check the provider/model or try a faster model", zh: "生成计划超过 {seconds} 秒没有响应——请检查模型/接口，或先换成更快的模型" },
   "err.clarify": { en: "couldn't generate clarifying questions — the draft is still usable", zh: "无法生成澄清问题——初稿仍可用" },
+  "err.clarifyTimeout": { en: "clarifying questions timed out after {seconds}s — continuing with the draft", zh: "澄清问题超过 {seconds} 秒没有响应——已先使用初稿继续" },
   "err.refine": { en: "couldn't refine the plan — try again or use the draft as-is", zh: "无法优化计划——重试或直接用初稿" },
 } as const satisfies Record<string, Record<Lang, string>>;
 

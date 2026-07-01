@@ -9,7 +9,7 @@ import type { LlmGateway, LlmRequest, LlmResponse, LlmUsage } from "./index";
 // ──────────────────────────────────────────────────────────────────────────
 
 const FIXED_USAGE: LlmUsage = {
-  model: "claude-sonnet-4-6",
+  model: "claude-sonnet-5",
   inputTokens: 42,
   outputTokens: 99,
 };

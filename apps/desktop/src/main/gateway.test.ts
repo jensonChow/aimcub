@@ -33,6 +33,44 @@ vi.mock("@core/llm", () => ({
 import { testProviderConfig } from "./gateway";
 
 describe("desktop provider connection test", () => {
+  it.each([
+    ["openai", "gpt-5.4-mini", "https://api.openai.com/v1", "json_schema"],
+    ["deepseek", "deepseek-v4-pro", "https://api.deepseek.com", "json_object"],
+    ["minimax", "MiniMax-M3", "https://api.minimax.io/v1", "prompt"],
+    ["zai", "glm-5.2", "https://api.z.ai/api/paas/v4", "json_object"],
+    ["google", "gemini-3.5-flash", "https://generativelanguage.googleapis.com/v1beta/openai", "prompt"],
+    ["qwen", "qwen-plus", "https://dashscope.aliyuncs.com/compatible-mode/v1", "prompt"],
+  ] as const)("maps %s to its catalog-backed OpenAI-compatible gateway", async (provider, model, baseURL, structuredOutputMode) => {
+    gatewayMocks.failWith = null;
+    gatewayMocks.openAiOptions.length = 0;
+
+    const result = await testProviderConfig({ provider, apiKey: "sk-test" });
+
+    expect(result.ok).toBe(true);
+    expect(result.model).toBe(model);
+    expect(result.baseURL).toBe(baseURL);
+    expect(gatewayMocks.openAiOptions[0]).toMatchObject({
+      apiKey: "sk-test",
+      model,
+      baseURL,
+      structuredOutputMode,
+    });
+  });
+
+  it("maps Anthropic to the native gateway", async () => {
+    gatewayMocks.failWith = null;
+    gatewayMocks.anthropicOptions.length = 0;
+
+    const result = await testProviderConfig({ provider: "anthropic", apiKey: "sk-ant" });
+
+    expect(result.ok).toBe(true);
+    expect(result.model).toBe("claude-sonnet-5");
+    expect(gatewayMocks.anthropicOptions[0]).toMatchObject({
+      apiKey: "sk-ant",
+      model: "claude-sonnet-5",
+    });
+  });
+
   it("maps a built-in provider to catalog defaults before probing", async () => {
     gatewayMocks.failWith = null;
     gatewayMocks.openAiOptions.length = 0;
