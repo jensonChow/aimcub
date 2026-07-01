@@ -19,6 +19,7 @@ A universal **aim-management** layer for the harness era. Humans and agents are 
 - **Evidence is append-only + idempotent**; milestone completion is state *derived* from the evidence stream via `evaluate()`, never written directly.
 - **`@core/*` is the only place business logic lives** — pure TS, zero platform deps, unit-tested. App shells (`apps/*`) only do I/O, rendering, platform bridging. CI guards purity via ESLint `no-restricted-imports` + `types:[]` tsc.
 - **Lean-first**: a `jobs` table + pg_cron (not pgmq), linear milestones (not DAG), single-table memory (no vectors). Add complexity only when a concrete trigger demands it.
+- **Built-in planning tools first**: local read/search/memory/context tools are first-party Aimcub runtime tools; MCP is the external extension boundary, not the substrate for core primitives.
 
 ## Layout
 `packages/{core (@core/domain), types (@core/types), db, api, llm, ui-tokens}` + `apps/{web, mcp = active; ios = v2, extension = v3 = placeholders}`. Full table in `README.md`.
