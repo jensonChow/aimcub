@@ -79,6 +79,7 @@ export type {
   OpenAiGatewayOptions,
   OpenAiFetchPort,
   OpenAiFetchResponse,
+  StructuredOutputMode,
 } from "./openai-gateway";
 export { decompose, decomposeWithQuality, planQualityMetadata } from "./decompose";
 export type {

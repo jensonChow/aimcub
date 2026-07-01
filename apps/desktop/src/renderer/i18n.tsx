@@ -321,7 +321,7 @@ export const STRINGS = {
   "pf.useOpenRouter": { en: "Use OpenRouter", zh: "用 OpenRouter" },
   "pf.baseUrlPlaceholder": { en: "https://api.openai.com/v1 (default)", zh: "https://api.openai.com/v1(默认)" },
   "pf.model": { en: "Model", zh: "模型" },
-  "pf.modelPlaceholder": { en: "e.g. deepseek/deepseek-chat or anthropic/claude-sonnet-4", zh: "例如 deepseek/deepseek-chat 或 anthropic/claude-sonnet-4" },
+  "pf.modelPlaceholder": { en: "e.g. deepseek-v4-pro, deepseek-v4-flash, or anthropic/claude-sonnet-4", zh: "例如 deepseek-v4-pro、deepseek-v4-flash 或 anthropic/claude-sonnet-4" },
   "pf.apiKey": { en: "API key", zh: "API 密钥" },
   "pf.keyKeep": { en: "•••• leave blank to keep current key", zh: "•••• 留空则保留当前密钥" },
   "pf.notUsableKey": { en: "That config isn't usable yet — check the key.", zh: "该配置还不可用——检查密钥。" },

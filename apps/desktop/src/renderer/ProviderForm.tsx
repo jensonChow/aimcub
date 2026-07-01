@@ -16,7 +16,7 @@ const OPENAI_COMPATIBLE_PRESETS = [
     id: "deepseek",
     label: "DeepSeek",
     baseURL: "https://api.deepseek.com",
-    model: "deepseek-chat",
+    model: "deepseek-v4-pro",
   },
   {
     id: "siliconflow",
@@ -70,7 +70,7 @@ export function ProviderForm({ status, onSaved, onClose }: ProviderFormProps) {
   function applyOpenAiCompatiblePreset(preset: (typeof OPENAI_COMPATIBLE_PRESETS)[number]) {
     setProviderKind("openai-compatible");
     setBaseURL(preset.baseURL);
-    if (!model.trim() && preset.model) setModel(preset.model);
+    if (preset.model) setModel(preset.model);
   }
 
   async function save() {

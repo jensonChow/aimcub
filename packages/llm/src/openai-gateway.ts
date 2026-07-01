@@ -69,6 +69,11 @@ export interface OpenAiGatewayOptions {
    * reject the new name.
    */
   maxTokensParam?: MaxTokensParam;
+  /**
+   * Structured-output request shape. OpenAI/OpenRouter support `json_schema`; DeepSeek's
+   * public OpenAI-compatible API documents `json_object`.
+   */
+  structuredOutputMode?: StructuredOutputMode;
 }
 
 interface ChatCompletionResponse {
@@ -78,6 +83,7 @@ interface ChatCompletionResponse {
 
 /** Which field carries the output-token cap (see {@link OpenAiGatewayOptions.maxTokensParam}). */
 export type MaxTokensParam = "max_completion_tokens" | "max_tokens";
+export type StructuredOutputMode = "json_schema" | "json_object";
 
 const DEFAULT_BASE_URL = "https://api.openai.com/v1";
 const DEFAULT_MAX_TOKENS = 8192;
@@ -86,8 +92,17 @@ const DEFAULT_MAX_TOKENS = 8192;
 // tiers) + OpenRouter accept `max_completion_tokens`. Older self-hosted OpenAI-compatible
 // servers that only know `max_tokens` can opt back via `maxTokensParam`.
 const DEFAULT_MAX_TOKENS_PARAM: MaxTokensParam = "max_completion_tokens";
+const DEFAULT_STRUCTURED_OUTPUT_MODE: StructuredOutputMode = "json_schema";
 /** Schema name handed to `json_schema` — providers require a `^[A-Za-z0-9_-]+$` identifier. */
 const SCHEMA_NAME = "aimcub_structured_output";
+
+function isDeepSeekBaseUrl(baseURL: string): boolean {
+  try {
+    return new URL(baseURL).hostname === "api.deepseek.com";
+  } catch {
+    return baseURL.includes("api.deepseek.com");
+  }
+}
 
 export class OpenAiCompatibleLlmGateway implements LlmGateway {
   private readonly meter: UsageMeter;
@@ -97,6 +112,7 @@ export class OpenAiCompatibleLlmGateway implements LlmGateway {
   private readonly baseURL: string;
   private readonly maxTokens: number;
   private readonly maxTokensParam: MaxTokensParam;
+  private readonly structuredOutputMode: StructuredOutputMode;
   private readonly fetchImpl: OpenAiFetchPort;
 
   constructor(opts: OpenAiGatewayOptions) {
@@ -106,7 +122,8 @@ export class OpenAiCompatibleLlmGateway implements LlmGateway {
     this.model = opts.model;
     this.baseURL = (opts.baseURL ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
     this.maxTokens = opts.maxTokens ?? DEFAULT_MAX_TOKENS;
-    this.maxTokensParam = opts.maxTokensParam ?? DEFAULT_MAX_TOKENS_PARAM;
+    this.maxTokensParam = opts.maxTokensParam ?? (isDeepSeekBaseUrl(this.baseURL) ? "max_tokens" : DEFAULT_MAX_TOKENS_PARAM);
+    this.structuredOutputMode = opts.structuredOutputMode ?? (isDeepSeekBaseUrl(this.baseURL) ? "json_object" : DEFAULT_STRUCTURED_OUTPUT_MODE);
     this.fetchImpl = opts.client ?? fetch;
   }
 
@@ -150,10 +167,13 @@ export class OpenAiCompatibleLlmGateway implements LlmGateway {
       messages,
     };
     if (structured && req.schema !== undefined) {
-      body.response_format = {
-        type: "json_schema",
-        json_schema: { name: SCHEMA_NAME, schema: req.schema, strict: true },
-      };
+      body.response_format =
+        this.structuredOutputMode === "json_object"
+          ? { type: "json_object" }
+          : {
+              type: "json_schema",
+              json_schema: { name: SCHEMA_NAME, schema: req.schema, strict: true },
+            };
     }
 
     const response = await this.fetchImpl(`${this.baseURL}/chat/completions`, {

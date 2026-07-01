@@ -129,6 +129,33 @@ describe("OpenAiCompatibleLlmGateway · request shaping", () => {
     expect(body.max_completion_tokens).toBeUndefined();
   });
 
+  it("uses DeepSeek-compatible request defaults for api.deepseek.com", async () => {
+    const payload = { ok: true };
+    const { client, impl } = fakeFetch(JSON.stringify(payload));
+    const { meter } = recordingMeter();
+    const gw = new OpenAiCompatibleLlmGateway({
+      meter,
+      ownerId: "o",
+      apiKey: "k",
+      model: "deepseek-v4-pro",
+      baseURL: "https://api.deepseek.com",
+      client,
+    });
+
+    await gw.completeStructured<typeof payload>({ task: "decompose", prompt: "give me json", schema: { type: "object" } });
+
+    const body = JSON.parse(impl.mock.calls[0]![1].body) as {
+      model: string;
+      max_tokens?: number;
+      max_completion_tokens?: number;
+      response_format?: { type: string; json_schema?: unknown };
+    };
+    expect(body.model).toBe("deepseek-v4-pro");
+    expect(body.max_tokens).toBeDefined();
+    expect(body.max_completion_tokens).toBeUndefined();
+    expect(body.response_format).toEqual({ type: "json_object" });
+  });
+
   it("omits response_format on a plain (non-structured) complete", async () => {
     const { client, impl } = fakeFetch("ok");
     const { meter } = recordingMeter();
