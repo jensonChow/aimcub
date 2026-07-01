@@ -5,8 +5,44 @@ import type { LlmProvider, ProviderConfig, ProviderStatus } from "../shared/ipc"
 import { useI18n } from "./i18n";
 import { C, card, inputStyle, labelStyle, linkButton, optionButton, primaryButton } from "./styles";
 
-/** OpenRouter is the easy default for the OpenAI-compatible path (one key, 50+ models). */
-const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
+const OPENAI_COMPATIBLE_PRESETS = [
+  {
+    id: "openrouter",
+    label: "OpenRouter",
+    baseURL: "https://openrouter.ai/api/v1",
+    model: "anthropic/claude-sonnet-4",
+  },
+  {
+    id: "deepseek",
+    label: "DeepSeek",
+    baseURL: "https://api.deepseek.com",
+    model: "deepseek-chat",
+  },
+  {
+    id: "siliconflow",
+    label: "SiliconFlow",
+    baseURL: "https://api.siliconflow.cn/v1",
+    model: "",
+  },
+  {
+    id: "dashscope",
+    label: "Qwen/DashScope",
+    baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    model: "qwen-plus",
+  },
+  {
+    id: "moonshot",
+    label: "Kimi/Moonshot",
+    baseURL: "https://api.moonshot.cn/v1",
+    model: "moonshot-v1-8k",
+  },
+  {
+    id: "ollama",
+    label: "Ollama",
+    baseURL: "http://localhost:11434/v1",
+    model: "",
+  },
+] as const;
 
 interface ProviderFormProps {
   status: ProviderStatus | null;
@@ -30,6 +66,12 @@ export function ProviderForm({ status, onSaved, onClose }: ProviderFormProps) {
   const keyOk = apiKey.trim().length > 0 || hasStoredKey;
   const modelOk = !isOpenAi || model.trim().length > 0;
   const canSave = keyOk && modelOk && !busy;
+
+  function applyOpenAiCompatiblePreset(preset: (typeof OPENAI_COMPATIBLE_PRESETS)[number]) {
+    setProviderKind("openai-compatible");
+    setBaseURL(preset.baseURL);
+    if (!model.trim() && preset.model) setModel(preset.model);
+  }
 
   async function save() {
     setFormError(null);
@@ -76,9 +118,36 @@ export function ProviderForm({ status, onSaved, onClose }: ProviderFormProps) {
 
       {isOpenAi && (
         <>
+          <label style={{ ...labelStyle(), marginTop: 14 }}>{t("pf.presets")}</label>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {OPENAI_COMPATIBLE_PRESETS.map((preset) => (
+              <button
+                key={preset.id}
+                onClick={() => applyOpenAiCompatiblePreset(preset)}
+                style={{
+                  ...linkButton(),
+                  border: `1px solid ${baseURL === preset.baseURL ? C.accent : C.border}`,
+                  borderRadius: 8,
+                  padding: "6px 9px",
+                  color: baseURL === preset.baseURL ? C.accent : C.muted,
+                  background: baseURL === preset.baseURL ? C.accentBg : "#fff",
+                }}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+          <div style={{ color: C.muted, fontSize: 12, marginTop: 8 }}>
+            {t("pf.openaiCompatibleHint")}
+          </div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 14 }}>
             <label style={labelStyle()}>{t("pf.baseUrl")}</label>
-            <button onClick={() => setBaseURL(OPENROUTER_BASE_URL)} style={linkButton()}>{t("pf.useOpenRouter")}</button>
+            <button
+              onClick={() => applyOpenAiCompatiblePreset(OPENAI_COMPATIBLE_PRESETS[0])}
+              style={linkButton()}
+            >
+              {t("pf.useOpenRouter")}
+            </button>
           </div>
           <input
             value={baseURL}

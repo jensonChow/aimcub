@@ -312,6 +312,11 @@ export const STRINGS = {
   "pf.openai": { en: "OpenAI-compatible", zh: "OpenAI 兼容" },
   "pf.anthropicDesc": { en: "Native Claude API.", zh: "原生 Claude API。" },
   "pf.openaiDesc": { en: "OpenRouter, DeepSeek, Qwen, local Ollama/vLLM…", zh: "OpenRouter、DeepSeek、Qwen、本地 Ollama/vLLM…" },
+  "pf.presets": { en: "Endpoint presets", zh: "接口预设" },
+  "pf.openaiCompatibleHint": {
+    en: "Blank Base URL means OpenAI. If your key is from another provider, pick its preset or paste that provider's OpenAI-compatible /v1 endpoint.",
+    zh: "Base URL 留空会请求 OpenAI。如果密钥来自其他提供方,请选择对应预设,或填写该提供方的 OpenAI-compatible /v1 接口。",
+  },
   "pf.baseUrl": { en: "Base URL (optional)", zh: "Base URL(可选)" },
   "pf.useOpenRouter": { en: "Use OpenRouter", zh: "用 OpenRouter" },
   "pf.baseUrlPlaceholder": { en: "https://api.openai.com/v1 (default)", zh: "https://api.openai.com/v1(默认)" },
