@@ -23,7 +23,13 @@ orchestration product. The local desktop loop and shared `@core` packages should
 remain usable, inspectable, and hackable without relying on a closed hosted
 service.
 
-Hosted Supabase-backed surfaces can add sync, teams, and sharing, but the core
+The brand boundary is: **open local planning architecture, online aim platform**.
+The local product should own planning, agent management, provider configuration,
+context capture, and eval transparency. The online product should own multi-user
+collaboration, cross-device sync, team permissions, managed infrastructure, and
+the future aim-sharing platform.
+
+Hosted Supabase-backed surfaces can add networked value, but the core
 aim/context/eval architecture should stay transparent. License choice is
 intentionally TBD before public release.
 

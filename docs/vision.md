@@ -29,6 +29,14 @@ closed service. Keep `@core/*` portable and platform-neutral so contributors can
 build new shells, agent adapters, and local workflows without rewriting the aim
 logic.
 
+The brand strategy is deliberately split:
+
+- **Open local planning architecture.** Desktop, local storage, provider setup,
+  agent management, context capture, and eval transparency are the trust anchor.
+- **Online aim platform.** Multi-user collaboration, team routing, cross-device
+  sync, permissioned sharing, managed agent infrastructure, and the future
+  aim-sharing network require hosted surfaces.
+
 The license is intentionally undecided until the business/community boundary is
 explicit.
 
@@ -71,9 +79,12 @@ clear.
 
 1. **Personal aim management.** You treat yourself as an agent, collaborate with
    other agents, treat the real world as context, and let the system auto-judge the
-   human/agent boundary — some work to you, some to the agents.
+   human/agent boundary — some work to you, some to the agents. This should be
+   fully credible in the open-source local product.
 2. **Team aim management.** Many people + agents; each person has a context; aims
-   are dispatched and handled according to that context.
+   are dispatched and handled according to that context. This is primarily an
+   online collaboration product because identity, permissions, sync, and routing
+   are networked concerns.
 3. **Aim-sharing platform.** Break the boundaries of the organization — everything
    is aim-first. A person with deeply specialized context can be shared across many
    aims. Think a closed, paid GitHub for goals — but mind where GitHub falls short:
