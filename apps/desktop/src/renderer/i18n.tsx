@@ -310,6 +310,7 @@ export const STRINGS = {
   },
   "pf.providerLabel": { en: "Provider", zh: "提供方" },
   "pf.model": { en: "Model", zh: "模型" },
+  "pf.modelId": { en: "Model ID: {id}", zh: "模型 ID:{id}" },
   "pf.customModel": { en: "Custom model ID", zh: "自定义模型 ID" },
   "pf.modelPlaceholder": { en: "e.g. deepseek-v4-pro, MiniMax-M3, glm-5.2, or qwen-plus", zh: "例如 deepseek-v4-pro、MiniMax-M3、glm-5.2 或 qwen-plus" },
   "pf.endpoint": { en: "Endpoint", zh: "接口地址" },

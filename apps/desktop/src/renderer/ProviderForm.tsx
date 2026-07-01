@@ -15,7 +15,7 @@ import type { ProviderConfig, ProviderStatus } from "../shared/ipc";
 import { useI18n } from "./i18n";
 import { C, card, inputStyle, labelStyle, linkButton, optionButton, primaryButton, secondaryButton } from "./styles";
 
-const CUSTOM_MODEL = "__custom__";
+export const CUSTOM_MODEL = "__custom__";
 const PROVIDER_OPTIONS = LLM_PROVIDER_CATALOG;
 
 interface ProviderFormProps {
@@ -24,21 +24,48 @@ interface ProviderFormProps {
   onClose: () => void;
 }
 
-function providerOrDefault(provider: ProviderStatus["provider"] | null | undefined): LlmProvider {
+export interface ProviderFormState {
+  providerKind: LlmProvider;
+  apiKey: string;
+  baseURL: string;
+  model: string;
+}
+
+export function providerOrDefault(provider: ProviderStatus["provider"] | null | undefined): LlmProvider {
   return provider && getLlmProviderDefinition(provider) ? provider : "anthropic";
 }
 
-function modelOrDefault(provider: LlmProvider, model: string | null | undefined): string {
+export function modelOrDefault(provider: LlmProvider, model: string | null | undefined): string {
   return model?.trim() || getDefaultModel(provider);
 }
 
-function baseURLOrDefault(provider: LlmProvider, baseURL: string | null | undefined): string {
+export function baseURLOrDefault(provider: LlmProvider, baseURL: string | null | undefined): string {
   return baseURL?.trim() || getDefaultBaseURL(provider) || "";
 }
 
-function modelSelectValue(def: LlmProviderDefinition, model: string): string {
+export function modelSelectValue(def: LlmProviderDefinition, model: string): string {
   if (def.models.length === 0) return CUSTOM_MODEL;
   return modelBelongsToProvider(def.id, model) ? model : CUSTOM_MODEL;
+}
+
+export function providerFormStateForProvider(provider: LlmProvider): Pick<ProviderFormState, "providerKind" | "baseURL" | "model"> {
+  return {
+    providerKind: provider,
+    baseURL: baseURLOrDefault(provider, null),
+    model: modelOrDefault(provider, null),
+  };
+}
+
+export function providerConfigForFormState(state: ProviderFormState): ProviderConfig {
+  const def = getLlmProviderDefinition(state.providerKind);
+  const selectedModel = def ? modelSelectValue(def, state.model) : CUSTOM_MODEL;
+  const finalModel = selectedModel === CUSTOM_MODEL ? state.model.trim() : state.model.trim() || def?.defaultModel;
+  return {
+    provider: state.providerKind,
+    apiKey: state.apiKey.trim(),
+    baseURL: def?.protocol === "openai-compatible" ? state.baseURL.trim() || undefined : undefined,
+    model: finalModel || undefined,
+  };
 }
 
 export function ProviderForm({ status, onSaved, onClose }: ProviderFormProps) {
@@ -67,9 +94,10 @@ export function ProviderForm({ status, onSaved, onClose }: ProviderFormProps) {
   const canTest = keyOk && modelOk && !busy && !testBusy;
 
   function selectProvider(next: LlmProvider) {
-    setProviderKind(next);
-    setBaseURL(baseURLOrDefault(next, null));
-    setModel(modelOrDefault(next, null));
+    const nextState = providerFormStateForProvider(next);
+    setProviderKind(nextState.providerKind);
+    setBaseURL(nextState.baseURL);
+    setModel(nextState.model);
   }
 
   function selectModel(next: string) {
@@ -81,13 +109,7 @@ export function ProviderForm({ status, onSaved, onClose }: ProviderFormProps) {
   }
 
   function currentConfig(): ProviderConfig {
-    const finalModel = hasCustomModelInput ? model.trim() : model.trim() || providerDef.defaultModel;
-    return {
-      provider: providerKind,
-      apiKey: apiKey.trim(),
-      baseURL: usesEndpoint ? baseURL.trim() || undefined : undefined,
-      model: finalModel || undefined,
-    };
+    return providerConfigForFormState({ providerKind, apiKey, baseURL, model });
   }
 
   async function testConnection() {
@@ -124,7 +146,8 @@ export function ProviderForm({ status, onSaved, onClose }: ProviderFormProps) {
     }
   }
 
-  const selectedModelHelp = providerDef.models.find((item) => item.id === model)?.description;
+  const selectedModelId = model.trim() || providerDef.defaultModel;
+  const selectedModelHelp = providerDef.models.find((item) => item.id === selectedModelId)?.description;
 
   return (
     <div style={{ ...card(), background: "#fbfaf7" }}>
@@ -161,7 +184,12 @@ export function ProviderForm({ status, onSaved, onClose }: ProviderFormProps) {
           style={{ ...inputStyle(), marginTop: providerDef.models.length > 0 ? 8 : 0 }}
         />
       )}
-      {selectedModelHelp && <div style={{ color: C.muted, fontSize: 12, marginTop: 6 }}>{selectedModelHelp}</div>}
+      {selectedModelId && (
+        <div style={{ color: C.muted, fontSize: 12, marginTop: 6 }}>
+          {t("pf.modelId", { id: selectedModelId })}
+          {selectedModelHelp ? ` · ${selectedModelHelp}` : ""}
+        </div>
+      )}
 
       {usesEndpoint && (
         <>
