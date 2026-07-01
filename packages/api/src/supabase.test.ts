@@ -84,6 +84,35 @@ describe("user path issues RLS-bound queries on the user client", () => {
     expect(await repo.getGoal(GOAL)).toBeNull();
     expect((user.calls[0] as RecordedCall).terminal).toBe("maybeSingle");
   });
+
+  it("updateGoalPlan writes the plan snapshot and optional metadata on the user client", async () => {
+    const user = new FakeSupabase({
+      respond: () =>
+        ok<Goal>({
+          ...goalRow(),
+          status: "active",
+          plan_json: { nodes: [] },
+          metadata: { plan_quality: { grade: "pass", score: 100, issues: [] } },
+        }),
+    });
+    const repo = new SupabaseAimcubRepo(user, new FakeSupabase());
+
+    const updated = await repo.updateGoalPlan(GOAL, { nodes: [] }, "active", {
+      plan_quality: { grade: "pass", score: 100, issues: [] },
+    });
+
+    expect(updated.status).toBe("active");
+    const call = user.calls[0] as RecordedCall;
+    expect(call.table).toBe("goals");
+    expect(call.op).toBe("update");
+    expect(call.values).toMatchObject({
+      plan_json: { nodes: [] },
+      status: "active",
+      metadata: { plan_quality: { grade: "pass", score: 100 } },
+    });
+    expect(call.filters).toContainEqual({ kind: "eq", column: "id", value: GOAL });
+    expect(call.terminal).toBe("single");
+  });
 });
 
 describe("server path uses the service_role client (bypasses RLS)", () => {

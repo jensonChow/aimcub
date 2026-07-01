@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { decompose, type DecomposeInput } from "./decompose";
+import { decompose, decomposeWithQuality, type DecomposeInput } from "./decompose";
 import type { LlmGateway, LlmRequest, LlmResponse, LlmUsage } from "./index";
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -25,6 +25,23 @@ function mockGateway(output: unknown): LlmGateway & { calls: LlmRequest[] } {
     async completeStructured<T>(req: LlmRequest & { schema: unknown }): Promise<LlmResponse<T>> {
       calls.push(req);
       return { output: output as T, usage: FIXED_USAGE };
+    },
+  };
+}
+
+function mockGatewayQueue(outputs: unknown[]): LlmGateway & { calls: LlmRequest[] } {
+  const calls: LlmRequest[] = [];
+  const queue = [...outputs];
+  return {
+    calls,
+    async complete(req: LlmRequest): Promise<LlmResponse<string>> {
+      calls.push(req);
+      const output = queue.shift();
+      return { output: typeof output === "string" ? output : JSON.stringify(output), usage: FIXED_USAGE };
+    },
+    async completeStructured<T>(req: LlmRequest & { schema: unknown }): Promise<LlmResponse<T>> {
+      calls.push(req);
+      return { output: queue.shift() as T, usage: FIXED_USAGE };
     },
   };
 }
@@ -60,6 +77,14 @@ function validPlan() {
         description: "Normalize git/CI events into the append-only evidence stream.",
         est_effort: "m",
         xp_reward: 30,
+        decomposition_contract: {
+          why: "The ingester needs a separately verifiable implementation step before CI can prove it.",
+          definition_of_done: "Git and CI events are normalized into the append-only evidence stream.",
+          required_evidence: ["A commit touching the API evidence ingestion path."],
+          likely_owner: "agent",
+          context_gaps: [],
+          eval_signal: "The milestone is done when trusted source events become idempotent evidence rows.",
+        },
         acceptance_rule: {
           logic: "all",
           clauses: [
@@ -79,6 +104,14 @@ function validPlan() {
         description: "The ingestion test workflow passes on main.",
         est_effort: "s",
         xp_reward: 15,
+        decomposition_contract: {
+          why: "The implementation needs a dependent verification milestone so passing tests cannot be skipped.",
+          definition_of_done: "The ingestion test workflow succeeds.",
+          required_evidence: ["A successful CI status for the ingestion tests."],
+          likely_owner: "agent",
+          context_gaps: [],
+          eval_signal: "The milestone is done when CI proves the ingester still works.",
+        },
         acceptance_rule: {
           logic: "all",
           clauses: [
@@ -107,6 +140,10 @@ describe("decompose · happy path", () => {
     expect(result.output).not.toBeNull();
     expect(result.output?.nodes.map((n) => n.key)).toEqual(["m1", "m2"]);
     expect(result.output?.edges).toEqual([{ from: "m1", to: "m2" }]);
+    expect(result.output?.nodes[0]?.decomposition_contract).toMatchObject({
+      likely_owner: "agent",
+      required_evidence: ["A commit touching the API evidence ingestion path."],
+    });
     // Both v1 evaluators survive the round-trip.
     expect(result.output?.nodes[0]?.acceptance_rule.clauses[0]?.evaluator).toBe("commit_pattern");
     expect(result.output?.nodes[1]?.acceptance_rule.clauses[0]?.evaluator).toBe("ci_status");
@@ -123,7 +160,204 @@ describe("decompose · happy path", () => {
     expect(call.task).toBe("decompose");
     expect(call.schema).toBeDefined();
     expect(call.system).toContain("Aimcub");
+    expect(call.system).toContain("decomposition_contract");
     expect(call.prompt).toContain(INPUT.title);
+  });
+
+  it("includes known user context in the prompt", async () => {
+    const gw = mockGateway(validPlan());
+    await decompose(gw, {
+      ...INPUT,
+      memories: [
+        {
+          category: "preference",
+          kind: "semantic",
+          source: "user_stated",
+          confidence: 0.9,
+          content: "User prefers CLI-first workflows.",
+        },
+      ],
+    });
+
+    expect(gw.calls[0]!.prompt).toContain("Known user context");
+    expect(gw.calls[0]!.prompt).toContain("preference:");
+    expect(gw.calls[0]!.prompt).toContain("User prefers CLI-first workflows.");
+    expect(gw.calls[0]!.system).toContain("constraint: treat as hard limits");
+    expect(gw.calls[0]!.system).toContain("eval_signal");
+  });
+
+  it("includes context lineage learning in the prompt", async () => {
+    const gw = mockGateway(validPlan());
+    await decompose(gw, {
+      ...INPUT,
+      lineageLearning: {
+        version: 1,
+        totalQuestions: 2,
+        totalAnswered: 2,
+        totalCaptured: 1,
+        totalImpacted: 1,
+        totalPending: 1,
+        rows: [
+          {
+            source: "review_gap",
+            gapSource: "decomposition_contract",
+            category: "eval_signal",
+            capturePurpose: "define_eval",
+            improvesDimension: "verifiability",
+            askedCount: 1,
+            answeredCount: 1,
+            memoryCapturedCount: 1,
+            impactedCount: 1,
+            pendingContextCount: 0,
+            answerRate: 1,
+            captureRate: 1,
+            impactRate: 1,
+            recommendation: "reuse_pattern",
+            exampleQuestion: "What proves this milestone is complete?",
+            exampleAnswer: "pnpm test passes",
+            exampleNodeTitle: "Scaffold CLI",
+            signals: ["quality_dimension_improved", "missing_contract_eval_signal"],
+          },
+          {
+            source: "unknown",
+            category: "procedure",
+            capturePurpose: "document_procedure",
+            improvesDimension: "context_fit",
+            askedCount: 1,
+            answeredCount: 1,
+            memoryCapturedCount: 0,
+            impactedCount: 0,
+            pendingContextCount: 1,
+            answerRate: 1,
+            captureRate: 0,
+            impactRate: 0,
+            recommendation: "resolve_pending",
+            exampleQuestion: "Which release checklist should this follow?",
+            exampleAnswer: "Use the release checklist",
+            signals: [],
+          },
+        ],
+        guidance: [
+          "Reuse eval-signal verifiability questions from decomposition-contract; 1/1 captured answers improved plans.",
+          "Resolve pending procedure context from unknown before relying on it in milestone contracts.",
+        ],
+      },
+    });
+
+    expect(gw.calls[0]!.prompt).toContain("Historical context lineage learning");
+    expect(gw.calls[0]!.prompt).toContain("2 questions · 1 captured · 1 impacted · 1 pending");
+    expect(gw.calls[0]!.prompt).toContain("decomposition_contract/eval_signal");
+    expect(gw.calls[0]!.prompt).toContain("reuse_pattern");
+    expect(gw.calls[0]!.prompt).toContain("example node: Scaffold CLI");
+    expect(gw.calls[0]!.prompt).toContain("Resolve pending procedure context");
+  });
+
+  it("includes decomposition learning in the prompt", async () => {
+    const gw = mockGateway(validPlan());
+    await decompose(gw, {
+      ...INPUT,
+      decompositionLearning: {
+        version: 1,
+        totalAims: 2,
+        totalMilestones: 5,
+        completedMilestones: 3,
+        qualityIssueCount: 1,
+        contextOutcomeCount: 1,
+        evidenceAttributionCount: 1,
+        rows: [
+          {
+            source: "quality_issue",
+            recommendation: "improve_acceptance",
+            aimId: "goal-1",
+            aimTitle: "Ship CLI",
+            nodeKey: "m1",
+            nodeTitle: "Implement CLI command",
+            dimension: "verifiability",
+            issueCodes: ["weak_commit_pattern"],
+            reason: "weak_commit_pattern",
+            example: "Commit pattern is too broad.",
+          },
+          {
+            source: "completed_contract",
+            recommendation: "reuse_pattern",
+            aimId: "goal-3",
+            aimTitle: "Ship CLI",
+            nodeTitle: "Implement CLI command",
+            decidedBy: "rule_auto",
+            evidenceKinds: ["git_commit"],
+            evaluatorKinds: ["commit_pattern"],
+            triggeringEvidenceCount: 1,
+            minimumTrustScore: 0.95,
+            completed: true,
+            reason: "completed_with_evidence_attribution",
+            example: "Implement CLI command: done when command runs.",
+          },
+          {
+            source: "context_outcome",
+            recommendation: "ask_context_earlier",
+            aimId: "goal-2",
+            aimTitle: "Release CLI",
+            nodeTitle: "Release CLI",
+            category: "eval_signal",
+            acceptedContextCount: 1,
+            rejectedContextCount: 0,
+            deprioritizedContextCount: 0,
+            reason: "accepted_context_changed_or_supported_plan",
+            example: "Which verification command proves release readiness?",
+          },
+        ],
+        guidance: [
+          "Improve acceptance rules for \"Implement CLI command\"; prior decomposition had weak_commit_pattern issues.",
+        ],
+      },
+    });
+
+    expect(gw.calls[0]!.prompt).toContain("Historical decomposition learning");
+    expect(gw.calls[0]!.prompt).toContain("2 aims · 3/5 milestones completed · 1 quality issues · 1 context outcomes · 1 evidence attributions");
+    expect(gw.calls[0]!.prompt).toContain("improve_acceptance from quality_issue");
+    expect(gw.calls[0]!.prompt).toContain("weak_commit_pattern");
+    expect(gw.calls[0]!.prompt).toContain("evidence git_commit via commit_pattern");
+    expect(gw.calls[0]!.prompt).toContain("min trust 0.95");
+    expect(gw.calls[0]!.prompt).toContain("ask_context_earlier from context_outcome");
+    expect(gw.calls[0]!.prompt).toContain("Improve acceptance rules");
+  });
+
+  it("includes decomposition strategy in the prompt", async () => {
+    const gw = mockGateway(validPlan());
+    await decompose(gw, {
+      ...INPUT,
+      decompositionStrategy: {
+        version: 1,
+        title: "Ship Aimcub CLI",
+        actionCount: 2,
+        actions: [
+          {
+            focus: "verifiability",
+            priority: "high",
+            recommendation: "Make every acceptance_rule evidence-backed and specific.",
+            reason: "Historical decompositions had acceptance weaknesses.",
+            sourceRows: 2,
+          },
+          {
+            focus: "context_fit",
+            priority: "medium",
+            recommendation: "Surface context_gaps before locking the plan.",
+            reason: "Historical accepted context changed plans.",
+            sourceRows: 1,
+          },
+        ],
+        guidance: [
+          "Treat eval signals as acceptance inputs; every milestone should name the evidence that can satisfy it.",
+        ],
+      },
+    });
+
+    expect(gw.calls[0]!.prompt).toContain("Current decomposition strategy");
+    expect(gw.calls[0]!.prompt).toContain('Strategy for "Ship Aimcub CLI": 2 actions');
+    expect(gw.calls[0]!.prompt).toContain("[high] verifiability");
+    expect(gw.calls[0]!.prompt).toContain("acceptance_rule evidence-backed");
+    expect(gw.calls[0]!.prompt).toContain("[medium] context_fit");
+    expect(gw.calls[0]!.prompt).toContain("Treat eval signals as acceptance inputs");
   });
 
   it("applies zod defaults and fills domain when omitted from input", async () => {
@@ -134,6 +368,79 @@ describe("decompose · happy path", () => {
     expect(result.validation.ok).toBe(true);
     // The user prompt should default the domain to `software`.
     expect((gw.calls[0] as LlmRequest).prompt).toContain("software");
+  });
+});
+
+describe("decomposeWithQuality", () => {
+  it("retries once with critique feedback and selects the improved plan", async () => {
+    const weak = validPlan();
+    weak.nodes[0]!.acceptance_rule.clauses = [
+      { evaluator: "commit_pattern", auto_verifiable: true, match: {} },
+    ];
+    const improved = validPlan();
+    const gw = mockGatewayQueue([weak, improved]);
+
+    const result = await decomposeWithQuality(gw, {
+      ...INPUT,
+      memories: [{ category: "constraint", content: "Constraint: Use packages/api for the evidence ingester.", confidence: 1 }],
+    });
+
+    expect(result.output?.nodes[0]?.acceptance_rule.clauses[0]).toMatchObject({
+      evaluator: "commit_pattern",
+      match: { path_glob: "packages/api/**" },
+    });
+    expect(result.quality?.grade).toBe("pass");
+    expect(result.retried).toBe(true);
+    expect(result.attempts).toBe(2);
+    expect(result.firstQuality?.grade).toBe("fail");
+    expect(gw.calls).toHaveLength(2);
+    expect(gw.calls[1]!.prompt).toContain("Aimcub quality critique");
+    expect(gw.calls[1]!.prompt).toContain("Scorecard dimensions to improve");
+    expect(gw.calls[1]!.prompt).toContain("verifiability: fail");
+    expect(gw.calls[1]!.prompt).toContain("Fix order: verifiability first");
+    expect(gw.calls[1]!.prompt).toContain("commit_pattern with no filters");
+  });
+
+  it("retries with structured instructions when eval signals are missing from acceptance rules", async () => {
+    const weak = validPlan();
+    weak.nodes[0]!.description = "Implement the evidence path and capture a golden recording for review.";
+    const improved = validPlan();
+    improved.nodes[0]!.acceptance_rule.clauses = [
+      {
+        evaluator: "commit_pattern",
+        auto_verifiable: true,
+        match: { path_glob: "packages/api/**", min_files: 1, message_pattern: "golden recording" },
+      },
+    ];
+    const gw = mockGatewayQueue([weak, improved]);
+
+    const result = await decomposeWithQuality(gw, {
+      ...INPUT,
+      memories: [
+        {
+          category: "eval_signal",
+          content: "Eval signal: Done means a golden recording proves demo readiness.",
+          confidence: 0.9,
+        },
+      ],
+    });
+
+    expect(result.retried).toBe(true);
+    expect(result.quality?.issues.map((issue) => issue.code)).not.toContain("missing_eval_acceptance_signal");
+    expect(gw.calls[1]!.prompt).toContain("Actionable refinement instructions");
+    expect(gw.calls[1]!.prompt).toContain("context_fit: warn");
+    expect(gw.calls[1]!.prompt).toContain("Convert the eval_signal into evidence-backed acceptance_rule details");
+    expect(gw.calls[1]!.prompt).toContain("commit_pattern message/path/min_files");
+  });
+
+  it("does not retry a plan that already passes quality critique", async () => {
+    const gw = mockGatewayQueue([validPlan()]);
+    const result = await decomposeWithQuality(gw, INPUT);
+
+    expect(result.retried).toBe(false);
+    expect(result.attempts).toBe(1);
+    expect(result.quality?.grade).toBe("pass");
+    expect(gw.calls).toHaveLength(1);
   });
 });
 

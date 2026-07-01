@@ -10,6 +10,7 @@
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 
+import { clarifyAnswersToMemories } from "@core/llm";
 import type { ClarifyAnswer, ClarifyQuestion } from "@core/llm";
 import type { NewMemory } from "@core/store";
 
@@ -44,16 +45,33 @@ export function parseAnswers(raw: string): ClarifyAnswer[] {
   return answers;
 }
 
+function questionLabel(question: ClarifyQuestion): string {
+  return question.source_dimension
+    ? `${question.kind} · ${question.source_dimension.replace("_", "-")}`
+    : question.kind;
+}
+
+function questionWhyLabel(question: ClarifyQuestion): string {
+  return (question.why_asked ?? [])
+    .map((why) => {
+      if (why.code === "review_gap") return why.category ? `review gap/${why.category.replace("_", "-")}` : "review gap";
+      if (why.code === "quality_dimension") return `quality/${why.source_dimension?.replace("_", "-") ?? "dimension"}`;
+      return `learning/${why.recommendation ?? "signal"}`;
+    })
+    .join(" · ");
+}
+
+function questionCaptureLabel(question: ClarifyQuestion): string {
+  const capture = question.capture;
+  if (!capture) return "";
+  const origin = capture.origin?.nodeKey ? ` · from ${capture.origin.nodeKey}` : "";
+  const roi = typeof capture.origin?.roiScore === "number" ? ` · roi ${capture.origin.roiScore}` : "";
+  return `${capture.scope}/${capture.category.replace("_", "-")} · ${capture.purpose.replace("_", "-")} · improves ${capture.improvesDimension.replace("_", "-")}${origin}${roi}`;
+}
+
 /** Fold answers into `user_stated` memories — mirrors the desktop save path. Pure. */
 export function answersToMemories(questions: ClarifyQuestion[], answers: ClarifyAnswer[]): NewMemory[] {
-  const byId = new Map(questions.map((q) => [q.id, q]));
-  return answers
-    .map((a) => ({ a, text: a.other_text?.trim() || a.selected_label?.trim() || "" }))
-    .filter((x) => x.text.length > 0)
-    .map(({ a, text }) => {
-      const label = byId.get(a.question_id)?.question ?? a.question_id;
-      return { content: `${label} → ${text}`, source: "user_stated" as const };
-    });
+  return clarifyAnswersToMemories(questions, answers);
 }
 
 /** Interactively ask each question on the TTY and collect the answers (empty input = skip). */
@@ -63,8 +81,12 @@ export async function promptAnswers(questions: ClarifyQuestion[]): Promise<Clari
   try {
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i]!;
-      stdout.write(`\n[${i + 1}/${questions.length}] (${q.kind}) ${q.question}\n`);
+      stdout.write(`\n[${i + 1}/${questions.length}] (${questionLabel(q)}) ${q.question}\n`);
       if (q.why_high_impact) stdout.write(`  why: ${q.why_high_impact}\n`);
+      const asked = questionWhyLabel(q);
+      if (asked) stdout.write(`  asked: ${asked}\n`);
+      const capture = questionCaptureLabel(q);
+      if (capture) stdout.write(`  capture: ${capture}\n`);
       q.options.forEach((o, n) => stdout.write(`  ${n + 1}) ${o.label}${o.tradeoff ? ` — ${o.tradeoff}` : ""}\n`));
 
       const reply = (await rl.question(`  Pick 1-${q.options.length}, type your own answer, or Enter to skip: `)).trim();

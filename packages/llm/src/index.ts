@@ -80,16 +80,64 @@ export type {
   OpenAiFetchPort,
   OpenAiFetchResponse,
 } from "./openai-gateway";
-export { decompose } from "./decompose";
-export type { DecomposeInput, DecomposeResult } from "./decompose";
+export { decompose, decomposeWithQuality, planQualityMetadata } from "./decompose";
+export type {
+  DecomposeInput,
+  DecomposeResult,
+  DecomposeWithQualityResult,
+  PlanQualityMetadata,
+  PlanQualityRetryMetadata,
+} from "./decompose";
+export { selectPlanningMemories, selectPlanningMemoriesWithTrace } from "./planning-context";
+export type {
+  PlanningContextSelectionReport,
+  PlanningContextSelectionResult,
+  PlanningContextSelectionRow,
+  PlanningContextScope,
+  PlanningMemory,
+  SelectPlanningMemoriesInput,
+} from "./planning-context";
+export {
+  buildAimIntakeReport,
+  planningContextReportsFromGoals,
+  recordAssumptionContextCandidatesForStore,
+  recordReviewContextCandidatesForStore,
+  reviewDecompositionStrategyForStore,
+  selectPlanningContextForStore,
+  summarizeClarifyLearningForStore,
+  summarizeContextCaptureLearningForStore,
+  summarizeContextLineageLearningForStore,
+  summarizeDecompositionLearningForStore,
+} from "./context-workflow";
+export type {
+  ContextWorkflowSnapshot,
+  ContextWorkflowStore,
+  PlanningContextForAim,
+} from "./context-workflow";
 export { localDecompose } from "./local-decompose";
 export type { DecomposeRequest } from "./local-decompose";
 export { decompositionJsonSchema } from "./decomposition-schema";
 export type { DecompositionJsonSchema } from "./decomposition-schema";
 
 // Clarifying-questions step (the planning "feedback step").
-export { clarify, validateClarify, buildRefinedDescription } from "./clarify";
+export {
+  clarify,
+  validateClarify,
+  buildRefinedDescription,
+  clarifyAnswersToMemories,
+  clarifyImpactReportFromMetadata,
+  summarizeClarifyLearning,
+  traceClarifyAnswerImpact,
+} from "./clarify";
 export type {
+  ClarifyAnswerMemory,
+  ClarifyAnswerImpactReport,
+  ClarifyAnswerImpactRow,
+  ClarifyAnswerImpactSignal,
+  ClarifyAnswerQualityDelta,
+  ClarifyLearningRecommendation,
+  ClarifyLearningReport,
+  ClarifyLearningRow,
   ClarifyInput,
   ClarifyResult,
   ClarifyOutput,
@@ -98,6 +146,9 @@ export type {
   ClarifyAnswer,
   ClarifyAssumption,
   ClarifyQuestionKind,
+  ClarifyQuestionWhy,
+  ClarifyQuestionWhyCode,
+  ClarifyQuestionSourceDimension,
   ClarifyValidation,
 } from "./clarify";
 export { clarifyJsonSchema } from "./clarify-schema";

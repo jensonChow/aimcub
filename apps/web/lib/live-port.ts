@@ -13,7 +13,8 @@
  */
 import type { CreateGoalInput } from "@core/api-client";
 import { SupabaseAimcubRepo, type SupabaseLike } from "@core/api-client";
-import { AnthropicLlmGateway, decompose, type UsageMeter } from "@core/llm";
+import { reviewPlan } from "@core/domain";
+import { AnthropicLlmGateway, decomposeWithQuality, planQualityMetadata, type UsageMeter } from "@core/llm";
 import type { DecompositionOutput, Goal, Milestone } from "@core/types";
 import type { DataPort } from "./data-port";
 import { localDecompose } from "./decompose";
@@ -49,26 +50,41 @@ export class SupabaseDataPort implements DataPort {
 
   async createGoal(input: CreateGoalInput): Promise<{ goal: Goal; milestones: Milestone[] }> {
     const goal = await this.repo.createGoal(input);
-    const decomposition = await this.plan(input);
+    const planned = await this.plan(input, goal.metadata);
+    const decomposition = planned.output;
     const milestones = materialize(decomposition, goal.id, input.ownerId);
     await this.repo.insertMilestones(milestones);
-    const updated = await this.repo.updateGoalPlan(goal.id, decomposition, "active");
+    const updated = await this.repo.updateGoalPlan(goal.id, decomposition, "active", planned.metadata);
     return { goal: updated, milestones };
   }
 
   /** Claude decomposition with a deterministic local fallback — goal creation never fails on LLM hiccups. */
-  private async plan(input: CreateGoalInput): Promise<DecompositionOutput> {
+  private async plan(
+    input: CreateGoalInput,
+    metadata: Record<string, unknown> = {},
+  ): Promise<{ output: DecompositionOutput; metadata?: Record<string, unknown> }> {
     const request = { title: input.title, description: input.description, domain: input.domain };
     if (readEnv().anthropicApiKey) {
       try {
         const gateway = new AnthropicLlmGateway({ meter: LOG_METER, ownerId: input.ownerId });
-        const result = await decompose(gateway, request);
-        if (result.output) return result.output;
+        const result = await decomposeWithQuality(gateway, request);
+        if (result.output) {
+          const review = reviewPlan({ plan: result.output, context: [], quality: result.quality });
+          return { output: result.output, metadata: { ...metadata, ...planQualityMetadata(result, review) } };
+        }
         console.error("[decompose] plan failed validation; using local fallback:", result.validation);
       } catch (err) {
         console.error("[decompose] LLM call failed; using local fallback:", err);
       }
     }
-    return localDecompose(request);
+    const output = localDecompose(request);
+    const review = reviewPlan({ plan: output, context: [] });
+    return {
+      output,
+      metadata: {
+        ...metadata,
+        ...planQualityMetadata({ quality: review.quality, retried: false, attempts: 1, firstQuality: review.quality }, review),
+      },
+    };
   }
 }

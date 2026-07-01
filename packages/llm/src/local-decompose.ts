@@ -6,7 +6,7 @@
  * from here. Lives in `@core/llm` (next to `decompose`) so the web app and the desktop
  * app share one fallback. Pure — depends only on `@core/types`.
  */
-import type { AcceptanceRule, DecompositionOutput, EstEffort, GoalDomain, PlanNode } from "@core/types";
+import type { AcceptanceRule, DecompositionContract, DecompositionOutput, EstEffort, GoalDomain, PlanNode } from "@core/types";
 
 export interface DecomposeRequest {
   title: string;
@@ -93,6 +93,26 @@ const TEMPLATE_STEPS: ReadonlyArray<{ title: string; description: string; rule: 
 
 const XP_BY_EFFORT: Record<EstEffort, number> = { xs: 5, s: 10, m: 20, l: 40, xl: 80 };
 
+function fallbackContract(step: { title: string; description: string }, index: number): DecompositionContract {
+  const owner: DecompositionContract["likely_owner"] = index === 2 || index === 3 ? "agent" : "either";
+  return {
+    why: `This milestone turns "${step.title}" into a separately verifiable outcome instead of hiding it inside a broad aim.`,
+    definition_of_done: step.description,
+    required_evidence: [
+      index === 3 ? "A successful CI status event." : "A trusted commit or CI event that matches the acceptance rule.",
+    ],
+    likely_owner: owner,
+    context_gaps: [
+      {
+        category: "eval_signal",
+        question: "What would make this milestone count as genuinely complete for this aim?",
+        reason: "offline_fallback_missing_personalized_eval",
+      },
+    ],
+    eval_signal: "The milestone is complete when its acceptance rule proves the stated outcome without relying only on manual judgment.",
+  };
+}
+
 /**
  * Deterministically decompose a goal into a linear DecompositionOutput.
  * Same shape the LLM returns, so downstream code is identical for offline and live.
@@ -108,6 +128,7 @@ export function localDecompose(req: DecomposeRequest): DecompositionOutput {
       est_effort: effort,
       xp_reward: XP_BY_EFFORT[effort],
       acceptance_rule: step.rule(),
+      decomposition_contract: fallbackContract(step, i),
     };
   });
 

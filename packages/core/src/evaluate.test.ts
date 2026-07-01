@@ -126,3 +126,30 @@ describe("evaluate · anti-spoofing (auto_verifiable)", () => {
     expect(evaluate(rule, [migrationCommit]).passed).toBe(true); // same glob, but trust=1
   });
 });
+
+describe("evaluate · manual_confirm", () => {
+  it("matches a trusted manual_check evidence row", () => {
+    const rule = AcceptanceRule.parse({
+      logic: "all",
+      completion_mode: "manual",
+      clauses: [{ evaluator: "manual_confirm", match: {} }],
+    });
+    const manual = ev({
+      id: "manual1",
+      kind: "manual_check",
+      payload: { confirmed: true },
+      trust_score: 1,
+    });
+    const r = evaluate(rule, [manual]);
+    expect(r.passed).toBe(true);
+    expect(r.matchedEvidenceIds).toEqual(["manual1"]);
+  });
+
+  it("rejects an explicit negative manual check", () => {
+    const rule = AcceptanceRule.parse({
+      logic: "all",
+      clauses: [{ evaluator: "manual_confirm", match: {} }],
+    });
+    expect(evaluate(rule, [ev({ kind: "manual_check", payload: { confirmed: false } })]).passed).toBe(false);
+  });
+});

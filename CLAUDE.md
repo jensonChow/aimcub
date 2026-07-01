@@ -5,6 +5,7 @@ A universal **aim-management** layer for the harness era. Humans and agents are 
 ## Working agreement
 - **Language**: the user gives instructions in Chinese and you may reply in Chinese, but **everything committed to the repo is English** — code, comments, identifiers, commit messages, docs, SQL. **Exception**: end-user UI is bilingual via i18n — English is the source-of-truth + a `zh` locale (only `zh` translation values are Chinese; keys/code/comments stay English).
 - **This file is the project's top-level rule set. Keep it ≤50 lines.** Detailed direction lives in `docs/vision.md` — never grow CLAUDE.md into it.
+- Current handoff and recent decisions live in `docs/handoff.md`; update it when transferring work.
 - Verify before claiming "done": `pnpm build && pnpm test && pnpm typecheck && pnpm lint && pnpm core:purity` must stay green.
 
 ## North star (the four pillars)
