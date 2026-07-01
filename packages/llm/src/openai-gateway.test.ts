@@ -199,6 +199,28 @@ describe("OpenAiCompatibleLlmGateway · completeStructured", () => {
 });
 
 describe("OpenAiCompatibleLlmGateway · transport errors", () => {
+  it("times out a request that never resolves", async () => {
+    vi.useFakeTimers();
+    try {
+      const client = vi.fn(() => new Promise<OpenAiFetchResponse>(() => {})) as unknown as OpenAiFetchPort;
+      const { meter } = recordingMeter();
+      const gw = new OpenAiCompatibleLlmGateway({
+        meter,
+        ownerId: "o",
+        apiKey: "k",
+        model: "gpt-x",
+        client,
+        requestTimeoutMs: 25,
+      });
+
+      const promise = expect(gw.complete({ task: "classify", prompt: "x" })).rejects.toThrow(/request timed out after 25ms/);
+      await vi.advanceTimersByTimeAsync(25);
+      await promise;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("throws on a non-2xx response, including the status and body", async () => {
     const { client } = fakeFetch("rate limited", { ok: false, status: 429 });
     const { meter } = recordingMeter();

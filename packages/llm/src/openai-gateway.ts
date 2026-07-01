@@ -30,6 +30,8 @@ import type {
 // narrowly, the same way `anthropic-gateway.ts` declares `process`. The platform's real
 // `fetch` (Node 18+/Electron/Bun/Deno) structurally satisfies this narrow signature.
 declare const fetch: OpenAiFetchPort;
+declare const setTimeout: (handler: () => void, timeoutMs: number) => unknown;
+declare const clearTimeout: (handle: unknown) => void;
 
 /** Minimal response surface we read from a fetch call. */
 export interface OpenAiFetchResponse {
@@ -63,6 +65,8 @@ export interface OpenAiGatewayOptions {
   client?: OpenAiFetchPort;
   /** Max output tokens per request. Defaults to a value comfortably above a full plan. */
   maxTokens?: number;
+  /** Transport timeout. Defaults to 60s so UI callers never wait forever. */
+  requestTimeoutMs?: number;
   /**
    * Which request field carries the token cap. Defaults to `max_completion_tokens` (the
    * current canonical field). Set to `max_tokens` only for legacy self-hosted servers that
@@ -87,6 +91,7 @@ export type StructuredOutputMode = "json_schema" | "json_object";
 
 const DEFAULT_BASE_URL = "https://api.openai.com/v1";
 const DEFAULT_MAX_TOKENS = 8192;
+const DEFAULT_REQUEST_TIMEOUT_MS = 60_000;
 // `max_completion_tokens` is the current canonical field — OpenAI's reasoning models
 // (o-series, gpt-5.x) REJECT the legacy `max_tokens` with an HTTP 400, and OpenAI (all
 // tiers) + OpenRouter accept `max_completion_tokens`. Older self-hosted OpenAI-compatible
@@ -104,6 +109,18 @@ function isDeepSeekBaseUrl(baseURL: string): boolean {
   }
 }
 
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: unknown;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`request timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer !== undefined) clearTimeout(timer);
+  });
+}
+
 export class OpenAiCompatibleLlmGateway implements LlmGateway {
   private readonly meter: UsageMeter;
   private readonly ownerId: string;
@@ -113,6 +130,7 @@ export class OpenAiCompatibleLlmGateway implements LlmGateway {
   private readonly maxTokens: number;
   private readonly maxTokensParam: MaxTokensParam;
   private readonly structuredOutputMode: StructuredOutputMode;
+  private readonly requestTimeoutMs: number;
   private readonly fetchImpl: OpenAiFetchPort;
 
   constructor(opts: OpenAiGatewayOptions) {
@@ -122,6 +140,7 @@ export class OpenAiCompatibleLlmGateway implements LlmGateway {
     this.model = opts.model;
     this.baseURL = (opts.baseURL ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
     this.maxTokens = opts.maxTokens ?? DEFAULT_MAX_TOKENS;
+    this.requestTimeoutMs = opts.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
     this.maxTokensParam = opts.maxTokensParam ?? (isDeepSeekBaseUrl(this.baseURL) ? "max_tokens" : DEFAULT_MAX_TOKENS_PARAM);
     this.structuredOutputMode = opts.structuredOutputMode ?? (isDeepSeekBaseUrl(this.baseURL) ? "json_object" : DEFAULT_STRUCTURED_OUTPUT_MODE);
     this.fetchImpl = opts.client ?? fetch;
@@ -176,14 +195,17 @@ export class OpenAiCompatibleLlmGateway implements LlmGateway {
             };
     }
 
-    const response = await this.fetchImpl(`${this.baseURL}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify(body),
-    });
+    const response = await withTimeout(
+      this.fetchImpl(`${this.baseURL}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify(body),
+      }),
+      this.requestTimeoutMs,
+    );
 
     const raw = await response.text();
     if (!response.ok) {
