@@ -6,9 +6,11 @@ import type { ProviderStatus } from "../shared/ipc";
 
 import { I18nProvider } from "./i18n";
 import {
-  ProviderForm,
   providerConfigForFormState,
   providerFormStateForProvider,
+} from "./providerFormState";
+import {
+  ProviderForm,
 } from "./ProviderForm";
 
 const noop = () => {};
