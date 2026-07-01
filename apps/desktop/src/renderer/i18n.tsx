@@ -330,6 +330,10 @@ export const STRINGS = {
   "pf.keyKeep": { en: "•••• leave blank to keep current key", zh: "•••• 留空则保留当前密钥" },
   "pf.notUsableKey": { en: "That config isn't usable yet — check the key.", zh: "该配置还不可用——检查密钥。" },
   "pf.notUsableKeyModel": { en: "That config isn't usable yet — check the key and model.", zh: "该配置还不可用——检查密钥和模型。" },
+  "pf.testProvider": { en: "Test model", zh: "测试模型" },
+  "pf.testing": { en: "Testing…", zh: "测试中…" },
+  "pf.testOk": { en: "Connection test passed in {ms} ms.", zh: "连接测试通过,耗时 {ms} ms。" },
+  "pf.testFailed": { en: "Connection test failed.", zh: "连接测试失败。" },
   "pf.saving": { en: "Saving…", zh: "保存中…" },
   "pf.saveProvider": { en: "Save provider", zh: "保存提供方" },
 

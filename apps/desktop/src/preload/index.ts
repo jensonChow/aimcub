@@ -24,6 +24,7 @@ const api: AimcubApi = {
   rejectContextCandidate: (id) => ipcRenderer.invoke(IPC.rejectContextCandidate, id),
   getProviderConfig: () => ipcRenderer.invoke(IPC.getProviderConfig),
   setProviderConfig: (config) => ipcRenderer.invoke(IPC.setProviderConfig, config),
+  testProviderConfig: (config) => ipcRenderer.invoke(IPC.testProviderConfig, config),
 };
 
 contextBridge.exposeInMainWorld("aimcub", api);

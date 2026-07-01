@@ -118,7 +118,7 @@ function inferCompatibleDefaults(baseURL: string): { maxTokensParam?: MaxTokensP
   if (host.includes("api.z.ai")) return { maxTokensParam: "max_tokens", structuredOutputMode: "json_object" };
   if (host.includes("api.minimax.io") || host.includes("api.minimaxi.com")) return { maxTokensParam: "max_tokens", structuredOutputMode: "prompt" };
   if (host.includes("dashscope") || host.includes("maas.aliyuncs.com")) return { maxTokensParam: "max_tokens", structuredOutputMode: "prompt" };
-  if (host.includes("generativelanguage.googleapis.com")) return { maxTokensParam: "max_tokens", structuredOutputMode: "json_schema" };
+  if (host.includes("generativelanguage.googleapis.com")) return { maxTokensParam: "max_tokens", structuredOutputMode: "prompt" };
   return {};
 }
 

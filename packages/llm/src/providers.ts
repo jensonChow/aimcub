@@ -138,7 +138,7 @@ export const LLM_PROVIDER_CATALOG = [
     baseURLHint: "Google Gemini OpenAI compatibility root.",
     defaultModel: "gemini-3.5-flash",
     maxTokensParam: "max_tokens",
-    structuredOutputMode: "json_schema",
+    structuredOutputMode: "prompt",
     models: [
       { id: "gemini-3.5-flash", label: "Gemini 3.5 Flash", description: "Fast Gemini model." },
       { id: "gemini-3.5-pro", label: "Gemini 3.5 Pro", description: "Higher-capability Gemini model." },

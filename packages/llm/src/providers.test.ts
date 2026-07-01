@@ -32,6 +32,10 @@ describe("LLM provider catalog", () => {
       protocol: "openai-compatible",
       structuredOutputMode: "prompt",
     });
+    expect(getLlmProviderDefinition("google")).toMatchObject({
+      protocol: "openai-compatible",
+      structuredOutputMode: "prompt",
+    });
   });
 
   it("recognizes only supported provider ids", () => {

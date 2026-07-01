@@ -128,6 +128,16 @@ export interface ProviderStatus {
   hasApiKey: boolean;
 }
 
+/** Result of a live provider/model connection probe. Never includes the secret key. */
+export interface ProviderTestResult {
+  ok: boolean;
+  provider: LlmProvider;
+  model: string | null;
+  baseURL: string | null;
+  error: string | null;
+  latencyMs: number;
+}
+
 /** The typed surface exposed on `window.aimcub` by the preload bridge. */
 export interface AimcubApi {
   intake(req: DraftRequest): Promise<AimIntakeReport>;
@@ -151,6 +161,7 @@ export interface AimcubApi {
   rejectContextCandidate(id: string): Promise<Memory | null>;
   getProviderConfig(): Promise<ProviderStatus>;
   setProviderConfig(config: ProviderConfig): Promise<ProviderStatus>;
+  testProviderConfig(config: ProviderConfig): Promise<ProviderTestResult>;
 }
 
 /** Channel names — kept in one place so main and preload can't drift. */
@@ -176,6 +187,7 @@ export const IPC = {
   rejectContextCandidate: "aimcub:rejectContextCandidate",
   getProviderConfig: "aimcub:getProviderConfig",
   setProviderConfig: "aimcub:setProviderConfig",
+  testProviderConfig: "aimcub:testProviderConfig",
 } as const;
 
 declare global {

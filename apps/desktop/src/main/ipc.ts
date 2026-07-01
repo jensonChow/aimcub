@@ -40,13 +40,14 @@ import {
   type DraftRequest,
   type ProviderConfig,
   type ProviderStatus,
+  type ProviderTestResult,
   type RefineRequest,
   type SaveRequest,
   type SavedGoal,
 } from "../shared/ipc";
 import { runClarify, runDraft, runRefine } from "./planner";
 import { aimStore } from "./store";
-import { buildGateway, getProviderStatus, setProviderConfig } from "./gateway";
+import { buildGateway, getProviderStatus, setProviderConfig, testProviderConfig } from "./gateway";
 
 async function planningContext(input: {
   title: string;
@@ -219,6 +220,10 @@ export function registerIpc(): void {
 
   ipcMain.handle(IPC.setProviderConfig, async (_e, config: ProviderConfig): Promise<ProviderStatus> =>
     setProviderConfig(config),
+  );
+
+  ipcMain.handle(IPC.testProviderConfig, async (_e, config: ProviderConfig): Promise<ProviderTestResult> =>
+    testProviderConfig(config),
   );
 
   ipcMain.handle(IPC.saveGoal, async (_e, req: SaveRequest): Promise<SavedGoal> => {

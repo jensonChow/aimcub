@@ -13,7 +13,7 @@ import {
 import type { ProviderConfig, ProviderStatus } from "../shared/ipc";
 
 import { useI18n } from "./i18n";
-import { C, card, inputStyle, labelStyle, linkButton, optionButton, primaryButton } from "./styles";
+import { C, card, inputStyle, labelStyle, linkButton, optionButton, primaryButton, secondaryButton } from "./styles";
 
 const CUSTOM_MODEL = "__custom__";
 const PROVIDER_OPTIONS = LLM_PROVIDER_CATALOG;
@@ -49,6 +49,8 @@ export function ProviderForm({ status, onSaved, onClose }: ProviderFormProps) {
   const [baseURL, setBaseURL] = useState(baseURLOrDefault(initialProvider, status?.baseURL));
   const [model, setModel] = useState(modelOrDefault(initialProvider, status?.model));
   const [busy, setBusy] = useState(false);
+  const [testBusy, setTestBusy] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
   const providerDef = getLlmProviderDefinition(providerKind) ?? PROVIDER_OPTIONS[0]!;
@@ -61,7 +63,8 @@ export function ProviderForm({ status, onSaved, onClose }: ProviderFormProps) {
   const hasStoredKey = (status?.hasApiKey ?? false) && status?.provider === providerKind;
   const keyOk = apiKey.trim().length > 0 || hasStoredKey;
   const modelOk = hasCustomModelInput ? Boolean(model.trim()) : Boolean((model.trim() || providerDef.defaultModel).trim());
-  const canSave = keyOk && modelOk && !busy;
+  const canSave = keyOk && modelOk && !busy && !testBusy;
+  const canTest = keyOk && modelOk && !busy && !testBusy;
 
   function selectProvider(next: LlmProvider) {
     setProviderKind(next);
@@ -77,18 +80,38 @@ export function ProviderForm({ status, onSaved, onClose }: ProviderFormProps) {
     setModel(next);
   }
 
+  function currentConfig(): ProviderConfig {
+    const finalModel = hasCustomModelInput ? model.trim() : model.trim() || providerDef.defaultModel;
+    return {
+      provider: providerKind,
+      apiKey: apiKey.trim(),
+      baseURL: usesEndpoint ? baseURL.trim() || undefined : undefined,
+      model: finalModel || undefined,
+    };
+  }
+
+  async function testConnection() {
+    setFormError(null);
+    setTestResult(null);
+    setTestBusy(true);
+    try {
+      const result = await window.aimcub.testProviderConfig(currentConfig());
+      setTestResult({
+        ok: result.ok,
+        message: result.ok ? t("pf.testOk", { ms: result.latencyMs }) : result.error ?? t("pf.testFailed"),
+      });
+    } catch (e) {
+      setTestResult({ ok: false, message: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setTestBusy(false);
+    }
+  }
+
   async function save() {
     setFormError(null);
     setBusy(true);
     try {
-      const finalModel = hasCustomModelInput ? model.trim() : model.trim() || providerDef.defaultModel;
-      const config: ProviderConfig = {
-        provider: providerKind,
-        apiKey: apiKey.trim(),
-        baseURL: usesEndpoint ? baseURL.trim() || undefined : undefined,
-        model: finalModel || undefined,
-      };
-      const nextStatus = await window.aimcub.setProviderConfig(config);
+      const nextStatus = await window.aimcub.setProviderConfig(currentConfig());
       if (!nextStatus.configured) {
         setFormError(t("pf.notUsableKeyModel"));
         return;
@@ -165,10 +188,20 @@ export function ProviderForm({ status, onSaved, onClose }: ProviderFormProps) {
       />
 
       {formError && <div style={{ color: C.danger, fontSize: 13, marginTop: 10 }}>{formError}</div>}
+      {testResult && (
+        <div style={{ color: testResult.ok ? "#2f6f44" : C.danger, fontSize: 13, marginTop: 10 }}>
+          {testResult.message}
+        </div>
+      )}
 
-      <button onClick={save} disabled={!canSave} style={primaryButton(!canSave)}>
-        {busy ? t("pf.saving") : t("pf.saveProvider")}
-      </button>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <button onClick={testConnection} disabled={!canTest} style={{ ...secondaryButton(), opacity: canTest ? 1 : 0.65 }}>
+          {testBusy ? t("pf.testing") : t("pf.testProvider")}
+        </button>
+        <button onClick={save} disabled={!canSave} style={primaryButton(!canSave)}>
+          {busy ? t("pf.saving") : t("pf.saveProvider")}
+        </button>
+      </div>
     </div>
   );
 }
