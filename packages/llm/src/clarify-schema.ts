@@ -74,7 +74,7 @@ export const clarifyJsonSchema = {
   properties: {
     questions: {
       type: "array",
-      description: "Only the few high-impact questions worth asking (0-5). Fewer is better.",
+      description: "A compact but sufficient context intake set (0-7), covering durable and aim-local context.",
       items: questionSchema,
     },
     assumptions: {

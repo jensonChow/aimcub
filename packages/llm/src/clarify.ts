@@ -41,8 +41,9 @@ import { clarifyJsonSchema } from "./clarify-schema";
 import { PLANNING_CONTEXT_RULES, planningMemoryCategory, renderPlanningContext } from "./planning-context";
 import type { PlanningMemory } from "./planning-context";
 
-const DEFAULT_MAX_QUESTIONS = 3;
-const HARD_MAX_QUESTIONS = 5;
+const DEFAULT_MAX_QUESTIONS = 6;
+const DEFAULT_MIN_CONTEXT_QUESTIONS = 4;
+const HARD_MAX_QUESTIONS = 7;
 
 export type ClarifyQuestionKind = "scope" | "involvement" | "assumption" | "constraint" | "capability";
 export type ClarifyQuestionSourceDimension = PlanQualityDimension;
@@ -290,7 +291,11 @@ const CLARIFY_SYSTEM_PROMPT = [
   "so the next pass is sharper. Be ruthlessly selective.",
   "",
   "Rules:",
-  "- Ask AT MOST a handful of questions (prefer 2-3, never more than 5). Fewer is better.",
+  "- Ask a compact but sufficient context intake set: usually 4-6 questions, never more than 7.",
+  "- Cover BOTH durable context and aim-local context. Durable/global context includes the",
+  "  user's stable constraints, preferences, capabilities, and eval standards. Aim-local",
+  "  context includes this aim's target surface, source material, workflow, files, commands,",
+  "  artifacts, or external facts that should not become long-term memory.",
   "- Ask ONLY what materially branches the plan (value-of-information). If an unknown is",
   "  low-impact or safely defaultable, do NOT ask it — record it under `assumptions`",
   "  (default-and-disclose) so the user can correct it instead.",
@@ -301,8 +306,8 @@ const CLARIFY_SYSTEM_PROMPT = [
   "- Each question carries >= 2 `options`. Every option is a concrete hypothesis (a",
   "  candidate answer), never a blank, and states its `tradeoff` (the consequence).",
   "- `allow_other` is always true — the user can always type a free-text answer.",
-  "- Prefer questions about: scope/ambition, the user's desired involvement (do-it-myself",
-  "  vs delegate), hard constraints, and load-bearing assumptions in the draft.",
+  "- Prefer questions about: exact target/outcome, source material to inspect, existing",
+  "  workflow/tools, eval evidence, durable constraints, and agent routing/capability.",
   "- When plan review signals are provided, turn high-priority context gaps into questions",
   "  before asking lower-impact scope or preference questions.",
   "- When aim intake readiness is provided, use it as the front door for question budget:",
@@ -317,9 +322,9 @@ const CLARIFY_SYSTEM_PROMPT = [
   "- Use historical context lineage learning as the strongest context tie-breaker: prefer",
   "  question categories whose past answers became durable memory and changed milestone",
   "  contracts; resolve pending context before asking new questions that repeat it.",
-  "- Use current decomposition strategy as a hard budget guide: when it prioritizes",
-  "  context fit, ask only questions whose answers can change milestone boundaries, owner",
-  "  routing, required evidence, or eval signals. Default everything else and disclose it.",
+  "- Use current decomposition strategy to prioritize, not to starve intake. When it",
+  "  prioritizes context fit, include questions whose answers can change milestone",
+  "  boundaries, owner routing, required evidence, or eval signals.",
   "- When a question comes from review signals, set `source_dimension` to the scorecard",
   "  dimension it most improves: `verifiability`, `granularity`, `distinctness`, or",
   "  `context_fit`. Set it to null for general discovery questions.",
@@ -561,16 +566,9 @@ function renderLineageLearning(learning: ContextLineageLearningReport | null | u
   return lines.join("\n");
 }
 
-function decompositionStrategyQuestionCap(strategy: DecompositionStrategyReport | null | undefined): number | null {
-  const action = strategy?.actions.find((item) => item.focus === "context_fit");
-  if (!action) return null;
-  return action.priority === "low" ? 1 : 2;
-}
-
 function strategyAwareMaxQuestions(maxQuestions: number | undefined, strategy: DecompositionStrategyReport | null | undefined): number {
-  const max = clampMax(maxQuestions);
-  const cap = decompositionStrategyQuestionCap(strategy);
-  return maxQuestions === undefined && cap ? Math.min(max, cap) : max;
+  void strategy;
+  return clampMax(maxQuestions);
 }
 
 function renderDecompositionStrategyForClarify(
@@ -888,7 +886,8 @@ function annotateQuestionWhy(
   if (why.length === 0) return question;
   const category = why.find((item) => item.category)?.category;
   const origin = captureOriginFromWhy(why);
-  const shouldRetargetCapture = Boolean(category && question.capture?.category !== category);
+  const isBaselineContextQuestion = question.capture?.reason === "baseline_context_intake";
+  const shouldRetargetCapture = !isBaselineContextQuestion && Boolean(category && question.capture?.category !== category);
   const capture = shouldRetargetCapture && category
     ? contextCaptureForCategory(category, question.source_dimension ? `review_${question.source_dimension}` : "review_gap", question.source_dimension, origin)
     : question.capture && origin
@@ -958,7 +957,7 @@ function buildClarifyPrompt(input: ClarifyInput, maxQuestions: number): string {
     }
     lines.push("", "Ask only what is STILL unresolved and high-impact.");
   } else {
-    lines.push("", "Surface the few high-impact clarifying questions following the rules and schema.");
+    lines.push("", "Surface a sufficient context intake set following the rules and schema.");
   }
   return lines.join("\n");
 }
@@ -998,7 +997,8 @@ export async function clarify(gateway: LlmGateway, input: ClarifyInput): Promise
     };
   }
   const contextAware = filterQuestionsAnsweredByContext(normalized, input.memories, maxQuestions);
-  const annotated = annotateClarifyWhy(contextAware, review, input.learning, input.captureLearning, input.lineageLearning, input.decompositionStrategy, input.intake);
+  const coverageAware = ensureContextIntakeCoverage(contextAware, input.memories, maxQuestions);
+  const annotated = annotateClarifyWhy(coverageAware, review, input.learning, input.captureLearning, input.lineageLearning, input.decompositionStrategy, input.intake);
   const validation = validateClarify(annotated);
   return { output: validation.ok ? annotated : null, validation, usage: raw.usage };
 }
@@ -1180,6 +1180,149 @@ function contextAnswersQuestion(
   }
 
   return null;
+}
+
+interface BaselineContextQuestionTarget {
+  id: string;
+  category: ContextCategory;
+  kind: ClarifyQuestionKind;
+  source_dimension: ClarifyQuestionSourceDimension;
+  question: string;
+  why_high_impact: string;
+  options: ClarifyOption[];
+}
+
+const BASELINE_CONTEXT_QUESTION_TARGETS: readonly BaselineContextQuestionTarget[] = [
+  {
+    id: "aim_target_context",
+    category: "project_fact",
+    kind: "assumption",
+    source_dimension: "context_fit",
+    question: "For this aim specifically, what exact target surface, source material, or existing state should the agent inspect before finalizing the plan?",
+    why_high_impact: "This prevents the plan from guessing the current project state or target artifact.",
+    options: [
+      { label: "Inspect local project/context first", tradeoff: "Better grounded plan; requires local context access." },
+      { label: "Proceed from the written aim only", tradeoff: "Faster, but more assumptions may be wrong." },
+    ],
+  },
+  {
+    id: "durable_eval_signal",
+    category: "eval_signal",
+    kind: "constraint",
+    source_dimension: "verifiability",
+    question: "What would make this aim count as genuinely complete for you, and what evidence should prove it?",
+    why_high_impact: "This becomes a reusable evaluation signal and sharpens acceptance rules.",
+    options: [
+      { label: "Automated artifact or test proves it", tradeoff: "Best for agent execution and repeatable eval." },
+      { label: "Human review or subjective approval proves it", tradeoff: "Captures taste or judgment, but needs your review." },
+    ],
+  },
+  {
+    id: "aim_procedure_context",
+    category: "procedure",
+    kind: "constraint",
+    source_dimension: "verifiability",
+    question: "For this aim, are there existing commands, files, docs, workflows, or external references the agent should follow or research?",
+    why_high_impact: "This gives the agent concrete local or web context to use before decomposing work.",
+    options: [
+      { label: "Use existing local artifacts", tradeoff: "Grounds the plan in current files and workflows." },
+      { label: "Research external/current information", tradeoff: "Useful for modern APIs, competitors, or market facts." },
+    ],
+  },
+  {
+    id: "durable_capability_routing",
+    category: "capability",
+    kind: "capability",
+    source_dimension: "context_fit",
+    question: "Which parts should agents handle by default, and what access or tools can they use?",
+    why_high_impact: "This becomes routing context so agent-capable work is not assigned back to you.",
+    options: [
+      { label: "Agents handle all digital work", tradeoff: "You only handle approvals, secrets, and real-world actions." },
+      { label: "Ask before agent execution", tradeoff: "More control, but slower orchestration." },
+    ],
+  },
+  {
+    id: "durable_constraints",
+    category: "constraint",
+    kind: "constraint",
+    source_dimension: "granularity",
+    question: "What non-negotiable constraints should this and future plans remember?",
+    why_high_impact: "Stable constraints prevent plans from violating cost, privacy, deadline, platform, or quality boundaries.",
+    options: [
+      { label: "Strict boundaries are known", tradeoff: "Plan can avoid invalid branches." },
+      { label: "No hard constraints yet", tradeoff: "Plan can optimize for speed and discovery." },
+    ],
+  },
+];
+
+function highConfidenceGlobalMemoryForCategory(
+  category: ContextCategory,
+  memories: readonly PlanningMemory[] | undefined,
+): boolean {
+  return (memories ?? []).some((memory) => {
+    if ((memory.goalId ?? memory.goal_id ?? null) !== null) return false;
+    if (typeof memory.confidence === "number" && memory.confidence < 0.75) return false;
+    return planningMemoryCategory(memory) === category && memory.content.trim().length > 0;
+  });
+}
+
+function questionCategory(question: ClarifyQuestion): ContextCategory {
+  return question.capture?.category ?? answerContextCategory(question);
+}
+
+function createBaselineContextQuestion(target: BaselineContextQuestionTarget): ClarifyQuestion {
+  return {
+    id: target.id,
+    question: target.question,
+    why_high_impact: target.why_high_impact,
+    kind: target.kind,
+    source_dimension: target.source_dimension,
+    allow_other: true,
+    options: [...target.options],
+    capture: contextCaptureForCategory(target.category, "baseline_context_intake", target.source_dimension, {
+      source: "clarify",
+      reason: target.why_high_impact,
+      prompt: target.question,
+      roiSignals: target.category === "eval_signal"
+        ? ["high_priority", "eval_signal"]
+        : target.category === "procedure"
+          ? ["high_priority", "procedure"]
+          : target.category === "capability"
+            ? ["medium_priority", "capability"]
+            : ["medium_priority", "missing_context"],
+    }),
+  };
+}
+
+function ensureContextIntakeCoverage(
+  output: ClarifyOutput,
+  memories: readonly PlanningMemory[] | undefined,
+  maxQuestions: number,
+): ClarifyOutput {
+  const minQuestions = Math.min(maxQuestions, DEFAULT_MIN_CONTEXT_QUESTIONS);
+  if (maxQuestions <= 0 || output.questions.length >= minQuestions) return output;
+
+  const questions = [...output.questions];
+  const existingIds = new Set(questions.map((question) => question.id));
+  const coveredCategories = new Set(questions.map(questionCategory));
+
+  for (const target of BASELINE_CONTEXT_QUESTION_TARGETS) {
+    if (questions.length >= minQuestions || questions.length >= maxQuestions) break;
+    if (existingIds.has(target.id)) continue;
+    if (coveredCategories.has(target.category)) continue;
+    if (
+      (target.category === "constraint" || target.category === "preference" || target.category === "capability" || target.category === "eval_signal") &&
+      highConfidenceGlobalMemoryForCategory(target.category, memories)
+    ) {
+      continue;
+    }
+    const question = createBaselineContextQuestion(target);
+    questions.push(question);
+    existingIds.add(question.id);
+    coveredCategories.add(target.category);
+  }
+
+  return { ...output, questions };
 }
 
 function filterQuestionsAnsweredByContext(

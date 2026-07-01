@@ -163,7 +163,7 @@ describe("clarify · happy path", () => {
     expect(result.validation.ok).toBe(true);
     expect(result.validation.errors).toEqual([]);
     expect(result.output).not.toBeNull();
-    expect(result.output?.questions.map((q) => q.id)).toEqual(["scope", "lang"]);
+    expect(result.output?.questions.map((q) => q.id)).toEqual(["scope", "lang", "aim_target_context", "durable_eval_signal"]);
     expect(result.output?.questions[0]?.source_dimension).toBe("granularity");
     expect(result.output?.questions[0]?.capture).toMatchObject({
       category: "constraint",
@@ -173,6 +173,16 @@ describe("clarify · happy path", () => {
       reason: "clarify_granularity",
     });
     expect(result.output?.questions[0]?.options).toHaveLength(2);
+    expect(result.output?.questions.find((q) => q.id === "aim_target_context")?.capture).toMatchObject({
+      category: "project_fact",
+      scope: "aim",
+      purpose: "shape_plan",
+    });
+    expect(result.output?.questions.find((q) => q.id === "durable_eval_signal")?.capture).toMatchObject({
+      category: "eval_signal",
+      scope: "global",
+      purpose: "define_eval",
+    });
     expect(result.output?.assumptions[0]?.default_value).toBe("github");
     expect(result.usage).toEqual(FIXED_USAGE);
   });
@@ -405,11 +415,11 @@ describe("clarify · happy path", () => {
 
     expect(gw.calls[0]!.system).toContain("current decomposition strategy");
     expect(gw.calls[0]!.prompt).toContain("Current decomposition strategy");
-    expect(gw.calls[0]!.prompt).toContain("Effective question budget: 2");
+    expect(gw.calls[0]!.prompt).toContain("Effective question budget: 6");
     expect(gw.calls[0]!.prompt).toContain("[high] context_fit");
     expect(gw.calls[0]!.prompt).toContain("change milestone boundaries, owner routing, required evidence, or eval signals");
     expect(result.validation.ok).toBe(true);
-    expect(result.output?.questions).toHaveLength(2);
+    expect(result.output?.questions.map((q) => q.id)).toEqual(["scope", "lang", "proof", "aim_target_context"]);
   });
 
   it("annotates returned questions with decomposition-strategy why-asked signals", async () => {
@@ -1007,7 +1017,8 @@ describe("clarify · happy path", () => {
     });
 
     expect(result.validation.ok).toBe(true);
-    expect(result.output?.questions.map((q) => q.id)).toEqual(["scope"]);
+    expect(result.output?.questions.map((q) => q.id)).toEqual(["scope", "aim_target_context", "durable_eval_signal", "aim_procedure_context"]);
+    expect(result.output?.questions.map((q) => q.id)).not.toContain("lang");
     expect(result.output?.assumptions.some((a) => a.statement.includes("Which language?"))).toBe(true);
     expect(result.output?.assumptions.some((a) => a.default_value.includes("TypeScript"))).toBe(true);
   });
@@ -1028,7 +1039,7 @@ describe("clarify · happy path", () => {
     });
 
     expect(result.validation.ok).toBe(true);
-    expect(result.output?.questions.map((q) => q.id)).toEqual(["scope", "lang"]);
+    expect(result.output?.questions.map((q) => q.id)).toEqual(["scope", "lang", "aim_target_context", "durable_eval_signal"]);
   });
 
   it("truncates to maxQuestions", async () => {
@@ -1038,11 +1049,17 @@ describe("clarify · happy path", () => {
     expect(result.output?.questions[0]?.id).toBe("scope");
   });
 
-  it("accepts an empty question set (everything defaulted) without failing", async () => {
+  it("fills baseline context intake when the model returns an empty question set", async () => {
     const gw = mockGateway({ questions: [], assumptions: [{ statement: "Assumed solo.", default_value: "solo" }] });
     const result = await clarify(gw, INPUT);
     expect(result.validation.ok).toBe(true);
-    expect(result.output?.questions).toEqual([]);
+    expect(result.output?.questions.map((q) => q.id)).toEqual([
+      "aim_target_context",
+      "durable_eval_signal",
+      "aim_procedure_context",
+      "durable_capability_routing",
+    ]);
+    expect(result.output?.questions.map((q) => q.capture?.scope)).toEqual(["aim", "global", "aim", "global"]);
     expect(result.output?.assumptions).toHaveLength(1);
   });
 
@@ -1054,7 +1071,8 @@ describe("clarify · happy path", () => {
     const result = await clarify(mockGateway(output), INPUT);
 
     expect(result.validation.ok).toBe(true);
-    expect(result.output?.questions.map((q) => q.source_dimension)).toEqual([undefined, undefined]);
+    expect(result.output?.questions.slice(0, 2).map((q) => q.source_dimension)).toEqual([undefined, undefined]);
+    expect(result.output?.questions.map((q) => q.id)).toContain("aim_target_context");
   });
 });
 

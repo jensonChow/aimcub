@@ -161,6 +161,10 @@ describe("decompose · happy path", () => {
     expect(call.schema).toBeDefined();
     expect(call.system).toContain("Aimcub");
     expect(call.system).toContain("decomposition_contract");
+    expect(call.system).toContain("Default to `agent` for digital work");
+    expect(call.system).toContain("Use `human` only for work that must happen in the physical world");
+    expect(call.system).toContain("local context scanning or");
+    expect(call.system).toContain("web research");
     expect(call.prompt).toContain(INPUT.title);
   });
 
