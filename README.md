@@ -13,7 +13,8 @@ automatically. As you (and your agents) work, a durable context forms — your
 **Core positioning**: a coding agent (Claude Code, etc.) is just one of many
 "evidence emitters," reporting in via MCP; git/CI webhooks are another class of
 emitter. The MCP server is the human/agent connection point. The developer
-scenario is simply the first subset to light up. See [`docs/vision.md`](docs/vision.md)
+scenario is simply the first subset to light up. The desktop app is now the fixed
+local entry for planning and provider/model setup. See [`docs/vision.md`](docs/vision.md)
 for the full direction.
 
 ## Open-source posture
@@ -51,6 +52,7 @@ packages/
   llm/         @core/llm         Claude gateway (model routing + metering) + goal decomposition
   ui-tokens/   @ui/tokens        design tokens
 apps/
+  desktop/    Electron desktop app           — fixed local entry
   web/         Next.js @ Vercel              — active
   mcp/         MCP server (Streamable HTTP)  — active
   ios/         Expo RN                       — v2 (placeholder)
@@ -74,9 +76,18 @@ apps/
 ```bash
 corepack enable pnpm
 pnpm install
+pnpm desktop      # fixed local desktop entry
 pnpm build        # turbo full build
 pnpm test         # @core/domain unit tests
 pnpm core:purity  # verify core has zero platform dependencies
+```
+
+Desktop-specific commands should be launched from the repo root:
+
+```bash
+pnpm desktop        # run the current Electron desktop app
+pnpm desktop:build  # build the current desktop app
+pnpm desktop:pack   # produce a local macOS app directory
 ```
 
 Optional live provider smoke tests:
