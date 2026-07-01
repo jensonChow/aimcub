@@ -5,6 +5,7 @@
  */
 import type { DecompositionOutput, Goal, Memory, Milestone } from "@core/types";
 import type { AimIntakeReport, ContextHealthRow, ContextLineageLearningReport, ContextProfileReport, DecompositionLearningReport, DecompositionStrategyReport, PlanQualityReport, PlanReviewReport } from "@core/domain";
+import type { LlmProvider } from "@core/llm/providers";
 import type {
   ClarifyOutput,
   ClarifyQuestion,
@@ -99,26 +100,26 @@ export interface DeprioritizeContextMemoryRequest {
 // ── LLM provider configuration (multi-provider / BYO-key) ────────────────────
 
 /**
- * Which gateway to build. `anthropic` uses the native Messages API; `openai-compatible`
- * targets any OpenAI `/chat/completions` endpoint (OpenAI, OpenRouter, DeepSeek, local
- * Ollama/vLLM, …) so users bring their own key and point at whichever endpoint they like.
+ * Which gateway to build. `anthropic` uses the native Messages API; direct providers such
+ * as OpenAI, DeepSeek, MiniMax, Z.ai, Google, and Qwen use catalog-backed defaults; the
+ * `openai-compatible` escape hatch targets any custom `/chat/completions` endpoint.
  */
-export type LlmProvider = "anthropic" | "openai-compatible";
+export type { LlmProvider };
 
 /** What the renderer sends to configure the provider (includes the secret key). */
 export interface ProviderConfig {
   provider: LlmProvider;
   /** Leave blank on update to keep the already-stored key. */
   apiKey: string;
-  /** API root (openai-compatible only). Empty ⇒ provider default. */
+  /** API root for OpenAI-compatible providers. Empty ⇒ provider default. */
   baseURL?: string;
-  /** The single model id (required for openai-compatible; ignored for anthropic routing). */
+  /** The selected model id. */
   model?: string;
 }
 
 /** What the renderer reads back — never includes the secret key. */
 export interface ProviderStatus {
-  /** True when a usable gateway can be built (provider + key, plus model for openai). */
+  /** True when a usable gateway can be built (provider + key + selected/default model). */
   configured: boolean;
   provider: LlmProvider | null;
   baseURL: string | null;

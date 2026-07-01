@@ -601,6 +601,18 @@ describe("provider settings (settings.json shared by desktop + CLI)", () => {
     expect(loadSettings(dir)).toEqual(cfg);
   });
 
+  it("round-trips a built-in direct provider config", () => {
+    const dir = freshDir();
+    const cfg: ProviderSettings = {
+      provider: "deepseek",
+      apiKey: "sk-file",
+      model: "deepseek-v4-pro",
+      baseURL: "https://api.deepseek.com",
+    };
+    saveSettings(cfg, dir);
+    expect(loadSettings(dir)).toEqual(cfg);
+  });
+
   it("writes settings.json with owner-only (0600) perms — it holds a key", () => {
     const dir = freshDir();
     saveSettings({ provider: "anthropic", apiKey: "sk-ant" }, dir);
@@ -616,7 +628,7 @@ describe("provider settings (settings.json shared by desktop + CLI)", () => {
 
   it("returns null for an unknown provider on file", () => {
     const dir = freshDir();
-    writeFileSync(settingsPath(dir), JSON.stringify({ provider: "gemini", apiKey: "k" }), "utf8");
+    writeFileSync(settingsPath(dir), JSON.stringify({ provider: "unknown-ai", apiKey: "k" }), "utf8");
     expect(loadSettings(dir)).toBeNull();
   });
 });

@@ -6,8 +6,9 @@
 
 /** 2026 model IDs (lean-first: aim decompose/replan use Sonnet, high-frequency classify/extract use Haiku; Opus reserved for explicit overrides on hard reasoning). */
 export const Models = {
+  fable: "claude-fable-5",
   opus: "claude-opus-4-8",
-  sonnet: "claude-sonnet-4-6",
+  sonnet: "claude-sonnet-5",
   haiku: "claude-haiku-4-5-20251001",
 } as const;
 export type ModelId = (typeof Models)[keyof typeof Models];
@@ -51,8 +52,8 @@ export interface LlmRequest {
   prompt: string;
   /** JSON Schema enforcing structured output (decomposition uses flat nodes+edges). */
   schema?: unknown;
-  /** Override the routing (rare). */
-  model?: ModelId;
+  /** Override the routing (rare). Provider gateways may accept non-Anthropic model ids. */
+  model?: string;
 }
 
 export interface LlmResponse<T = string> {
@@ -79,8 +80,25 @@ export type {
   OpenAiGatewayOptions,
   OpenAiFetchPort,
   OpenAiFetchResponse,
-  StructuredOutputMode,
 } from "./openai-gateway";
+export {
+  LLM_PROVIDER_CATALOG,
+  LLM_PROVIDER_IDS,
+  getDefaultBaseURL,
+  getDefaultModel,
+  getLlmProviderDefinition,
+  isLlmProvider,
+  modelBelongsToProvider,
+} from "./providers";
+export type {
+  BuiltInLlmProvider,
+  LlmModelOption,
+  LlmProtocol,
+  MaxTokensParam,
+  LlmProvider,
+  LlmProviderDefinition,
+  StructuredOutputMode,
+} from "./providers";
 export { decompose, decomposeWithQuality, planQualityMetadata } from "./decompose";
 export type {
   DecomposeInput,

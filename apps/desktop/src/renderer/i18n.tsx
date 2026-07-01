@@ -304,8 +304,8 @@ export const STRINGS = {
 
   "pf.title": { en: "LLM provider", zh: "模型提供方" },
   "pf.blurb": {
-    en: "Your key stays on this Mac — it never leaves the main process. No offline templates; real decomposition only.",
-    zh: "你的密钥只留在这台 Mac——永不离开主进程。没有离线模板,只做真实拆解。",
+    en: "Choose a provider and model. Your key stays on this Mac — it never leaves the main process.",
+    zh: "选择提供方和模型。你的密钥只留在这台 Mac——永不离开主进程。",
   },
   "pf.providerLabel": { en: "Provider", zh: "提供方" },
   "pf.anthropic": { en: "Anthropic (Claude)", zh: "Anthropic(Claude)" },
@@ -321,7 +321,11 @@ export const STRINGS = {
   "pf.useOpenRouter": { en: "Use OpenRouter", zh: "用 OpenRouter" },
   "pf.baseUrlPlaceholder": { en: "https://api.openai.com/v1 (default)", zh: "https://api.openai.com/v1(默认)" },
   "pf.model": { en: "Model", zh: "模型" },
-  "pf.modelPlaceholder": { en: "e.g. deepseek-v4-pro, deepseek-v4-flash, or anthropic/claude-sonnet-4", zh: "例如 deepseek-v4-pro、deepseek-v4-flash 或 anthropic/claude-sonnet-4" },
+  "pf.customModel": { en: "Custom model ID", zh: "自定义模型 ID" },
+  "pf.modelPlaceholder": { en: "e.g. deepseek-v4-pro, MiniMax-M3, glm-5.2, or qwen-plus", zh: "例如 deepseek-v4-pro、MiniMax-M3、glm-5.2 或 qwen-plus" },
+  "pf.endpoint": { en: "Endpoint", zh: "接口地址" },
+  "pf.endpointPlaceholder": { en: "OpenAI-compatible /v1 root", zh: "OpenAI-compatible /v1 根地址" },
+  "pf.endpointHint": { en: "Advanced: override only when your provider account requires a regional or workspace-specific endpoint.", zh: "高级选项: 仅在账号需要区域或 workspace 专属接口时覆盖。" },
   "pf.apiKey": { en: "API key", zh: "API 密钥" },
   "pf.keyKeep": { en: "•••• leave blank to keep current key", zh: "•••• 留空则保留当前密钥" },
   "pf.notUsableKey": { en: "That config isn't usable yet — check the key.", zh: "该配置还不可用——检查密钥。" },

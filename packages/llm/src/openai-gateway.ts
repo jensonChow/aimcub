@@ -11,11 +11,11 @@
  * Routing note: `routeModel(task)` returns Anthropic model ids only, so it does NOT apply
  * here. An OpenAI-compatible deployment uses the single configured `model` for every task.
  *
- * Structured output uses `response_format: { type: "json_schema", strict: true }`. Our
- * decompose/clarify schemas (all-required + nullable + additionalProperties:false) already
- * satisfy OpenAI strict mode. Strict-JSON support varies by model, but the callers
- * (`decompose`/`clarify`) are total + zod/validate-guarded, so a weak model just yields an
- * invalid plan that is reported as `{ ok:false }`, never a crash.
+ * Structured output prefers `response_format: { type: "json_schema", strict: true }`.
+ * Providers that only support JSON mode receive the schema as prompt text plus
+ * `response_format: { type: "json_object" }`; weaker compatible servers can use prompt-only
+ * JSON. The callers (`decompose`/`clarify`) are total + zod/validate-guarded, so a weak model
+ * yields an invalid plan that is reported as `{ ok:false }`, never a crash.
  */
 import type {
   LlmGateway,
@@ -24,6 +24,7 @@ import type {
   LlmUsage,
   UsageMeter,
 } from "./index";
+import type { MaxTokensParam, StructuredOutputMode } from "./providers";
 
 // The llm package tsconfig sets `types: []` (mirroring @core purity), so neither
 // @types/node nor the DOM lib is pulled in. Declare the one global we use — `fetch` —
@@ -74,8 +75,9 @@ export interface OpenAiGatewayOptions {
    */
   maxTokensParam?: MaxTokensParam;
   /**
-   * Structured-output request shape. OpenAI/OpenRouter support `json_schema`; DeepSeek's
-   * public OpenAI-compatible API documents `json_object`.
+   * Structured-output request shape. OpenAI/OpenRouter support `json_schema`; providers such
+   * as DeepSeek/Z.ai document `json_object`; compatible servers without either can use
+   * `prompt`, which embeds the schema in the prompt and omits `response_format`.
    */
   structuredOutputMode?: StructuredOutputMode;
 }
@@ -84,10 +86,6 @@ interface ChatCompletionResponse {
   choices?: Array<{ message?: { content?: string | null; refusal?: string | null } }>;
   usage?: { prompt_tokens?: number; completion_tokens?: number };
 }
-
-/** Which field carries the output-token cap (see {@link OpenAiGatewayOptions.maxTokensParam}). */
-export type MaxTokensParam = "max_completion_tokens" | "max_tokens";
-export type StructuredOutputMode = "json_schema" | "json_object";
 
 const DEFAULT_BASE_URL = "https://api.openai.com/v1";
 const DEFAULT_MAX_TOKENS = 8192;
@@ -107,6 +105,32 @@ function isDeepSeekBaseUrl(baseURL: string): boolean {
   } catch {
     return baseURL.includes("api.deepseek.com");
   }
+}
+
+function inferCompatibleDefaults(baseURL: string): { maxTokensParam?: MaxTokensParam; structuredOutputMode?: StructuredOutputMode } {
+  let host = "";
+  try {
+    host = new URL(baseURL).hostname;
+  } catch {
+    host = baseURL;
+  }
+  if (host.includes("api.deepseek.com")) return { maxTokensParam: "max_tokens", structuredOutputMode: "json_object" };
+  if (host.includes("api.z.ai")) return { maxTokensParam: "max_tokens", structuredOutputMode: "json_object" };
+  if (host.includes("api.minimax.io") || host.includes("api.minimaxi.com")) return { maxTokensParam: "max_tokens", structuredOutputMode: "prompt" };
+  if (host.includes("dashscope") || host.includes("maas.aliyuncs.com")) return { maxTokensParam: "max_tokens", structuredOutputMode: "prompt" };
+  if (host.includes("generativelanguage.googleapis.com")) return { maxTokensParam: "max_tokens", structuredOutputMode: "json_schema" };
+  return {};
+}
+
+function appendSchemaInstruction(prompt: string, schema: unknown): string {
+  return [
+    prompt,
+    "",
+    "Structured output contract:",
+    "Return only valid JSON. Do not wrap the JSON in Markdown or add explanatory text.",
+    "The JSON must satisfy this JSON Schema:",
+    JSON.stringify(schema),
+  ].join("\n");
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
@@ -141,8 +165,13 @@ export class OpenAiCompatibleLlmGateway implements LlmGateway {
     this.baseURL = (opts.baseURL ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
     this.maxTokens = opts.maxTokens ?? DEFAULT_MAX_TOKENS;
     this.requestTimeoutMs = opts.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
-    this.maxTokensParam = opts.maxTokensParam ?? (isDeepSeekBaseUrl(this.baseURL) ? "max_tokens" : DEFAULT_MAX_TOKENS_PARAM);
-    this.structuredOutputMode = opts.structuredOutputMode ?? (isDeepSeekBaseUrl(this.baseURL) ? "json_object" : DEFAULT_STRUCTURED_OUTPUT_MODE);
+    const inferred = inferCompatibleDefaults(this.baseURL);
+    this.maxTokensParam =
+      opts.maxTokensParam ?? inferred.maxTokensParam ?? (isDeepSeekBaseUrl(this.baseURL) ? "max_tokens" : DEFAULT_MAX_TOKENS_PARAM);
+    this.structuredOutputMode =
+      opts.structuredOutputMode ??
+      inferred.structuredOutputMode ??
+      (isDeepSeekBaseUrl(this.baseURL) ? "json_object" : DEFAULT_STRUCTURED_OUTPUT_MODE);
     this.fetchImpl = opts.client ?? fetch;
   }
 
@@ -178,7 +207,11 @@ export class OpenAiCompatibleLlmGateway implements LlmGateway {
     // uses its single configured model.
     const messages: Array<{ role: "system" | "user"; content: string }> = [];
     if (req.system) messages.push({ role: "system", content: req.system });
-    messages.push({ role: "user", content: req.prompt });
+    const prompt =
+      structured && req.schema !== undefined && this.structuredOutputMode !== "json_schema"
+        ? appendSchemaInstruction(req.prompt, req.schema)
+        : req.prompt;
+    messages.push({ role: "user", content: prompt });
 
     const body: Record<string, unknown> = {
       model: this.model,
@@ -186,13 +219,14 @@ export class OpenAiCompatibleLlmGateway implements LlmGateway {
       messages,
     };
     if (structured && req.schema !== undefined) {
-      body.response_format =
-        this.structuredOutputMode === "json_object"
-          ? { type: "json_object" }
-          : {
-              type: "json_schema",
-              json_schema: { name: SCHEMA_NAME, schema: req.schema, strict: true },
-            };
+      if (this.structuredOutputMode === "json_object") {
+        body.response_format = { type: "json_object" };
+      } else if (this.structuredOutputMode === "json_schema") {
+        body.response_format = {
+          type: "json_schema",
+          json_schema: { name: SCHEMA_NAME, schema: req.schema, strict: true },
+        };
+      }
     }
 
     const response = await withTimeout(

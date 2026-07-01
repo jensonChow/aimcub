@@ -148,12 +148,14 @@ describe("OpenAiCompatibleLlmGateway · request shaping", () => {
       model: string;
       max_tokens?: number;
       max_completion_tokens?: number;
+      messages: Array<{ role: string; content: string }>;
       response_format?: { type: string; json_schema?: unknown };
     };
     expect(body.model).toBe("deepseek-v4-pro");
     expect(body.max_tokens).toBeDefined();
     expect(body.max_completion_tokens).toBeUndefined();
     expect(body.response_format).toEqual({ type: "json_object" });
+    expect(body.messages[0]!.content).toContain("The JSON must satisfy this JSON Schema:");
   });
 
   it("omits response_format on a plain (non-structured) complete", async () => {
@@ -165,6 +167,34 @@ describe("OpenAiCompatibleLlmGateway · request shaping", () => {
 
     const body = JSON.parse(impl.mock.calls[0]![1].body) as Record<string, unknown>;
     expect(body.response_format).toBeUndefined();
+  });
+
+  it("supports prompt-only structured output for compatible providers without response_format", async () => {
+    const payload = { ok: true };
+    const { client, impl } = fakeFetch(JSON.stringify(payload));
+    const { meter } = recordingMeter();
+    const gw = new OpenAiCompatibleLlmGateway({
+      meter,
+      ownerId: "o",
+      apiKey: "k",
+      model: "MiniMax-M3",
+      baseURL: "https://api.minimax.io/v1",
+      client,
+    });
+
+    await gw.completeStructured<typeof payload>({ task: "decompose", prompt: "give me json", schema: { type: "object" } });
+
+    const body = JSON.parse(impl.mock.calls[0]![1].body) as {
+      max_tokens?: number;
+      max_completion_tokens?: number;
+      messages: Array<{ role: string; content: string }>;
+      response_format?: unknown;
+    };
+    expect(body.max_tokens).toBeDefined();
+    expect(body.max_completion_tokens).toBeUndefined();
+    expect(body.response_format).toBeUndefined();
+    expect(body.messages[0]!.content).toContain("Return only valid JSON");
+    expect(body.messages[0]!.content).toContain("\"type\":\"object\"");
   });
 });
 

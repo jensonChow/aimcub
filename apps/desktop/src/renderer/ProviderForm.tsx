@@ -1,48 +1,22 @@
 import { useState } from "react";
 
-import type { LlmProvider, ProviderConfig, ProviderStatus } from "../shared/ipc";
+import {
+  LLM_PROVIDER_CATALOG,
+  getDefaultBaseURL,
+  getDefaultModel,
+  getLlmProviderDefinition,
+  modelBelongsToProvider,
+  type LlmProvider,
+  type LlmProviderDefinition,
+} from "@core/llm/providers";
+
+import type { ProviderConfig, ProviderStatus } from "../shared/ipc";
 
 import { useI18n } from "./i18n";
 import { C, card, inputStyle, labelStyle, linkButton, optionButton, primaryButton } from "./styles";
 
-const OPENAI_COMPATIBLE_PRESETS = [
-  {
-    id: "openrouter",
-    label: "OpenRouter",
-    baseURL: "https://openrouter.ai/api/v1",
-    model: "anthropic/claude-sonnet-4",
-  },
-  {
-    id: "deepseek",
-    label: "DeepSeek",
-    baseURL: "https://api.deepseek.com",
-    model: "deepseek-v4-pro",
-  },
-  {
-    id: "siliconflow",
-    label: "SiliconFlow",
-    baseURL: "https://api.siliconflow.cn/v1",
-    model: "",
-  },
-  {
-    id: "dashscope",
-    label: "Qwen/DashScope",
-    baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-    model: "qwen-plus",
-  },
-  {
-    id: "moonshot",
-    label: "Kimi/Moonshot",
-    baseURL: "https://api.moonshot.cn/v1",
-    model: "moonshot-v1-8k",
-  },
-  {
-    id: "ollama",
-    label: "Ollama",
-    baseURL: "http://localhost:11434/v1",
-    model: "",
-  },
-] as const;
+const CUSTOM_MODEL = "__custom__";
+const PROVIDER_OPTIONS = LLM_PROVIDER_CATALOG;
 
 interface ProviderFormProps {
   status: ProviderStatus | null;
@@ -50,42 +24,73 @@ interface ProviderFormProps {
   onClose: () => void;
 }
 
+function providerOrDefault(provider: ProviderStatus["provider"] | null | undefined): LlmProvider {
+  return provider && getLlmProviderDefinition(provider) ? provider : "anthropic";
+}
+
+function modelOrDefault(provider: LlmProvider, model: string | null | undefined): string {
+  return model?.trim() || getDefaultModel(provider);
+}
+
+function baseURLOrDefault(provider: LlmProvider, baseURL: string | null | undefined): string {
+  return baseURL?.trim() || getDefaultBaseURL(provider) || "";
+}
+
+function modelSelectValue(def: LlmProviderDefinition, model: string): string {
+  if (def.models.length === 0) return CUSTOM_MODEL;
+  return modelBelongsToProvider(def.id, model) ? model : CUSTOM_MODEL;
+}
+
 export function ProviderForm({ status, onSaved, onClose }: ProviderFormProps) {
   const { t } = useI18n();
-  const [providerKind, setProviderKind] = useState<LlmProvider>(status?.provider ?? "anthropic");
+  const initialProvider = providerOrDefault(status?.provider);
+  const [providerKind, setProviderKind] = useState<LlmProvider>(initialProvider);
   const [apiKey, setApiKey] = useState("");
-  const [baseURL, setBaseURL] = useState(status?.baseURL ?? "");
-  const [model, setModel] = useState(status?.model ?? "");
+  const [baseURL, setBaseURL] = useState(baseURLOrDefault(initialProvider, status?.baseURL));
+  const [model, setModel] = useState(modelOrDefault(initialProvider, status?.model));
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const isOpenAi = providerKind === "openai-compatible";
+  const providerDef = getLlmProviderDefinition(providerKind) ?? PROVIDER_OPTIONS[0]!;
+  const usesEndpoint = providerDef.protocol === "openai-compatible";
+  const selectedModel = modelSelectValue(providerDef, model);
+  const hasCustomModelInput = selectedModel === CUSTOM_MODEL;
+
   // A stored key only counts for the provider it was saved under. After switching
   // providers, the user must enter a fresh key.
   const hasStoredKey = (status?.hasApiKey ?? false) && status?.provider === providerKind;
   const keyOk = apiKey.trim().length > 0 || hasStoredKey;
-  const modelOk = !isOpenAi || model.trim().length > 0;
+  const modelOk = hasCustomModelInput ? Boolean(model.trim()) : Boolean((model.trim() || providerDef.defaultModel).trim());
   const canSave = keyOk && modelOk && !busy;
 
-  function applyOpenAiCompatiblePreset(preset: (typeof OPENAI_COMPATIBLE_PRESETS)[number]) {
-    setProviderKind("openai-compatible");
-    setBaseURL(preset.baseURL);
-    if (preset.model) setModel(preset.model);
+  function selectProvider(next: LlmProvider) {
+    setProviderKind(next);
+    setBaseURL(baseURLOrDefault(next, null));
+    setModel(modelOrDefault(next, null));
+  }
+
+  function selectModel(next: string) {
+    if (next === CUSTOM_MODEL) {
+      setModel(modelBelongsToProvider(providerKind, model) ? "" : model);
+      return;
+    }
+    setModel(next);
   }
 
   async function save() {
     setFormError(null);
     setBusy(true);
     try {
+      const finalModel = hasCustomModelInput ? model.trim() : model.trim() || providerDef.defaultModel;
       const config: ProviderConfig = {
         provider: providerKind,
         apiKey: apiKey.trim(),
-        baseURL: isOpenAi ? baseURL.trim() || undefined : undefined,
-        model: isOpenAi ? model.trim() || undefined : undefined,
+        baseURL: usesEndpoint ? baseURL.trim() || undefined : undefined,
+        model: finalModel || undefined,
       };
       const nextStatus = await window.aimcub.setProviderConfig(config);
       if (!nextStatus.configured) {
-        setFormError(t(isOpenAi ? "pf.notUsableKeyModel" : "pf.notUsableKey"));
+        setFormError(t("pf.notUsableKeyModel"));
         return;
       }
       onSaved(nextStatus);
@@ -96,6 +101,8 @@ export function ProviderForm({ status, onSaved, onClose }: ProviderFormProps) {
     }
   }
 
+  const selectedModelHelp = providerDef.models.find((item) => item.id === model)?.description;
+
   return (
     <div style={{ ...card(), background: "#fbfaf7" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
@@ -105,63 +112,46 @@ export function ProviderForm({ status, onSaved, onClose }: ProviderFormProps) {
       <div style={{ fontSize: 12, color: C.muted, margin: "4px 0 14px" }}>{t("pf.blurb")}</div>
 
       <label style={labelStyle()}>{t("pf.providerLabel")}</label>
-      <div style={{ display: "flex", gap: 8 }}>
-        {(["anthropic", "openai-compatible"] as LlmProvider[]).map((p) => (
-          <button key={p} onClick={() => setProviderKind(p)} style={optionButton(providerKind === p)}>
-            <div style={{ fontWeight: 500 }}>{p === "anthropic" ? t("pf.anthropic") : t("pf.openai")}</div>
-            <div style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>
-              {p === "anthropic" ? t("pf.anthropicDesc") : t("pf.openaiDesc")}
-            </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(148px, 1fr))", gap: 8 }}>
+        {PROVIDER_OPTIONS.map((provider) => (
+          <button key={provider.id} onClick={() => selectProvider(provider.id)} style={optionButton(providerKind === provider.id)}>
+            <div style={{ fontWeight: 500 }}>{provider.label}</div>
+            <div style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>{provider.description}</div>
           </button>
         ))}
       </div>
 
-      {isOpenAi && (
+      <label style={{ ...labelStyle(), marginTop: 14 }}>{t("pf.model")}</label>
+      {providerDef.models.length > 0 && (
+        <select value={selectedModel} onChange={(e) => selectModel(e.target.value)} style={inputStyle()}>
+          {providerDef.models.map((item) => (
+            <option key={item.id} value={item.id}>{item.label}</option>
+          ))}
+          <option value={CUSTOM_MODEL}>{t("pf.customModel")}</option>
+        </select>
+      )}
+      {hasCustomModelInput && (
+        <input
+          value={model}
+          onChange={(e) => setModel(e.target.value)}
+          placeholder={t("pf.modelPlaceholder")}
+          style={{ ...inputStyle(), marginTop: providerDef.models.length > 0 ? 8 : 0 }}
+        />
+      )}
+      {selectedModelHelp && <div style={{ color: C.muted, fontSize: 12, marginTop: 6 }}>{selectedModelHelp}</div>}
+
+      {usesEndpoint && (
         <>
-          <label style={{ ...labelStyle(), marginTop: 14 }}>{t("pf.presets")}</label>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {OPENAI_COMPATIBLE_PRESETS.map((preset) => (
-              <button
-                key={preset.id}
-                onClick={() => applyOpenAiCompatiblePreset(preset)}
-                style={{
-                  ...linkButton(),
-                  border: `1px solid ${baseURL === preset.baseURL ? C.accent : C.border}`,
-                  borderRadius: 8,
-                  padding: "6px 9px",
-                  color: baseURL === preset.baseURL ? C.accent : C.muted,
-                  background: baseURL === preset.baseURL ? C.accentBg : "#fff",
-                }}
-              >
-                {preset.label}
-              </button>
-            ))}
-          </div>
-          <div style={{ color: C.muted, fontSize: 12, marginTop: 8 }}>
-            {t("pf.openaiCompatibleHint")}
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 14 }}>
-            <label style={labelStyle()}>{t("pf.baseUrl")}</label>
-            <button
-              onClick={() => applyOpenAiCompatiblePreset(OPENAI_COMPATIBLE_PRESETS[0])}
-              style={linkButton()}
-            >
-              {t("pf.useOpenRouter")}
-            </button>
-          </div>
+          <label style={{ ...labelStyle(), marginTop: 14 }}>{t("pf.endpoint")}</label>
           <input
             value={baseURL}
             onChange={(e) => setBaseURL(e.target.value)}
-            placeholder={t("pf.baseUrlPlaceholder")}
+            placeholder={getDefaultBaseURL(providerKind) || t("pf.endpointPlaceholder")}
             style={inputStyle()}
           />
-          <label style={{ ...labelStyle(), marginTop: 14 }}>{t("pf.model")}</label>
-          <input
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            placeholder={t("pf.modelPlaceholder")}
-            style={inputStyle()}
-          />
+          <div style={{ color: C.muted, fontSize: 12, marginTop: 6 }}>
+            {providerDef.baseURLHint || t("pf.endpointHint")}
+          </div>
         </>
       )}
 
@@ -169,7 +159,7 @@ export function ProviderForm({ status, onSaved, onClose }: ProviderFormProps) {
       <input
         value={apiKey}
         onChange={(e) => setApiKey(e.target.value)}
-        placeholder={hasStoredKey ? t("pf.keyKeep") : isOpenAi ? "sk-or-... / sk-..." : "sk-ant-..."}
+        placeholder={hasStoredKey ? t("pf.keyKeep") : providerDef.apiKeyPlaceholder}
         type="password"
         style={inputStyle()}
       />

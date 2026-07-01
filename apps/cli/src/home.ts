@@ -1,3 +1,5 @@
+import { getLlmProviderDefinition } from "@core/llm/providers";
+
 import type { ResolvedProvider } from "./config";
 
 export type SetupProblem = "unknown_provider" | "missing_api_key" | "missing_model";
@@ -22,7 +24,8 @@ export function providerSetupProblems(provider: ResolvedProvider): SetupProblem[
   const problems: SetupProblem[] = [];
   if (!provider.provider) problems.push("unknown_provider");
   if (!provider.apiKey) problems.push("missing_api_key");
-  if (provider.provider === "openai-compatible" && !provider.model) problems.push("missing_model");
+  const def = getLlmProviderDefinition(provider.provider);
+  if (def?.protocol === "openai-compatible" && !provider.model) problems.push("missing_model");
   return problems;
 }
 
@@ -32,7 +35,8 @@ export function providerSetupComplete(provider: ResolvedProvider): boolean {
 
 function providerLabel(provider: ResolvedProvider): string {
   if (!provider.provider) return `${provider.providerLabel} (unknown)`;
-  if (provider.provider === "openai-compatible" && provider.model) {
+  const def = getLlmProviderDefinition(provider.provider);
+  if (def?.protocol === "openai-compatible" && provider.model) {
     return `${provider.provider} / ${provider.model}`;
   }
   if (provider.provider === "anthropic" && provider.model) {
@@ -47,7 +51,7 @@ function setupProblemLines(provider: ResolvedProvider): string[] {
       return `unknown provider "${provider.providerLabel}"`;
     }
     if (problem === "missing_model") {
-      return "model is required for openai-compatible";
+      return "model is required for this provider";
     }
     return "API key is missing";
   });
@@ -74,8 +78,8 @@ export function formatFirstRun(input: FirstRunInput): string {
     lines.push(
       "",
       "Setup will ask for",
-      "  1. Provider: anthropic or openai-compatible",
-      "  2. Model: only required for openai-compatible",
+      "  1. Provider: anthropic, openai, deepseek, minimax, zai, google, qwen, or openai-compatible",
+      "  2. Model: prefilled for built-in providers",
       "  3. API key: typed hidden, never echoed",
       "",
       "Press Ctrl-C to cancel.",
@@ -92,7 +96,7 @@ export function formatFirstRun(input: FirstRunInput): string {
     "",
     "For scripts",
     '  printf "%s\\n" "$ANTHROPIC_API_KEY" | aimcub setup --provider anthropic --api-key -',
-    '  printf "%s\\n" "$OPENAI_API_KEY" | aimcub setup --provider openai-compatible --model <model> --api-key -',
+    '  printf "%s\\n" "$DEEPSEEK_API_KEY" | aimcub setup --provider deepseek --api-key -',
     "",
     "Then",
     '  aimcub new "Ship the CLI"',

@@ -1,3 +1,5 @@
+import { getLlmProviderDefinition } from "@core/llm/providers";
+
 import type { ResolvedProvider } from "./config";
 
 export type DoctorLevel = "ok" | "warn" | "error";
@@ -53,13 +55,14 @@ export function buildDoctorReport(input: DoctorInput): DoctorReport {
     checks.push({ name: "provider-key", level: "ok", message: `key from ${input.provider.keySource}` });
   }
 
-  if (input.provider.provider === "openai-compatible" && !input.provider.model) {
+  const def = getLlmProviderDefinition(input.provider.provider);
+  if (def?.protocol === "openai-compatible" && !input.provider.model) {
     checks.push({
       name: "provider-model",
       level: "error",
-      message: "openai-compatible requires a model (`aimcub setup` or `aimcub config set model <id>`).",
+      message: "This provider requires a model (`aimcub setup` or `aimcub config set model <id>`).",
     });
-  } else if (input.provider.provider === "openai-compatible") {
+  } else if (def?.protocol === "openai-compatible") {
     checks.push({ name: "provider-model", level: "ok", message: input.provider.model ?? "" });
   }
 

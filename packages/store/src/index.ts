@@ -198,13 +198,38 @@ export function defaultDataDir(): string {
 // ──────────────────────────────────────────────────────────────────────────
 
 /** Persisted LLM provider config. Structurally the desktop's `ProviderConfig`. */
+export type ProviderSettingsProvider =
+  | "anthropic"
+  | "openai"
+  | "deepseek"
+  | "minimax"
+  | "zai"
+  | "google"
+  | "qwen"
+  | "openai-compatible";
+
+const PROVIDER_SETTINGS_PROVIDERS: readonly ProviderSettingsProvider[] = [
+  "anthropic",
+  "openai",
+  "deepseek",
+  "minimax",
+  "zai",
+  "google",
+  "qwen",
+  "openai-compatible",
+];
+
 export interface ProviderSettings {
-  provider: "anthropic" | "openai-compatible";
+  provider: ProviderSettingsProvider;
   apiKey: string;
-  /** openai-compatible endpoint; omitted ⇒ the gateway default. */
+  /** Endpoint root for OpenAI-compatible providers; omitted ⇒ provider default. */
   baseURL?: string;
-  /** Model id (required for openai-compatible; optional for anthropic routing). */
+  /** Model id selected for the provider. */
   model?: string;
+}
+
+function isProviderSettingsProvider(value: unknown): value is ProviderSettingsProvider {
+  return typeof value === "string" && PROVIDER_SETTINGS_PROVIDERS.includes(value as ProviderSettingsProvider);
 }
 
 /** Path to the provider settings file (sibling to the aim store). */
@@ -229,7 +254,7 @@ export function loadSettings(dataDir: string = defaultDataDir()): ProviderSettin
     }
 
     const provider = s.provider;
-    if (provider !== "anthropic" && provider !== "openai-compatible") return null;
+    if (!isProviderSettingsProvider(provider)) return null;
     return {
       provider,
       apiKey: typeof s.apiKey === "string" ? s.apiKey : "",

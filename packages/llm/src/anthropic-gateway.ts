@@ -22,7 +22,6 @@ import {
   type LlmRequest,
   type LlmResponse,
   type LlmUsage,
-  type ModelId,
   type UsageMeter,
 } from "./index";
 
@@ -45,6 +44,8 @@ export interface AnthropicGatewayOptions {
   apiKey?: string;
   /** Max output tokens per request. Defaults to a value comfortably above a full plan. */
   maxTokens?: number;
+  /** Optional fixed model selected by a UI/config; omitted keeps task-based routing. */
+  model?: string;
 }
 
 /**
@@ -96,6 +97,7 @@ export class AnthropicLlmGateway implements LlmGateway {
   private readonly meter: UsageMeter;
   private readonly ownerId: string;
   private readonly maxTokens: number;
+  private readonly model?: string;
   private readonly injectedClient?: AnthropicClientPort;
   private readonly apiKey?: string;
   private cachedClient?: AnthropicClientPort;
@@ -104,6 +106,7 @@ export class AnthropicLlmGateway implements LlmGateway {
     this.meter = opts.meter;
     this.ownerId = opts.ownerId;
     this.maxTokens = opts.maxTokens ?? DEFAULT_MAX_TOKENS;
+    this.model = opts.model;
     this.injectedClient = opts.client;
     this.apiKey = opts.apiKey;
   }
@@ -133,7 +136,7 @@ export class AnthropicLlmGateway implements LlmGateway {
 
   /** Shared request path: route the model, call the SDK, normalize usage, meter it. */
   private async invoke(req: LlmRequest): Promise<{ text: string; usage: LlmUsage }> {
-    const model: ModelId = req.model ?? routeModel(req.task);
+    const model = req.model ?? this.model ?? routeModel(req.task);
     const client = this.getClient();
 
     const body: AnthropicCreateBody = {

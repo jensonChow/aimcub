@@ -19,7 +19,7 @@ describe("resolveProvider", () => {
     expect(r.keySource).toBe("env:AIMCUB_API_KEY");
   });
 
-  it("normalizes the 'openai' alias and reads model + base url", () => {
+  it("normalizes the direct OpenAI provider and reads model + base url", () => {
     const r = resolveProvider(
       {
         AIMCUB_PROVIDER: "openai",
@@ -29,17 +29,27 @@ describe("resolveProvider", () => {
       },
       null,
     );
-    expect(r.provider).toBe("openai-compatible");
+    expect(r.provider).toBe("openai");
     expect(r.model).toBe("deepseek/deepseek-chat");
     expect(r.baseURL).toBe("https://openrouter.ai/api/v1");
     expect(r.keySource).toBe("env:OPENAI_API_KEY");
   });
 
   it("flags an unrecognized provider as null but keeps the label", () => {
-    const r = resolveProvider({ AIMCUB_PROVIDER: "gemini" }, null);
+    const r = resolveProvider({ AIMCUB_PROVIDER: "bogus-ai" }, null);
     expect(r.provider).toBeNull();
-    expect(r.providerLabel).toBe("gemini");
+    expect(r.providerLabel).toBe("bogus-ai");
     expect(r.apiKey).toBe(""); // no key vars consulted for an unknown provider
+  });
+
+  it("recognizes built-in provider-specific key variables and defaults", () => {
+    const r = resolveProvider({ AIMCUB_PROVIDER: "deepseek", DEEPSEEK_API_KEY: "sk-ds" }, null);
+    expect(r.provider).toBe("deepseek");
+    expect(r.apiKey).toBe("sk-ds");
+    expect(r.keySource).toBe("env:DEEPSEEK_API_KEY");
+    expect(r.model).toBe("deepseek-v4-pro");
+    expect(r.modelSource).toBe("default");
+    expect(r.baseURL).toBe("https://api.deepseek.com");
   });
 
   describe("settings.json fallback (env wins)", () => {
@@ -124,7 +134,7 @@ describe("buildSettingsFromInput", () => {
   it("builds anthropic settings from a fresh key", () => {
     const { settings, errors } = buildSettingsFromInput({ provider: "anthropic", apiKey: "sk-ant-new" }, null);
     expect(errors).toEqual([]);
-    expect(settings).toEqual({ provider: "anthropic", apiKey: "sk-ant-new", model: undefined, baseURL: undefined });
+    expect(settings).toEqual({ provider: "anthropic", apiKey: "sk-ant-new", model: "claude-sonnet-5", baseURL: undefined });
   });
 
   it("requires a model for openai-compatible", () => {
@@ -147,7 +157,7 @@ describe("buildSettingsFromInput", () => {
   });
 
   it("rejects an unknown provider", () => {
-    const { settings, errors } = buildSettingsFromInput({ provider: "gemini", apiKey: "k" }, null);
+    const { settings, errors } = buildSettingsFromInput({ provider: "bogus-ai", apiKey: "k" }, null);
     expect(settings).toBeUndefined();
     expect(errors.join(" ")).toMatch(/unknown provider/i);
   });
@@ -158,6 +168,17 @@ describe("buildSettingsFromInput", () => {
       null,
     );
     expect(settings?.baseURL).toBeUndefined();
+  });
+
+  it("fills default model and endpoint for a built-in OpenAI-compatible provider", () => {
+    const { settings, errors } = buildSettingsFromInput({ provider: "deepseek", apiKey: "sk" }, null);
+    expect(errors).toEqual([]);
+    expect(settings).toEqual({
+      provider: "deepseek",
+      apiKey: "sk",
+      model: "deepseek-v4-pro",
+      baseURL: "https://api.deepseek.com",
+    });
   });
 
   it("keeps the baseURL for openai-compatible", () => {

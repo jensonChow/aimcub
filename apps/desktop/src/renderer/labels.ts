@@ -12,6 +12,7 @@ import type {
   PlanQualityDimensionReport,
 } from "@core/domain";
 import type { ClarifyAnswerImpactReport, ClarifyOutput, PlanningContextSelectionReport } from "@core/llm";
+import { getLlmProviderDefinition } from "@core/llm/providers";
 import type { PlanResult, ProviderStatus } from "../shared/ipc";
 
 import type { StringKey } from "./i18n";
@@ -376,9 +377,13 @@ export function contextHealthReasonLabel(reason: string, t: T): string {
 }
 
 export function providerLabel(s: ProviderStatus, t: (key: "provider.anthropicShort" | "provider.openaiShort") => string): string {
-  if (s.provider === "anthropic") return `${t("provider.anthropicShort")} ⚙`;
+  const def = getLlmProviderDefinition(s.provider);
+  if (s.provider === "anthropic") {
+    const model = s.model ? ` · ${s.model}` : "";
+    return `${t("provider.anthropicShort")}${model} ⚙`;
+  }
   const model = s.model ? ` · ${s.model}` : "";
-  return `${t("provider.openaiShort")}${model} ⚙`;
+  return `${def?.shortLabel ?? t("provider.openaiShort")}${model} ⚙`;
 }
 
 export function formatDate(iso: string): string {

@@ -61,6 +61,7 @@ import {
   type PlanningMemory,
   type DecomposeWithQualityResult,
 } from "@core/llm";
+import { getDefaultModel, getLlmProviderDefinition } from "@core/llm/providers";
 import { createJsonFileStore, defaultDataDir, loadSettings, saveSettings, settingsPath, type LocalStore } from "@core/store";
 import type {
   ContextCategory,
@@ -178,10 +179,10 @@ The title may be piped on stdin (use "-" or omit it): echo "ship auth" | aimcub 
 
 Provider config — run \`aimcub setup\` once; it saves to ~/.aimcub/settings.json (shared with the
 desktop app). Environment variables override the saved settings for one-off / CI use:
-  AIMCUB_PROVIDER   anthropic | openai-compatible
-  AIMCUB_API_KEY    API key (falls back to ANTHROPIC_API_KEY / OPENAI_API_KEY)
-  AIMCUB_MODEL      model id (required for openai-compatible)
-  AIMCUB_BASE_URL   endpoint (openai-compatible only; default https://api.openai.com/v1)
+  AIMCUB_PROVIDER   anthropic | openai | deepseek | minimax | zai | google | qwen | openai-compatible
+  AIMCUB_API_KEY    API key (or provider-specific vars like ANTHROPIC_API_KEY / DEEPSEEK_API_KEY)
+  AIMCUB_MODEL      model id (prefilled for built-in providers)
+  AIMCUB_BASE_URL   endpoint override for OpenAI-compatible providers
   AIMCUB_HOME       data dir for the shared store (default ~/.aimcub)
 
 Examples:
@@ -239,14 +240,18 @@ function loadTextArg(value: string): string {
 function buildGateway(): LlmGateway {
   const r = resolveProvider(process.env, loadSettings());
   if (r.provider === null) {
-    throw new UserError(`Unknown provider "${r.providerLabel}". Use "anthropic" or "openai-compatible".`);
+    throw new UserError(`Unknown provider "${r.providerLabel}". Use anthropic, openai, deepseek, minimax, zai, google, qwen, or openai-compatible.`);
   }
   if (!r.apiKey) {
     throw new UserError(`No API key for the ${r.provider} provider. Run \`aimcub setup\` to configure one.`);
   }
-  if (r.provider === "openai-compatible") {
+  const def = getLlmProviderDefinition(r.provider);
+  if (!def) {
+    throw new UserError(`Unknown provider "${r.providerLabel}".`);
+  }
+  if (def.protocol === "openai-compatible") {
     if (!r.model) {
-      throw new UserError("No model for the openai-compatible provider. Run `aimcub setup` (or set AIMCUB_MODEL).");
+      throw new UserError("No model for this provider. Run `aimcub setup` (or set AIMCUB_MODEL).");
     }
     return new OpenAiCompatibleLlmGateway({
       meter: noopMeter,
@@ -254,9 +259,16 @@ function buildGateway(): LlmGateway {
       apiKey: r.apiKey,
       model: r.model,
       baseURL: r.baseURL ?? undefined,
+      maxTokensParam: def.maxTokensParam,
+      structuredOutputMode: def.structuredOutputMode,
     });
   }
-  return new AnthropicLlmGateway({ meter: noopMeter, ownerId: OWNER, apiKey: r.apiKey });
+  return new AnthropicLlmGateway({
+    meter: noopMeter,
+    ownerId: OWNER,
+    apiKey: r.apiKey,
+    model: r.model ?? getDefaultModel("anthropic"),
+  });
 }
 
 /** Resolve a full or unique-prefix goal id to a full id. */
