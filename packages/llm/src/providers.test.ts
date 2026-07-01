@@ -38,6 +38,15 @@ describe("LLM provider catalog", () => {
     });
   });
 
+  it("leaves custom endpoint request shaping to URL inference", () => {
+    expect(getLlmProviderDefinition("openai-compatible")).toMatchObject({
+      protocol: "openai-compatible",
+      baseURL: "https://api.openai.com/v1",
+    });
+    expect(getLlmProviderDefinition("openai-compatible")?.maxTokensParam).toBeUndefined();
+    expect(getLlmProviderDefinition("openai-compatible")?.structuredOutputMode).toBeUndefined();
+  });
+
   it("recognizes only supported provider ids", () => {
     expect(isLlmProvider("zai")).toBe(true);
     expect(isLlmProvider("gemini")).toBe(false);

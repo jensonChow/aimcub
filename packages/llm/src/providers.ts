@@ -178,8 +178,6 @@ export const LLM_PROVIDER_CATALOG = [
     baseURL: "https://api.openai.com/v1",
     baseURLHint: "Paste an OpenAI-compatible /v1 root.",
     defaultModel: "",
-    maxTokensParam: "max_completion_tokens",
-    structuredOutputMode: "json_schema",
     models: [],
   },
 ] as const satisfies readonly LlmProviderDefinition[];

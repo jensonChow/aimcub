@@ -89,6 +89,29 @@ describe("desktop provider connection test", () => {
     });
   });
 
+  it("lets custom endpoints infer request shaping from the base URL", async () => {
+    gatewayMocks.failWith = null;
+    gatewayMocks.openAiOptions.length = 0;
+
+    const result = await testProviderConfig({
+      provider: "openai-compatible",
+      apiKey: "sk-test",
+      model: "deepseek-v4-pro",
+      baseURL: "https://api.deepseek.com",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.model).toBe("deepseek-v4-pro");
+    expect(result.baseURL).toBe("https://api.deepseek.com");
+    expect(gatewayMocks.openAiOptions[0]).toMatchObject({
+      apiKey: "sk-test",
+      model: "deepseek-v4-pro",
+      baseURL: "https://api.deepseek.com",
+    });
+    expect(gatewayMocks.openAiOptions[0]?.maxTokensParam).toBeUndefined();
+    expect(gatewayMocks.openAiOptions[0]?.structuredOutputMode).toBeUndefined();
+  });
+
   it("reports missing keys without constructing a gateway", async () => {
     gatewayMocks.openAiOptions.length = 0;
 
