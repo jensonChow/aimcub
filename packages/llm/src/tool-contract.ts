@@ -52,6 +52,7 @@ export type AimcubToolErrorCode =
   | "is_directory"
   | "binary_file"
   | "bounds_exceeded"
+  | "unsupported_content_type"
   | "conflict"
   | "timeout"
   | "provider_error"
@@ -718,7 +719,16 @@ export const BUILT_IN_TOOL_CONTRACTS = [
     description: "Fetch a bounded public URL and extract text/metadata for planning context.",
     availability: "requires_network_provider",
     permission: permission("network.fetch", "medium", "Network fetch for a public URL.", true),
-    errors: ["invalid_input", "permission_denied", "disabled", "unavailable", "timeout", "provider_error", "bounds_exceeded"],
+    errors: [
+      "invalid_input",
+      "permission_denied",
+      "disabled",
+      "unavailable",
+      "timeout",
+      "provider_error",
+      "bounds_exceeded",
+      "unsupported_content_type",
+    ],
     sourceMetadata: webSource,
     inputSchema: {
       type: "object",

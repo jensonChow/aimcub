@@ -188,6 +188,19 @@ export type {
   WebSearchInput,
   WebSearchOutput,
 } from "./tool-contract";
+export {
+  BraveWebSearchClient,
+  createWebResearchRuntime,
+  createWebResearchRuntimeFromEnv,
+} from "./web-research";
+export type {
+  BraveWebSearchClientOptions,
+  WebResearchFetchPort,
+  WebResearchFetchResponse,
+  WebResearchRuntime,
+  WebResearchRuntimeOptions,
+  WebSearchClient,
+} from "./web-research";
 
 // Clarifying-questions step (the planning "feedback step").
 export {

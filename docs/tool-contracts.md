@@ -17,7 +17,7 @@ Each tool contract declares:
 - `errors`: normalized error codes.
 - `sourceMetadata`: source kinds the observation may cite.
 
-Handlers are deliberately separate from contracts. A later Desktop runtime layer should bind a contract to an `AimcubToolHandler`, enforce permissions, execute the tool, and return an `AimcubToolResult`.
+Handlers are deliberately separate from contracts. A Desktop runtime layer binds a contract to an `AimcubToolHandler`, enforces permissions, executes the tool, and returns an `AimcubToolResult`.
 
 ## Built-In Surface
 
@@ -42,3 +42,16 @@ The v1 contract registry includes:
 - Write/edit tools require explicit approval by default.
 - Web tools are optional provider-backed tools. If no provider is configured, the planner should record a missing web-research gap instead of blocking local planning.
 - Tool observations should cite sources as file, workspace, memory, web, user, or tool metadata so the Desktop Inspector can show process and context provenance.
+
+## First-Party Web Runtime
+
+`packages/llm/src/web-research.ts` implements the v1 first-party runtime handlers for:
+
+- `web.search`
+- `web.fetch`
+
+These handlers are still Aimcub-owned runtime tools, not MCP tools. They enforce `network.search` / `network.fetch` permissions and return normalized `AimcubToolResult` observations.
+
+`web.search` uses a provider abstraction. The built-in provider is `BraveWebSearchClient`, enabled through `AIMCUB_BRAVE_SEARCH_API_KEY` or `BRAVE_SEARCH_API_KEY` when constructing the runtime with `createWebResearchRuntimeFromEnv`. If no provider is configured, the handler returns `disabled` instead of blocking local planning.
+
+`web.fetch` uses an injected or platform `fetch` implementation. It only fetches `http` / `https` URLs, blocks localhost and private-network hosts by default, enforces response-size limits, extracts text/metadata/links from text-like content, and emits web source metadata for Inspector provenance.
