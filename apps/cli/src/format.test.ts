@@ -205,6 +205,15 @@ describe("formatPlanPretty", () => {
         },
       ],
       acquisition: [],
+      loop: {
+        version: 1,
+        shouldContinue: false,
+        nextStepId: null,
+        stopCondition: "Context is sufficient for decomposition; continue collecting eval signals from evidence after execution.",
+        steps: [],
+        aimContextTargets: [],
+        durableMemoryTargets: [],
+      },
       nextActions: ["Answer 1 high-priority intake question before accepting a plan."],
     });
 
@@ -600,6 +609,40 @@ describe("formatAimIntake", () => {
           ],
         },
       ],
+      loop: {
+        version: 1,
+        shouldContinue: true,
+        nextStepId: "loop_1",
+        stopCondition: "Continue context intake until high-priority gaps are answered, skipped, or converted into aim-local context or pending durable memory candidates.",
+        steps: [
+          {
+            id: "loop_1",
+            acquisitionId: "acq_1",
+            channel: "web_research",
+            priority: "high",
+            status: "needs_permission",
+            action: "Run first-party web research before finalizing milestones.",
+            reason: "Need current docs.",
+            toolCalls: [
+              { name: "web.search", boundary: "first_party", reason: "Find current external sources related to the aim." },
+              { name: "web.fetch", boundary: "first_party", reason: "Fetch bounded source text from selected web results for citation-grade context." },
+            ],
+            memoryPlan: [
+              {
+                scope: "aim",
+                kind: "semantic",
+                categories: ["project_fact", "procedure"],
+                source: "tool_observation",
+              },
+            ],
+            outputs: ["aim_context"],
+            repeatMode: "until_context_ready",
+            blocksPlanAcceptance: true,
+          },
+        ],
+        aimContextTargets: ["project_fact", "procedure"],
+        durableMemoryTargets: [],
+      },
       nextActions: ["Answer 1 high-priority intake question before accepting a plan."],
     });
 
@@ -610,6 +653,8 @@ describe("formatAimIntake", () => {
     expect(text).toContain("capture: global eval-signal · define-eval · improves verifiability");
     expect(text).toContain("acquire: [high] web-research · aim · project-fact, procedure");
     expect(text).toContain("tools web.search, web.fetch");
+    expect(text).toContain("loop: continue · next loop_1");
+    expect(text).toContain("web-research · needs_permission · until_context_ready");
     expect(text).toContain("Answer 1 high-priority intake question");
   });
 });

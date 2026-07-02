@@ -730,6 +730,40 @@ describe("clarify · happy path", () => {
             ],
           },
         ],
+        loop: {
+          version: 1,
+          shouldContinue: true,
+          nextStepId: "loop_1",
+          stopCondition: "Continue context intake until high-priority gaps are answered, skipped, or converted into aim-local context or pending durable memory candidates.",
+          steps: [
+            {
+              id: "loop_1",
+              acquisitionId: "acq_1",
+              channel: "web_research",
+              priority: "high",
+              status: "needs_permission",
+              action: "Run first-party web research before finalizing milestones.",
+              reason: "External docs may shape this aim.",
+              toolCalls: [
+                { name: "web.search", boundary: "first_party", reason: "Find current external sources related to the aim." },
+                { name: "web.fetch", boundary: "first_party", reason: "Fetch bounded source text from selected web results for citation-grade context." },
+              ],
+              memoryPlan: [
+                {
+                  scope: "aim",
+                  kind: "semantic",
+                  categories: ["project_fact", "procedure"],
+                  source: "tool_observation",
+                },
+              ],
+              outputs: ["aim_context"],
+              repeatMode: "until_context_ready",
+              blocksPlanAcceptance: true,
+            },
+          ],
+          aimContextTargets: ["project_fact", "procedure"],
+          durableMemoryTargets: [],
+        },
         nextActions: ["Answer 1 high-priority intake question before accepting a plan."],
       },
     });
@@ -742,6 +776,9 @@ describe("clarify · happy path", () => {
     expect(gw.calls[0]!.prompt).toContain("Recommended context acquisition channels");
     expect(gw.calls[0]!.prompt).toContain("web_research");
     expect(gw.calls[0]!.prompt).toContain("web.search");
+    expect(gw.calls[0]!.prompt).toContain("Context intake loop");
+    expect(gw.calls[0]!.prompt).toContain("nextStep: loop_1");
+    expect(gw.calls[0]!.prompt).toContain("outputs: aim_context");
   });
 
   it("includes draft plan review gaps so high-value questions target decomposition quality", async () => {
@@ -930,6 +967,15 @@ describe("clarify · happy path", () => {
           },
         ],
         acquisition: [],
+        loop: {
+          version: 1,
+          shouldContinue: false,
+          nextStepId: null,
+          stopCondition: "Context is sufficient for decomposition; continue collecting eval signals from evidence after execution.",
+          steps: [],
+          aimContextTargets: [],
+          durableMemoryTargets: [],
+        },
         nextActions: ["Answer 1 targeted intake question if it would change scope or evidence."],
       },
     });

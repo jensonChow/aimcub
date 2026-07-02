@@ -270,6 +270,15 @@ describe("desktop planner · with a gateway (real @core/llm pipeline)", () => {
           },
         ],
         acquisition: [],
+        loop: {
+          version: 1,
+          shouldContinue: false,
+          nextStepId: null,
+          stopCondition: "Context is sufficient for decomposition; continue collecting eval signals from evidence after execution.",
+          steps: [],
+          aimContextTargets: [],
+          durableMemoryTargets: [],
+        },
         nextActions: ["Answer 1 high-priority intake question before accepting a plan."],
       },
     );

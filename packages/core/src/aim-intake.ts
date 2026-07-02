@@ -33,6 +33,10 @@ export type ContextAcquisitionChannel =
   | "conversation"
   | "questionnaire";
 export type ContextAcquisitionScope = "aim" | "global" | "mixed";
+export type ContextIntakeRuntimeBoundary = "first_party" | "external_connector" | "user";
+export type ContextIntakeStepStatus = "ready" | "needs_permission" | "needs_connector" | "needs_user";
+export type ContextIntakeStepRepeatMode = "once" | "until_context_ready" | "until_answered_or_skipped";
+export type ContextIntakeOutputKind = "aim_context" | "durable_memory_candidate" | "clarifying_answer";
 
 export interface ContextCaptureOrigin {
   source: ContextCaptureOriginSource;
@@ -73,6 +77,41 @@ export interface ContextAcquisitionRecommendation {
   memoryTargets: ContextAcquisitionMemoryTarget[];
 }
 
+export interface ContextIntakeToolCallPlan {
+  name: string;
+  boundary: ContextIntakeRuntimeBoundary;
+  reason: string;
+}
+
+export interface ContextIntakeMemoryPlan extends ContextAcquisitionMemoryTarget {
+  source: "tool_observation" | "user_answer" | "completion_evidence";
+}
+
+export interface ContextIntakeLoopStep {
+  id: string;
+  acquisitionId: string;
+  channel: ContextAcquisitionChannel;
+  priority: PlanContextGapPriority;
+  status: ContextIntakeStepStatus;
+  action: string;
+  reason: string;
+  toolCalls: ContextIntakeToolCallPlan[];
+  memoryPlan: ContextIntakeMemoryPlan[];
+  outputs: ContextIntakeOutputKind[];
+  repeatMode: ContextIntakeStepRepeatMode;
+  blocksPlanAcceptance: boolean;
+}
+
+export interface ContextIntakeLoopReport {
+  version: 1;
+  shouldContinue: boolean;
+  nextStepId: string | null;
+  stopCondition: string;
+  steps: ContextIntakeLoopStep[];
+  aimContextTargets: ContextCategory[];
+  durableMemoryTargets: ContextCategory[];
+}
+
 export interface AimIntakeQuestion {
   id: string;
   category: ContextCategory;
@@ -109,6 +148,7 @@ export interface AimIntakeReport {
   coverage: AimIntakeContextCoverage;
   questions: AimIntakeQuestion[];
   acquisition: ContextAcquisitionRecommendation[];
+  loop: ContextIntakeLoopReport;
   nextActions: string[];
 }
 
@@ -453,6 +493,140 @@ function acquisitionRecommendations(input: {
     .map((row, index) => ({ ...row, id: `acq_${index + 1}` }));
 }
 
+function toolBoundary(name: string): ContextIntakeRuntimeBoundary {
+  if (name.startsWith("external.")) return "external_connector";
+  if (name === "context.ask_user") return "user";
+  return "first_party";
+}
+
+function toolCallReason(channel: ContextAcquisitionChannel, name: string): string {
+  switch (name) {
+    case "local.scan_workspace":
+      return "Build an aim-local inventory of the selected workspace before decomposition.";
+    case "local.glob":
+      return "Find candidate files and folders without reading arbitrary content.";
+    case "local.search":
+      return "Search approved local context for terms that shape scope, procedure, or evidence.";
+    case "local.read":
+      return "Read only the selected files needed to turn local artifacts into planning context.";
+    case "memory.search":
+      return "Reuse active memory before asking the user to repeat known context.";
+    case "memory.write_candidate":
+      return "Save newly collected context as a pending candidate instead of silently changing memory.";
+    case "web.search":
+      return "Find current external sources related to the aim.";
+    case "web.fetch":
+      return "Fetch bounded source text from selected web results for citation-grade context.";
+    case "context.ask_user":
+      return channel === "questionnaire"
+        ? "Ask the highest-ROI structured questions with a free-text escape hatch."
+        : "Keep the conversation open for missing context that tools cannot infer.";
+    case "external.notion":
+      return "Search the user's connected Notion or equivalent personal database through the external connector boundary.";
+    case "external.gmail":
+      return "Search user-owned email context through the external connector boundary when relevant.";
+    case "external.calendar":
+      return "Search user-owned calendar context through the external connector boundary when relevant.";
+    default:
+      return "Collect context for this aim through the configured runtime boundary.";
+  }
+}
+
+function stepStatus(channel: ContextAcquisitionChannel, tools: readonly string[]): ContextIntakeStepStatus {
+  if (channel === "conversation" || channel === "questionnaire") return "needs_user";
+  if (tools.some((tool) => tool.startsWith("external."))) return "needs_connector";
+  if (tools.some((tool) => tool.startsWith("local.") || tool.startsWith("web.") || tool === "memory.write_candidate")) return "needs_permission";
+  return "ready";
+}
+
+function stepRepeatMode(channel: ContextAcquisitionChannel): ContextIntakeStepRepeatMode {
+  switch (channel) {
+    case "conversation":
+    case "questionnaire":
+      return "until_answered_or_skipped";
+    case "local_workspace":
+    case "personal_database":
+    case "web_research":
+      return "until_context_ready";
+  }
+}
+
+function outputsForAcquisition(row: ContextAcquisitionRecommendation): ContextIntakeOutputKind[] {
+  const outputs = new Set<ContextIntakeOutputKind>();
+  for (const target of row.memoryTargets) {
+    outputs.add(target.scope === "aim" ? "aim_context" : "durable_memory_candidate");
+  }
+  if (row.channel === "conversation" || row.channel === "questionnaire") outputs.add("clarifying_answer");
+  return [...outputs];
+}
+
+function memorySourceForChannel(channel: ContextAcquisitionChannel): ContextIntakeMemoryPlan["source"] {
+  switch (channel) {
+    case "conversation":
+    case "questionnaire":
+      return "user_answer";
+    case "local_workspace":
+    case "personal_database":
+    case "web_research":
+      return "tool_observation";
+  }
+}
+
+function blocksAcceptance(
+  row: ContextAcquisitionRecommendation,
+  readiness: AimIntakeReadiness,
+): boolean {
+  return readiness === "needs_plan_refinement" || row.priority === "high" || row.categories.includes("eval_signal");
+}
+
+export function buildContextIntakeLoop(input: {
+  readiness: AimIntakeReadiness;
+  acquisition: readonly ContextAcquisitionRecommendation[];
+}): ContextIntakeLoopReport {
+  const steps = input.acquisition.map((row, index): ContextIntakeLoopStep => ({
+    id: `loop_${index + 1}`,
+    acquisitionId: row.id,
+    channel: row.channel,
+    priority: row.priority,
+    status: stepStatus(row.channel, row.suggestedTools),
+    action: row.action,
+    reason: row.reason,
+    toolCalls: row.suggestedTools.map((name) => ({
+      name,
+      boundary: toolBoundary(name),
+      reason: toolCallReason(row.channel, name),
+    })),
+    memoryPlan: row.memoryTargets.map((target) => ({
+      ...target,
+      source: memorySourceForChannel(row.channel),
+    })),
+    outputs: outputsForAcquisition(row),
+    repeatMode: stepRepeatMode(row.channel),
+    blocksPlanAcceptance: blocksAcceptance(row, input.readiness),
+  }));
+  const nextStep = steps.find((step) => step.blocksPlanAcceptance) ?? steps[0] ?? null;
+  const shouldContinue = input.readiness !== "ready" && steps.length > 0;
+  return {
+    version: 1,
+    shouldContinue,
+    nextStepId: shouldContinue ? nextStep?.id ?? null : null,
+    stopCondition: shouldContinue
+      ? "Continue context intake until high-priority gaps are answered, skipped, or converted into aim-local context or pending durable memory candidates."
+      : "Context is sufficient for decomposition; continue collecting eval signals from evidence after execution.",
+    steps,
+    aimContextTargets: uniqueCategories(steps.flatMap((step) =>
+      step.memoryPlan
+        .filter((target) => target.scope === "aim")
+        .flatMap((target) => target.categories),
+    )),
+    durableMemoryTargets: uniqueCategories(steps.flatMap((step) =>
+      step.memoryPlan
+        .filter((target) => target.scope === "global")
+        .flatMap((target) => target.categories),
+    )),
+  };
+}
+
 function actionPriorityValue(priority: "high" | "medium" | "low"): number {
   return priority === "high" ? 0 : priority === "medium" ? 1 : 2;
 }
@@ -654,6 +828,10 @@ function nextActions(input: {
   if (topAcquisition && input.report.readiness !== "ready") {
     actions.push(topAcquisition.action);
   }
+  const nextStep = input.report.loop.steps.find((step) => step.id === input.report.loop.nextStepId);
+  if (nextStep && nextStep.action !== topAcquisition?.action) {
+    actions.push(nextStep.action);
+  }
   if (input.report.coverage.selectedTotal === 0) {
     actions.push("Let answers and completion evidence from this aim seed the user's context profile.");
   }
@@ -696,14 +874,19 @@ export function reviewAimIntake(input: ReviewAimIntakeInput): AimIntakeReport {
     coverage,
     questions: sortedQuestions,
   };
+  const acquisition = acquisitionRecommendations({
+    aim: input,
+    readiness: partialWithoutAcquisition.readiness,
+    coverage,
+    questions: sortedQuestions,
+    draftReview: input.draftReview,
+  });
   const partial = {
     ...partialWithoutAcquisition,
-    acquisition: acquisitionRecommendations({
-      aim: input,
+    acquisition,
+    loop: buildContextIntakeLoop({
       readiness: partialWithoutAcquisition.readiness,
-      coverage,
-      questions: sortedQuestions,
-      draftReview: input.draftReview,
+      acquisition,
     }),
   };
   return {

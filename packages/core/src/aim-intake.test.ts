@@ -75,6 +75,32 @@ describe("reviewAimIntake", () => {
         },
       ],
     });
+    expect(report.loop).toMatchObject({
+      version: 1,
+      shouldContinue: true,
+      nextStepId: "loop_1",
+      aimContextTargets: expect.arrayContaining(["project_fact", "procedure"]),
+    });
+    expect(report.loop.steps[0]).toMatchObject({
+      acquisitionId: "acq_1",
+      channel: "local_workspace",
+      status: "needs_permission",
+      outputs: expect.arrayContaining(["aim_context"]),
+      repeatMode: "until_context_ready",
+      blocksPlanAcceptance: true,
+      toolCalls: expect.arrayContaining([
+        expect.objectContaining({
+          name: "local.scan_workspace",
+          boundary: "first_party",
+        }),
+      ]),
+      memoryPlan: expect.arrayContaining([
+        expect.objectContaining({
+          scope: "aim",
+          source: "tool_observation",
+        }),
+      ]),
+    });
     expect(report.nextActions).toContain("Review pending context candidates so future aims need fewer questions.");
   });
 
@@ -117,6 +143,29 @@ describe("reviewAimIntake", () => {
       ]),
     });
     expect(report.acquisition.find((row) => row.channel === "questionnaire")?.memoryTargets.length).toBeGreaterThan(0);
+    expect(report.loop.steps.find((step) => step.channel === "personal_database")).toMatchObject({
+      status: "needs_connector",
+      toolCalls: expect.arrayContaining([
+        expect.objectContaining({
+          name: "external.notion",
+          boundary: "external_connector",
+        }),
+      ]),
+      outputs: expect.arrayContaining(["aim_context", "durable_memory_candidate"]),
+    });
+    expect(report.loop.steps.find((step) => step.channel === "web_research")).toMatchObject({
+      status: "needs_permission",
+      toolCalls: expect.arrayContaining([
+        expect.objectContaining({ name: "web.search", boundary: "first_party" }),
+        expect.objectContaining({ name: "web.fetch", boundary: "first_party" }),
+      ]),
+    });
+    expect(report.loop.steps.find((step) => step.channel === "questionnaire")).toMatchObject({
+      status: "needs_user",
+      repeatMode: "until_answered_or_skipped",
+      outputs: expect.arrayContaining(["clarifying_answer"]),
+    });
+    expect(report.loop.durableMemoryTargets).toEqual(expect.arrayContaining(["constraint", "preference", "capability"]));
   });
 
   it("uses draft review gaps and quality actions to mark a plan as needing refinement", () => {
@@ -341,6 +390,8 @@ describe("reviewAimIntake", () => {
 
     expect(report.readiness).toBe("ready");
     expect(report.questions).toEqual([]);
+    expect(report.loop.shouldContinue).toBe(false);
+    expect(report.loop.nextStepId).toBeNull();
     expect(report.nextActions).toEqual(["Proceed with decomposition and keep collecting eval signals from evidence."]);
   });
 });

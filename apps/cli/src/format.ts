@@ -738,6 +738,16 @@ export function formatAimIntake(report: AimIntakeReport): string {
     lines.push(`   acquire: [${row.priority}] ${row.channel.replace("_", "-")} · ${row.scope}${categories}${tools}`);
     lines.push(`     ${row.action}`);
   }
+  if (report.loop) {
+    lines.push(`   loop: ${report.loop.shouldContinue ? "continue" : "ready"} · next ${report.loop.nextStepId ?? "none"}`);
+    const nextStep = report.loop.steps.find((step) => step.id === report.loop.nextStepId) ?? report.loop.steps[0];
+    if (nextStep) {
+      const tools = nextStep.toolCalls.length > 0
+        ? ` · tools ${nextStep.toolCalls.map((tool) => `${tool.name}:${tool.boundary}`).join(", ")}`
+        : "";
+      lines.push(`     ${nextStep.channel.replace("_", "-")} · ${nextStep.status} · ${nextStep.repeatMode}${tools}`);
+    }
+  }
   for (const action of report.nextActions.slice(0, 4)) {
     lines.push(`   action: ${action}`);
   }

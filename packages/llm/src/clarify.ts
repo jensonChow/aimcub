@@ -625,6 +625,18 @@ function renderAimIntake(intake: AimIntakeReport | null | undefined): string {
       lines.push(`- [${row.priority}] ${row.channel} · ${row.scope}${categories}${tools}: ${row.action}`);
     }
   }
+  if (intake.loop) {
+    lines.push("Context intake loop:");
+    lines.push(`- shouldContinue: ${intake.loop.shouldContinue}; nextStep: ${intake.loop.nextStepId ?? "none"}`);
+    lines.push(`- stopCondition: ${intake.loop.stopCondition}`);
+    for (const step of intake.loop.steps.slice(0, 4)) {
+      const tools = step.toolCalls.length > 0
+        ? ` · tools: ${step.toolCalls.map((tool) => `${tool.name}/${tool.boundary}`).join(", ")}`
+        : "";
+      const outputs = step.outputs.length > 0 ? ` · outputs: ${step.outputs.join(", ")}` : "";
+      lines.push(`- ${step.id}: [${step.priority}] ${step.channel} · ${step.status} · repeat ${step.repeatMode}${outputs}${tools}`);
+    }
+  }
   if (intake.nextActions.length > 0) {
     lines.push("Intake next actions:");
     for (const action of intake.nextActions.slice(0, 3)) lines.push(`- ${action}`);
