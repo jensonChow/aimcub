@@ -1044,9 +1044,16 @@ function SessionDetails(props: {
   onDeprioritizeContext: (id: string) => void;
 }) {
   const { t } = useI18n();
+  const doneCount = props.events.filter((event) => event.status === "done").length;
+  const hasRunning = props.events.some((event) => event.status === "running") || Boolean(props.busyStep);
   return (
     <details style={sessionDetailsStyle()} open={props.events.length > 0 || Boolean(props.busyStep)}>
-      <summary style={sessionDetailsSummaryStyle()}>{t("chat.details")}</summary>
+      <summary style={sessionDetailsSummaryStyle()}>
+        <span>{t("trace.title")}</span>
+        <span style={sessionDetailsSummaryMetaStyle()}>
+          {hasRunning ? t("spinner.live") : t("trace.count", { n: doneCount, total: props.events.length })}
+        </span>
+      </summary>
       <InspectorRail
         activeTab={props.activeTab}
         onTab={props.onTab}
@@ -1074,8 +1081,9 @@ function SessionDetails(props: {
         onRejectContext={props.onRejectContext}
         onArchiveContext={props.onArchiveContext}
         onDeprioritizeContext={props.onDeprioritizeContext}
-        showTabs
+        showTabs={false}
         sticky={false}
+        compact
       />
     </details>
   );
@@ -1306,11 +1314,24 @@ function sessionDetailsStyle(): CSSProperties {
 function sessionDetailsSummaryStyle(): CSSProperties {
   return {
     cursor: "pointer",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+    gap: 12,
     fontSize: 13,
     fontWeight: 600,
     color: C.muted,
     padding: "8px 0 10px",
     listStyle: "none",
+  };
+}
+
+function sessionDetailsSummaryMetaStyle(): CSSProperties {
+  return {
+    color: C.muted,
+    fontSize: 12,
+    fontWeight: 500,
+    whiteSpace: "nowrap",
   };
 }
 
@@ -1836,8 +1857,20 @@ function InspectorRail(props: {
   onDeprioritizeContext: (id: string) => void;
   showTabs?: boolean;
   sticky: boolean;
+  compact?: boolean;
 }) {
   const { t } = useI18n();
+  if (props.compact) {
+    return (
+      <aside style={compactTraceSurfaceStyle()}>
+        {props.events.length > 0 ? (
+          <PlanningProcessPanel events={props.events} busyStep={props.busyStep} embedded />
+        ) : (
+          <InspectorEmpty title={t("shell.noProcess")} body={t("shell.noProcessBody")} />
+        )}
+      </aside>
+    );
+  }
   const tabs: InspectorTab[] = ["process", "context", "quality", "activity"];
   const tabLabels = {
     process: "shell.tab.process",
@@ -2026,6 +2059,14 @@ function railSurface(): CSSProperties {
   };
 }
 
+function compactTraceSurfaceStyle(): CSSProperties {
+  return {
+    borderTop: `1px solid ${C.border}`,
+    paddingTop: 6,
+    color: C.text,
+  };
+}
+
 function emptyInspectorStyle(): CSSProperties {
   return {
     color: C.muted,
@@ -2110,7 +2151,7 @@ function traceStatusColor(status: PlanningTraceStatus): string {
   }
 }
 
-function PlanningProcessPanel(props: { events: PlanningTraceEvent[]; busyStep: BusyStep | null }) {
+function PlanningProcessPanel(props: { events: PlanningTraceEvent[]; busyStep: BusyStep | null; embedded?: boolean }) {
   const { t } = useI18n();
   if (props.events.length === 0) return null;
   const currentEvent = props.events.find((event) => event.status === "running")
@@ -2118,12 +2159,14 @@ function PlanningProcessPanel(props: { events: PlanningTraceEvent[]; busyStep: B
     ?? null;
   return (
     <section style={processPanelStyle()}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline" }}>
-        <div style={{ fontWeight: 600, fontSize: 14 }}>{t("trace.title")}</div>
-        <div style={{ color: C.muted, fontSize: 12 }}>
-          {t("trace.count", { n: props.events.filter((event) => event.status === "done").length, total: props.events.length })}
+      {!props.embedded && (
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline" }}>
+          <div style={{ fontWeight: 600, fontSize: 14 }}>{t("trace.title")}</div>
+          <div style={{ color: C.muted, fontSize: 12 }}>
+            {t("trace.count", { n: props.events.filter((event) => event.status === "done").length, total: props.events.length })}
+          </div>
         </div>
-      </div>
+      )}
       <SpinnerVerbLine step={props.busyStep} detail={currentEvent?.detail} compact />
       <div style={{ display: "grid", gap: 0, marginTop: 8 }}>
         {props.events.map((event) => {
