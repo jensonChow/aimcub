@@ -64,6 +64,13 @@ function signalMatchesStep(signal: ContextIntakeProgressSignal, step: ContextInt
   return false;
 }
 
+function groundsAimContext(signal: ContextIntakeProgressSignal, step: ContextIntakeLoopStep): boolean {
+  if (step.channel === "web_research" && signal.source === "tool_observation") {
+    return signal.toolName === "web.fetch";
+  }
+  return true;
+}
+
 function outputSatisfied(
   output: ContextIntakeOutputKind,
   step: ContextIntakeLoopStep,
@@ -79,6 +86,7 @@ function outputSatisfied(
       return signals.some((signal) =>
         signalMatchesStep(signal, step) &&
         signal.source !== "user_request" &&
+        groundsAimContext(signal, step) &&
         (signal.scope === "aim" || signal.source === "tool_observation"),
       );
     case "durable_memory_candidate":

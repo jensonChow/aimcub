@@ -152,4 +152,55 @@ describe("reviewContextIntakeProgress", () => {
     expect(progress.blockedAcceptanceCount).toBeGreaterThan(0);
     expect(progress.nextActions.join(" ")).toContain("context intake");
   });
+
+  it("requires fetched web source context before satisfying web research intake", () => {
+    const intake = reviewAimIntake({
+      title: "Research latest Cambodia travel docs",
+      description: "Need current official source material before planning.",
+      selectedContext: [],
+      memories: [],
+    });
+    const webResearch = intake.loop.steps.find((step) => step.channel === "web_research");
+    expect(webResearch).toBeTruthy();
+
+    const searchOnly = reviewContextIntakeProgress({
+      loop: intake.loop,
+      signals: [
+        {
+          source: "tool_observation",
+          channel: "web_research",
+          toolName: "web.search",
+          scope: "aim",
+          category: "project_fact",
+          summary: "Found search results for Cambodia travel docs.",
+        },
+      ],
+    });
+
+    expect(searchOnly.steps.find((step) => step.stepId === webResearch!.id)).toMatchObject({
+      status: "blocked",
+      satisfiedOutputs: [],
+      remainingOutputs: ["aim_context"],
+    });
+
+    const fetched = reviewContextIntakeProgress({
+      loop: intake.loop,
+      signals: [
+        {
+          source: "tool_observation",
+          channel: "web_research",
+          toolName: "web.fetch",
+          scope: "aim",
+          category: "project_fact",
+          summary: "Fetched the official Cambodia travel advisory page.",
+        },
+      ],
+    });
+
+    expect(fetched.steps.find((step) => step.stepId === webResearch!.id)).toMatchObject({
+      status: "satisfied",
+      satisfiedOutputs: ["aim_context"],
+      remainingOutputs: [],
+    });
+  });
 });
