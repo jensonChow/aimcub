@@ -449,6 +449,9 @@ export function planningToolsOf(g: Goal): PlanningToolIpcTrace | null {
   if (!trace || !Array.isArray(trace.observations) || !Array.isArray(trace.failures)) return null;
   return {
     observations: trace.observations as PlanningToolIpcTrace["observations"],
+    observationEvents: Array.isArray(trace.observationEvents)
+      ? trace.observationEvents as PlanningToolIpcTrace["observationEvents"]
+      : undefined,
     failures: trace.failures as PlanningToolIpcTrace["failures"],
     distillation: trace.distillation ?? null,
   };

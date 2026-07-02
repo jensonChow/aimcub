@@ -15,6 +15,7 @@ import type {
   ClarifyLearningReport,
   ContextDistillOutput,
   AimcubToolObservation,
+  PlanningToolObservationEvent,
   PlanningContextSelectionReport,
   PlanningToolFailure,
 } from "@core/llm";
@@ -86,6 +87,7 @@ export interface ClarifyIpcResult {
 
 export interface PlanningToolIpcTrace {
   observations: Array<AimcubToolObservation<unknown>>;
+  observationEvents?: PlanningToolObservationEvent[];
   failures: PlanningToolFailure[];
   distillation: ContextDistillOutput | null;
 }

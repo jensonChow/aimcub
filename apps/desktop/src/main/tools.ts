@@ -11,6 +11,7 @@ import {
   type ContextDistillOutput,
   type PlanningContextForAim,
   type PlanningToolFailure,
+  type PlanningToolObservationEvent,
 } from "@core/llm";
 
 import type { DraftRequest } from "../shared/ipc";
@@ -18,6 +19,7 @@ import { aimStore, LOCAL_OWNER } from "./store";
 
 export interface DesktopPlanningContext extends PlanningContextForAim {
   toolObservations: Array<AimcubToolObservation<unknown>>;
+  toolObservationEvents: PlanningToolObservationEvent[];
   toolFailures: PlanningToolFailure[];
   toolDistillation: ContextDistillOutput | null;
 }
@@ -98,6 +100,7 @@ export async function collectDesktopPlanningContext(req: DraftRequest): Promise<
     report: toolContext.report,
     sourceMemories,
     toolObservations: toolContext.observations,
+    toolObservationEvents: toolContext.observationEvents,
     toolFailures: toolContext.failures,
     toolDistillation: toolContext.distillation,
   };

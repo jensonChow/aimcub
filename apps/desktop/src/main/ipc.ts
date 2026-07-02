@@ -12,8 +12,13 @@ import {
   critiquePlan,
   reviewContextCaptureFulfillment,
   reviewContextHealth,
+  reviewContextIntakeProgress,
   reviewContextProfile,
   reviewPlan,
+  type ContextCategory,
+  type ContextAcquisitionChannel,
+  type ContextCaptureScope,
+  type ContextIntakeProgressSignal,
   type DecompositionLearningReport,
 } from "@core/domain";
 import {
@@ -59,9 +64,70 @@ async function planningContext(input: {
 function planningToolTrace(context: DesktopPlanningContext) {
   return {
     observations: context.toolObservations,
+    observationEvents: context.toolObservationEvents,
     failures: context.toolFailures,
     distillation: context.toolDistillation,
   };
+}
+
+function channelForToolName(toolName: string): ContextAcquisitionChannel | undefined {
+  if (toolName.startsWith("local.")) return "local_workspace";
+  if (toolName.startsWith("web.")) return "web_research";
+  if (toolName === "memory.search") return "personal_database";
+  if (toolName === "memory.write_candidate") return undefined;
+  return undefined;
+}
+
+function scopeForCandidate(scope: string | undefined): ContextCaptureScope {
+  return scope === "global" ? "global" : "aim";
+}
+
+function isContextCategory(value: unknown): value is ContextCategory {
+  return value === "preference" ||
+    value === "constraint" ||
+    value === "capability" ||
+    value === "eval_signal" ||
+    value === "project_fact" ||
+    value === "procedure";
+}
+
+function contextIntakeSignals(input: {
+  planning: DesktopPlanningContext;
+  questions: SaveRequest["questions"];
+  answers: SaveRequest["answers"];
+}): ContextIntakeProgressSignal[] {
+  const signals: ContextIntakeProgressSignal[] = [];
+  for (const event of input.planning.toolObservationEvents) {
+    signals.push({
+      source: event.toolName === "memory.write_candidate" ? "memory_candidate" : "tool_observation",
+      toolName: event.toolName,
+      channel: channelForToolName(event.toolName),
+      summary: event.observation.summary,
+    });
+  }
+  for (const candidate of input.planning.toolDistillation?.durableMemoryCandidates ?? []) {
+    signals.push({
+      source: "memory_candidate",
+      category: isContextCategory(candidate.category) ? candidate.category : undefined,
+      scope: scopeForCandidate(candidate.scope),
+      summary: candidate.content,
+    });
+  }
+  const questionById = new Map(input.questions.map((question) => [question.id, question]));
+  for (const answer of input.answers) {
+    const text = answer.other_text?.trim() || answer.selected_label?.trim();
+    if (!text) continue;
+    const question = questionById.get(answer.question_id);
+    signals.push({
+      source: "user_answer",
+      channel: "questionnaire",
+      category: question?.capture?.category,
+      scope: question?.capture?.scope,
+      questionId: answer.question_id,
+      summary: text,
+    });
+  }
+  return signals;
 }
 
 async function clarifyLearning() {
@@ -256,6 +322,21 @@ export function registerIpc(): void {
       memories,
       impacts: answerImpact?.rows ?? [],
     });
+    const intake = buildAimIntakeReport({
+      title: req.title,
+      description: req.description,
+      planning: selectedContext,
+      draftReview: req.review ?? null,
+      lineageLearning,
+    });
+    const intakeProgress = reviewContextIntakeProgress({
+      loop: intake.loop,
+      signals: contextIntakeSignals({
+        planning: selectedContext,
+        questions: req.questions,
+        answers: req.answers,
+      }),
+    });
 
     const saved = await aimStore.createGoal({
       title: req.title,
@@ -271,13 +352,8 @@ export function registerIpc(): void {
               output: req.plan,
             }, req.review)
           : {}),
-        aim_intake: buildAimIntakeReport({
-          title: req.title,
-          description: req.description,
-          planning: selectedContext,
-          draftReview: req.review ?? null,
-          lineageLearning,
-        }),
+        aim_intake: intake,
+        context_intake_progress: intakeProgress,
         planning_context: selectedContext.report,
         planning_tools: planningToolTrace(selectedContext),
         ...(answerImpact ? { clarify_answer_impact: answerImpact } : {}),

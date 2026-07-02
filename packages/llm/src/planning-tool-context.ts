@@ -35,10 +35,16 @@ export interface PlanningToolFailure {
   error: AimcubToolFailure;
 }
 
+export interface PlanningToolObservationEvent {
+  toolName: AimcubToolName;
+  observation: AimcubToolObservation<unknown>;
+}
+
 export interface PlanningToolContextResult {
   memories: PlanningMemory[];
   report: PlanningContextSelectionReport;
   observations: Array<AimcubToolObservation<unknown>>;
+  observationEvents: PlanningToolObservationEvent[];
   failures: PlanningToolFailure[];
   distillation: ContextDistillOutput | null;
 }
@@ -148,10 +154,12 @@ function addResult<T>(
   toolName: AimcubToolName,
   result: { ok: true; observation: AimcubToolObservation<T> } | { ok: false; error: AimcubToolFailure },
   observations: Array<AimcubToolObservation<unknown>>,
+  observationEvents: PlanningToolObservationEvent[],
   failures: PlanningToolFailure[],
 ): AimcubToolObservation<T> | null {
   if (result.ok) {
     observations.push(result.observation as AimcubToolObservation<unknown>);
+    observationEvents.push({ toolName, observation: result.observation as AimcubToolObservation<unknown> });
     return result.observation;
   }
   failures.push({ toolName, error: result.error });
@@ -164,6 +172,7 @@ export async function collectPlanningToolContext(
   input: PlanningToolContextInput,
 ): Promise<PlanningToolContextResult> {
   const observations: Array<AimcubToolObservation<unknown>> = [];
+  const observationEvents: PlanningToolObservationEvent[] = [];
   const failures: PlanningToolFailure[] = [];
   const planningMemories: PlanningMemory[] = [];
   const query = queryForAim(input);
@@ -177,6 +186,7 @@ export async function collectPlanningToolContext(
       limit: input.memoryLimit ?? DEFAULT_CONTEXT_LIMIT,
     }, context),
     observations,
+    observationEvents,
     failures,
   );
   if (memoryObservation) planningMemories.push(...collectMemoryData(memoryObservation));
@@ -191,6 +201,7 @@ export async function collectPlanningToolContext(
         includeHidden: false,
       }, context),
       observations,
+      observationEvents,
       failures,
     );
     if (localScanObservation) planningMemories.push(...collectLocalScanData(localScanObservation));
@@ -204,6 +215,7 @@ export async function collectPlanningToolContext(
         limit: input.webSearchLimit ?? DEFAULT_WEB_SEARCH_LIMIT,
       }, context),
       observations,
+      observationEvents,
       failures,
     );
     if (webSearchObservation) {
@@ -218,6 +230,7 @@ export async function collectPlanningToolContext(
             extractMode: "text",
           }, context),
           observations,
+          observationEvents,
           failures,
         );
         if (webFetchObservation) planningMemories.push(...collectWebFetchData(webFetchObservation));
@@ -235,6 +248,7 @@ export async function collectPlanningToolContext(
         observations,
       }, context),
       observations,
+      observationEvents,
       failures,
     );
     distillation = distillObservation ? distillObservation.data : null;
@@ -253,6 +267,7 @@ export async function collectPlanningToolContext(
           sourceToolCallId: "context.distill",
         }, context),
         observations,
+        observationEvents,
         failures,
       );
     }
@@ -270,6 +285,7 @@ export async function collectPlanningToolContext(
     memories: selection.memories,
     report: selection.report,
     observations,
+    observationEvents,
     failures,
     distillation,
   };

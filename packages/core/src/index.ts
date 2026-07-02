@@ -12,6 +12,7 @@ export * from "./plan-handoff";
 export * from "./evidence";
 export * from "./context";
 export * from "./context-capture";
+export * from "./context-intake-progress";
 export * from "./context-lineage";
 export * from "./aim-intake";
 export * from "./aim-learning";

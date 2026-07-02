@@ -59,6 +59,11 @@ describe("planning tool context collector", () => {
       "Found 1 web result.",
       "Distilled planning tool observations into compact context.",
     ]);
+    expect(result.observationEvents.map((event) => event.toolName)).toEqual([
+      "memory.search",
+      "web.search",
+      "context.distill",
+    ]);
     expect(result.memories.map((memory) => memory.content)).toEqual([
       "User prefers TypeScript for Aimcub tools.",
       "Web search result: Aimcub research — A first-party planning tool runtime. — Source: https://example.com/aimcub",
@@ -94,6 +99,7 @@ describe("planning tool context collector", () => {
     expect(result.failures).toEqual([
       { toolName: "web.search", error: { code: "disabled", message: "No provider.", retryable: false } },
     ]);
+    expect(result.observationEvents.map((event) => event.toolName)).toEqual(["memory.search", "context.distill"]);
     expect(result.distillation?.missingQuestions.map((question) => question.id)).toContain("missing_eval_signal");
   });
 
