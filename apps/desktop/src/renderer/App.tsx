@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
 import type { DecompositionOutput, Goal, Memory } from "@core/types";
 import { reviewAimLearning, reviewContextLineage } from "@core/domain";
@@ -945,13 +945,36 @@ function ChatComposer(props: {
   onMetaClick: () => void;
 }) {
   const { t } = useI18n();
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const canSubmit = props.value.trim().length > 0 && !props.disabled;
+
+  function resizeComposer() {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    const nextHeight = Math.min(150, Math.max(44, el.scrollHeight));
+    el.style.height = `${nextHeight}px`;
+    el.style.overflowY = el.scrollHeight > 150 ? "auto" : "hidden";
+  }
+
+  useEffect(() => {
+    resizeComposer();
+  }, [props.value]);
+
+  useEffect(() => {
+    if (!props.disabled) textareaRef.current?.focus();
+  }, [props.disabled, props.placeholder]);
+
   return (
     <div style={composerShellStyle()}>
       <textarea
+        ref={textareaRef}
         value={props.value}
         disabled={props.disabled}
-        onChange={(event) => props.onChange(event.target.value)}
+        onChange={(event) => {
+          props.onChange(event.target.value);
+          resizeComposer();
+        }}
         onKeyDown={(event) => {
           if (event.key === "Enter" && !event.shiftKey) {
             event.preventDefault();
@@ -959,7 +982,8 @@ function ChatComposer(props: {
           }
         }}
         placeholder={props.placeholder}
-        rows={2}
+        rows={1}
+        aria-label={props.placeholder}
         style={composerInputStyle()}
       />
       <div style={composerFooterStyle()}>
@@ -1251,8 +1275,10 @@ function composerShellStyle(): CSSProperties {
 function composerInputStyle(): CSSProperties {
   return {
     width: "100%",
-    minHeight: 54,
-    maxHeight: 140,
+    height: 44,
+    minHeight: 44,
+    maxHeight: 150,
+    overflowY: "hidden",
     resize: "none",
     border: 0,
     outline: "none",
@@ -1262,7 +1288,7 @@ function composerInputStyle(): CSSProperties {
     fontSize: 15,
     lineHeight: 1.45,
     boxSizing: "border-box",
-    padding: "5px 6px 8px",
+    padding: "8px 6px",
   };
 }
 
