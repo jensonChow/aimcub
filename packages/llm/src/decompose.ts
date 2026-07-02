@@ -12,7 +12,21 @@
  * can decide whether to re-prompt, surface the error, or fall back.
  */
 import { DecompositionOutput, type GoalDomain } from "@core/types";
-import { buildPlanHandoffReport, critiquePlan, reviewPlan, validatePlan, type ContextLineageLearningReport, type DecompositionLearningReport, type DecompositionStrategyReport, type PlanHandoffReport, type PlanQualityReport, type PlanReviewReport, type PlanValidation } from "@core/domain";
+import {
+  buildLocalHandoffManifest,
+  buildPlanHandoffReport,
+  critiquePlan,
+  reviewPlan,
+  validatePlan,
+  type ContextLineageLearningReport,
+  type DecompositionLearningReport,
+  type DecompositionStrategyReport,
+  type LocalHandoffManifest,
+  type PlanHandoffReport,
+  type PlanQualityReport,
+  type PlanReviewReport,
+  type PlanValidation,
+} from "@core/domain";
 
 import type { LlmGateway, LlmResponse, LlmUsage } from "./index";
 import { decompositionJsonSchema } from "./decomposition-schema";
@@ -70,6 +84,7 @@ export interface PlanQualityMetadata extends Record<string, unknown> {
   plan_quality_retry: PlanQualityRetryMetadata;
   plan_review?: PlanReviewReport;
   plan_handoff?: PlanHandoffReport;
+  local_handoff_manifest?: LocalHandoffManifest;
 }
 
 /** Persistable metadata for the selected decomposition and its quality retry loop. */
@@ -88,7 +103,14 @@ export function planQualityMetadata(
     },
   };
   if (review) metadata.plan_review = review;
-  if (result.output) metadata.plan_handoff = buildPlanHandoffReport({ plan: result.output });
+  if (result.output) {
+    const handoff = buildPlanHandoffReport({ plan: result.output });
+    metadata.plan_handoff = handoff;
+    metadata.local_handoff_manifest = buildLocalHandoffManifest({
+      plan: result.output,
+      handoff,
+    });
+  }
   return metadata;
 }
 
