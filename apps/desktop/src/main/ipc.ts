@@ -17,18 +17,14 @@ import {
   reviewContextProfile,
   reviewContextSedimentation,
   reviewPlan,
-  type ContextCategory,
-  type ContextAcquisitionChannel,
-  type ContextCaptureScope,
   type ContextIntakeProgressSignal,
-  type ContextSedimentationCandidateInput,
   type DecompositionLearningReport,
 } from "@core/domain";
 import {
   buildAimIntakeReport,
   planQualityMetadata,
   clarifyAnswersToMemories,
-  type ContextAskUserOutput,
+  contextIntakeSignalsFromPlanningToolEvents,
   planningContextReportsFromGoals,
   recordAssumptionContextCandidatesForStore,
   recordReviewContextCandidatesForStore,
@@ -75,81 +71,14 @@ function planningToolTrace(context: DesktopPlanningContext) {
   };
 }
 
-function channelForToolName(toolName: string): ContextAcquisitionChannel | undefined {
-  if (toolName.startsWith("local.")) return "local_workspace";
-  if (toolName.startsWith("web.")) return "web_research";
-  if (toolName === "memory.search") return "personal_database";
-  if (toolName === "memory.write_candidate") return undefined;
-  return undefined;
-}
-
-function scopeForCandidate(scope: string | undefined): ContextCaptureScope {
-  return scope === "global" ? "global" : "aim";
-}
-
-function isContextCategory(value: unknown): value is ContextCategory {
-  return value === "preference" ||
-    value === "constraint" ||
-    value === "capability" ||
-    value === "eval_signal" ||
-    value === "project_fact" ||
-    value === "procedure";
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isContextAskUserOutput(value: unknown): value is ContextAskUserOutput {
-  return isRecord(value) &&
-    typeof value.requestId === "string" &&
-    Array.isArray(value.questions);
-}
-
-function scopeForAskUserQuestion(scope: string | undefined): ContextCaptureScope | undefined {
-  if (scope === "global") return "global";
-  if (scope === "current_aim") return "aim";
-  return undefined;
-}
-
-function contextAskUserSignals(output: ContextAskUserOutput): ContextIntakeProgressSignal[] {
-  return output.questions.map((question) => ({
-    source: "user_request",
-    toolName: "context.ask_user",
-    channel: "questionnaire",
-    category: isContextCategory(question.category) ? question.category : undefined,
-    scope: scopeForAskUserQuestion(question.captureScope),
-    questionId: question.id,
-    summary: question.question,
-  }));
-}
-
 function contextIntakeSignals(input: {
   planning: DesktopPlanningContext;
   questions: SaveRequest["questions"];
   answers: SaveRequest["answers"];
 }): ContextIntakeProgressSignal[] {
-  const signals: ContextIntakeProgressSignal[] = [];
-  for (const event of input.planning.toolObservationEvents) {
-    if (event.toolName === "context.ask_user" && isContextAskUserOutput(event.observation.data)) {
-      signals.push(...contextAskUserSignals(event.observation.data));
-      continue;
-    }
-    signals.push({
-      source: event.toolName === "memory.write_candidate" ? "memory_candidate" : "tool_observation",
-      toolName: event.toolName,
-      channel: channelForToolName(event.toolName),
-      summary: event.observation.summary,
-    });
-  }
-  for (const candidate of input.planning.toolDistillation?.durableMemoryCandidates ?? []) {
-    signals.push({
-      source: "memory_candidate",
-      category: isContextCategory(candidate.category) ? candidate.category : undefined,
-      scope: scopeForCandidate(candidate.scope),
-      summary: candidate.content,
-    });
-  }
+  const signals: ContextIntakeProgressSignal[] = contextIntakeSignalsFromPlanningToolEvents(
+    input.planning.toolObservationEvents,
+  );
   const questionById = new Map(input.questions.map((question) => [question.id, question]));
   for (const answer of input.answers) {
     const text = answer.other_text?.trim() || answer.selected_label?.trim();
@@ -165,20 +94,6 @@ function contextIntakeSignals(input: {
     });
   }
   return signals;
-}
-
-function contextSedimentationCandidates(
-  planning: DesktopPlanningContext,
-): ContextSedimentationCandidateInput[] {
-  return (planning.toolDistillation?.durableMemoryCandidates ?? []).flatMap((candidate) => {
-    if (!isContextCategory(candidate.category)) return [];
-    return [{
-      content: candidate.content,
-      category: candidate.category,
-      scope: scopeForCandidate(candidate.scope),
-      source: "distilled_context",
-    }];
-  });
 }
 
 async function clarifyLearning() {
@@ -393,7 +308,6 @@ export function registerIpc(): void {
       loop: intake.loop,
       progress: intakeProgress,
       signals: intakeSignals,
-      candidates: contextSedimentationCandidates(selectedContext),
     });
     const localHandoffManifest = buildLocalHandoffManifest({
       plan: req.plan,

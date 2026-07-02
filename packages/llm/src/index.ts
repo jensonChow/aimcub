@@ -121,6 +121,7 @@ export type {
 } from "./planning-context";
 export {
   buildAimIntakeReport,
+  contextIntakeSignalsFromPlanningToolEvents,
   planningContextReportsFromGoals,
   recordAssumptionContextCandidatesForStore,
   recordReviewContextCandidatesForStore,

@@ -11,13 +11,14 @@ import {
   type AimIntakeReport,
   type ContextAssumption,
   type ContextCandidate,
+  type ContextIntakeProgressSignal,
   type ContextLineageLearningReport,
   type ContextSedimentationReport,
   type DecompositionLearningReport,
   type DecompositionStrategyReport,
   type PlanReviewReport,
 } from "@core/domain";
-import type { Evidence, Goal, Memory, MemoryKind, Milestone, MilestoneCompletion } from "@core/types";
+import type { ContextCategory, Evidence, Goal, Memory, MemoryKind, Milestone, MilestoneCompletion } from "@core/types";
 
 import { clarifyImpactReportFromMetadata, summarizeClarifyLearning, type ClarifyLearningReport } from "./clarify";
 import {
@@ -25,6 +26,18 @@ import {
   type PlanningContextSelectionReport,
   type PlanningMemory,
 } from "./planning-context";
+import type { PlanningToolObservationEvent } from "./planning-tool-context";
+import type {
+  ContextAskUserOutput,
+  ContextDistillOutput,
+  LocalGlobOutput,
+  LocalReadOutput,
+  LocalScanWorkspaceOutput,
+  LocalSearchOutput,
+  MemorySearchOutput,
+  WebFetchOutput,
+  WebSearchOutput,
+} from "./tool-contract";
 
 export interface ContextWorkflowSnapshot {
   goals: Goal[];
@@ -111,6 +124,218 @@ export function buildAimIntakeReport(input: {
     draftReview: input.draftReview ?? null,
     lineageLearning: input.lineageLearning,
   });
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isContextCategory(value: unknown): value is ContextCategory {
+  return value === "preference" ||
+    value === "constraint" ||
+    value === "capability" ||
+    value === "eval_signal" ||
+    value === "project_fact" ||
+    value === "procedure";
+}
+
+function scopeForCaptureScope(value: string | undefined): ContextIntakeProgressSignal["scope"] | undefined {
+  if (value === "global") return "global";
+  if (value === "current_aim") return "aim";
+  return undefined;
+}
+
+function scopeForMemoryScope(value: string | undefined): ContextIntakeProgressSignal["scope"] | undefined {
+  if (value === "global") return "global";
+  if (value === "current_aim") return "aim";
+  return undefined;
+}
+
+function channelForToolName(toolName: string): ContextIntakeProgressSignal["channel"] | undefined {
+  if (toolName.startsWith("local.")) return "local_workspace";
+  if (toolName.startsWith("web.")) return "web_research";
+  if (toolName === "memory.search") return "personal_database";
+  if (toolName === "memory.write_candidate") return undefined;
+  if (toolName === "context.ask_user") return "questionnaire";
+  return undefined;
+}
+
+function isContextAskUserOutput(value: unknown): value is ContextAskUserOutput {
+  return isRecord(value) && typeof value.requestId === "string" && Array.isArray(value.questions);
+}
+
+function isContextDistillOutput(value: unknown): value is ContextDistillOutput {
+  return isRecord(value) && Array.isArray(value.durableMemoryCandidates) && Array.isArray(value.missingQuestions);
+}
+
+function isMemorySearchOutput(value: unknown): value is MemorySearchOutput {
+  return isRecord(value) && Array.isArray(value.memories);
+}
+
+function isWebSearchOutput(value: unknown): value is WebSearchOutput {
+  return isRecord(value) && Array.isArray(value.results);
+}
+
+function isWebFetchOutput(value: unknown): value is WebFetchOutput {
+  return isRecord(value) && typeof value.finalUrl === "string" && typeof value.status === "number";
+}
+
+function isLocalReadOutput(value: unknown): value is LocalReadOutput {
+  return isRecord(value) && typeof value.path === "string" && Array.isArray(value.lines);
+}
+
+function isLocalSearchOutput(value: unknown): value is LocalSearchOutput {
+  return isRecord(value) && Array.isArray(value.matches);
+}
+
+function isLocalGlobOutput(value: unknown): value is LocalGlobOutput {
+  return isRecord(value) && Array.isArray(value.paths);
+}
+
+function isLocalScanWorkspaceOutput(value: unknown): value is LocalScanWorkspaceOutput {
+  return isRecord(value) &&
+    typeof value.root === "string" &&
+    typeof value.fileCount === "number" &&
+    typeof value.directoryCount === "number" &&
+    Array.isArray(value.likelyProjectTypes);
+}
+
+function cleanText(value: unknown): string {
+  return typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
+}
+
+function webSearchSummary(output: WebSearchOutput, fallback: string | undefined): string {
+  const results = output.results.slice(0, 3).map((result) =>
+    [result.title, result.snippet, result.url].map(cleanText).filter(Boolean).join(" — "),
+  ).filter(Boolean);
+  return results.join("\n") || cleanText(fallback);
+}
+
+function webFetchSummary(output: WebFetchOutput, fallback: string | undefined): string {
+  return [
+    output.title ? `Fetched web page: ${output.title}` : "Fetched web page",
+    output.text?.slice(0, 1_000),
+    `Source: ${output.finalUrl}`,
+  ].map(cleanText).filter(Boolean).join(" — ") || cleanText(fallback);
+}
+
+function localObservationSummary(value: unknown, fallback: string | undefined): string {
+  if (isLocalScanWorkspaceOutput(value)) {
+    return [
+      `Workspace scan: ${value.root}`,
+      `${value.fileCount} files and ${value.directoryCount} directories`,
+      value.likelyProjectTypes.length ? `Likely project types: ${value.likelyProjectTypes.join(", ")}` : undefined,
+    ].map(cleanText).filter(Boolean).join(" — ");
+  }
+  if (isLocalReadOutput(value)) {
+    return `Read local file: ${value.path}`;
+  }
+  if (isLocalSearchOutput(value)) {
+    return `Local search found ${value.matches.length} match${value.matches.length === 1 ? "" : "es"}.`;
+  }
+  if (isLocalGlobOutput(value)) {
+    return `Local glob found ${value.paths.length} path${value.paths.length === 1 ? "" : "s"}.`;
+  }
+  return cleanText(fallback);
+}
+
+export function contextIntakeSignalsFromPlanningToolEvents(
+  events: readonly PlanningToolObservationEvent[],
+): ContextIntakeProgressSignal[] {
+  const signals: ContextIntakeProgressSignal[] = [];
+
+  for (const event of events) {
+    const data = event.observation.data;
+    if (event.toolName === "context.ask_user" && isContextAskUserOutput(data)) {
+      for (const question of data.questions) {
+        signals.push({
+          source: "user_request",
+          toolName: event.toolName,
+          channel: "questionnaire",
+          category: isContextCategory(question.category) ? question.category : undefined,
+          scope: scopeForCaptureScope(question.captureScope),
+          questionId: question.id,
+          summary: question.question,
+        });
+      }
+      continue;
+    }
+
+    if (event.toolName === "context.distill" && isContextDistillOutput(data)) {
+      for (const candidate of data.durableMemoryCandidates) {
+        signals.push({
+          source: "memory_candidate",
+          toolName: event.toolName,
+          category: isContextCategory(candidate.category) ? candidate.category : undefined,
+          scope: scopeForCaptureScope(candidate.scope),
+          summary: candidate.content,
+        });
+      }
+      continue;
+    }
+
+    if (event.toolName === "memory.search" && isMemorySearchOutput(data)) {
+      for (const memory of data.memories) {
+        const scope = scopeForMemoryScope(memory.scope);
+        if (!scope) continue;
+        signals.push({
+          source: "tool_observation",
+          toolName: event.toolName,
+          channel: "personal_database",
+          category: isContextCategory(memory.category) ? memory.category : undefined,
+          scope,
+          questionId: memory.id,
+          summary: memory.content,
+        });
+      }
+      continue;
+    }
+
+    if (event.toolName === "web.fetch" && isWebFetchOutput(data)) {
+      signals.push({
+        source: "tool_observation",
+        toolName: event.toolName,
+        channel: "web_research",
+        category: "project_fact",
+        scope: "aim",
+        summary: webFetchSummary(data, event.observation.summary),
+      });
+      continue;
+    }
+
+    if (event.toolName === "web.search" && isWebSearchOutput(data)) {
+      signals.push({
+        source: "tool_observation",
+        toolName: event.toolName,
+        channel: "web_research",
+        category: "project_fact",
+        scope: "aim",
+        summary: webSearchSummary(data, event.observation.summary),
+      });
+      continue;
+    }
+
+    if (event.toolName.startsWith("local.")) {
+      signals.push({
+        source: "tool_observation",
+        toolName: event.toolName,
+        channel: "local_workspace",
+        category: "project_fact",
+        scope: "aim",
+        summary: localObservationSummary(data, event.observation.summary),
+      });
+      continue;
+    }
+
+    signals.push({
+      source: event.toolName === "memory.write_candidate" ? "memory_candidate" : "tool_observation",
+      toolName: event.toolName,
+      channel: channelForToolName(event.toolName),
+      summary: event.observation.summary,
+    });
+  }
+
+  return signals;
 }
 
 async function contextLineageReportsForStore(

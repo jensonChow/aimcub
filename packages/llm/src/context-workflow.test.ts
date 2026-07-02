@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import type { Goal, Memory } from "@core/types";
+import { buildContextIntakeLoop, reviewContextIntakeProgress } from "@core/domain";
 
 import {
   buildAimIntakeReport,
+  contextIntakeSignalsFromPlanningToolEvents,
   planningContextReportsFromGoals,
   recordSedimentationMemoryCandidatesForStore,
   selectPlanningContextForStore,
 } from "./context-workflow";
+import type { PlanningToolObservationEvent } from "./planning-tool-context";
 
 const ownerId = "00000000-0000-4000-8000-000000000001";
 
@@ -43,6 +46,179 @@ function goal(overrides: Partial<Goal>): Goal {
 }
 
 describe("context workflow", () => {
+  it("turns planning tool observations into structured intake signals", () => {
+    const events: PlanningToolObservationEvent[] = [
+      {
+        toolName: "local.scan_workspace",
+        observation: {
+          summary: "Scanned workspace.",
+          data: {
+            root: "/workspace/aimcub",
+            fileCount: 42,
+            directoryCount: 8,
+            likelyProjectTypes: ["node", "typescript"],
+            manifests: [{ path: "/workspace/aimcub/package.json", kind: "node-package" }],
+            ignoredPatterns: ["node_modules/"],
+            sensitivePathsExcluded: [],
+          },
+          sources: [{ kind: "workspace", path: "/workspace/aimcub" }],
+        },
+      },
+      {
+        toolName: "web.fetch",
+        observation: {
+          summary: "Fetched official docs.",
+          data: {
+            finalUrl: "https://example.com/docs",
+            status: 200,
+            title: "Official docs",
+            text: "Use the official documentation as the current source of truth.",
+            truncated: false,
+          },
+          sources: [{ kind: "web", url: "https://example.com/docs" }],
+        },
+      },
+      {
+        toolName: "context.distill",
+        observation: {
+          summary: "Distilled context.",
+          data: {
+            summary: "Relevant current docs and reusable preference.",
+            usedSources: [],
+            missingQuestions: [],
+            durableMemoryCandidates: [{
+              content: "Preference: Keep generated plans concise.",
+              category: "preference",
+              scope: "global",
+            }],
+          },
+          sources: [],
+        },
+      },
+      {
+        toolName: "context.ask_user",
+        observation: {
+          summary: "Prepared one question.",
+          data: {
+            requestId: "ask-1",
+            questions: [{
+              id: "q1",
+              question: "What evidence proves this aim is done?",
+              category: "eval_signal",
+              captureScope: "current_aim",
+            }],
+          },
+          sources: [],
+        },
+      },
+      {
+        toolName: "memory.search",
+        observation: {
+          summary: "Selected planning memories.",
+          data: {
+            memories: [
+              {
+                id: "global-memory",
+                content: "Constraint: Keep @core pure.",
+                category: "constraint",
+                kind: "semantic",
+                scope: "global",
+                confidence: 0.95,
+              },
+              {
+                id: "old-aim-memory",
+                content: "Project fact: Previous unrelated aim used SQLite.",
+                category: "project_fact",
+                kind: "semantic",
+                scope: "related_aim",
+                confidence: 0.9,
+              },
+            ],
+          },
+          sources: [{ kind: "memory", uri: "memory:global-memory" }],
+        },
+      },
+    ];
+
+    const signals = contextIntakeSignalsFromPlanningToolEvents(events);
+
+    expect(signals).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        source: "tool_observation",
+        toolName: "local.scan_workspace",
+        channel: "local_workspace",
+        category: "project_fact",
+        scope: "aim",
+        summary: expect.stringContaining("Workspace scan: /workspace/aimcub"),
+      }),
+      expect.objectContaining({
+        source: "tool_observation",
+        toolName: "web.fetch",
+        channel: "web_research",
+        category: "project_fact",
+        scope: "aim",
+        summary: expect.stringContaining("Official docs"),
+      }),
+      expect.objectContaining({
+        source: "memory_candidate",
+        toolName: "context.distill",
+        category: "preference",
+        scope: "global",
+      }),
+      expect.objectContaining({
+        source: "user_request",
+        toolName: "context.ask_user",
+        channel: "questionnaire",
+        category: "eval_signal",
+        scope: "aim",
+        questionId: "q1",
+      }),
+      expect.objectContaining({
+        source: "tool_observation",
+        toolName: "memory.search",
+        channel: "personal_database",
+        category: "constraint",
+        scope: "global",
+        questionId: "global-memory",
+      }),
+    ]));
+    expect(signals.find((signal) => signal.questionId === "old-aim-memory")).toBeUndefined();
+
+    const loop = buildContextIntakeLoop({
+      readiness: "needs_targeted_context",
+      acquisition: [
+        {
+          id: "acq_local",
+          channel: "local_workspace",
+          priority: "high",
+          scope: "aim",
+          categories: ["project_fact"],
+          reason: "Local workspace should ground the aim.",
+          action: "Scan local workspace.",
+          suggestedTools: ["local.scan_workspace"],
+          memoryTargets: [{ scope: "aim", kind: "semantic", categories: ["project_fact"] }],
+        },
+        {
+          id: "acq_web",
+          channel: "web_research",
+          priority: "high",
+          scope: "aim",
+          categories: ["project_fact"],
+          reason: "Current docs should ground the aim.",
+          action: "Fetch current docs.",
+          suggestedTools: ["web.search", "web.fetch"],
+          memoryTargets: [{ scope: "aim", kind: "semantic", categories: ["project_fact"] }],
+        },
+      ],
+    });
+    const progress = reviewContextIntakeProgress({ loop, signals });
+
+    expect(progress.steps).toEqual([
+      expect.objectContaining({ channel: "local_workspace", status: "satisfied" }),
+      expect.objectContaining({ channel: "web_research", status: "satisfied" }),
+    ]);
+  });
+
   it("selects planning context through a store-like port", async () => {
     const planning = await selectPlanningContextForStore(
       {
