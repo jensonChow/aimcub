@@ -4,6 +4,7 @@ import type {
   AimcubToolName,
   AimcubToolObservation,
   ContextDistillOutput,
+  LocalReadOutput,
   LocalScanWorkspaceOutput,
   MemorySearchOutput,
   WebFetchOutput,
@@ -52,6 +53,9 @@ export interface PlanningToolContextResult {
 
 const DEFAULT_CONTEXT_LIMIT = 12;
 const DEFAULT_WEB_SEARCH_LIMIT = 3;
+const DEFAULT_LOCAL_MANIFEST_READ_LIMIT = 3;
+const DEFAULT_LOCAL_MANIFEST_READ_LINES = 80;
+const DEFAULT_LOCAL_MANIFEST_READ_BYTES = 16_000;
 
 function queryForAim(input: PlanningToolContextInput): string {
   return [input.title, input.description].filter((part): part is string => Boolean(part?.trim())).join("\n");
@@ -125,6 +129,27 @@ function localScanOutputToPlanningMemory(output: LocalScanWorkspaceOutput): Plan
   };
 }
 
+function localReadOutputToPlanningMemory(output: LocalReadOutput): PlanningMemory {
+  const body = output.lines
+    .map((line) => `${line.line}: ${line.text}`)
+    .join("\n")
+    .slice(0, 2_400);
+  return {
+    id: `local.read:${output.path}`,
+    content: [
+      `Local file: ${output.path}`,
+      body,
+      output.truncated ? "File content was truncated." : undefined,
+    ].filter(Boolean).join("\n"),
+    kind: "semantic",
+    category: "project_fact",
+    source: "local.read",
+    confidence: 0.74,
+    goalId: null,
+    goal_id: null,
+  };
+}
+
 function distillationCandidatesToPlanningMemories(
   output: ContextDistillOutput,
   currentAimId: string | null | undefined,
@@ -168,6 +193,24 @@ function collectLocalScanData(observation: AimcubToolObservation<unknown>): Plan
     return [];
   }
   return [localScanOutputToPlanningMemory(data as LocalScanWorkspaceOutput)];
+}
+
+function collectLocalReadData(observation: AimcubToolObservation<unknown>): PlanningMemory[] {
+  const data = observation.data as Partial<LocalReadOutput> | undefined;
+  if (!data || typeof data.path !== "string" || !Array.isArray(data.lines)) return [];
+  return [localReadOutputToPlanningMemory(data as LocalReadOutput)];
+}
+
+function manifestPathsFromScan(observation: AimcubToolObservation<LocalScanWorkspaceOutput>): string[] {
+  const seen = new Set<string>();
+  const paths: string[] = [];
+  for (const manifest of observation.data.manifests) {
+    if (seen.has(manifest.path)) continue;
+    seen.add(manifest.path);
+    paths.push(manifest.path);
+    if (paths.length >= DEFAULT_LOCAL_MANIFEST_READ_LIMIT) break;
+  }
+  return paths;
 }
 
 function addResult<T>(
@@ -224,7 +267,25 @@ export async function collectPlanningToolContext(
       observationEvents,
       failures,
     );
-    if (localScanObservation) planningMemories.push(...collectLocalScanData(localScanObservation));
+    if (localScanObservation) {
+      planningMemories.push(...collectLocalScanData(localScanObservation));
+      if (registry.has("local.read")) {
+        for (const manifestPath of manifestPathsFromScan(localScanObservation)) {
+          const localReadObservation = addResult(
+            "local.read",
+            await registry.execute("local.read", {
+              path: manifestPath,
+              maxLines: DEFAULT_LOCAL_MANIFEST_READ_LINES,
+              maxBytes: DEFAULT_LOCAL_MANIFEST_READ_BYTES,
+            }, context),
+            observations,
+            observationEvents,
+            failures,
+          );
+          if (localReadObservation) planningMemories.push(...collectLocalReadData(localReadObservation));
+        }
+      }
+    }
   }
 
   if (input.includeWeb) {

@@ -171,6 +171,26 @@ describe("planning tool context collector", () => {
           sources: [{ kind: "workspace", path: "/workspace/aimcub" }],
         },
       }),
+      "local.read": async (input) => ({
+        ok: true,
+        observation: {
+          summary: "Read 6 lines from package.json.",
+          data: {
+            path: input.path,
+            lines: [
+              { line: 1, text: "{" },
+              { line: 2, text: '  "name": "aimcub",' },
+              { line: 3, text: '  "scripts": {' },
+              { line: 4, text: '    "test": "vitest run",' },
+              { line: 5, text: '    "build": "tsc -p tsconfig.json"' },
+              { line: 6, text: "  }" },
+            ],
+            truncated: false,
+            byteLength: 120,
+          },
+          sources: [{ kind: "file", path: input.path }],
+        },
+      }),
       "context.distill": createContextDistillHandler(),
     });
 
@@ -185,8 +205,16 @@ describe("planning tool context collector", () => {
     );
 
     expect(result.failures).toEqual([]);
+    expect(result.observationEvents.map((event) => event.toolName)).toEqual([
+      "memory.search",
+      "local.scan_workspace",
+      "local.read",
+      "context.distill",
+    ]);
     expect(result.memories.map((memory) => memory.source)).toContain("local.scan_workspace");
+    expect(result.memories.map((memory) => memory.source)).toContain("local.read");
     expect(result.memories.find((memory) => memory.source === "local.scan_workspace")?.content).toContain("Workspace scan: /workspace/aimcub");
+    expect(result.memories.find((memory) => memory.source === "local.read")?.content).toContain('"name": "aimcub"');
     expect(result.distillation?.summary).toContain("workspace");
   });
 
