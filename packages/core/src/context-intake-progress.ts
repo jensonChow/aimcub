@@ -64,12 +64,17 @@ function signalMatchesStep(signal: ContextIntakeProgressSignal, step: ContextInt
   return false;
 }
 
+function isFirstPartyMemorySearch(signal: ContextIntakeProgressSignal): boolean {
+  return signal.source === "tool_observation" && signal.toolName === "memory.search";
+}
+
 function toolObservationGroundsAimContext(signal: ContextIntakeProgressSignal, step: ContextIntakeLoopStep): boolean {
   if (signal.source !== "tool_observation") return false;
   if (step.channel === "web_research") {
     return signal.toolName === "web.fetch";
   }
   if (step.channel === "personal_database") {
+    if (isFirstPartyMemorySearch(signal)) return signal.scope === "aim";
     return typeof signal.toolName === "string" && step.toolCalls.some((tool) =>
       tool.name === signal.toolName && tool.boundary === "external_connector",
     );
@@ -109,6 +114,7 @@ function runtimeBlocked(step: ContextIntakeLoopStep, matched: readonly ContextIn
     );
   }
   if (step.status === "needs_connector") {
+    if (step.channel === "personal_database" && matched.some(isFirstPartyMemorySearch)) return false;
     const connectorTools = new Set(step.toolCalls
       .filter((tool) => tool.boundary === "external_connector")
       .map((tool) => tool.name));

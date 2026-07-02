@@ -175,7 +175,7 @@ describe("reviewContextIntakeProgress", () => {
     });
   });
 
-  it("does not treat memory search alone as personal database aim context", () => {
+  it("uses first-party memory search before requiring personal database connectors", () => {
     const intake = reviewAimIntake({
       title: "Plan from my Notion travel notes",
       description: "Use my personal notes and known preferences.",
@@ -200,18 +200,19 @@ describe("reviewContextIntakeProgress", () => {
     });
 
     expect(memoryOnly.steps.find((step) => step.stepId === personalDatabase!.id)).toMatchObject({
-      status: "blocked",
+      status: "pending",
       satisfiedOutputs: ["durable_memory_candidate"],
       remainingOutputs: ["aim_context"],
     });
 
-    const connected = reviewContextIntakeProgress({
+    const firstPartyMemory = reviewContextIntakeProgress({
       loop: intake.loop,
       signals: [
         {
           source: "tool_observation",
           channel: "personal_database",
-          toolName: "external.notion",
+          toolName: "memory.search",
+          scope: "aim",
           category: "project_fact",
           summary: "Found the user's Cambodia travel note.",
         },
@@ -226,7 +227,7 @@ describe("reviewContextIntakeProgress", () => {
       ],
     });
 
-    expect(connected.steps.find((step) => step.stepId === personalDatabase!.id)).toMatchObject({
+    expect(firstPartyMemory.steps.find((step) => step.stepId === personalDatabase!.id)).toMatchObject({
       status: "satisfied",
       satisfiedOutputs: expect.arrayContaining(["aim_context", "durable_memory_candidate"]),
       remainingOutputs: [],
