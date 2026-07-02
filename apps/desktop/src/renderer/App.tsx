@@ -737,7 +737,7 @@ function AppInner() {
   const showInspector = step !== "home";
 
   return (
-    <div style={{ fontFamily: "system-ui, -apple-system, sans-serif", color: C.text, background: C.page, minHeight: "100vh" }}>
+    <div style={{ fontFamily: "system-ui, -apple-system, sans-serif", color: C.text, background: C.page, width: "100%", height: "100vh", overflow: "hidden" }}>
       <div style={classicShellStyle(compactShell)}>
         <ClassicSidebar
           compact={compactShell}
@@ -997,7 +997,10 @@ function classicShellStyle(compact: boolean): CSSProperties {
   return {
     display: "grid",
     gridTemplateColumns: compact ? "1fr" : "268px minmax(0, 1fr)",
-    minHeight: "100vh",
+    gridTemplateRows: compact ? "auto minmax(0, 1fr)" : undefined,
+    width: "100%",
+    height: "100vh",
+    overflow: "hidden",
   };
 }
 
@@ -1013,6 +1016,8 @@ function classicSidebarStyle(compact: boolean): CSSProperties {
     padding: compact ? "16px 14px" : "18px 14px",
     boxSizing: "border-box",
     minWidth: 0,
+    height: compact ? "auto" : "100vh",
+    overflow: "hidden",
   };
 }
 
@@ -1021,6 +1026,9 @@ function mainShellStyle(compact: boolean): CSSProperties {
     minWidth: 0,
     padding: compact ? "16px 14px 44px" : "22px 34px 56px",
     boxSizing: "border-box",
+    height: "100vh",
+    overflowY: "auto",
+    overscrollBehavior: "contain",
   };
 }
 
