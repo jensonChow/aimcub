@@ -38,6 +38,7 @@ import {
 
 import type { LlmGateway, LlmResponse, LlmUsage } from "./index";
 import { clarifyJsonSchema } from "./clarify-schema";
+import type { AimOutputLanguage } from "./language";
 import { PLANNING_CONTEXT_RULES, planningMemoryCategory, renderPlanningContext } from "./planning-context";
 import type { PlanningMemory } from "./planning-context";
 
@@ -129,6 +130,8 @@ export interface ClarifyInput {
   lineageLearning?: ContextLineageLearningReport | null;
   /** Current decomposition strategy. Used to keep question budget focused on context that can change the next plan. */
   decompositionStrategy?: DecompositionStrategyReport | null;
+  /** User-facing output language inferred from the aim text. Schema enum values stay unchanged. */
+  outputLanguage?: AimOutputLanguage;
   /** Aim-specific intake readiness. Used to choose questions that close missing context. */
   intake?: AimIntakeReport | null;
   /** Optional plan review from the draft. If omitted, clarify computes one from @core/domain. */
@@ -305,6 +308,9 @@ const CLARIFY_SYSTEM_PROMPT = [
   PLANNING_CONTEXT_RULES,
   "- Each question carries >= 2 `options`. Every option is a concrete hypothesis (a",
   "  candidate answer), never a blank, and states its `tradeoff` (the consequence).",
+  "- Keep question text short and user-facing. Avoid internal scorecard, contract, ROI,",
+  "  lineage, or schema jargon in `question`, option `label`, and option `tradeoff`.",
+  "- Option labels should be short natural phrases; put nuance in one concise tradeoff.",
   "- `allow_other` is always true — the user can always type a free-text answer.",
   "- Prefer questions about: exact target/outcome, source material to inspect, existing",
   "  workflow/tools, eval evidence, durable constraints, and agent routing/capability.",
@@ -331,6 +337,8 @@ const CLARIFY_SYSTEM_PROMPT = [
   "- Use `capability` when the answer identifies what the user, team, or linked agents are",
   "  good at or can access; those answers become routing context later.",
   "- Give every question a unique, stable `id` (e.g. `scope`, `q2`).",
+  "- Follow the requested output language for every user-facing string. Do not translate",
+  "  schema enum values, source_dimension values, ids, commands, paths, or code names.",
   "- The schema marks every field required: set any field that does not apply to null.",
 ].join("\n");
 
@@ -915,6 +923,20 @@ function annotateClarifyWhy(
   };
 }
 
+function renderOutputLanguageInstruction(language: AimOutputLanguage | undefined): string {
+  if (language === "simplified_chinese") {
+    return [
+      "Output language: Simplified Chinese.",
+      "Write every user-facing question, reason, option label, option tradeoff, and assumption in Simplified Chinese.",
+      "Keep schema enum values, ids, source_dimension values, commands, paths, and code names unchanged.",
+    ].join("\n");
+  }
+  return [
+    "Output language: English unless the user's aim is clearly written in another language.",
+    "Keep schema enum values, ids, source_dimension values, commands, paths, and code names unchanged.",
+  ].join("\n");
+}
+
 /** Build the per-goal user prompt. */
 function buildClarifyPrompt(input: ClarifyInput, maxQuestions: number): string {
   const domain = input.domain ?? "software";
@@ -924,6 +946,8 @@ function buildClarifyPrompt(input: ClarifyInput, maxQuestions: number): string {
     `Goal title: ${input.title}`,
     `Goal domain: ${domain}`,
     `Goal description: ${description}`,
+    "",
+    renderOutputLanguageInstruction(input.outputLanguage),
     "",
     "Known user context from previous aims:",
     renderPlanningContext(input.memories),
@@ -997,7 +1021,7 @@ export async function clarify(gateway: LlmGateway, input: ClarifyInput): Promise
     };
   }
   const contextAware = filterQuestionsAnsweredByContext(normalized, input.memories, maxQuestions);
-  const coverageAware = ensureContextIntakeCoverage(contextAware, input.memories, maxQuestions);
+  const coverageAware = ensureContextIntakeCoverage(contextAware, input.memories, maxQuestions, input.outputLanguage);
   const annotated = annotateClarifyWhy(coverageAware, review, input.learning, input.captureLearning, input.lineageLearning, input.decompositionStrategy, input.intake);
   const validation = validateClarify(annotated);
   return { output: validation.ok ? annotated : null, validation, usage: raw.usage };
@@ -1270,24 +1294,89 @@ function questionCategory(question: ClarifyQuestion): ContextCategory {
   return question.capture?.category ?? answerContextCategory(question);
 }
 
-function createBaselineContextQuestion(target: BaselineContextQuestionTarget): ClarifyQuestion {
+function localizeBaselineContextQuestionTarget(
+  target: BaselineContextQuestionTarget,
+  language: AimOutputLanguage | undefined,
+): BaselineContextQuestionTarget {
+  if (language !== "simplified_chinese") return target;
+  switch (target.id) {
+    case "aim_target_context":
+      return {
+        ...target,
+        question: "这个目标要先查看哪些具体材料、文件夹或现状？",
+        why_high_impact: "这能避免计划凭空猜当前状态。",
+        options: [
+          { label: "先看本地材料", tradeoff: "计划更贴近现状，但需要读取上下文。" },
+          { label: "先按描述推进", tradeoff: "更快，但可能带着假设。" },
+        ],
+      };
+    case "durable_eval_signal":
+      return {
+        ...target,
+        question: "对你来说，什么证据能证明这个目标真的完成了？",
+        why_high_impact: "这会变成可复用的验收标准。",
+        options: [
+          { label: "自动化结果证明", tradeoff: "适合代理执行和重复评估。" },
+          { label: "人工确认即可", tradeoff: "适合审美和判断，但需要你审查。" },
+        ],
+      };
+    case "aim_procedure_context":
+      return {
+        ...target,
+        question: "有没有已有命令、文件、文档、流程或外部资料要遵循？",
+        why_high_impact: "这能让代理基于真实材料拆分任务。",
+        options: [
+          { label: "使用本地资料", tradeoff: "计划会贴合现有文件和流程。" },
+          { label: "需要外部研究", tradeoff: "适合最新 API、竞品或市场信息。" },
+        ],
+      };
+    case "durable_capability_routing":
+      return {
+        ...target,
+        question: "哪些部分默认交给代理做？它能使用哪些访问权限或工具？",
+        why_high_impact: "这会成为之后分配工作的路由上下文。",
+        options: [
+          { label: "数字工作交给代理", tradeoff: "你主要负责授权、密钥和现实动作。" },
+          { label: "执行前先问我", tradeoff: "控制感更强，但推进更慢。" },
+        ],
+      };
+    case "durable_constraints":
+      return {
+        ...target,
+        question: "有哪些这次和未来都要记住的硬约束？",
+        why_high_impact: "稳定约束能避免计划越过成本、隐私、时间或质量边界。",
+        options: [
+          { label: "有明确边界", tradeoff: "计划可以避开无效路线。" },
+          { label: "暂时没有硬约束", tradeoff: "计划可以优先速度和探索。" },
+        ],
+      };
+    default:
+      return target;
+  }
+}
+
+function createBaselineContextQuestion(
+  target: BaselineContextQuestionTarget,
+  language?: AimOutputLanguage,
+): ClarifyQuestion {
+  const localizedTarget = localizeBaselineContextQuestionTarget(target, language);
   return {
-    id: target.id,
-    question: target.question,
-    why_high_impact: target.why_high_impact,
-    kind: target.kind,
-    source_dimension: target.source_dimension,
+    id: localizedTarget.id,
+    question: localizedTarget.question,
+    why_high_impact: localizedTarget.why_high_impact,
+    kind: localizedTarget.kind,
+    source_dimension: localizedTarget.source_dimension,
     allow_other: true,
-    options: [...target.options],
-    capture: contextCaptureForCategory(target.category, "baseline_context_intake", target.source_dimension, {
+    options: [...localizedTarget.options],
+    capture: contextCaptureForCategory(localizedTarget.category, "baseline_context_intake", localizedTarget.source_dimension, {
       source: "clarify",
-      reason: target.why_high_impact,
-      prompt: target.question,
-      roiSignals: target.category === "eval_signal"
+      reason: localizedTarget.why_high_impact,
+      prompt: localizedTarget.question,
+      roiSignals: localizedTarget.category === "eval_signal"
         ? ["high_priority", "eval_signal"]
-        : target.category === "procedure"
+        : localizedTarget.category === "procedure"
           ? ["high_priority", "procedure"]
-          : target.category === "capability"
+          : localizedTarget.category === "capability"
             ? ["medium_priority", "capability"]
             : ["medium_priority", "missing_context"],
     }),
@@ -1298,6 +1387,7 @@ function ensureContextIntakeCoverage(
   output: ClarifyOutput,
   memories: readonly PlanningMemory[] | undefined,
   maxQuestions: number,
+  outputLanguage?: AimOutputLanguage,
 ): ClarifyOutput {
   const minQuestions = Math.min(maxQuestions, DEFAULT_MIN_CONTEXT_QUESTIONS);
   if (maxQuestions <= 0 || output.questions.length >= minQuestions) return output;
@@ -1316,7 +1406,7 @@ function ensureContextIntakeCoverage(
     ) {
       continue;
     }
-    const question = createBaselineContextQuestion(target);
+    const question = createBaselineContextQuestion(target, outputLanguage);
     questions.push(question);
     existingIds.add(question.id);
     coveredCategories.add(target.category);

@@ -16,6 +16,7 @@ import {
   type ClarifyLearningReport,
   type ClarifyQuestion,
   type DecomposeWithQualityResult,
+  type AimOutputLanguage,
   type PlanningMemory,
 } from "@core/llm";
 import { reviewPlan, type AimIntakeReport, type ContextCaptureLearningReport, type ContextLineageLearningReport, type DecompositionLearningReport, type DecompositionStrategyReport, type PlanReviewReport } from "@core/domain";
@@ -24,6 +25,15 @@ import type { DecompositionOutput } from "@core/types";
 import type { ClarifyIpcResult, PlanResult } from "../shared/ipc";
 
 const NO_PROVIDER = "No LLM provider configured — add a provider and API key in settings.";
+
+function inferAimOutputLanguage(title: string, description?: string): AimOutputLanguage {
+  const text = [title, description].filter(Boolean).join("\n");
+  const cjkCount = (text.match(/[\u3400-\u9fff]/g) ?? []).length;
+  const latinCount = (text.match(/[A-Za-z]/g) ?? []).length;
+  return cjkCount >= 2 && cjkCount >= Math.ceil(latinCount / 3)
+    ? "simplified_chinese"
+    : "english";
+}
 
 function qualityRetry(result: DecomposeWithQualityResult): NonNullable<PlanResult["qualityRetry"]> {
   return {
@@ -43,7 +53,8 @@ export async function runDraft(
   decompositionStrategy?: DecompositionStrategyReport | null,
 ): Promise<PlanResult> {
   if (!gateway) return { ok: false, output: null, errors: [NO_PROVIDER] };
-  const r = await decomposeWithQuality(gateway, { title, description, memories, lineageLearning, decompositionLearning, decompositionStrategy });
+  const outputLanguage = inferAimOutputLanguage(title, description);
+  const r = await decomposeWithQuality(gateway, { title, description, memories, lineageLearning, decompositionLearning, decompositionStrategy, outputLanguage });
   if (r.output) {
     return {
       ok: true,
@@ -71,7 +82,8 @@ export async function runClarify(
   decompositionStrategy?: DecompositionStrategyReport | null,
 ): Promise<ClarifyIpcResult> {
   if (!gateway) return { ok: false, output: null, errors: [NO_PROVIDER] };
-  const r = await clarify(gateway, { title, description, draft, memories, learning, captureLearning, lineageLearning, decompositionStrategy, intake, review });
+  const outputLanguage = inferAimOutputLanguage(title, description);
+  const r = await clarify(gateway, { title, description, draft, memories, learning, captureLearning, lineageLearning, decompositionStrategy, outputLanguage, intake, review });
   if (r.output) return { ok: true, output: r.output, errors: [] };
   return { ok: false, output: null, errors: r.validation.errors };
 }
@@ -90,13 +102,14 @@ export async function runRefine(
   decompositionStrategy?: DecompositionStrategyReport | null,
 ): Promise<PlanResult> {
   if (!gateway) return { ok: false, output: null, errors: [NO_PROVIDER] };
+  const outputLanguage = inferAimOutputLanguage(title, description);
   const reviewInstruction = reviewPrompt?.trim()
     ? `Plan review action to address before accepting:\n${reviewPrompt.trim()}`
     : "";
   const refinedDescription = [buildRefinedDescription(description, questions, answers), reviewInstruction]
     .filter((part) => part.trim().length > 0)
     .join("\n\n");
-  const r = await decomposeWithQuality(gateway, { title, description: refinedDescription, memories, lineageLearning, decompositionLearning, decompositionStrategy });
+  const r = await decomposeWithQuality(gateway, { title, description: refinedDescription, memories, lineageLearning, decompositionLearning, decompositionStrategy, outputLanguage });
   if (r.output) {
     return {
       ok: true,

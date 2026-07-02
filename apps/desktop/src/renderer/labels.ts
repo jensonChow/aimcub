@@ -13,7 +13,7 @@ import type {
 } from "@core/domain";
 import type { ClarifyAnswerImpactReport, ClarifyOutput, PlanningContextSelectionReport } from "@core/llm";
 import { getLlmProviderDefinition } from "@core/llm/providers";
-import type { PlanResult, ProviderStatus } from "../shared/ipc";
+import type { PlanResult, PlanningToolIpcTrace, ProviderStatus } from "../shared/ipc";
 
 import type { StringKey } from "./i18n";
 import { C } from "./styles";
@@ -441,6 +441,16 @@ export function planningContextOf(g: Goal): PlanningContextSelectionReport | nul
     limit: typeof report.limit === "number" ? report.limit : report.selected.length,
     selected: report.selected as PlanningContextSelectionReport["selected"],
     ignored: report.ignored as PlanningContextSelectionReport["ignored"],
+  };
+}
+
+export function planningToolsOf(g: Goal): PlanningToolIpcTrace | null {
+  const trace = g.metadata?.planning_tools as Partial<PlanningToolIpcTrace> | undefined;
+  if (!trace || !Array.isArray(trace.observations) || !Array.isArray(trace.failures)) return null;
+  return {
+    observations: trace.observations as PlanningToolIpcTrace["observations"],
+    failures: trace.failures as PlanningToolIpcTrace["failures"],
+    distillation: trace.distillation ?? null,
   };
 }
 

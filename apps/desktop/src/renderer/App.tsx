@@ -4,7 +4,7 @@ import type { DecompositionOutput, Goal, Memory } from "@core/types";
 import { reviewAimLearning, reviewContextLineage } from "@core/domain";
 import type { AimIntakeReport, AimLearningReport, ContextCaptureFulfillmentReport, ContextHealthRow, ContextLineageLearningReport, ContextLineageReport, ContextProfileReport, DecompositionLearningReport, DecompositionStrategyReport, PlanQualityDimensionReport } from "@core/domain";
 import type { ClarifyOutput, ClarifyAnswer, ClarifyAnswerImpactReport, ClarifyLearningReport, PlanningContextSelectionReport } from "@core/llm";
-import type { PlanResult, ProviderStatus } from "../shared/ipc";
+import type { PlanResult, PlanningToolIpcTrace, ProviderStatus } from "../shared/ipc";
 
 import { summarizeRule } from "./summarize";
 import { ContextInbox } from "./ContextInbox";
@@ -47,6 +47,7 @@ import {
   pendingContextForGoal,
   planOf,
   planningContextOf,
+  planningToolsOf,
   providerLabel,
   qualityTone,
   reviewOf,
@@ -124,6 +125,7 @@ function AppInner() {
   const [planReview, setPlanReview] = useState<PlanResult["review"]>(null);
   const [planQualityRetry, setPlanQualityRetry] = useState<PlanResult["qualityRetry"] | null>(null);
   const [planningContext, setPlanningContext] = useState<PlanningContextSelectionReport | null>(null);
+  const [planningTools, setPlanningTools] = useState<PlanningToolIpcTrace | null>(null);
   const [planningTrace, setPlanningTrace] = useState<PlanningTraceEvent[]>([]);
   const [aimIntake, setAimIntake] = useState<AimIntakeReport | null>(null);
   const [decompositionStrategy, setDecompositionStrategy] = useState<DecompositionStrategyReport | null>(null);
@@ -266,6 +268,59 @@ function AppInner() {
     });
   }
 
+  function planningToolObservationTitle(observation: PlanningToolIpcTrace["observations"][number]): string {
+    const sourceKinds = new Set(observation.sources.map((source) => source.kind));
+    const summary = observation.summary.toLowerCase();
+    if (summary.includes("distill") || summary.includes("context")) return t("trace.tool.context");
+    if (sourceKinds.has("web")) return t("trace.tool.web");
+    if (sourceKinds.has("file") || sourceKinds.has("workspace")) return t("trace.tool.local");
+    if (sourceKinds.has("memory")) return t("trace.tool.memory");
+    return t("trace.tool.observation");
+  }
+
+  function planningToolObservationDetail(
+    observation: PlanningToolIpcTrace["observations"][number],
+    trace?: PlanningToolIpcTrace | null,
+  ): string {
+    const parts = [
+      shortUiText(observation.summary),
+      t("trace.tool.sources", { n: observation.sources.length }),
+    ];
+    const warningCount = observation.warnings?.length ?? 0;
+    if (warningCount > 0) parts.push(t("trace.tool.warnings", { n: warningCount }));
+    if (trace?.distillation && observation.summary.toLowerCase().includes("distill")) {
+      parts.push(t("trace.tool.missing", { n: trace.distillation.missingQuestions.length }));
+      parts.push(t("trace.tool.candidates", { n: trace.distillation.durableMemoryCandidates.length }));
+    }
+    return parts.join(" · ");
+  }
+
+  function appendPlanningToolTrace(phase: "draft" | "clarify" | "refine", trace?: PlanningToolIpcTrace | null) {
+    if (!trace || (trace.observations.length === 0 && trace.failures.length === 0)) return;
+    const toolEvents: PlanningTraceEvent[] = [
+      ...trace.observations.map((observation, index) =>
+        traceEvent(
+          `${phase}-tool-observation-${index}`,
+          observation.warnings?.length ? "warning" : "done",
+          planningToolObservationTitle(observation),
+          planningToolObservationDetail(observation, trace),
+        ),
+      ),
+      ...trace.failures.map((failure, index) =>
+        traceEvent(
+          `${phase}-tool-failure-${index}-${failure.toolName}`,
+          "warning",
+          t("trace.tool.failure"),
+          `${failure.toolName}: ${shortUiText(failure.error.message)}`,
+        ),
+      ),
+    ];
+    setPlanningTrace((events) => {
+      const toolEventIds = new Set(toolEvents.map((event) => event.id));
+      return [...events.filter((event) => !toolEventIds.has(event.id)), ...toolEvents];
+    });
+  }
+
   function describeContextTrace(report?: PlanningContextSelectionReport | null, intake?: AimIntakeReport | null): string {
     return t("trace.contextDone", {
       selected: report?.selected.length ?? 0,
@@ -308,6 +363,7 @@ function AppInner() {
     setPlanReview(null);
     setPlanQualityRetry(null);
     setPlanningContext(null);
+    setPlanningTools(null);
     setPlanningTrace([]);
     setAimIntake(null);
     setDecompositionStrategy(null);
@@ -450,6 +506,8 @@ function AppInner() {
       );
       setAimIntake(d.intake ?? null);
       setPlanningContext(d.planningContext ?? null);
+      setPlanningTools(d.planningTools ?? null);
+      appendPlanningToolTrace("draft", d.planningTools);
       updatePlanningTrace("context", {
         status: "done",
         detail: describeContextTrace(d.planningContext, d.intake ?? null),
@@ -480,6 +538,8 @@ function AppInner() {
           CLARIFY_UI_TIMEOUT_MS,
           t("err.clarifyTimeout", { seconds: Math.round(CLARIFY_UI_TIMEOUT_MS / 1000) }),
         );
+        setPlanningTools(c.planningTools ?? d.planningTools ?? null);
+        appendPlanningToolTrace("clarify", c.planningTools);
         // Clarify is best-effort: if the model returns nothing usable, proceed with the draft
         // and an empty question set rather than blocking — the draft is already valid.
         setClarifyOut(c.output ?? { questions: [], assumptions: [] });
@@ -547,6 +607,8 @@ function AppInner() {
       setPlanReview(r.review ?? null);
       setPlanQualityRetry(r.qualityRetry ?? null);
       setPlanningContext(r.planningContext ?? null);
+      setPlanningTools(r.planningTools ?? null);
+      appendPlanningToolTrace("refine", r.planningTools);
       setAimIntake(r.intake ?? null);
       updatePlanningTrace("context", {
         status: "done",
@@ -614,6 +676,11 @@ function AppInner() {
     : savedGoal
       ? planningContextOf(savedGoal) ?? planningContext
       : planningContext;
+  const activePlanningTools = viewing
+    ? planningToolsOf(viewing)
+    : savedGoal
+      ? planningToolsOf(savedGoal) ?? planningTools
+      : planningTools;
   const activeLearning = activeGoal
     ? reviewAimLearning({ goal: activeGoal, pendingContext: activeGoalPending, contextOutcomes: contextHistory })
     : null;
@@ -751,6 +818,7 @@ function AppInner() {
             contextLineageLearning={contextLineageLearning}
             contextDecompositionLearning={contextDecompositionLearning}
             planningContext={activePlanningContext}
+            planningTools={activePlanningTools}
             review={activeReview}
             planQuality={planQuality}
             qualityRetry={planQualityRetry}
@@ -906,6 +974,7 @@ function InspectorRail(props: {
   contextLineageLearning: ContextLineageLearningReport | null;
   contextDecompositionLearning: DecompositionLearningReport | null;
   planningContext: PlanningContextSelectionReport | null;
+  planningTools: PlanningToolIpcTrace | null;
   review: PlanResult["review"] | null;
   planQuality: PlanResult["quality"] | null;
   qualityRetry: PlanResult["qualityRetry"] | null;
@@ -928,16 +997,7 @@ function InspectorRail(props: {
     quality: "shell.tab.quality",
     activity: "shell.tab.activity",
   } as const;
-  const hasContext = Boolean(
-    props.contextCandidates.length ||
-      props.aimIntake ||
-      props.planningContext ||
-      ((props.contextProfile?.totalActive ?? 0) + (props.contextProfile?.totalPending ?? 0)) ||
-      props.contextHealth.length ||
-      props.contextLearning ||
-      props.contextLineageLearning ||
-      props.contextDecompositionLearning,
-  );
+  const hasContext = true;
   const hasQuality = Boolean(props.review || props.planQuality || props.decompositionStrategy);
   const hasActivity = Boolean(props.learning || props.answerImpact || props.captureFulfillment || props.contextLineage);
   return (
@@ -961,6 +1021,11 @@ function InspectorRail(props: {
       {props.activeTab === "context" && (
         hasContext ? (
           <div>
+            <InspectorSectionTitle title={t("shell.context.sources")} />
+            <ContextSourcesPanel
+              contextProfile={props.contextProfile}
+              planningTools={props.planningTools}
+            />
             <InspectorSectionTitle title={t("shell.context.pending")} />
             <ContextInbox candidates={props.contextCandidates} onAccept={props.onAcceptContext} onReject={props.onRejectContext} />
             <InspectorSectionTitle title={t("shell.context.usedMissing")} />
@@ -1031,6 +1096,72 @@ function InspectorEmpty(props: { title: string; body: string }) {
     <div style={{ ...card(), background: "#f8fafc", color: C.muted }}>
       <div style={{ color: C.text, fontWeight: 600, fontSize: 14 }}>{props.title}</div>
       <div style={{ fontSize: 13, lineHeight: 1.5, marginTop: 6 }}>{props.body}</div>
+    </div>
+  );
+}
+
+function ContextSourcesPanel(props: {
+  contextProfile: ContextProfileReport | null;
+  planningTools: PlanningToolIpcTrace | null;
+}) {
+  const { t } = useI18n();
+  const observations = props.planningTools?.observations ?? [];
+  const failures = props.planningTools?.failures ?? [];
+  const memoryObservations = observations.filter((observation) =>
+    observation.sources.some((source) => source.kind === "memory"),
+  ).length;
+  const memoryCount = props.contextProfile?.totalActive ?? memoryObservations;
+  const localObservations = observations.filter((observation) =>
+    observation.sources.some((source) => source.kind === "file" || source.kind === "workspace"),
+  ).length;
+  const webObservations = observations.filter((observation) =>
+    observation.sources.some((source) => source.kind === "web"),
+  ).length;
+  const webFailures = failures.filter((failure) => failure.toolName === "web.search" || failure.toolName === "web.fetch").length;
+  return (
+    <div style={{ display: "grid", gap: 8, marginBottom: 14 }}>
+      <ContextSourceCard
+        title={t("context.source.memory")}
+        body={t("context.source.memoryBody", { n: memoryCount })}
+        status={memoryCount > 0 ? t("context.source.active") : t("context.source.ready")}
+        tone={memoryCount > 0 ? "#1a7f4b" : C.muted}
+      />
+      <ContextSourceCard
+        title={t("context.source.folder")}
+        body={localObservations > 0
+          ? t("context.source.folderBodyActive", { n: localObservations })
+          : t("context.source.folderBody")}
+        status={localObservations > 0 ? t("context.source.active") : t("context.source.comingSoon")}
+        tone={localObservations > 0 ? "#1a7f4b" : C.muted}
+      />
+      <ContextSourceCard
+        title={t("context.source.connector")}
+        body={t("context.source.connectorBody")}
+        status={t("context.source.comingSoon")}
+        tone={C.muted}
+      />
+      <ContextSourceCard
+        title={t("context.source.web")}
+        body={webObservations > 0
+          ? t("context.source.webBodyActive", { n: webObservations })
+          : webFailures > 0
+            ? t("context.source.webBodyBlocked", { n: webFailures })
+            : t("context.source.webBody")}
+        status={webObservations > 0 ? t("context.source.active") : t("context.source.optional")}
+        tone={webObservations > 0 ? "#1a7f4b" : webFailures > 0 ? "#8a6517" : C.muted}
+      />
+    </div>
+  );
+}
+
+function ContextSourceCard(props: { title: string; body: string; status: string; tone: string }) {
+  return (
+    <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: "#fff", padding: "10px 11px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline" }}>
+        <div style={{ color: C.text, fontSize: 13, fontWeight: 600 }}>{props.title}</div>
+        <div style={{ color: props.tone, fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>{props.status}</div>
+      </div>
+      <div style={{ color: C.muted, fontSize: 12, lineHeight: 1.45, marginTop: 4 }}>{props.body}</div>
     </div>
   );
 }
@@ -1149,13 +1280,13 @@ function PlanningProcessPanel(props: { events: PlanningTraceEvent[] }) {
         {props.events.map((event) => {
           const tone = traceStatusColor(event.status);
           return (
-            <div key={event.id} style={{ display: "grid", gridTemplateColumns: "32px 1fr 64px", gap: 8, alignItems: "start" }}>
+            <div key={event.id} style={{ display: "grid", gridTemplateColumns: "32px minmax(0, 1fr) 64px", gap: 8, alignItems: "start" }}>
               <div style={{ color: tone, fontFamily: "ui-monospace, monospace", fontSize: 12, fontWeight: 700 }}>
                 {traceStatusMark(event.status)}
               </div>
               <div style={{ minWidth: 0 }}>
                 <div style={{ color: C.text, fontSize: 13, fontWeight: 600 }}>{event.title}</div>
-                <div style={{ color: C.muted, fontSize: 12, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <div style={{ color: C.muted, fontSize: 12, lineHeight: 1.4, marginTop: 2, wordBreak: "break-word" }}>
                   {event.detail}
                 </div>
               </div>
@@ -1284,17 +1415,6 @@ function QuestionsStep(props: {
                 </span>
               )}
             </div>
-            {q.why_high_impact && <div style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>{q.why_high_impact}</div>}
-            {q.why_asked && q.why_asked.length > 0 && (
-              <div style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>
-                {t("q.askedBecause")} {q.why_asked.map((why) => clarifyWhyLabel(why, t)).join(" · ")}
-              </div>
-            )}
-            {q.capture && (
-              <div style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>
-                {captureContractLabel(q.capture, t)}
-              </div>
-            )}
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
               {q.options.map((opt) => {
                 const selected = answers[q.id]?.label === opt.label;
@@ -1316,6 +1436,22 @@ function QuestionsStep(props: {
               placeholder={t("q.other")}
               style={{ ...inputStyle(), marginTop: 8, fontSize: 13 }}
             />
+            {(q.why_high_impact || (q.why_asked && q.why_asked.length > 0) || q.capture) && (
+              <details style={{ color: C.muted, fontSize: 12, lineHeight: 1.45, marginTop: 10 }}>
+                <summary style={{ cursor: "pointer", color: C.accent, fontWeight: 600 }}>{t("q.details")}</summary>
+                {q.why_high_impact && <div style={{ marginTop: 6 }}>{q.why_high_impact}</div>}
+                {q.why_asked && q.why_asked.length > 0 && (
+                  <div style={{ marginTop: 4 }}>
+                    {t("q.askedBecause")} {q.why_asked.map((why) => clarifyWhyLabel(why, t)).join(" · ")}
+                  </div>
+                )}
+                {q.capture && (
+                  <div style={{ marginTop: 4 }}>
+                    {captureContractLabel(q.capture, t)}
+                  </div>
+                )}
+              </details>
+            )}
           </div>
         );
       })}

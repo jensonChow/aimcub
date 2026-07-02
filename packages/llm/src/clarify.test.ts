@@ -1063,6 +1063,21 @@ describe("clarify · happy path", () => {
     expect(result.output?.assumptions).toHaveLength(1);
   });
 
+  it("localizes baseline context intake for a Chinese aim", async () => {
+    const gw = mockGateway({ questions: [], assumptions: [] });
+    const result = await clarify(gw, {
+      ...INPUT,
+      title: "我想找一个工作",
+      description: "希望先拆成清晰的求职计划。",
+      outputLanguage: "simplified_chinese",
+    });
+
+    expect(result.validation.ok).toBe(true);
+    expect(result.output?.questions[0]?.question).toContain("查看");
+    expect(result.output?.questions[0]?.options[0]?.label).toBe("先看本地材料");
+    expect(result.output?.questions[1]?.question).toContain("证据");
+  });
+
   it("keeps backward compatibility when source dimensions are missing or invalid", async () => {
     const output = validQuestions();
     delete output.questions[0]!.source_dimension;

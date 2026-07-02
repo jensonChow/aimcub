@@ -199,12 +199,35 @@ describe("desktop planner · with a gateway (real @core/llm pipeline)", () => {
     expect(decomposeCall?.prompt).toContain("visible process traces");
   });
 
+  it("instructs draft output to follow a Chinese aim language", async () => {
+    const { gateway, calls } = recordingGateway();
+
+    const d = await runDraft(gateway, "我想找一个工作", "希望先拆成清晰的求职计划。");
+
+    expect(d.ok).toBe(true);
+    const decomposeCall = calls.find((call) => call.task === "decompose");
+    expect(decomposeCall?.prompt).toContain("Output language: Simplified Chinese");
+    expect(decomposeCall?.prompt).toContain("user-facing JSON string");
+  });
+
   it("clarifies into real forks (>=2 options each)", async () => {
     const draft = localDecompose(aim);
     const c = await runClarify(mockGateway(), aim.title, aim.description, draft);
     expect(c.ok).toBe(true);
     expect(c.output!.questions.length).toBeGreaterThan(0);
     expect(c.output!.questions.every((q) => q.options.length >= 2)).toBe(true);
+  });
+
+  it("instructs clarify output to follow a Chinese aim language", async () => {
+    const draft = localDecompose({ title: "我想找一个工作" });
+    const { gateway, calls } = recordingGateway();
+
+    const c = await runClarify(gateway, "我想找一个工作", "希望先拆成清晰的求职计划。", draft);
+
+    expect(c.ok).toBe(true);
+    const clarifyCall = calls.find((call) => call.task === "classify");
+    expect(clarifyCall?.prompt).toContain("Output language: Simplified Chinese");
+    expect(clarifyCall?.prompt).toContain("question, reason, option label");
   });
 
   it("passes aim intake readiness into the clarify prompt", async () => {

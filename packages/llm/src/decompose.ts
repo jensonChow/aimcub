@@ -16,6 +16,7 @@ import { critiquePlan, reviewPlan, validatePlan, type ContextLineageLearningRepo
 
 import type { LlmGateway, LlmResponse, LlmUsage } from "./index";
 import { decompositionJsonSchema } from "./decomposition-schema";
+import type { AimOutputLanguage } from "./language";
 import { PLANNING_CONTEXT_RULES, renderPlanningContext } from "./planning-context";
 import type { PlanningMemory } from "./planning-context";
 
@@ -33,6 +34,8 @@ export interface DecomposeInput {
   decompositionLearning?: DecompositionLearningReport | null;
   /** Current decomposition strategy derived from the aim and historical decomposition learning. */
   decompositionStrategy?: DecompositionStrategyReport | null;
+  /** User-facing output language inferred from the aim text. Schema enum values stay unchanged. */
+  outputLanguage?: AimOutputLanguage;
 }
 
 /** Result of {@link decompose}. `validation.ok === false` ⇒ `output` may be null. */
@@ -201,6 +204,20 @@ function renderDecompositionStrategy(strategy: DecompositionStrategyReport | nul
   return lines.join("\n");
 }
 
+function renderOutputLanguageInstruction(language: AimOutputLanguage | undefined): string {
+  if (language === "simplified_chinese") {
+    return [
+      "Output language: Simplified Chinese.",
+      "Write every user-facing JSON string in Simplified Chinese: goal_summary, rationale, node titles/descriptions, contract text, context gap questions, and freeform acceptance text.",
+      "Do not translate schema enum values, evaluator names, file globs, commands, branch names, API names, URLs, or code identifiers.",
+    ].join("\n");
+  }
+  return [
+    "Output language: English unless the user's aim is clearly written in another language.",
+    "Do not translate schema enum values, evaluator names, file globs, commands, branch names, API names, URLs, or code identifiers.",
+  ].join("\n");
+}
+
 function buildUserPrompt(input: DecomposeInput): string {
   const domain = input.domain ?? "software";
   const description = input.description?.trim() ? input.description.trim() : "(no description provided)";
@@ -208,6 +225,8 @@ function buildUserPrompt(input: DecomposeInput): string {
     `Goal title: ${input.title}`,
     `Goal domain: ${domain}`,
     `Goal description: ${description}`,
+    "",
+    renderOutputLanguageInstruction(input.outputLanguage),
     "",
     "Known user context from previous aims:",
     renderPlanningContext(input.memories),

@@ -91,6 +91,9 @@ export {
   modelBelongsToProvider,
 } from "./providers";
 export type {
+  AimOutputLanguage,
+} from "./language";
+export type {
   BuiltInLlmProvider,
   LlmModelOption,
   LlmProtocol,
