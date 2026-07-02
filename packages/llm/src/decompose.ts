@@ -19,6 +19,8 @@ import {
   reviewPlan,
   validatePlan,
   type ContextLineageLearningReport,
+  type ContextSedimentationAimContext,
+  type ContextSedimentationMemoryCandidate,
   type DecompositionLearningReport,
   type DecompositionStrategyReport,
   type LocalHandoffManifest,
@@ -91,6 +93,10 @@ export interface PlanQualityMetadata extends Record<string, unknown> {
 export interface PlanQualityMetadataOptions {
   /** Context that shaped decomposition and should travel with future local-agent handoff jobs. */
   selectedContext?: readonly PlanQualityContext[];
+  /** Aim-scoped context collected during the current intake loop. */
+  aimContext?: readonly ContextSedimentationAimContext[];
+  /** Pending durable context collected during the current intake loop. */
+  durableMemoryCandidates?: readonly ContextSedimentationMemoryCandidate[];
 }
 
 /** Persistable metadata for the selected decomposition and its quality retry loop. */
@@ -116,6 +122,8 @@ export function planQualityMetadata(
     metadata.local_handoff_manifest = buildLocalHandoffManifest({
       plan: result.output,
       handoff,
+      aimContext: options?.aimContext,
+      durableMemoryCandidates: options?.durableMemoryCandidates,
       selectedContext: options?.selectedContext,
     });
   }

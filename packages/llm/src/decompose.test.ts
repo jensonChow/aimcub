@@ -543,6 +543,29 @@ describe("planQualityMetadata", () => {
     const result = await decomposeWithQuality(mockGateway(validPlan()), INPUT);
 
     const metadata = planQualityMetadata(result, null, {
+      aimContext: [
+        {
+          content: "Project fact: The evidence ingester lives under packages/api.",
+          category: "project_fact",
+          source: "tool_observation",
+          channel: "local_workspace",
+          stepId: "loop_local",
+          reason: "Aim-scoped context collected from local workspace intake.",
+        },
+      ],
+      durableMemoryCandidates: [
+        {
+          content: "Eval signal: Trusted source events should become idempotent evidence rows.",
+          kind: "semantic",
+          category: "eval_signal",
+          source: "agent_inferred",
+          confidence: 0.82,
+          channel: "questionnaire",
+          stepId: "loop_eval",
+          originId: "q_eval",
+          reason: "Durable eval signal captured during intake.",
+        },
+      ],
       selectedContext: [
         {
           content: "Procedure: Run pnpm test before handing off local agent work.",
@@ -557,13 +580,28 @@ describe("planQualityMetadata", () => {
     expect(metadata.plan_handoff?.nextActions[0]).toBe("Queue 2 agent-ready tasks for local agent handoff.");
     expect(metadata.local_handoff_manifest?.agentQueue.map((job) => job.nodeKey)).toEqual(["m1", "m2"]);
     expect(metadata.local_handoff_manifest?.agentQueue[1]!.prerequisiteKeys).toEqual(["m1"]);
-    expect(metadata.local_handoff_manifest?.agentQueue[0]!.inputContext).toEqual([
+    expect(metadata.local_handoff_manifest?.agentQueue[0]!.inputContext).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        category: "project_fact",
+        source: "tool_observation",
+        stepId: "loop_local",
+        content: "Project fact: The evidence ingester lives under packages/api.",
+      }),
+      expect.objectContaining({
+        category: "eval_signal",
+        source: "agent_inferred",
+        stepId: "loop_eval",
+        content: "Eval signal: Trusted source events should become idempotent evidence rows.",
+      }),
       expect.objectContaining({
         category: "procedure",
         source: "selected_context",
         content: "Procedure: Run pnpm test before handing off local agent work.",
       }),
-    ]);
+    ]));
+    expect(metadata.local_handoff_manifest?.evalSignals).toContain(
+      "Eval signal: Trusted source events should become idempotent evidence rows.",
+    );
     expect(metadata.local_handoff_manifest?.nextActions[0]).toBe("Prepare 2 local agent jobs for queueing.");
   });
 });
