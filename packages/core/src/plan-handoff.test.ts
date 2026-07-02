@@ -372,17 +372,51 @@ describe("buildLocalHandoffManifest", () => {
       edges: [],
     };
 
-    const manifest = buildLocalHandoffManifest({ plan });
+    const manifest = buildLocalHandoffManifest({
+      plan,
+      aimContext: [{
+        content: "Project fact: The user selected /workspace/aimcub as the local source.",
+        category: "project_fact",
+        source: "tool_observation",
+        reason: "Aim-scoped context collected through local_workspace.",
+      }],
+      durableMemoryCandidates: [{
+        content: "Constraint: Ask before crossing the external connector boundary.",
+        kind: "semantic",
+        category: "constraint",
+        source: "user_stated",
+        confidence: 0.82,
+        reason: "Durable constraint context collected through questionnaire.",
+      }],
+    });
 
     expect(manifest.agentQueue).toEqual([]);
     expect(manifest.blockedAgentQueue).toEqual([
       expect.objectContaining({
         id: "blocked:scan",
         status: "needs_context",
+        inputContext: [
+          expect.objectContaining({
+            category: "project_fact",
+            content: "Project fact: The user selected /workspace/aimcub as the local source.",
+          }),
+          expect.objectContaining({
+            category: "constraint",
+            content: "Constraint: Ask before crossing the external connector boundary.",
+          }),
+        ],
         nextAction: "Collect context: Which folder should be scanned?",
       }),
     ]);
     expect(manifest.humanQueue.map((task) => task.id)).toEqual(["human:approve", "human:pair"]);
+    expect(manifest.humanQueue[0]!.inputContext).toEqual([
+      expect.objectContaining({
+        category: "project_fact",
+      }),
+      expect.objectContaining({
+        category: "constraint",
+      }),
+    ]);
     expect(manifest.nextActions).toEqual([
       "Resolve 1 blocked agent job before one-click handoff.",
       "Route 2 human-gated tasks outside the agent queue.",

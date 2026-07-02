@@ -78,6 +78,7 @@ export interface LocalAgentBlockedJob {
   title: string;
   status: Exclude<PlanHandoffReadiness, "ready">;
   blockerCodes: PlanHandoffBlockerCode[];
+  inputContext: LocalAgentHandoffContextItem[];
   contextGaps: DecompositionContextGap[];
   nextAction: string;
 }
@@ -88,6 +89,7 @@ export interface LocalHumanHandoffTask {
   title: string;
   likelyOwner: Extract<DecompositionOwner, "human" | "mixed">;
   blockerCodes: PlanHandoffBlockerCode[];
+  inputContext: LocalAgentHandoffContextItem[];
   contextGaps: DecompositionContextGap[];
   requiredDecision: string;
 }
@@ -353,7 +355,11 @@ function agentJob(
   };
 }
 
-function blockedJob(task: PlanHandoffTask): LocalAgentBlockedJob {
+function blockedJob(
+  task: PlanHandoffTask,
+  contexts: readonly LocalAgentHandoffContextItem[],
+  maxContextItems: number,
+): LocalAgentBlockedJob {
   const needsContext = task.contextGaps[0];
   return {
     id: `blocked:${task.nodeKey}`,
@@ -361,6 +367,7 @@ function blockedJob(task: PlanHandoffTask): LocalAgentBlockedJob {
     title: task.title,
     status: task.readiness === "ready" ? "needs_review" : task.readiness,
     blockerCodes: task.blockerCodes,
+    inputContext: contextForTask(contexts, maxContextItems),
     contextGaps: task.contextGaps,
     nextAction: needsContext
       ? `Collect context: ${needsContext.question}`
@@ -368,13 +375,18 @@ function blockedJob(task: PlanHandoffTask): LocalAgentBlockedJob {
   };
 }
 
-function humanTask(task: PlanHandoffTask): LocalHumanHandoffTask {
+function humanTask(
+  task: PlanHandoffTask,
+  contexts: readonly LocalAgentHandoffContextItem[],
+  maxContextItems: number,
+): LocalHumanHandoffTask {
   return {
     id: `human:${task.nodeKey}`,
     nodeKey: task.nodeKey,
     title: task.title,
     likelyOwner: task.likelyOwner === "mixed" ? "mixed" : "human",
     blockerCodes: task.blockerCodes,
+    inputContext: contextForTask(contexts, maxContextItems),
     contextGaps: task.contextGaps,
     requiredDecision: task.likelyOwner === "mixed"
       ? "Decide the human handoff point before agent execution continues."
@@ -422,10 +434,10 @@ export function buildLocalHandoffManifest(input: BuildLocalHandoffManifestInput)
   const partial: Omit<LocalHandoffManifest, "nextActions"> = {
     version: 1,
     agentQueue: report.agentReady.map((task) => agentJob(task, contexts, maxContextItems)),
-    blockedAgentQueue: report.agentBlocked.map(blockedJob),
+    blockedAgentQueue: report.agentBlocked.map((task) => blockedJob(task, contexts, maxContextItems)),
     humanQueue: [
-      ...report.humanRequired.map(humanTask),
-      ...report.mixed.map(humanTask),
+      ...report.humanRequired.map((task) => humanTask(task, contexts, maxContextItems)),
+      ...report.mixed.map((task) => humanTask(task, contexts, maxContextItems)),
     ],
     evalSignals: [
       ...new Set([
