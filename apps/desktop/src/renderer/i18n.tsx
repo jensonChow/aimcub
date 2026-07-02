@@ -60,6 +60,18 @@ export const STRINGS = {
   "shell.pending": { en: "Pending", zh: "待处理" },
   "shell.processLivesInInspector": { en: "Open Process in the sidebar to follow the detailed planning trace.", zh: "在左侧打开「过程」即可跟踪详细拆分轨迹。" },
 
+  "chat.new": { en: "New chat", zh: "新对话" },
+  "chat.home": { en: "Chats", zh: "对话" },
+  "chat.search": { en: "Search chats", zh: "搜索对话" },
+  "chat.sessions": { en: "Sessions", zh: "会话" },
+  "chat.session_one": { en: "{n} session", zh: "{n} 个会话" },
+  "chat.session_other": { en: "{n} sessions", zh: "{n} 个会话" },
+  "chat.greeting": { en: "What do you want to accomplish?", zh: "你想达成什么？" },
+  "chat.placeholder": { en: "Start with an aim", zh: "输入一个目标" },
+  "chat.followupPlaceholder": { en: "Ask for follow-up changes", zh: "输入后续修改要求" },
+  "chat.send": { en: "Send", zh: "发送" },
+  "chat.details": { en: "Details", zh: "详情" },
+
   "home.aim_one": { en: "{n} aim", zh: "{n} 个目标" },
   "home.aim_other": { en: "{n} aims", zh: "{n} 个目标" },
   "home.none": { en: "No aims yet.", zh: "还没有目标。" },

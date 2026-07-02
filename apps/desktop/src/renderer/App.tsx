@@ -13,7 +13,6 @@ import {
   ContextLineageLearningPanel,
   ContextProfilePanel,
   DecompositionLearningPanel,
-  HomeView,
 } from "./HomeView";
 import { I18nProvider, useI18n, type StringKey } from "./i18n";
 import { LangToggle } from "./LangToggle";
@@ -56,7 +55,6 @@ import {
   card,
   chipButton,
   inputStyle,
-  labelStyle,
   optionButton,
   primaryButton,
   secondaryButton,
@@ -189,6 +187,7 @@ function AppInner() {
   const [contextDecompositionLearning, setContextDecompositionLearning] = useState<DecompositionLearningReport | null>(null);
   const [viewing, setViewing] = useState<Goal | null>(null);
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("process");
+  const [composerText, setComposerText] = useState("");
   const viewportWidth = useViewportWidth();
 
   useEffect(() => {
@@ -419,6 +418,7 @@ function AppInner() {
   function goHome() {
     setError(null);
     setViewing(null);
+    setComposerText("");
     setInspectorTab("context");
     clearWizard();
     refreshGoals();
@@ -435,6 +435,7 @@ function AppInner() {
   function startNew() {
     setError(null);
     setViewing(null);
+    setComposerText("");
     setInspectorTab("context");
     clearWizard();
     setStep("aim");
@@ -524,13 +525,27 @@ function AppInner() {
     }
   }
 
-  async function startDraft() {
-    if (!title.trim()) return;
+  async function runDraft(req: { title: string; description?: string }) {
     if (!configured) {
       setShowSettings(true);
       return;
     }
-    const req = { title: title.trim(), description: description.trim() || undefined };
+    setDraft(null);
+    setClarifyOut(null);
+    setAnswers({});
+    setFinalPlan(null);
+    setPlanQuality(null);
+    setPlanReview(null);
+    setPlanQualityRetry(null);
+    setPlanningContext(null);
+    setPlanningTools(null);
+    setAimIntake(null);
+    setDecompositionStrategy(null);
+    setTitle(req.title);
+    setDescription(req.description ?? "");
+    setViewing(null);
+    setSavedGoal(null);
+    setSavedAt(null);
     const providerText = provider ? providerLabel(provider, t) : "LLM";
     setError(null);
     setInspectorTab("process");
@@ -608,6 +623,13 @@ function AppInner() {
       setError(e instanceof Error ? e.message : String(e));
       setStep("aim");
     }
+  }
+
+  async function startDraftFromComposer(prompt: string) {
+    const nextTitle = prompt.trim();
+    if (!nextTitle) return;
+    setComposerText("");
+    await runDraft({ title: nextTitle });
   }
 
   async function refine(useDraftAsIs: boolean, reviewPrompt?: string) {
@@ -734,7 +756,26 @@ function AppInner() {
     ? reviewContextLineage({ goal: activeGoal, pendingContext: activeGoalPending, contextOutcomes: contextHistory })
     : null;
   const workspaceTitle = (viewing?.title ?? savedGoal?.title ?? title.trim()) || t(step === "home" ? "home.recent" : "shell.currentAim");
-  const showInspector = step !== "home";
+  const showSessionDetails = step !== "home" && step !== "aim";
+  const composerDisabled = Boolean(activeBusyStep);
+  const composerPlaceholder = step === "plan" && !viewing && finalPlan
+    ? t("chat.followupPlaceholder")
+    : t("chat.placeholder");
+
+  async function submitComposerPrompt(prompt: string) {
+    const nextPrompt = prompt.trim();
+    if (!nextPrompt || composerDisabled) return;
+    setComposerText("");
+    if (step === "plan" && !viewing && finalPlan) {
+      await refine(false, nextPrompt);
+      return;
+    }
+    if (step === "questions") {
+      await refine(false, nextPrompt);
+      return;
+    }
+    await startDraftFromComposer(nextPrompt);
+  }
 
   return (
     <div style={{ fontFamily: "system-ui, -apple-system, sans-serif", color: C.text, background: C.page, width: "100%", height: "100vh", overflow: "hidden" }}>
@@ -744,18 +785,15 @@ function AppInner() {
           goals={goals}
           currentGoal={activeGoal}
           step={step}
-          activeTab={inspectorTab}
-          pendingContextCount={contextCandidates.length}
           onHome={goHome}
           onNew={startNew}
           onOpen={openGoal}
-          onTab={setInspectorTab}
         />
 
         <section style={mainShellStyle(compactShell)}>
           <header style={mainTopBarStyle(compactShell)}>
             <div style={{ minWidth: 0 }}>
-              {showInspector && (
+              {showSessionDetails && (
                 <>
                   <div style={{ color: C.text, fontSize: 15, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {workspaceTitle}
@@ -766,9 +804,11 @@ function AppInner() {
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
               <LangToggle />
-              <button onClick={() => setShowSettings((v) => !v)} style={chipButton()}>
-                {provider?.configured ? providerLabel(provider, t) : t("provider.setup")}
-              </button>
+              {showSessionDetails && (
+                <button onClick={() => setShowSettings((v) => !v)} style={chipButton()}>
+                  {provider?.configured ? providerLabel(provider, t) : t("provider.setup")}
+                </button>
+              )}
             </div>
           </header>
 
@@ -792,100 +832,230 @@ function AppInner() {
           )}
 
           <main style={contentSurfaceStyle(compactShell)}>
-            {step === "home" && (
-              <HomeView
-                goals={goals}
-                onNew={startNew}
-                onOpen={openGoal}
-                onDelete={removeGoal}
-              />
-            )}
+            <section style={agentWorkspaceStyle()}>
+              <div style={conversationStreamStyle()}>
+                {(step === "home" || step === "aim") && (
+                  <ChatStart goals={goals} onOpen={openGoal} />
+                )}
 
-            {step === "aim" && (
-              <AimForm
-                title={title}
-                description={description}
-                disabled={!configured}
-                onTitle={setTitle}
-                onDescription={setDescription}
-                onSubmit={startDraft}
-                onCancel={goHome}
-              />
-            )}
+                {(step === "drafting" || step === "clarifying" || step === "refining") && (
+                  <BusyPlanState step={step} title={title.trim()} description={description.trim()} />
+                )}
 
-            {(step === "drafting" || step === "clarifying" || step === "refining") && (
-              <BusyPlanState step={step} title={title.trim()} description={description.trim()} />
-            )}
+                {step === "questions" && clarifyOut && (
+                  <QuestionsStep
+                    clarify={clarifyOut}
+                    answers={answers}
+                    onAnswer={(id, patch) => setAnswers((m) => ({ ...m, [id]: { label: null, other: "", ...m[id], ...patch } }))}
+                    onRefine={() => refine(false)}
+                    onUseDraft={() => refine(true)}
+                  />
+                )}
 
-            {step === "questions" && clarifyOut && (
-              <QuestionsStep
-                clarify={clarifyOut}
-                answers={answers}
-                onAnswer={(id, patch) => setAnswers((m) => ({ ...m, [id]: { label: null, other: "", ...m[id], ...patch } }))}
-                onRefine={() => refine(false)}
-                onUseDraft={() => refine(true)}
-              />
-            )}
+                {step === "plan" && viewing && (
+                  <SavedGoalView
+                    goal={viewing}
+                    onBack={goHome}
+                    onDelete={() => removeGoal(viewing)}
+                  />
+                )}
 
-            {step === "plan" && viewing && (
-              <SavedGoalView
-                goal={viewing}
-                onBack={goHome}
-                onDelete={() => removeGoal(viewing)}
-              />
-            )}
+                {step === "plan" && !viewing && finalPlan && (
+                  <PlanView
+                    plan={finalPlan}
+                    title={title.trim() || t("shell.currentAim")}
+                    description={description.trim() || undefined}
+                    review={planReview}
+                    savedAt={savedAt}
+                    contextCandidateCount={savedContextCandidateCount}
+                    onSave={save}
+                    onRefineWithReview={(prompt) => refine(false, prompt)}
+                    onReset={startNew}
+                    onHome={goHome}
+                  />
+                )}
 
-            {step === "plan" && !viewing && finalPlan && (
-              <PlanView
-                plan={finalPlan}
-                title={title.trim() || t("shell.currentAim")}
-                description={description.trim() || undefined}
-                review={planReview}
-                savedAt={savedAt}
-                contextCandidateCount={savedContextCandidateCount}
-                onSave={save}
-                onRefineWithReview={(prompt) => refine(false, prompt)}
-                onReset={startNew}
-                onHome={goHome}
-              />
-            )}
-          </main>
-
-          {showInspector && (
-            <InspectorRail
-              activeTab={inspectorTab}
-              onTab={setInspectorTab}
-              events={planningTrace}
-              busyStep={activeBusyStep}
-              aimIntake={activeIntake}
-              decompositionStrategy={decompositionStrategy}
-              contextCandidates={contextCandidates}
-              contextProfile={contextProfile}
-              contextHealth={contextHealth}
-              contextLearning={contextLearning}
-              contextLineageLearning={contextLineageLearning}
-              contextDecompositionLearning={contextDecompositionLearning}
-              planningContext={activePlanningContext}
-              planningTools={activePlanningTools}
-              review={activeReview}
-              planQuality={planQuality}
-              qualityRetry={planQualityRetry}
-              plan={activePlan}
-              learning={activeLearning}
-              answerImpact={activeAnswerImpact}
-              captureFulfillment={activeCaptureFulfillment}
-              contextLineage={activeContextLineage}
-              onAcceptContext={acceptContextCandidate}
-              onRejectContext={rejectContextCandidate}
-              onArchiveContext={archiveContextMemory}
-              onDeprioritizeContext={deprioritizeContextMemory}
-              showTabs={false}
-              sticky={false}
+                {showSessionDetails && (
+                  <SessionDetails
+                    activeTab={inspectorTab}
+                    onTab={setInspectorTab}
+                    events={planningTrace}
+                    busyStep={activeBusyStep}
+                    aimIntake={activeIntake}
+                    decompositionStrategy={decompositionStrategy}
+                    contextCandidates={contextCandidates}
+                    contextProfile={contextProfile}
+                    contextHealth={contextHealth}
+                    contextLearning={contextLearning}
+                    contextLineageLearning={contextLineageLearning}
+                    contextDecompositionLearning={contextDecompositionLearning}
+                    planningContext={activePlanningContext}
+                    planningTools={activePlanningTools}
+                    review={activeReview}
+                    planQuality={planQuality}
+                    qualityRetry={planQualityRetry}
+                    plan={activePlan}
+                    learning={activeLearning}
+                    answerImpact={activeAnswerImpact}
+                    captureFulfillment={activeCaptureFulfillment}
+                    contextLineage={activeContextLineage}
+                    onAcceptContext={acceptContextCandidate}
+                    onRejectContext={rejectContextCandidate}
+                    onArchiveContext={archiveContextMemory}
+                    onDeprioritizeContext={deprioritizeContextMemory}
+                  />
+                )}
+              </div>
+              <ChatComposer
+                value={composerText}
+                placeholder={composerPlaceholder}
+                disabled={composerDisabled}
+                onChange={setComposerText}
+                onSubmit={submitComposerPrompt}
+                meta={provider?.configured ? providerLabel(provider, t) : t("provider.setup")}
+                onMetaClick={() => setShowSettings((v) => !v)}
             />
-          )}
+            </section>
+          </main>
         </section>
       </div>
     </div>
+  );
+}
+
+function ChatStart(props: {
+  goals: Goal[];
+  onOpen: (goal: Goal) => void;
+}) {
+  const { t } = useI18n();
+  const recent = props.goals.slice(0, 4);
+  return (
+    <div style={chatStartStyle()}>
+      <div style={{ color: C.accent, fontSize: 13, fontWeight: 700, marginBottom: 14 }}>Aimcub</div>
+      <h1 style={{ margin: 0, fontSize: 34, lineHeight: 1.1, letterSpacing: 0, fontWeight: 740 }}>
+        {t("chat.greeting")}
+      </h1>
+      {recent.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 22 }}>
+          {recent.map((goal) => (
+            <button key={goal.id} onClick={() => props.onOpen(goal)} style={sessionChipStyle()}>
+              {goal.title.length > 46 ? `${goal.title.slice(0, 45)}...` : goal.title}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ChatComposer(props: {
+  value: string;
+  placeholder: string;
+  disabled: boolean;
+  meta: string;
+  onChange: (value: string) => void;
+  onSubmit: (value: string) => void;
+  onMetaClick: () => void;
+}) {
+  const { t } = useI18n();
+  const canSubmit = props.value.trim().length > 0 && !props.disabled;
+  return (
+    <div style={composerShellStyle()}>
+      <textarea
+        value={props.value}
+        disabled={props.disabled}
+        onChange={(event) => props.onChange(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && !event.shiftKey) {
+            event.preventDefault();
+            if (canSubmit) props.onSubmit(props.value);
+          }
+        }}
+        placeholder={props.placeholder}
+        rows={2}
+        style={composerInputStyle()}
+      />
+      <div style={composerFooterStyle()}>
+        <button onClick={props.onMetaClick} style={composerMetaButton()}>
+          {props.meta}
+        </button>
+        <button
+          onClick={() => props.onSubmit(props.value)}
+          disabled={!canSubmit}
+          style={composerSendButton(!canSubmit)}
+          title={t("chat.send")}
+          aria-label={t("chat.send")}
+        >
+          ↑
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SessionDetails(props: {
+  activeTab: InspectorTab;
+  onTab: (tab: InspectorTab) => void;
+  events: PlanningTraceEvent[];
+  busyStep: BusyStep | null;
+  aimIntake: AimIntakeReport | null;
+  decompositionStrategy: DecompositionStrategyReport | null;
+  contextCandidates: Memory[];
+  contextProfile: ContextProfileReport | null;
+  contextHealth: ContextHealthRow[];
+  contextLearning: ClarifyLearningReport | null;
+  contextLineageLearning: ContextLineageLearningReport | null;
+  contextDecompositionLearning: DecompositionLearningReport | null;
+  planningContext: PlanningContextSelectionReport | null;
+  planningTools: PlanningToolIpcTrace | null;
+  review: PlanResult["review"] | null;
+  planQuality: PlanResult["quality"] | null;
+  qualityRetry: PlanResult["qualityRetry"] | null;
+  plan: DecompositionOutput | null;
+  learning: AimLearningReport | null;
+  answerImpact: ClarifyAnswerImpactReport | null;
+  captureFulfillment: ContextCaptureFulfillmentReport | null;
+  contextLineage: ContextLineageReport | null;
+  onAcceptContext: (candidate: Memory, content: string, scope: "aim" | "global") => void;
+  onRejectContext: (candidate: Memory) => void;
+  onArchiveContext: (id: string) => void;
+  onDeprioritizeContext: (id: string) => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <details style={sessionDetailsStyle()}>
+      <summary style={sessionDetailsSummaryStyle()}>{t("chat.details")}</summary>
+      <InspectorRail
+        activeTab={props.activeTab}
+        onTab={props.onTab}
+        events={props.events}
+        busyStep={props.busyStep}
+        aimIntake={props.aimIntake}
+        decompositionStrategy={props.decompositionStrategy}
+        contextCandidates={props.contextCandidates}
+        contextProfile={props.contextProfile}
+        contextHealth={props.contextHealth}
+        contextLearning={props.contextLearning}
+        contextLineageLearning={props.contextLineageLearning}
+        contextDecompositionLearning={props.contextDecompositionLearning}
+        planningContext={props.planningContext}
+        planningTools={props.planningTools}
+        review={props.review}
+        planQuality={props.planQuality}
+        qualityRetry={props.qualityRetry}
+        plan={props.plan}
+        learning={props.learning}
+        answerImpact={props.answerImpact}
+        captureFulfillment={props.captureFulfillment}
+        contextLineage={props.contextLineage}
+        onAcceptContext={props.onAcceptContext}
+        onRejectContext={props.onRejectContext}
+        onArchiveContext={props.onArchiveContext}
+        onDeprioritizeContext={props.onDeprioritizeContext}
+        showTabs
+        sticky={false}
+      />
+    </details>
   );
 }
 
@@ -894,12 +1064,9 @@ function ClassicSidebar(props: {
   goals: Goal[];
   currentGoal: Goal | null;
   step: Step;
-  activeTab: InspectorTab;
-  pendingContextCount: number;
   onHome: () => void;
   onNew: () => void;
   onOpen: (goal: Goal) => void;
-  onTab: (tab: InspectorTab) => void;
 }) {
   const { t } = useI18n();
   const [query, setQuery] = useState("");
@@ -908,13 +1075,6 @@ function ClassicSidebar(props: {
     if (!q) return true;
     return `${goal.title} ${goal.description ?? ""}`.toLowerCase().includes(q);
   });
-  const tabs: InspectorTab[] = ["process", "context", "quality", "activity"];
-  const tabLabels = {
-    process: "shell.tab.process",
-    context: "shell.tab.context",
-    quality: "shell.tab.quality",
-    activity: "shell.tab.activity",
-  } as const;
   return (
     <aside style={classicSidebarStyle(props.compact)}>
       <div>
@@ -924,10 +1084,10 @@ function ClassicSidebar(props: {
         </button>
         <div style={{ display: "grid", gap: 8, marginTop: 18 }}>
           <button onClick={props.onNew} style={sidebarCommandButton(true)}>
-            {t("home.new")}
+            {t("chat.new")}
           </button>
           <button onClick={props.onHome} style={sidebarNavButton(props.step === "home")}>
-            {t("shell.aims")}
+            {t("chat.home")}
           </button>
         </div>
       </div>
@@ -936,11 +1096,11 @@ function ClassicSidebar(props: {
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder={t("shell.searchAims")}
+          placeholder={t("chat.search")}
           style={sidebarSearchInputStyle()}
         />
-        <SidebarSectionLabel label={t("shell.recentAims")} value={t(props.goals.length === 1 ? "home.aim_one" : "home.aim_other", { n: props.goals.length })} />
-        <div style={{ display: "grid", gap: 7, maxHeight: props.compact ? 220 : "min(34vh, 330px)", overflow: "auto", paddingRight: 2 }}>
+        <SidebarSectionLabel label={t("chat.sessions")} value={t(props.goals.length === 1 ? "chat.session_one" : "chat.session_other", { n: props.goals.length })} />
+        <div style={{ display: "grid", gap: 7, maxHeight: props.compact ? 220 : "none", overflow: "auto", paddingRight: 2 }}>
           {filteredGoals.map((goal) => {
             const selected = props.currentGoal?.id === goal.id;
             const plan = planOf(goal);
@@ -958,28 +1118,6 @@ function ClassicSidebar(props: {
           )}
         </div>
       </div>
-
-      {props.step !== "home" && (
-        <div>
-          <SidebarSectionLabel label={t("shell.planningLayers")} value={t("shell.auditLayer")} />
-          <div style={{ display: "grid", gap: 6 }}>
-            {tabs.map((tab) => (
-              <button key={tab} onClick={() => props.onTab(tab)} style={sidebarNavButton(props.activeTab === tab)}>
-                {t(tabLabels[tab])}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {(props.step !== "home" || props.pendingContextCount > 0) && (
-        <div style={{ marginTop: "auto", borderTop: `1px solid ${C.border}`, paddingTop: 12 }}>
-          <button onClick={() => props.onTab("context")} style={sidebarContextButton(props.activeTab === "context")}>
-            <span>{t("context.inbox")}</span>
-            <span style={sidebarCountPill()}>{props.pendingContextCount}</span>
-          </button>
-        </div>
-      )}
     </aside>
   );
 }
@@ -991,6 +1129,137 @@ function SidebarSectionLabel(props: { label: string; value?: string }) {
       {props.value ? <div style={{ color: C.muted, fontSize: 11, whiteSpace: "nowrap" }}>{props.value}</div> : null}
     </div>
   );
+}
+
+function agentWorkspaceStyle(): CSSProperties {
+  return {
+    display: "grid",
+    gridTemplateRows: "minmax(0, 1fr) auto",
+    height: "100%",
+    minHeight: 0,
+  };
+}
+
+function conversationStreamStyle(): CSSProperties {
+  return {
+    minHeight: 0,
+    overflowY: "auto",
+    padding: "24px 0 22px",
+    boxSizing: "border-box",
+  };
+}
+
+function chatStartStyle(): CSSProperties {
+  return {
+    minHeight: "100%",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    maxWidth: 760,
+    margin: "0 auto",
+    paddingBottom: 72,
+    boxSizing: "border-box",
+  };
+}
+
+function sessionChipStyle(): CSSProperties {
+  return {
+    border: `1px solid ${C.border}`,
+    background: "#fff",
+    color: C.text,
+    borderRadius: 8,
+    padding: "8px 10px",
+    cursor: "pointer",
+    fontSize: 13,
+    maxWidth: 260,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  };
+}
+
+function composerShellStyle(): CSSProperties {
+  return {
+    width: "min(840px, 100%)",
+    margin: "0 auto",
+    border: `1px solid ${C.border}`,
+    background: "#fff",
+    borderRadius: 14,
+    boxShadow: "0 14px 44px rgba(20, 20, 18, 0.08), 0 1px 2px rgba(20, 20, 18, 0.05)",
+    padding: 10,
+    boxSizing: "border-box",
+  };
+}
+
+function composerInputStyle(): CSSProperties {
+  return {
+    width: "100%",
+    minHeight: 54,
+    maxHeight: 140,
+    resize: "none",
+    border: 0,
+    outline: "none",
+    background: "transparent",
+    color: C.text,
+    fontFamily: "inherit",
+    fontSize: 15,
+    lineHeight: 1.45,
+    boxSizing: "border-box",
+    padding: "5px 6px 8px",
+  };
+}
+
+function composerFooterStyle(): CSSProperties {
+  return {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  };
+}
+
+function composerMetaButton(): CSSProperties {
+  return {
+    border: "none",
+    background: "transparent",
+    color: C.muted,
+    fontSize: 12,
+    cursor: "pointer",
+    padding: "4px 6px",
+  };
+}
+
+function composerSendButton(disabled: boolean): CSSProperties {
+  return {
+    border: "none",
+    background: disabled ? "#d8d8d3" : C.text,
+    color: "#fff",
+    borderRadius: 999,
+    minWidth: 32,
+    height: 32,
+    padding: "0 12px",
+    cursor: disabled ? "default" : "pointer",
+    fontSize: 12,
+    fontWeight: 700,
+  };
+}
+
+function sessionDetailsStyle(): CSSProperties {
+  return {
+    width: "min(840px, 100%)",
+    margin: "18px auto 0",
+    color: C.muted,
+  };
+}
+
+function sessionDetailsSummaryStyle(): CSSProperties {
+  return {
+    cursor: "pointer",
+    fontSize: 12,
+    fontWeight: 700,
+    color: C.muted,
+    padding: "8px 0",
+  };
 }
 
 function classicShellStyle(compact: boolean): CSSProperties {
@@ -1007,7 +1276,7 @@ function classicShellStyle(compact: boolean): CSSProperties {
 function classicSidebarStyle(compact: boolean): CSSProperties {
   return {
     display: "grid",
-    gridTemplateRows: compact ? "auto auto auto auto" : "auto minmax(0, 1fr) auto auto",
+    gridTemplateRows: compact ? "auto auto" : "auto minmax(0, 1fr)",
     gap: 16,
     background: "#f1f1ee",
     borderRight: compact ? "none" : `1px solid ${C.border}`,
@@ -1027,8 +1296,9 @@ function mainShellStyle(compact: boolean): CSSProperties {
     padding: compact ? "16px 14px 44px" : "22px 34px 56px",
     boxSizing: "border-box",
     height: "100vh",
-    overflowY: "auto",
-    overscrollBehavior: "contain",
+    overflow: "hidden",
+    display: "flex",
+    flexDirection: "column",
   };
 }
 
@@ -1047,9 +1317,10 @@ function contentSurfaceStyle(compact: boolean): CSSProperties {
   return {
     minWidth: 0,
     padding: compact ? 2 : 0,
-    minHeight: compact ? 300 : 390,
+    minHeight: 0,
+    flex: 1,
     boxSizing: "border-box",
-    marginBottom: 16,
+    overflow: "hidden",
   };
 }
 
@@ -1127,39 +1398,6 @@ function sidebarGoalButton(selected: boolean): CSSProperties {
     cursor: "pointer",
     color: C.text,
     boxShadow: selected ? `inset 3px 0 0 ${C.accent}` : "none",
-  };
-}
-
-function sidebarContextButton(selected: boolean): CSSProperties {
-  return {
-    display: "flex",
-    justifyContent: "space-between",
-    gap: 10,
-    alignItems: "center",
-    width: "100%",
-    border: `1px solid ${selected ? "#d4e5eb" : C.border}`,
-    background: selected ? C.accentBg : "#fbfbf9",
-    color: selected ? C.accent : C.text,
-    borderRadius: 8,
-    padding: "9px 10px",
-    cursor: "pointer",
-    fontSize: 13,
-    fontWeight: 650,
-  };
-}
-
-function sidebarCountPill(): CSSProperties {
-  return {
-    minWidth: 22,
-    height: 22,
-    display: "inline-grid",
-    placeItems: "center",
-    borderRadius: 999,
-    background: "#e5e5df",
-    color: C.muted,
-    fontSize: 11,
-    fontWeight: 800,
-    padding: "0 7px",
   };
 }
 
@@ -1635,46 +1873,6 @@ function DecompositionStrategyPanel(props: { report: DecompositionStrategyReport
           ))}
         </div>
       </div>
-    </section>
-  );
-}
-
-function AimForm(props: {
-  title: string;
-  description: string;
-  disabled: boolean;
-  onTitle: (v: string) => void;
-  onDescription: (v: string) => void;
-  onSubmit: () => void;
-  onCancel: () => void;
-}) {
-  const { t } = useI18n();
-  return (
-    <section style={card()}>
-      <label style={labelStyle()}>{t("aim.titleLabel")}</label>
-      <input
-        autoFocus
-        value={props.title}
-        onChange={(e) => props.onTitle(e.target.value)}
-        placeholder={t("aim.titlePlaceholder")}
-        style={inputStyle()}
-        onKeyDown={(e) => { if (e.key === "Enter" && props.title.trim()) props.onSubmit(); }}
-      />
-      <label style={{ ...labelStyle(), marginTop: 14 }}>{t("aim.descLabel")}</label>
-      <textarea
-        value={props.description}
-        onChange={(e) => props.onDescription(e.target.value)}
-        placeholder={t("aim.descPlaceholder")}
-        rows={3}
-        style={{ ...inputStyle(), resize: "vertical" }}
-      />
-      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-        <button onClick={props.onSubmit} disabled={!props.title.trim()} style={primaryButton(!props.title.trim())}>
-          {t("aim.draft")}
-        </button>
-        <button onClick={props.onCancel} style={secondaryButton()}>{t("common.cancel")}</button>
-      </div>
-      {props.disabled && <div style={{ fontSize: 12, color: C.muted, marginTop: 10 }}>{t("aim.needProvider")}</div>}
     </section>
   );
 }
