@@ -448,6 +448,36 @@ export async function recordAssumptionContextCandidatesForStore(
   return recordContextCandidates(store, goal, extractMemoryCandidatesFromAssumptions({ goal, assumptions }));
 }
 
+function memoryKindForCategory(category: ContextCategory): MemoryKind {
+  return category === "procedure" ? "procedural" : "semantic";
+}
+
+function memorySourceForAimContext(
+  source: ContextSedimentationReport["aimContext"][number]["source"],
+): Memory["source"] {
+  return source === "user_answer" ? "user_stated" : "agent_inferred";
+}
+
+export async function recordSedimentationAimContextForStore(
+  store: Pick<ContextWorkflowStore, "addMemoryCandidate">,
+  goal: Goal,
+  sedimentation: ContextSedimentationReport | null | undefined,
+): Promise<Memory[]> {
+  const saved: Memory[] = [];
+  for (const context of sedimentation?.aimContext ?? []) {
+    const memory = await store.addMemoryCandidate({
+      goalId: goal.id,
+      content: context.content,
+      kind: memoryKindForCategory(context.category),
+      category: context.category,
+      source: memorySourceForAimContext(context.source),
+      confidence: context.source === "user_answer" ? 0.82 : 0.7,
+    });
+    if (memory.status === "pending") saved.push(memory);
+  }
+  return saved;
+}
+
 export async function recordSedimentationMemoryCandidatesForStore(
   store: Pick<ContextWorkflowStore, "addMemoryCandidate">,
   sedimentation: ContextSedimentationReport | null | undefined,

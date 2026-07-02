@@ -7,6 +7,7 @@ import {
   buildAimIntakeReport,
   contextIntakeSignalsFromPlanningToolEvents,
   planningContextReportsFromGoals,
+  recordSedimentationAimContextForStore,
   recordSedimentationMemoryCandidatesForStore,
   selectPlanningContextForStore,
 } from "./context-workflow";
@@ -381,6 +382,92 @@ describe("context workflow", () => {
         category: "preference",
         source: "user_stated",
       }),
+    ]);
+  });
+
+  it("records sedimented aim context as current-goal pending memory candidates", async () => {
+    const calls: Array<{
+      goalId?: string | null;
+      content: string;
+      kind?: Memory["kind"];
+      category?: Memory["category"];
+      source?: Memory["source"];
+      confidence?: number;
+    }> = [];
+    const currentGoal = goal({ id: "20000000-0000-4000-8000-000000000099" });
+
+    const saved = await recordSedimentationAimContextForStore(
+      {
+        async addMemoryCandidate(input) {
+          calls.push(input);
+          return memory({
+            id: `30000000-0000-4000-8000-00000000000${calls.length}`,
+            goal_id: input.goalId ?? null,
+            content: input.content,
+            kind: input.kind ?? "semantic",
+            category: input.category ?? "project_fact",
+            source: input.source ?? "agent_inferred",
+            confidence: input.confidence ?? 0.7,
+            status: "pending",
+          });
+        },
+      },
+      currentGoal,
+      {
+        version: 1,
+        readyForDecomposition: true,
+        shouldIterate: false,
+        aimContextCount: 2,
+        durableMemoryCandidateCount: 1,
+        aimContext: [
+          {
+            content: "Project fact: Official visa page was fetched for this trip.",
+            category: "project_fact",
+            source: "tool_observation",
+            reason: "Aim-scoped context collected through web_research.",
+          },
+          {
+            content: "Procedure: Check passport validity before booking.",
+            category: "procedure",
+            source: "user_answer",
+            reason: "Aim-scoped context collected through questionnaire.",
+          },
+        ],
+        durableMemoryCandidates: [
+          {
+            content: "Preference: Keep travel plans concise.",
+            kind: "semantic",
+            category: "preference",
+            source: "user_stated",
+            confidence: 0.82,
+            reason: "Durable preference context collected during planning.",
+          },
+        ],
+        pendingSteps: [],
+        nextActions: [],
+      },
+    );
+
+    expect(calls).toEqual([
+      expect.objectContaining({
+        goalId: currentGoal.id,
+        content: "Project fact: Official visa page was fetched for this trip.",
+        kind: "semantic",
+        category: "project_fact",
+        source: "agent_inferred",
+      }),
+      expect.objectContaining({
+        goalId: currentGoal.id,
+        content: "Procedure: Check passport validity before booking.",
+        kind: "procedural",
+        category: "procedure",
+        source: "user_stated",
+        confidence: 0.82,
+      }),
+    ]);
+    expect(saved.map((row) => [row.goal_id, row.status, row.category])).toEqual([
+      [currentGoal.id, "pending", "project_fact"],
+      [currentGoal.id, "pending", "procedure"],
     ]);
   });
 });
