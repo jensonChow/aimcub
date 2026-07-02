@@ -4,8 +4,7 @@
  * Default locale follows the OS language and the last choice is remembered (localStorage).
  *
  * Keys, code, and comments stay English (per the project rule); only the `zh` VALUES are
- * Chinese, which is inherent to bilingual UI. `summarizeRule` (acceptance-rule text) is a
- * derived technical expression and is intentionally left English for now.
+ * Chinese, which is inherent to bilingual UI.
  */
 import { createContext, useCallback, useContext, useState } from "react";
 import type { ReactNode } from "react";
@@ -366,6 +365,7 @@ export const STRINGS = {
   "plan.details": { en: "Details", zh: "详情" },
   "plan.hideDetails": { en: "Hide", zh: "收起" },
   "plan.contract": { en: "Contract", zh: "契约" },
+  "plan.completionStandard": { en: "Done when:", zh: "完成标准:" },
   "plan.contractDone": { en: "Done:", zh: "完成:" },
   "plan.contractEvidence": { en: "Evidence:", zh: "证据:" },
   "plan.contractEval": { en: "Eval:", zh: "评估:" },

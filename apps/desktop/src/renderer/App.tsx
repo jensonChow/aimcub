@@ -6,7 +6,6 @@ import type { AimIntakeReport, AimLearningReport, ContextCaptureFulfillmentRepor
 import type { ClarifyOutput, ClarifyAnswer, ClarifyAnswerImpactReport, ClarifyLearningReport, PlanningContextSelectionReport } from "@core/llm";
 import type { PlanResult, PlanningToolIpcTrace, ProviderStatus } from "../shared/ipc";
 
-import { summarizeRule } from "./summarize";
 import { ContextInbox } from "./ContextInbox";
 import {
   ContextHealthPanel,
@@ -1484,6 +1483,7 @@ function MilestoneCards(props: { plan: DecompositionOutput }) {
       {props.plan.nodes.map((n, i) => {
         const contract = n.decomposition_contract;
         const open = openKey === n.key;
+        const completionStandard = contract?.definition_of_done || n.description || n.title;
         return (
           <div key={n.key} style={{ ...card(), marginBottom: 0, borderColor: open ? "#b8cbe8" : C.border }}>
             <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12, alignItems: "start" }}>
@@ -1495,10 +1495,10 @@ function MilestoneCards(props: { plan: DecompositionOutput }) {
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8, alignItems: "center" }}>
                   <span style={miniPill()}>{contract ? decompositionOwnerLabel(contract.likely_owner, t) : t("plan.ownerUnknown")}</span>
                   <span style={miniPill(C.accent)}>{t("shell.pending")}</span>
-                  <span style={{ color: C.muted, fontSize: 12, fontFamily: "ui-monospace, monospace" }}>+{n.xp_reward} xp</span>
                 </div>
-                <div style={{ fontSize: 12, color: C.accent, marginTop: 9, lineHeight: 1.45 }}>
-                  {summarizeRule(n.acceptance_rule)}
+                <div style={{ fontSize: 13, color: C.muted, marginTop: 9, lineHeight: 1.45 }}>
+                  <span style={{ color: C.text, fontWeight: 600 }}>{t("plan.completionStandard")} </span>
+                  {shortUiText(completionStandard)}
                 </div>
               </div>
               <button onClick={() => setOpenKey(open ? null : n.key)} style={{ ...secondaryButton(), marginTop: 0, padding: "6px 9px", fontSize: 12 }}>
