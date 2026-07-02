@@ -9,6 +9,7 @@ import { ipcMain } from "electron";
 import type { Goal } from "@core/types";
 import type { NewMemory } from "@core/store";
 import {
+  buildLocalHandoffManifest,
   critiquePlan,
   reviewContextCaptureFulfillment,
   reviewContextHealth,
@@ -361,6 +362,10 @@ export function registerIpc(): void {
       signals: intakeSignals,
       candidates: contextSedimentationCandidates(selectedContext),
     });
+    const localHandoffManifest = buildLocalHandoffManifest({
+      plan: req.plan,
+      aimContext: contextSedimentation.aimContext,
+    });
 
     const saved = await aimStore.createGoal({
       title: req.title,
@@ -379,6 +384,7 @@ export function registerIpc(): void {
         aim_intake: intake,
         context_intake_progress: intakeProgress,
         context_sedimentation: contextSedimentation,
+        local_handoff_manifest: localHandoffManifest,
         planning_context: selectedContext.report,
         planning_tools: planningToolTrace(selectedContext),
         ...(answerImpact ? { clarify_answer_impact: answerImpact } : {}),

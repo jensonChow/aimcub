@@ -1,11 +1,13 @@
 import type {
   AcceptanceClause,
   AcceptanceRule,
+  ContextCategory,
   DecompositionContextGap,
   DecompositionOutput,
   DecompositionOwner,
   PlanNode,
 } from "@core/types";
+import type { ContextSedimentationAimContext } from "./context-sedimentation";
 
 export type PlanHandoffReadiness = "ready" | "needs_context" | "needs_human" | "needs_review";
 
@@ -45,6 +47,63 @@ export interface PlanHandoffReport {
 
 export interface BuildPlanHandoffReportInput {
   plan: DecompositionOutput;
+}
+
+export interface LocalAgentHandoffContextItem {
+  category: ContextCategory;
+  content: string;
+  source: ContextSedimentationAimContext["source"];
+  stepId?: string;
+  reason: string;
+}
+
+export interface LocalAgentHandoffJob {
+  id: string;
+  nodeKey: string;
+  title: string;
+  status: "ready";
+  prerequisiteKeys: string[];
+  inputContext: LocalAgentHandoffContextItem[];
+  expectedEvidence: string[];
+  evalSignal: string;
+  acceptanceSummary: string;
+  handoffBrief: string;
+}
+
+export interface LocalAgentBlockedJob {
+  id: string;
+  nodeKey: string;
+  title: string;
+  status: Exclude<PlanHandoffReadiness, "ready">;
+  blockerCodes: PlanHandoffBlockerCode[];
+  contextGaps: DecompositionContextGap[];
+  nextAction: string;
+}
+
+export interface LocalHumanHandoffTask {
+  id: string;
+  nodeKey: string;
+  title: string;
+  likelyOwner: Extract<DecompositionOwner, "human" | "mixed">;
+  blockerCodes: PlanHandoffBlockerCode[];
+  contextGaps: DecompositionContextGap[];
+  requiredDecision: string;
+}
+
+export interface LocalHandoffManifest {
+  version: 1;
+  agentQueue: LocalAgentHandoffJob[];
+  blockedAgentQueue: LocalAgentBlockedJob[];
+  humanQueue: LocalHumanHandoffTask[];
+  evalSignals: string[];
+  nextActions: string[];
+}
+
+export interface BuildLocalHandoffManifestInput {
+  plan: DecompositionOutput;
+  handoff?: PlanHandoffReport;
+  aimContext?: readonly ContextSedimentationAimContext[];
+  maxContextItemsPerJob?: number;
 }
 
 const SUPPORTED_AUTO_EVALUATORS = new Set<AcceptanceClause["evaluator"]>([
@@ -205,5 +264,112 @@ export function buildPlanHandoffReport(input: BuildPlanHandoffReportInput): Plan
   return {
     ...partial,
     nextActions: nextActions(partial),
+  };
+}
+
+function contextMatchesTask(context: ContextSedimentationAimContext, task: PlanHandoffTask): boolean {
+  if (task.contextGaps.some((gap) => gap.category === context.category)) return true;
+  if (context.category === "project_fact" || context.category === "procedure" || context.category === "eval_signal") return true;
+  return false;
+}
+
+function contextForTask(
+  task: PlanHandoffTask,
+  aimContext: readonly ContextSedimentationAimContext[],
+  maxItems: number,
+): LocalAgentHandoffContextItem[] {
+  return aimContext
+    .filter((context) => contextMatchesTask(context, task))
+    .slice(0, maxItems)
+    .map((context) => ({
+      category: context.category,
+      content: context.content,
+      source: context.source,
+      ...(context.stepId ? { stepId: context.stepId } : {}),
+      reason: context.reason,
+    }));
+}
+
+function agentJob(
+  task: PlanHandoffTask,
+  aimContext: readonly ContextSedimentationAimContext[],
+  maxContextItems: number,
+): LocalAgentHandoffJob {
+  return {
+    id: `agent:${task.nodeKey}`,
+    nodeKey: task.nodeKey,
+    title: task.title,
+    status: "ready",
+    prerequisiteKeys: task.prerequisiteKeys,
+    inputContext: contextForTask(task, aimContext, maxContextItems),
+    expectedEvidence: task.expectedEvidence,
+    evalSignal: task.evalSignal ?? "Complete the task according to the aim-specific acceptance rule.",
+    acceptanceSummary: task.acceptanceSummary,
+    handoffBrief: task.handoffBrief,
+  };
+}
+
+function blockedJob(task: PlanHandoffTask): LocalAgentBlockedJob {
+  const needsContext = task.contextGaps[0];
+  return {
+    id: `blocked:${task.nodeKey}`,
+    nodeKey: task.nodeKey,
+    title: task.title,
+    status: task.readiness === "ready" ? "needs_review" : task.readiness,
+    blockerCodes: task.blockerCodes,
+    contextGaps: task.contextGaps,
+    nextAction: needsContext
+      ? `Collect context: ${needsContext.question}`
+      : "Review handoff contract, owner, and auto-verifiable evidence before queueing.",
+  };
+}
+
+function humanTask(task: PlanHandoffTask): LocalHumanHandoffTask {
+  return {
+    id: `human:${task.nodeKey}`,
+    nodeKey: task.nodeKey,
+    title: task.title,
+    likelyOwner: task.likelyOwner === "mixed" ? "mixed" : "human",
+    blockerCodes: task.blockerCodes,
+    contextGaps: task.contextGaps,
+    requiredDecision: task.likelyOwner === "mixed"
+      ? "Decide the human handoff point before agent execution continues."
+      : "User or another human must complete or approve this task.",
+  };
+}
+
+function manifestNextActions(input: {
+  manifest: Omit<LocalHandoffManifest, "nextActions">;
+  report: PlanHandoffReport;
+}): string[] {
+  const actions: string[] = [];
+  if (input.manifest.agentQueue.length > 0) {
+    actions.push(`Prepare ${input.manifest.agentQueue.length} local agent job${input.manifest.agentQueue.length === 1 ? "" : "s"} for queueing.`);
+  }
+  if (input.manifest.blockedAgentQueue.length > 0) {
+    actions.push(`Resolve ${input.manifest.blockedAgentQueue.length} blocked agent job${input.manifest.blockedAgentQueue.length === 1 ? "" : "s"} before one-click handoff.`);
+  }
+  if (input.manifest.humanQueue.length > 0) {
+    actions.push(`Route ${input.manifest.humanQueue.length} human-gated task${input.manifest.humanQueue.length === 1 ? "" : "s"} outside the agent queue.`);
+  }
+  return actions.length > 0 ? actions : input.report.nextActions;
+}
+
+export function buildLocalHandoffManifest(input: BuildLocalHandoffManifestInput): LocalHandoffManifest {
+  const report = input.handoff ?? buildPlanHandoffReport({ plan: input.plan });
+  const maxContextItems = input.maxContextItemsPerJob ?? 6;
+  const partial: Omit<LocalHandoffManifest, "nextActions"> = {
+    version: 1,
+    agentQueue: report.agentReady.map((task) => agentJob(task, input.aimContext ?? [], maxContextItems)),
+    blockedAgentQueue: report.agentBlocked.map(blockedJob),
+    humanQueue: [
+      ...report.humanRequired.map(humanTask),
+      ...report.mixed.map(humanTask),
+    ],
+    evalSignals: [...new Set(report.agentReady.flatMap((task) => task.evalSignal ? [task.evalSignal] : []))],
+  };
+  return {
+    ...partial,
+    nextActions: manifestNextActions({ manifest: partial, report }),
   };
 }

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { AcceptanceRule, DecompositionOutput, DecompositionOwner, PlanNode } from "@core/types";
 
-import { buildPlanHandoffReport } from "./plan-handoff";
+import { buildLocalHandoffManifest, buildPlanHandoffReport } from "./plan-handoff";
 
 function commitRule(mode: AcceptanceRule["completion_mode"] = "auto_then_confirm"): AcceptanceRule {
   return {
@@ -146,5 +146,98 @@ describe("buildPlanHandoffReport", () => {
     expect(report.agentBlocked[2]!.blockerCodes).toEqual(
       expect.arrayContaining(["missing_agent_evidence", "unsupported_auto_evaluator"]),
     );
+  });
+});
+
+describe("buildLocalHandoffManifest", () => {
+  it("packages agent-ready tasks with aim context and eval signals", () => {
+    const plan: DecompositionOutput = {
+      goal_summary: "Ship local handoff.",
+      domain: "software",
+      rationale: "Local agents need a queueable manifest.",
+      nodes: [
+        node("context", "agent"),
+        node("verify", "agent", { acceptance_rule: {
+          logic: "all",
+          threshold: 1,
+          completion_mode: "auto",
+          clauses: [{ evaluator: "ci_status", auto_verifiable: true, match: { conclusion: "success" } }],
+        } }),
+      ],
+      edges: [{ from: "context", to: "verify" }],
+    };
+
+    const manifest = buildLocalHandoffManifest({
+      plan,
+      aimContext: [
+        {
+          content: "Project fact: Use the local workspace as the source of truth.",
+          category: "project_fact",
+          source: "distilled_context",
+          stepId: "loop_1",
+          reason: "Aim-scoped context collected through local_workspace.",
+        },
+        {
+          content: "Constraint: This stable preference belongs in memory, not every local job.",
+          category: "constraint",
+          source: "user_answer",
+          reason: "Durable context candidate.",
+        },
+      ],
+    });
+
+    expect(manifest.version).toBe(1);
+    expect(manifest.agentQueue.map((job) => job.id)).toEqual(["agent:context", "agent:verify"]);
+    expect(manifest.agentQueue[1]!.prerequisiteKeys).toEqual(["context"]);
+    expect(manifest.agentQueue[0]!.inputContext).toEqual([
+      expect.objectContaining({
+        category: "project_fact",
+        stepId: "loop_1",
+      }),
+    ]);
+    expect(manifest.evalSignals).toEqual([
+      "context meets the aim-specific standard.",
+      "verify meets the aim-specific standard.",
+    ]);
+    expect(manifest.nextActions[0]).toBe("Prepare 2 local agent jobs for queueing.");
+  });
+
+  it("keeps blocked agent and human-gated work out of the ready queue", () => {
+    const plan: DecompositionOutput = {
+      goal_summary: "Route local handoff work.",
+      domain: "software",
+      rationale: "Only ready agent work should enter the queue.",
+      nodes: [
+        node("scan", "agent", {
+          decomposition_contract: {
+            why: "The agent needs the workspace.",
+            definition_of_done: "Relevant files are identified.",
+            required_evidence: ["Workspace scan result."],
+            likely_owner: "agent",
+            context_gaps: [{ category: "project_fact", question: "Which folder should be scanned?", reason: "Folder access is missing." }],
+            eval_signal: "The scan points to the right source material.",
+          },
+        }),
+        node("approve", "human", { acceptance_rule: manualRule() }),
+        node("pair", "mixed"),
+      ],
+      edges: [],
+    };
+
+    const manifest = buildLocalHandoffManifest({ plan });
+
+    expect(manifest.agentQueue).toEqual([]);
+    expect(manifest.blockedAgentQueue).toEqual([
+      expect.objectContaining({
+        id: "blocked:scan",
+        status: "needs_context",
+        nextAction: "Collect context: Which folder should be scanned?",
+      }),
+    ]);
+    expect(manifest.humanQueue.map((task) => task.id)).toEqual(["human:approve", "human:pair"]);
+    expect(manifest.nextActions).toEqual([
+      "Resolve 1 blocked agent job before one-click handoff.",
+      "Route 2 human-gated tasks outside the agent queue.",
+    ]);
   });
 });
