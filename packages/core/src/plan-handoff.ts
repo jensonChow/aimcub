@@ -65,6 +65,7 @@ export interface LocalAgentHandoffJob {
   title: string;
   status: "ready";
   prerequisiteKeys: string[];
+  waitingOnHumanNodeKeys: string[];
   inputContext: LocalAgentHandoffContextItem[];
   expectedEvidence: string[];
   evalSignal: string;
@@ -78,6 +79,7 @@ export interface LocalAgentBlockedJob {
   title: string;
   status: Exclude<PlanHandoffReadiness, "ready">;
   blockerCodes: PlanHandoffBlockerCode[];
+  waitingOnHumanNodeKeys: string[];
   inputContext: LocalAgentHandoffContextItem[];
   contextGaps: DecompositionContextGap[];
   nextAction: string;
@@ -89,6 +91,7 @@ export interface LocalHumanHandoffTask {
   title: string;
   likelyOwner: Extract<DecompositionOwner, "human" | "mixed">;
   blockerCodes: PlanHandoffBlockerCode[];
+  unblocksAgentNodeKeys: string[];
   inputContext: LocalAgentHandoffContextItem[];
   contextGaps: DecompositionContextGap[];
   requiredDecision: string;
@@ -336,10 +339,39 @@ function contextForTask(
     }));
 }
 
+function taskMap(report: PlanHandoffReport): Map<string, PlanHandoffTask> {
+  const tasks = [
+    ...report.agentReady,
+    ...report.agentBlocked,
+    ...report.humanRequired,
+    ...report.mixed,
+    ...report.either,
+  ];
+  return new Map(tasks.map((task) => [task.nodeKey, task]));
+}
+
+function humanPrerequisiteKeys(
+  task: PlanHandoffTask,
+  tasksByKey: ReadonlyMap<string, PlanHandoffTask>,
+): string[] {
+  return task.prerequisiteKeys.filter((key) => {
+    const prerequisite = tasksByKey.get(key);
+    return prerequisite?.likelyOwner === "human" || prerequisite?.likelyOwner === "mixed";
+  });
+}
+
+function agentDependentKeys(task: PlanHandoffTask, report: PlanHandoffReport): string[] {
+  const agentishTasks = [...report.agentReady, ...report.agentBlocked];
+  return agentishTasks
+    .filter((candidate) => candidate.prerequisiteKeys.includes(task.nodeKey))
+    .map((candidate) => candidate.nodeKey);
+}
+
 function agentJob(
   task: PlanHandoffTask,
   contexts: readonly LocalAgentHandoffContextItem[],
   maxContextItems: number,
+  waitingOnHumanNodeKeys: readonly string[],
 ): LocalAgentHandoffJob {
   return {
     id: `agent:${task.nodeKey}`,
@@ -347,6 +379,7 @@ function agentJob(
     title: task.title,
     status: "ready",
     prerequisiteKeys: task.prerequisiteKeys,
+    waitingOnHumanNodeKeys: [...waitingOnHumanNodeKeys],
     inputContext: contextForTask(contexts, maxContextItems),
     expectedEvidence: task.expectedEvidence,
     evalSignal: task.evalSignal ?? "Complete the task according to the aim-specific acceptance rule.",
@@ -359,6 +392,7 @@ function blockedJob(
   task: PlanHandoffTask,
   contexts: readonly LocalAgentHandoffContextItem[],
   maxContextItems: number,
+  waitingOnHumanNodeKeys: readonly string[],
 ): LocalAgentBlockedJob {
   const needsContext = task.contextGaps[0];
   return {
@@ -367,6 +401,7 @@ function blockedJob(
     title: task.title,
     status: task.readiness === "ready" ? "needs_review" : task.readiness,
     blockerCodes: task.blockerCodes,
+    waitingOnHumanNodeKeys: [...waitingOnHumanNodeKeys],
     inputContext: contextForTask(contexts, maxContextItems),
     contextGaps: task.contextGaps,
     nextAction: needsContext
@@ -379,6 +414,7 @@ function humanTask(
   task: PlanHandoffTask,
   contexts: readonly LocalAgentHandoffContextItem[],
   maxContextItems: number,
+  unblocksAgentNodeKeys: readonly string[],
 ): LocalHumanHandoffTask {
   return {
     id: `human:${task.nodeKey}`,
@@ -386,6 +422,7 @@ function humanTask(
     title: task.title,
     likelyOwner: task.likelyOwner === "mixed" ? "mixed" : "human",
     blockerCodes: task.blockerCodes,
+    unblocksAgentNodeKeys: [...unblocksAgentNodeKeys],
     inputContext: contextForTask(contexts, maxContextItems),
     contextGaps: task.contextGaps,
     requiredDecision: task.likelyOwner === "mixed"
@@ -418,6 +455,10 @@ function manifestNextActions(input: {
   if (input.manifest.agentQueue.length > 0) {
     actions.push(`Prepare ${input.manifest.agentQueue.length} local agent job${input.manifest.agentQueue.length === 1 ? "" : "s"} for queueing.`);
   }
+  const humanGatedAgentCount = input.manifest.agentQueue.filter((job) => job.waitingOnHumanNodeKeys.length > 0).length;
+  if (humanGatedAgentCount > 0) {
+    actions.push(`Hold ${humanGatedAgentCount} queued agent job${humanGatedAgentCount === 1 ? "" : "s"} until human prerequisites complete.`);
+  }
   if (input.manifest.blockedAgentQueue.length > 0) {
     actions.push(`Resolve ${input.manifest.blockedAgentQueue.length} blocked agent job${input.manifest.blockedAgentQueue.length === 1 ? "" : "s"} before one-click handoff.`);
   }
@@ -431,13 +472,22 @@ export function buildLocalHandoffManifest(input: BuildLocalHandoffManifestInput)
   const report = input.handoff ?? buildPlanHandoffReport({ plan: input.plan });
   const maxContextItems = input.maxContextItemsPerJob ?? 6;
   const contexts = handoffContextCandidates(input);
+  const tasksByKey = taskMap(report);
   const partial: Omit<LocalHandoffManifest, "nextActions"> = {
     version: 1,
-    agentQueue: report.agentReady.map((task) => agentJob(task, contexts, maxContextItems)),
-    blockedAgentQueue: report.agentBlocked.map((task) => blockedJob(task, contexts, maxContextItems)),
+    agentQueue: report.agentReady.map((task) =>
+      agentJob(task, contexts, maxContextItems, humanPrerequisiteKeys(task, tasksByKey)),
+    ),
+    blockedAgentQueue: report.agentBlocked.map((task) =>
+      blockedJob(task, contexts, maxContextItems, humanPrerequisiteKeys(task, tasksByKey)),
+    ),
     humanQueue: [
-      ...report.humanRequired.map((task) => humanTask(task, contexts, maxContextItems)),
-      ...report.mixed.map((task) => humanTask(task, contexts, maxContextItems)),
+      ...report.humanRequired.map((task) =>
+        humanTask(task, contexts, maxContextItems, agentDependentKeys(task, report)),
+      ),
+      ...report.mixed.map((task) =>
+        humanTask(task, contexts, maxContextItems, agentDependentKeys(task, report)),
+      ),
     ],
     evalSignals: [
       ...new Set([

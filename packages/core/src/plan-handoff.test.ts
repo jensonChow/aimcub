@@ -350,6 +350,45 @@ describe("buildLocalHandoffManifest", () => {
     ]);
   });
 
+  it("marks human prerequisites that unblock queued agent jobs", () => {
+    const plan: DecompositionOutput = {
+      goal_summary: "Prepare a gated local agent run.",
+      domain: "software",
+      rationale: "The agent can run only after the user grants access.",
+      nodes: [
+        node("grant", "human", {
+          acceptance_rule: manualRule(),
+          decomposition_contract: {
+            why: "The user must grant access before automation can inspect the source.",
+            definition_of_done: "The user has granted access to the source folder.",
+            required_evidence: ["User confirms source folder access."],
+            likely_owner: "human",
+            context_gaps: [],
+            eval_signal: "The source folder is available for local agent execution.",
+          },
+        }),
+        node("inspect", "agent"),
+      ],
+      edges: [{ from: "grant", to: "inspect" }],
+    };
+
+    const manifest = buildLocalHandoffManifest({ plan });
+
+    expect(manifest.agentQueue.map((job) => job.nodeKey)).toEqual(["inspect"]);
+    expect(manifest.agentQueue[0]!.waitingOnHumanNodeKeys).toEqual(["grant"]);
+    expect(manifest.humanQueue).toEqual([
+      expect.objectContaining({
+        nodeKey: "grant",
+        unblocksAgentNodeKeys: ["inspect"],
+      }),
+    ]);
+    expect(manifest.nextActions).toEqual([
+      "Prepare 1 local agent job for queueing.",
+      "Hold 1 queued agent job until human prerequisites complete.",
+      "Route 1 human-gated task outside the agent queue.",
+    ]);
+  });
+
   it("keeps blocked agent and human-gated work out of the ready queue", () => {
     const plan: DecompositionOutput = {
       goal_summary: "Route local handoff work.",
