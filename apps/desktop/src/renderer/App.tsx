@@ -1614,7 +1614,7 @@ function classicSidebarStyle(compact: boolean, collapsed: boolean): CSSPropertie
     borderRight: compact ? "none" : `1px solid ${C.border}`,
     borderBottom: compact ? `1px solid ${C.border}` : "none",
     boxShadow: "none",
-    padding: collapsed ? "12px 8px" : compact ? "16px 14px" : "18px 12px 14px",
+    padding: collapsed ? "54px 8px 12px" : compact ? "16px 14px" : "56px 12px 14px",
     boxSizing: "border-box",
     minWidth: 0,
     height: compact ? "auto" : "100%",

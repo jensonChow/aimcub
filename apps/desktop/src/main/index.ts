@@ -10,6 +10,9 @@ function createWindow(): void {
     height: 760,
     show: false,
     title: "Aimcub",
+    backgroundColor: "#fafafa",
+    titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
+    trafficLightPosition: process.platform === "darwin" ? { x: 18, y: 18 } : undefined,
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
       sandbox: false,
