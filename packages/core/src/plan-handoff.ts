@@ -324,13 +324,63 @@ function handoffContextCandidates(input: BuildLocalHandoffManifestInput): LocalA
   });
 }
 
+function cleanSearchText(value: string): string {
+  return value.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function searchTokens(value: string): string[] {
+  return cleanSearchText(value).match(/[\p{L}\p{N}_-]{2,}/gu) ?? [];
+}
+
+function taskSearchText(task: PlanHandoffTask): string {
+  return [
+    task.title,
+    task.description,
+    task.expectedEvidence.join(" "),
+    task.evalSignal ?? "",
+    task.acceptanceSummary,
+    ...task.contextGaps.flatMap((gap) => [gap.category, gap.question, gap.reason]),
+  ].join(" ");
+}
+
+function contextCategoryBaseScore(category: ContextCategory): number {
+  switch (category) {
+    case "eval_signal":
+    case "procedure":
+      return 5;
+    case "constraint":
+    case "capability":
+      return 4;
+    case "project_fact":
+      return 3;
+    case "preference":
+      return 2;
+  }
+}
+
+function contextTaskScore(context: LocalAgentHandoffContextItem, task: PlanHandoffTask): number {
+  const taskText = cleanSearchText(taskSearchText(task));
+  const contextText = cleanSearchText(context.content);
+  const gapCategories = new Set(task.contextGaps.map((gap) => gap.category));
+  const tokenHits = searchTokens(context.content).filter((token) => taskText.includes(token)).length;
+  const taskTokens = searchTokens(taskText);
+  const reverseTokenHits = taskTokens.filter((token) => contextText.includes(token)).length;
+  return contextCategoryBaseScore(context.category) +
+    (gapCategories.has(context.category) ? 12 : 0) +
+    Math.min(10, (tokenHits + reverseTokenHits) * 2) +
+    (context.source === "tool_observation" ? 2 : 0);
+}
+
 function contextForTask(
   contexts: readonly LocalAgentHandoffContextItem[],
+  task: PlanHandoffTask,
   maxItems: number,
 ): LocalAgentHandoffContextItem[] {
   return contexts
+    .map((context, index) => ({ context, index, score: contextTaskScore(context, task) }))
+    .sort((a, b) => b.score - a.score || a.index - b.index)
     .slice(0, maxItems)
-    .map((context) => ({
+    .map(({ context }) => ({
       category: context.category,
       content: context.content,
       source: context.source,
@@ -380,7 +430,7 @@ function agentJob(
     status: "ready",
     prerequisiteKeys: task.prerequisiteKeys,
     waitingOnHumanNodeKeys: [...waitingOnHumanNodeKeys],
-    inputContext: contextForTask(contexts, maxContextItems),
+    inputContext: contextForTask(contexts, task, maxContextItems),
     expectedEvidence: task.expectedEvidence,
     evalSignal: task.evalSignal ?? "Complete the task according to the aim-specific acceptance rule.",
     acceptanceSummary: task.acceptanceSummary,
@@ -402,7 +452,7 @@ function blockedJob(
     status: task.readiness === "ready" ? "needs_review" : task.readiness,
     blockerCodes: task.blockerCodes,
     waitingOnHumanNodeKeys: [...waitingOnHumanNodeKeys],
-    inputContext: contextForTask(contexts, maxContextItems),
+    inputContext: contextForTask(contexts, task, maxContextItems),
     contextGaps: task.contextGaps,
     nextAction: needsContext
       ? `Collect context: ${needsContext.question}`
@@ -423,7 +473,7 @@ function humanTask(
     likelyOwner: task.likelyOwner === "mixed" ? "mixed" : "human",
     blockerCodes: task.blockerCodes,
     unblocksAgentNodeKeys: [...unblocksAgentNodeKeys],
-    inputContext: contextForTask(contexts, maxContextItems),
+    inputContext: contextForTask(contexts, task, maxContextItems),
     contextGaps: task.contextGaps,
     requiredDecision: task.likelyOwner === "mixed"
       ? "Decide the human handoff point before agent execution continues."

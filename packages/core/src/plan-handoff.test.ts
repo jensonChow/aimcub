@@ -245,6 +245,55 @@ describe("buildLocalHandoffManifest", () => {
     ]);
   });
 
+  it("prioritizes task-relevant context instead of blindly taking the first items", () => {
+    const plan: DecompositionOutput = {
+      goal_summary: "Research Cambodia entry logistics.",
+      domain: "custom",
+      rationale: "A local agent needs the most relevant context for each delegated task.",
+      nodes: [node("visa", "agent", {
+        title: "Research Cambodia visa requirements",
+        description: "Find the visa requirements, official sources, and required travel documents.",
+      })],
+      edges: [],
+    };
+
+    const manifest = buildLocalHandoffManifest({
+      plan,
+      maxContextItemsPerJob: 2,
+      aimContext: [
+        {
+          content: "Preference: Keep trip notes concise.",
+          category: "preference",
+          source: "user_answer",
+          reason: "General formatting preference.",
+        },
+        {
+          content: "Constraint: Keep all prices in USD.",
+          category: "constraint",
+          source: "user_answer",
+          reason: "General budgeting preference.",
+        },
+        {
+          content: "Project fact: Cambodia visa requirements depend on passport nationality and entry route.",
+          category: "project_fact",
+          source: "tool_observation",
+          reason: "Web research observation.",
+        },
+        {
+          content: "Procedure: Verify Cambodia visa requirements against official government sources.",
+          category: "procedure",
+          source: "distilled_context",
+          reason: "Research workflow.",
+        },
+      ],
+    });
+
+    expect(manifest.agentQueue[0]!.inputContext.map((context) => context.content)).toEqual([
+      "Project fact: Cambodia visa requirements depend on passport nationality and entry route.",
+      "Procedure: Verify Cambodia visa requirements against official government sources.",
+    ]);
+  });
+
   it("carries newly sedimented durable context into agent handoff jobs", () => {
     const plan: DecompositionOutput = {
       goal_summary: "Ship answer-aware handoff.",
@@ -294,7 +343,7 @@ describe("buildLocalHandoffManifest", () => {
       ],
     });
 
-    expect(manifest.agentQueue[0]!.inputContext).toEqual([
+    expect(manifest.agentQueue[0]!.inputContext).toEqual(expect.arrayContaining([
       expect.objectContaining({
         category: "project_fact",
         source: "tool_observation",
@@ -310,7 +359,7 @@ describe("buildLocalHandoffManifest", () => {
         category: "preference",
         source: "selected_context",
       }),
-    ]);
+    ]));
   });
 
   it("adds context-derived eval signals to the local handoff manifest", () => {
