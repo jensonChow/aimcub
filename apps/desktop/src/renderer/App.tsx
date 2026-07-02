@@ -53,7 +53,6 @@ import {
 import {
   C,
   card,
-  chipButton,
   inputStyle,
   optionButton,
   primaryButton,
@@ -760,6 +759,8 @@ function AppInner() {
     : null;
   const workspaceTitle = (viewing?.title ?? savedGoal?.title ?? title.trim()) || t(step === "home" ? "home.recent" : "shell.currentAim");
   const showSessionDetails = step !== "home" && step !== "aim";
+  const showTopBar = showSessionDetails;
+  const providerMeta = provider?.configured ? providerLabel(provider, t) : t("provider.setup");
   const composerDisabled = Boolean(activeBusyStep);
   const composerPlaceholder = step === "plan" && !viewing && finalPlan
     ? t("chat.followupPlaceholder")
@@ -793,32 +794,26 @@ function AppInner() {
           onNew={startNew}
           onOpen={openGoal}
           onToggleCollapsed={() => setSidebarCollapsed((value) => !value)}
+          providerMeta={providerMeta}
+          onProviderSettings={() => setShowSettings((v) => !v)}
         />
 
         <section style={mainShellStyle()}>
-          <header style={mainTopBarStyle(compactShell)}>
-            <div style={{ minWidth: 0 }}>
-              {showSessionDetails && (
+          {showTopBar && (
+            <header style={mainTopBarStyle(compactShell)}>
+              <div style={{ minWidth: 0 }}>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ color: C.text, fontSize: 15, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {workspaceTitle}
                   </div>
                   <div style={{ color: C.muted, fontSize: 12, marginTop: 3 }}>{t("shell.subtitle")}</div>
                 </div>
-              )}
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-              <LangToggle />
-              {showSessionDetails && (
-                <button onClick={() => setShowSettings((v) => !v)} style={chipButton()}>
-                  {provider?.configured ? providerLabel(provider, t) : t("provider.setup")}
-                </button>
-              )}
-            </div>
-          </header>
+              </div>
+            </header>
+          )}
 
           {showSettings && (
-            <div style={{ marginBottom: 14 }}>
+            <div style={settingsPanelWrapStyle(compactShell)}>
               <ProviderForm
                 status={provider}
                 onSaved={(s) => {
@@ -917,7 +912,7 @@ function AppInner() {
                 disabled={composerDisabled}
                 onChange={setComposerText}
                 onSubmit={submitComposerPrompt}
-                meta={provider?.configured ? providerLabel(provider, t) : t("provider.setup")}
+                meta={providerMeta}
                 onMetaClick={() => setShowSettings((v) => !v)}
               />
             </section>
@@ -1096,6 +1091,8 @@ function ClassicSidebar(props: {
   onNew: () => void;
   onOpen: (goal: Goal) => void;
   onToggleCollapsed: () => void;
+  providerMeta: string;
+  onProviderSettings: () => void;
 }) {
   const { t } = useI18n();
   const [query, setQuery] = useState("");
@@ -1149,7 +1146,7 @@ function ClassicSidebar(props: {
         </div>
       </div>
 
-      <div style={{ minHeight: 0 }}>
+      <div style={sidebarSessionsPaneStyle(props.compact)}>
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -1157,7 +1154,7 @@ function ClassicSidebar(props: {
           style={sidebarSearchInputStyle()}
         />
         <SidebarSectionLabel label={t("chat.sessions")} value={t(props.goals.length === 1 ? "chat.session_one" : "chat.session_other", { n: props.goals.length })} />
-        <div style={{ display: "grid", gap: 7, maxHeight: props.compact ? 220 : "none", overflow: "auto", paddingRight: 2 }}>
+        <div style={{ display: "grid", gap: 7, minHeight: 0, maxHeight: props.compact ? 220 : "none", overflow: "auto", paddingRight: 2 }}>
           {filteredGoals.map((goal) => {
             const selected = props.currentGoal?.id === goal.id;
             const plan = planOf(goal);
@@ -1174,6 +1171,13 @@ function ClassicSidebar(props: {
             <div style={{ color: C.muted, fontSize: 13, padding: "8px 2px" }}>{t("shell.noSearchResults")}</div>
           )}
         </div>
+      </div>
+
+      <div style={sidebarFooterStyle(props.compact)}>
+        <LangToggle />
+        <button onClick={props.onProviderSettings} style={sidebarProviderButtonStyle()}>
+          {props.providerMeta}
+        </button>
       </div>
     </aside>
   );
@@ -1445,7 +1449,7 @@ function classicSidebarStyle(compact: boolean, collapsed: boolean): CSSPropertie
     position: compact ? "relative" : "sticky",
     top: 0,
     display: "grid",
-    gridTemplateRows: collapsed ? "repeat(3, 36px) minmax(0, 1fr)" : compact ? "auto auto" : "auto minmax(0, 1fr)",
+    gridTemplateRows: collapsed ? "repeat(3, 36px) minmax(0, 1fr)" : compact ? "auto auto auto" : "auto minmax(0, 1fr) auto",
     alignContent: collapsed ? "start" : undefined,
     gap: collapsed ? 8 : 18,
     background: C.page,
@@ -1509,6 +1513,13 @@ function contentSurfaceStyle(compact: boolean): CSSProperties {
   };
 }
 
+function settingsPanelWrapStyle(compact: boolean): CSSProperties {
+  return {
+    flex: "0 0 auto",
+    padding: compact ? "12px 14px 0" : "14px 28px 0",
+  };
+}
+
 function sidebarBrandButton(): CSSProperties {
   return {
     display: "grid",
@@ -1519,6 +1530,45 @@ function sidebarBrandButton(): CSSProperties {
     color: C.text,
     padding: "0 2px",
     cursor: "pointer",
+    textAlign: "left",
+  };
+}
+
+function sidebarSessionsPaneStyle(compact: boolean): CSSProperties {
+  return {
+    minHeight: 0,
+    overflow: "hidden",
+    display: "grid",
+    gridTemplateRows: compact ? "auto auto auto" : "auto auto minmax(0, 1fr)",
+    alignContent: compact ? "start" : undefined,
+  };
+}
+
+function sidebarFooterStyle(compact: boolean): CSSProperties {
+  return {
+    display: "grid",
+    gap: 10,
+    alignContent: "end",
+    borderTop: compact ? "none" : `1px solid ${C.border}`,
+    paddingTop: compact ? 0 : 12,
+  };
+}
+
+function sidebarProviderButtonStyle(): CSSProperties {
+  return {
+    width: "100%",
+    minWidth: 0,
+    border: "1px solid transparent",
+    borderRadius: 8,
+    background: "rgba(31, 35, 40, 0.045)",
+    color: C.muted,
+    padding: "8px 10px",
+    cursor: "pointer",
+    fontSize: 12,
+    fontFamily: "inherit",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
     textAlign: "left",
   };
 }
