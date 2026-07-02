@@ -313,6 +313,43 @@ describe("buildLocalHandoffManifest", () => {
     ]);
   });
 
+  it("adds context-derived eval signals to the local handoff manifest", () => {
+    const plan: DecompositionOutput = {
+      goal_summary: "Ship eval-aware handoff.",
+      domain: "software",
+      rationale: "Aimcub owns the eval layer.",
+      nodes: [node("handoff", "agent")],
+      edges: [],
+    };
+
+    const manifest = buildLocalHandoffManifest({
+      plan,
+      durableMemoryCandidates: [
+        {
+          content: "Eval signal: Done means the generated handoff can be verified by pnpm test.",
+          kind: "semantic",
+          category: "eval_signal",
+          source: "user_stated",
+          confidence: 0.82,
+          stepId: "loop_questionnaire",
+          reason: "Durable eval_signal context collected through questionnaire.",
+        },
+      ],
+      selectedContext: [
+        {
+          content: "Eval signal: Done means the generated handoff can be verified by pnpm test.",
+          category: "eval_signal",
+          confidence: 0.95,
+        },
+      ],
+    });
+
+    expect(manifest.evalSignals).toEqual([
+      "handoff meets the aim-specific standard.",
+      "Eval signal: Done means the generated handoff can be verified by pnpm test.",
+    ]);
+  });
+
   it("keeps blocked agent and human-gated work out of the ready queue", () => {
     const plan: DecompositionOutput = {
       goal_summary: "Route local handoff work.",

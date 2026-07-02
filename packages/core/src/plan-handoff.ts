@@ -382,6 +382,22 @@ function humanTask(task: PlanHandoffTask): LocalHumanHandoffTask {
   };
 }
 
+function contextEvalSignals(input: BuildLocalHandoffManifestInput): string[] {
+  const signals: string[] = [];
+  for (const context of input.aimContext ?? []) {
+    if (context.category === "eval_signal" && context.content.trim()) signals.push(context.content.trim());
+  }
+  for (const context of input.durableMemoryCandidates ?? []) {
+    if (context.category === "eval_signal" && context.content.trim()) signals.push(context.content.trim());
+  }
+  for (const context of input.selectedContext ?? []) {
+    if (selectedContextCategory(context) === "eval_signal" && context.content.trim()) {
+      signals.push(context.content.trim());
+    }
+  }
+  return signals;
+}
+
 function manifestNextActions(input: {
   manifest: Omit<LocalHandoffManifest, "nextActions">;
   report: PlanHandoffReport;
@@ -411,7 +427,12 @@ export function buildLocalHandoffManifest(input: BuildLocalHandoffManifestInput)
       ...report.humanRequired.map(humanTask),
       ...report.mixed.map(humanTask),
     ],
-    evalSignals: [...new Set(report.agentReady.flatMap((task) => task.evalSignal ? [task.evalSignal] : []))],
+    evalSignals: [
+      ...new Set([
+        ...report.agentReady.flatMap((task) => task.evalSignal ? [task.evalSignal] : []),
+        ...contextEvalSignals(input),
+      ]),
+    ],
   };
   return {
     ...partial,
