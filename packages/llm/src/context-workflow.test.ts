@@ -66,6 +66,25 @@ describe("context workflow", () => {
         },
       },
       {
+        toolName: "local.read",
+        observation: {
+          summary: "Read package manifest.",
+          data: {
+            path: "/workspace/aimcub/package.json",
+            lines: [
+              { line: 1, text: "{" },
+              { line: 2, text: '  "name": "aimcub",' },
+              { line: 3, text: '  "scripts": {' },
+              { line: 4, text: '    "test": "vitest run"' },
+              { line: 5, text: "  }" },
+            ],
+            truncated: false,
+            byteLength: 96,
+          },
+          sources: [{ kind: "file", path: "/workspace/aimcub/package.json" }],
+        },
+      },
+      {
         toolName: "web.fetch",
         observation: {
           summary: "Fetched official docs.",
@@ -151,6 +170,14 @@ describe("context workflow", () => {
         category: "project_fact",
         scope: "aim",
         summary: expect.stringContaining("Workspace scan: /workspace/aimcub"),
+      }),
+      expect.objectContaining({
+        source: "tool_observation",
+        toolName: "local.read",
+        channel: "local_workspace",
+        category: "project_fact",
+        scope: "aim",
+        summary: expect.stringContaining('"name": "aimcub"'),
       }),
       expect.objectContaining({
         source: "tool_observation",

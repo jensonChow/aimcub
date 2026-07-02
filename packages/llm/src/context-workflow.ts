@@ -228,7 +228,16 @@ function localObservationSummary(value: unknown, fallback: string | undefined): 
     ].map(cleanText).filter(Boolean).join(" — ");
   }
   if (isLocalReadOutput(value)) {
-    return `Read local file: ${value.path}`;
+    const body = value.lines
+      .slice(0, 40)
+      .map((line) => `${line.line}: ${line.text}`)
+      .join("\n")
+      .slice(0, 1_200);
+    return [
+      `Read local file: ${value.path}`,
+      body,
+      value.truncated ? "File content was truncated." : undefined,
+    ].map(cleanText).filter(Boolean).join(" — ");
   }
   if (isLocalSearchOutput(value)) {
     return `Local search found ${value.matches.length} match${value.matches.length === 1 ? "" : "es"}.`;
