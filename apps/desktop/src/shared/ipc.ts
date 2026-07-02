@@ -13,7 +13,10 @@ import type {
   ClarifyAssumption,
   ClarifyAnswerImpactReport,
   ClarifyLearningReport,
+  ContextDistillOutput,
+  AimcubToolObservation,
   PlanningContextSelectionReport,
+  PlanningToolFailure,
 } from "@core/llm";
 
 export interface DraftRequest {
@@ -71,12 +74,20 @@ export interface PlanResult {
     firstQuality: PlanQualityReport | null;
   };
   planningContext?: PlanningContextSelectionReport | null;
+  planningTools?: PlanningToolIpcTrace | null;
 }
 
 export interface ClarifyIpcResult {
   ok: boolean;
   output: ClarifyOutput | null;
   errors: string[];
+  planningTools?: PlanningToolIpcTrace | null;
+}
+
+export interface PlanningToolIpcTrace {
+  observations: Array<AimcubToolObservation<unknown>>;
+  failures: PlanningToolFailure[];
+  distillation: ContextDistillOutput | null;
 }
 
 export interface SavedGoal {

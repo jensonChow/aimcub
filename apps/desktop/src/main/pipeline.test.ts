@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  collectPlanningToolContext,
+  createAimcubToolRegistry,
+  createContextDistillHandler,
   localDecompose,
   type ClarifyAnswer,
+  type AimcubToolHandlerContext,
   type LlmGateway,
   type LlmRequest,
   type LlmResponse,
@@ -85,6 +89,10 @@ function throwingGateway(): LlmGateway {
 }
 
 const aim = { title: "Build a CLI todo app with tests + CI", description: "A small command-line todo app." };
+const toolContext: AimcubToolHandlerContext = {
+  now: () => new Date("2026-07-02T00:00:00.000Z"),
+  permissions: ["memory.read", "context.distill"],
+};
 
 describe("desktop planner · no provider configured (no templates)", () => {
   it("runDraft fails honestly with a 'no provider' error", async () => {
@@ -157,6 +165,38 @@ describe("desktop planner · with a gateway (real @core/llm pipeline)", () => {
     expect(decomposeCall?.prompt).toContain("Historical context lineage learning");
     expect(decomposeCall?.prompt).toContain("decomposition_contract/eval_signal");
     expect(decomposeCall?.prompt).toContain("Scaffold CLI");
+  });
+
+  it("passes registry-collected first-party tool context into the draft prompt", async () => {
+    const registry = createAimcubToolRegistry({
+      "memory.search": async () => ({
+        ok: true,
+        observation: {
+          summary: "Selected 1 planning memory.",
+          data: {
+            memories: [{
+              id: "memory-1",
+              content: "User prefers CLI-first workflows with visible process traces.",
+              category: "preference",
+              kind: "semantic",
+              scope: "global",
+              confidence: 0.95,
+            }],
+          },
+          sources: [{ kind: "memory", uri: "memory:memory-1" }],
+        },
+      }),
+      "context.distill": createContextDistillHandler(),
+    });
+    const collected = await collectPlanningToolContext(registry, toolContext, aim);
+    const { gateway, calls } = recordingGateway();
+
+    const d = await runDraft(gateway, aim.title, aim.description, collected.memories);
+
+    expect(d.ok).toBe(true);
+    const decomposeCall = calls.find((call) => call.task === "decompose");
+    expect(decomposeCall?.prompt).toContain("Known user context from previous aims");
+    expect(decomposeCall?.prompt).toContain("visible process traces");
   });
 
   it("clarifies into real forks (>=2 options each)", async () => {

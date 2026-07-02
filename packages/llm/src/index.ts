@@ -189,6 +189,36 @@ export type {
   WebSearchOutput,
 } from "./tool-contract";
 export {
+  createAimcubToolRegistry,
+} from "./tool-registry";
+export type {
+  AimcubToolHandlerMap,
+  AimcubToolInputByName,
+  AimcubToolOutputByName,
+  AimcubToolRegistry,
+  AimcubTypedToolHandler,
+} from "./tool-registry";
+export {
+  createMemorySearchHandler,
+  createMemoryWriteCandidateHandler,
+} from "./memory-tools";
+export type {
+  MemorySearchStore,
+  MemoryToolStore,
+  MemoryWriteCandidateStore,
+} from "./memory-tools";
+export {
+  createContextDistillHandler,
+} from "./context-distill";
+export {
+  collectPlanningToolContext,
+} from "./planning-tool-context";
+export type {
+  PlanningToolContextInput,
+  PlanningToolContextResult,
+  PlanningToolFailure,
+} from "./planning-tool-context";
+export {
   BraveWebSearchClient,
   createWebResearchRuntime,
   createWebResearchRuntimeFromEnv,

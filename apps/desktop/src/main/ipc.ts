@@ -24,7 +24,6 @@ import {
   recordAssumptionContextCandidatesForStore,
   recordReviewContextCandidatesForStore,
   reviewDecompositionStrategyForStore,
-  selectPlanningContextForStore,
   summarizeClarifyLearningForStore,
   summarizeContextCaptureLearningForStore,
   summarizeContextLineageLearningForStore,
@@ -48,13 +47,21 @@ import {
 import { runClarify, runDraft, runRefine } from "./planner";
 import { aimStore } from "./store";
 import { buildGateway, getProviderStatus, setProviderConfig, testProviderConfig } from "./gateway";
+import { collectDesktopPlanningContext, type DesktopPlanningContext } from "./tools";
 
 async function planningContext(input: {
   title: string;
   description?: string;
-  limit?: number;
-}) {
-  return selectPlanningContextForStore(aimStore, input);
+}): Promise<DesktopPlanningContext> {
+  return collectDesktopPlanningContext(input);
+}
+
+function planningToolTrace(context: DesktopPlanningContext) {
+  return {
+    observations: context.toolObservations,
+    failures: context.toolFailures,
+    distillation: context.toolDistillation,
+  };
 }
 
 async function clarifyLearning() {
@@ -114,6 +121,7 @@ export function registerIpc(): void {
         lineageLearning,
       }),
       planningContext: selectedContext.report,
+      planningTools: planningToolTrace(selectedContext),
     };
   });
 
@@ -129,7 +137,7 @@ export function registerIpc(): void {
       draftReview,
       lineageLearning,
     });
-    return runClarify(
+    const clarified = await runClarify(
       buildGateway(),
       req.title,
       req.description,
@@ -142,6 +150,7 @@ export function registerIpc(): void {
       lineageLearning,
       decompositionStrategyReport,
     );
+    return { ...clarified, planningTools: planningToolTrace(selectedContext) };
   });
 
   ipcMain.handle(IPC.refine, async (_e, req: RefineRequest) => {
@@ -171,6 +180,7 @@ export function registerIpc(): void {
         lineageLearning,
       }),
       planningContext: selectedContext.report,
+      planningTools: planningToolTrace(selectedContext),
     };
   });
 
@@ -268,6 +278,7 @@ export function registerIpc(): void {
           lineageLearning,
         }),
         planning_context: selectedContext.report,
+        planning_tools: planningToolTrace(selectedContext),
         ...(answerImpact ? { clarify_answer_impact: answerImpact } : {}),
         ...(captureFulfillment.total > 0 ? { context_capture_fulfillment: captureFulfillment } : {}),
       },

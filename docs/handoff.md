@@ -100,6 +100,7 @@ Implement a narrow v1 tool substrate:
 3. Add optional web tool interfaces but keep implementation conservative:
    - web.search and web.fetch should have typed contracts and disabled/no-provider behavior if no provider is configured.
    - Current status: `packages/llm/src/web-research.ts` provides first-party runtime handlers for both tools. `web.search` supports a provider abstraction with Brave Search as the first built-in provider; `web.fetch` supports bounded public URL extraction with private-host blocking.
+   - Current status: `packages/llm/src/tool-registry.ts` and `packages/llm/src/planning-tool-context.ts` provide the unified first-party registry path used by Desktop planning. `apps/desktop/src/main/tools.ts` binds memory/context/web handlers and gates web research behind explicit environment flags.
    - Do not block the local MVP on a paid search provider. The planner should record "needs web research" gaps when web is unavailable.
 4. Integrate tools into the planning pipeline before decompose:
    aim input -> memory.search -> local.scan_workspace when a workspace is selected -> local.search/read when useful -> optional web.search/fetch -> context.distill -> context.ask_user for remaining durable/aim-local gaps -> decompose -> plan critique.

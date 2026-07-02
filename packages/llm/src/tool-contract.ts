@@ -233,7 +233,8 @@ export interface MemorySearchOutput {
     content: string;
     category: string;
     kind: string;
-    scope: "global" | "current_aim";
+    scope: "global" | "current_aim" | "related_aim";
+    goalId?: string | null;
     confidence?: number;
   }>;
 }
@@ -636,7 +637,8 @@ export const BUILT_IN_TOOL_CONTRACTS = [
               content: { type: "string" },
               category: { type: "string" },
               kind: { type: "string" },
-              scope: { type: "string", enum: ["global", "current_aim"] },
+              scope: { type: "string", enum: ["global", "current_aim", "related_aim"] },
+              goalId: { type: "string" },
               confidence: { type: "number", minimum: 0, maximum: 1 },
             },
           },

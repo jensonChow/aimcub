@@ -55,3 +55,11 @@ These handlers are still Aimcub-owned runtime tools, not MCP tools. They enforce
 `web.search` uses a provider abstraction. The built-in provider is `BraveWebSearchClient`, enabled through `AIMCUB_BRAVE_SEARCH_API_KEY` or `BRAVE_SEARCH_API_KEY` when constructing the runtime with `createWebResearchRuntimeFromEnv`. If no provider is configured, the handler returns `disabled` instead of blocking local planning.
 
 `web.fetch` uses an injected or platform `fetch` implementation. It only fetches `http` / `https` URLs, blocks localhost and private-network hosts by default, enforces response-size limits, extracts text/metadata/links from text-like content, and emits web source metadata for Inspector provenance.
+
+## Registry-Backed Planning
+
+`packages/llm/src/tool-registry.ts` owns the unified first-party registry shape. Runtime shells register handlers for the built-in contracts, then execute tools through a single `execute(name, input, context)` path.
+
+`packages/llm/src/planning-tool-context.ts` is the planning collector used before decomposition. It executes `memory.search`, optional web research, and `context.distill`, then converts tool observations into bounded `PlanningMemory` rows for the decompose prompt.
+
+Desktop binds the registry in `apps/desktop/src/main/tools.ts`. By default it grants only memory/context permissions. Web research is opt-in via `AIMCUB_ENABLE_WEB_RESEARCH=1`; fetching the top web result is additionally gated by `AIMCUB_FETCH_WEB_RESULTS=1`.
