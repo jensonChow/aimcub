@@ -36,7 +36,6 @@ import {
   decompositionStrategyFocusLabel,
   decompositionStrategyPriorityLabel,
   dimensionLabel,
-  formatDate,
   fulfillmentStatusColor,
   fulfillmentStatusLabel,
   fulfillmentStatusMark,
@@ -707,7 +706,7 @@ function AppInner() {
     }
   }
 
-  const compactShell = viewportWidth < 1000;
+  const compactShell = viewportWidth < 760;
   const activeBusyStep = isBusyStep(step) ? step : null;
   const activeGoal = viewing ?? savedGoal;
   const activeGoalPending = activeGoal
@@ -734,13 +733,11 @@ function AppInner() {
   const activeContextLineage = activeGoal
     ? reviewContextLineage({ goal: activeGoal, pendingContext: activeGoalPending, contextOutcomes: contextHistory })
     : null;
-  const shellStyle: CSSProperties = compactShell
-    ? { display: "grid", gridTemplateColumns: "1fr", gap: 14 }
-    : { display: "grid", gridTemplateColumns: "248px minmax(360px, 1fr) 300px", gap: 16, alignItems: "start" };
+  const workspaceTitle = (viewing?.title ?? savedGoal?.title ?? title.trim()) || t(step === "home" ? "home.recent" : "shell.currentAim");
 
   return (
     <div style={{ fontFamily: "system-ui, -apple-system, sans-serif", color: C.text, background: "#f4f6f8", minHeight: "100vh" }}>
-      <div style={{ maxWidth: 1580, margin: "0 auto", padding: compactShell ? "18px 14px 48px" : "24px 24px 56px" }}>
+      <div style={{ maxWidth: 1180, margin: "0 auto", padding: compactShell ? "18px 14px 48px" : "24px 28px 56px" }}>
         <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, gap: 12 }}>
           <button
             onClick={goHome}
@@ -777,20 +774,18 @@ function AppInner() {
           </div>
         )}
 
-        <div style={shellStyle}>
-          {!compactShell && (
-            <AimSidebar
-              goals={goals}
-              currentGoal={viewing}
-              step={step}
-              pendingContextCount={contextCandidates.length}
-              onHome={goHome}
-              onNew={startNew}
-              onOpen={openGoal}
-            />
-          )}
+        <WorkspaceBar
+          compact={compactShell}
+          step={step}
+          title={workspaceTitle}
+          goalsCount={goals.length}
+          pendingContextCount={contextCandidates.length}
+          onHome={goHome}
+          onNew={startNew}
+        />
 
-          <main style={{ minWidth: 0, background: "#fff", border: `1px solid ${C.border}`, borderRadius: 10, padding: compactShell ? 16 : 22, minHeight: compactShell ? 360 : "calc(100vh - 132px)", boxSizing: "border-box" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 14 }}>
+          <main style={{ minWidth: 0, background: "#fff", border: `1px solid ${C.border}`, borderRadius: 10, padding: compactShell ? 16 : 24, minHeight: compactShell ? 320 : 420, boxSizing: "border-box" }}>
             {step === "home" && (
               <HomeView
                 goals={goals}
@@ -877,7 +872,7 @@ function AppInner() {
             onRejectContext={rejectContextCandidate}
             onArchiveContext={archiveContextMemory}
             onDeprioritizeContext={deprioritizeContextMemory}
-            sticky={!compactShell}
+            sticky={false}
           />
         </div>
       </div>
@@ -885,64 +880,82 @@ function AppInner() {
   );
 }
 
-function AimSidebar(props: {
-  goals: Goal[];
-  currentGoal: Goal | null;
+function WorkspaceBar(props: {
+  compact: boolean;
   step: Step;
+  title: string;
+  goalsCount: number;
   pendingContextCount: number;
   onHome: () => void;
   onNew: () => void;
-  onOpen: (goal: Goal) => void;
 }) {
   const { t } = useI18n();
-  const [query, setQuery] = useState("");
-  const filtered = props.goals.filter((goal) => {
-    const q = query.trim().toLowerCase();
-    if (!q) return true;
-    return `${goal.title} ${goal.description ?? ""}`.toLowerCase().includes(q);
-  });
   return (
-    <aside style={railSurface()}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 14 }}>
-        <button onClick={props.onHome} style={{ ...linkLikeButton(), fontWeight: props.step === "home" ? 700 : 600 }}>
+    <nav style={workspaceBarStyle(props.compact)}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: "1 1 auto" }}>
+        <button onClick={props.onHome} style={workspaceBarButton(props.step === "home")}>
           {t("shell.aims")}
         </button>
-        <button onClick={props.onNew} style={{ ...primaryButton(false), marginTop: 0, padding: "7px 10px", fontSize: 12, whiteSpace: "nowrap" }}>
+        <button onClick={props.onNew} style={workspaceBarButton(props.step === "aim")}>
           {t("home.new")}
         </button>
+        <div style={{ minWidth: 0, color: C.text, fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {props.title}
+        </div>
       </div>
-      <input
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder={t("shell.searchAims")}
-        style={{ ...inputStyle(), fontSize: 13, padding: "9px 10px", marginBottom: 12 }}
-      />
-      <div style={{ color: C.muted, fontSize: 12, marginBottom: 8 }}>
-        {props.goals.length === 0 ? t("home.none") : t(props.goals.length === 1 ? "home.aim_one" : "home.aim_other", { n: props.goals.length })}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+        <span style={workspaceBadgeStyle()}>
+          {t(props.goalsCount === 1 ? "home.aim_one" : "home.aim_other", { n: props.goalsCount })}
+        </span>
+        <span style={workspaceBadgeStyle()}>
+          {t(props.pendingContextCount === 1 ? "shell.pendingContext_one" : "shell.pendingContext_other", { n: props.pendingContextCount })}
+        </span>
       </div>
-      <div style={{ display: "grid", gap: 8 }}>
-        {filtered.slice(0, 24).map((goal) => {
-          const selected = props.currentGoal?.id === goal.id;
-          const plan = planOf(goal);
-          return (
-            <button key={goal.id} onClick={() => props.onOpen(goal)} style={sidebarAimButton(selected)}>
-              <span style={{ display: "block", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{goal.title}</span>
-              <span style={{ display: "block", color: C.muted, fontSize: 12, marginTop: 4 }}>
-                {t((plan?.nodes.length ?? 0) === 1 ? "common.milestone_one" : "common.milestone_other", { n: plan?.nodes.length ?? 0 })}
-                {goal.created_at ? ` · ${formatDate(goal.created_at)}` : ""}
-              </span>
-            </button>
-          );
-        })}
-        {filtered.length === 0 && (
-          <div style={{ color: C.muted, fontSize: 13, padding: "14px 2px" }}>{t("shell.noSearchResults")}</div>
-        )}
-      </div>
-      <div style={{ borderTop: `1px solid ${C.border}`, marginTop: 16, paddingTop: 12, color: C.muted, fontSize: 12 }}>
-        {t(props.pendingContextCount === 1 ? "shell.pendingContext_one" : "shell.pendingContext_other", { n: props.pendingContextCount })}
-      </div>
-    </aside>
+    </nav>
   );
+}
+
+function workspaceBarStyle(compact: boolean): CSSProperties {
+  return {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    flexWrap: compact ? "wrap" : "nowrap",
+    background: "#fff",
+    border: `1px solid ${C.border}`,
+    borderRadius: 10,
+    padding: compact ? "10px 11px" : "10px 12px",
+    marginBottom: 14,
+    boxSizing: "border-box",
+  };
+}
+
+function workspaceBarButton(selected: boolean): CSSProperties {
+  return {
+    border: `1px solid ${selected ? "#b8cbe8" : C.border}`,
+    background: selected ? "#f3f7ff" : "#fff",
+    color: selected ? C.accent : C.text,
+    borderRadius: 7,
+    padding: "7px 10px",
+    cursor: "pointer",
+    fontSize: 12,
+    fontWeight: selected ? 700 : 600,
+    whiteSpace: "nowrap",
+  };
+}
+
+function workspaceBadgeStyle(): CSSProperties {
+  return {
+    border: `1px solid ${C.border}`,
+    borderRadius: 999,
+    color: C.muted,
+    background: "#fff",
+    fontSize: 11,
+    fontWeight: 600,
+    padding: "4px 8px",
+    whiteSpace: "nowrap",
+  };
 }
 
 function AimHeader(props: {
@@ -1109,7 +1122,7 @@ function InspectorRail(props: {
         <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>{t("shell.inspector")}</h2>
         <span style={{ color: C.muted, fontSize: 12 }}>{t("shell.auditLayer")}</span>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 6, marginBottom: 14 }}>
         {tabs.map((tab) => (
           <button key={tab} onClick={() => props.onTab(tab)} style={inspectorTabButton(props.activeTab === tab)}>
             {t(tabLabels[tab])}
@@ -1293,35 +1306,6 @@ function miniPill(color = C.muted): CSSProperties {
     padding: "3px 7px",
     lineHeight: 1.1,
     whiteSpace: "nowrap",
-  };
-}
-
-function linkLikeButton(): CSSProperties {
-  return {
-    border: 0,
-    background: "transparent",
-    color: C.text,
-    padding: 0,
-    cursor: "pointer",
-    fontSize: 15,
-    textAlign: "left",
-  };
-}
-
-function sidebarAimButton(selected: boolean): CSSProperties {
-  return {
-    width: "100%",
-    minWidth: 0,
-    boxSizing: "border-box",
-    overflow: "hidden",
-    textAlign: "left",
-    border: `1px solid ${selected ? "#b8cbe8" : C.border}`,
-    background: selected ? "#f3f7ff" : "#fff",
-    borderRadius: 8,
-    padding: "10px 11px",
-    cursor: "pointer",
-    color: C.text,
-    boxShadow: selected ? "inset 3px 0 0 #2f6fc8" : "none",
   };
 }
 
