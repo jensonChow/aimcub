@@ -15,7 +15,7 @@ import {
   DecompositionLearningPanel,
   HomeView,
 } from "./HomeView";
-import { I18nProvider, useI18n } from "./i18n";
+import { I18nProvider, useI18n, type StringKey } from "./i18n";
 import { LangToggle } from "./LangToggle";
 import { Notice } from "./Notice";
 import { ProviderForm } from "./ProviderForm";
@@ -68,6 +68,7 @@ type InspectorTab = "process" | "context" | "quality" | "activity";
 
 type AnswerMap = Record<string, { label: string | null; other: string }>;
 type PlanningTraceStatus = "pending" | "running" | "done" | "warning" | "error";
+type BusyStep = Extract<Step, "drafting" | "clarifying" | "refining">;
 type PlanningTraceEvent = {
   id: string;
   status: PlanningTraceStatus;
@@ -75,6 +76,32 @@ type PlanningTraceEvent = {
   detail: string;
   at: string;
 };
+
+type SpinnerVerb = {
+  verbKey: StringKey;
+  detailKey: StringKey;
+};
+
+const SPINNER_VERBS = {
+  drafting: [
+    { verbKey: "spinner.drafting.reading", detailKey: "spinner.drafting.readingDetail" },
+    { verbKey: "spinner.drafting.selecting", detailKey: "spinner.drafting.selectingDetail" },
+    { verbKey: "spinner.drafting.shaping", detailKey: "spinner.drafting.shapingDetail" },
+    { verbKey: "spinner.drafting.checking", detailKey: "spinner.drafting.checkingDetail" },
+  ],
+  clarifying: [
+    { verbKey: "spinner.clarifying.reviewing", detailKey: "spinner.clarifying.reviewingDetail" },
+    { verbKey: "spinner.clarifying.finding", detailKey: "spinner.clarifying.findingDetail" },
+    { verbKey: "spinner.clarifying.compressing", detailKey: "spinner.clarifying.compressingDetail" },
+    { verbKey: "spinner.clarifying.preparing", detailKey: "spinner.clarifying.preparingDetail" },
+  ],
+  refining: [
+    { verbKey: "spinner.refining.applying", detailKey: "spinner.refining.applyingDetail" },
+    { verbKey: "spinner.refining.rebalancing", detailKey: "spinner.refining.rebalancingDetail" },
+    { verbKey: "spinner.refining.tightening", detailKey: "spinner.refining.tighteningDetail" },
+    { verbKey: "spinner.refining.reviewing", detailKey: "spinner.refining.reviewingDetail" },
+  ],
+} satisfies Record<BusyStep, readonly SpinnerVerb[]>;
 
 const DRAFT_UI_TIMEOUT_MS = 150_000;
 const CLARIFY_UI_TIMEOUT_MS = 75_000;
@@ -91,6 +118,24 @@ function withUiTimeout<T>(promise: Promise<T>, timeoutMs: number, message: strin
 
 function traceTime(): string {
   return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+function isBusyStep(step: Step | null): step is BusyStep {
+  return step === "drafting" || step === "clarifying" || step === "refining";
+}
+
+function useSpinnerVerb(step: Step | null): { tick: number; item: SpinnerVerb } | null {
+  const [tick, setTick] = useState(0);
+  const busyStep = isBusyStep(step) ? step : null;
+  useEffect(() => {
+    setTick(0);
+    if (!busyStep) return;
+    const timer = window.setInterval(() => setTick((value) => value + 1), 1300);
+    return () => window.clearInterval(timer);
+  }, [busyStep]);
+  if (!busyStep) return null;
+  const verbs = SPINNER_VERBS[busyStep];
+  return { tick, item: verbs[tick % verbs.length]! };
 }
 
 function useViewportWidth(): number {
@@ -663,6 +708,7 @@ function AppInner() {
   }
 
   const compactShell = viewportWidth < 1000;
+  const activeBusyStep = isBusyStep(step) ? step : null;
   const activeGoal = viewing ?? savedGoal;
   const activeGoalPending = activeGoal
     ? pendingContextForGoal(activeGoal, activeGoal.id === savedGoal?.id ? savedContextCandidates : contextCandidates)
@@ -808,6 +854,7 @@ function AppInner() {
             activeTab={inspectorTab}
             onTab={setInspectorTab}
             events={planningTrace}
+            busyStep={activeBusyStep}
             aimIntake={activeIntake}
             decompositionStrategy={decompositionStrategy}
             contextCandidates={contextCandidates}
@@ -940,6 +987,61 @@ function AimHeader(props: {
   );
 }
 
+function SpinnerVerbLine(props: { step: Step | null; detail?: string; compact?: boolean }) {
+  const { lang, t } = useI18n();
+  const spinner = useSpinnerVerb(props.step);
+  if (!spinner) return null;
+  const frame = [".", "..", "..."][spinner.tick % 3]!;
+  const gap = lang === "zh" ? "" : " ";
+  return (
+    <div style={spinnerLineStyle(props.compact)}>
+      <div style={spinnerFrameStyle()}>{frame}</div>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ color: C.text, fontSize: props.compact ? 12 : 13, lineHeight: 1.35 }}>
+          <span style={{ color: C.accent, fontWeight: 700 }}>{t(spinner.item.verbKey)}</span>
+          {gap}
+          <span>{t(spinner.item.detailKey)}</span>
+        </div>
+        {props.detail ? (
+          <div style={{ color: C.muted, fontSize: 12, lineHeight: 1.4, marginTop: 2, wordBreak: "break-word" }}>
+            {props.detail}
+          </div>
+        ) : (
+          <div style={{ color: C.muted, fontSize: 12, lineHeight: 1.4, marginTop: 2 }}>
+            {t("spinner.live")}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function spinnerLineStyle(compact?: boolean): CSSProperties {
+  return {
+    display: "grid",
+    gridTemplateColumns: "34px minmax(0, 1fr)",
+    gap: 10,
+    alignItems: "start",
+    background: "#f7f9fb",
+    border: `1px solid ${C.border}`,
+    borderRadius: 8,
+    padding: compact ? "10px 11px" : "12px 14px",
+    marginTop: compact ? 12 : 14,
+  };
+}
+
+function spinnerFrameStyle(): CSSProperties {
+  return {
+    color: C.accent,
+    fontFamily: "ui-monospace, monospace",
+    fontSize: 13,
+    fontWeight: 800,
+    letterSpacing: 1,
+    textAlign: "center",
+    paddingTop: 1,
+  };
+}
+
 function BusyPlanState(props: { step: Step; title: string; description: string }) {
   const { t } = useI18n();
   const message = props.step === "drafting"
@@ -950,6 +1052,7 @@ function BusyPlanState(props: { step: Step; title: string; description: string }
   return (
     <section>
       <Notice tone="info">{message}</Notice>
+      <SpinnerVerbLine step={props.step} />
       <div style={{ ...card(), background: "#f8fafc", marginTop: 14 }}>
         <div style={{ color: C.muted, fontSize: 12, marginBottom: 6 }}>{t("shell.currentAim")}</div>
         <h2 style={{ margin: 0, fontSize: 24, letterSpacing: 0 }}>{props.title || t("shell.untitledAim")}</h2>
@@ -964,6 +1067,7 @@ function InspectorRail(props: {
   activeTab: InspectorTab;
   onTab: (tab: InspectorTab) => void;
   events: PlanningTraceEvent[];
+  busyStep: BusyStep | null;
   aimIntake: AimIntakeReport | null;
   decompositionStrategy: DecompositionStrategyReport | null;
   contextCandidates: Memory[];
@@ -1014,7 +1118,7 @@ function InspectorRail(props: {
       </div>
 
       {props.activeTab === "process" && (
-        props.events.length > 0 ? <PlanningProcessPanel events={props.events} /> : <InspectorEmpty title={t("shell.noProcess")} body={t("shell.noProcessBody")} />
+        props.events.length > 0 ? <PlanningProcessPanel events={props.events} busyStep={props.busyStep} /> : <InspectorEmpty title={t("shell.noProcess")} body={t("shell.noProcessBody")} />
       )}
 
       {props.activeTab === "context" && (
@@ -1264,9 +1368,12 @@ function traceStatusColor(status: PlanningTraceStatus): string {
   }
 }
 
-function PlanningProcessPanel(props: { events: PlanningTraceEvent[] }) {
+function PlanningProcessPanel(props: { events: PlanningTraceEvent[]; busyStep: BusyStep | null }) {
   const { t } = useI18n();
   if (props.events.length === 0) return null;
+  const currentEvent = props.events.find((event) => event.status === "running")
+    ?? props.events.find((event) => event.status === "pending")
+    ?? null;
   return (
     <section style={{ ...card(), background: "#f7f9fb" }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline" }}>
@@ -1275,6 +1382,7 @@ function PlanningProcessPanel(props: { events: PlanningTraceEvent[] }) {
           {t("trace.count", { n: props.events.filter((event) => event.status === "done").length, total: props.events.length })}
         </div>
       </div>
+      <SpinnerVerbLine step={props.busyStep} detail={currentEvent?.detail} compact />
       <div style={{ display: "grid", gap: 9, marginTop: 12 }}>
         {props.events.map((event) => {
           const tone = traceStatusColor(event.status);
