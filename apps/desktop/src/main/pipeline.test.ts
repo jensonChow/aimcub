@@ -6,6 +6,7 @@ import {
   createContextDistillHandler,
   localDecompose,
   type ClarifyAnswer,
+  type ClarifyQuestion,
   type AimcubToolHandlerContext,
   type LlmGateway,
   type LlmRequest,
@@ -369,6 +370,49 @@ describe("desktop planner · with a gateway (real @core/llm pipeline)", () => {
     expect(r.output!.nodes.length).toBeGreaterThan(0);
     expect(r.quality?.grade).toBe("pass");
     expect(r.review?.quality.grade).toBe("pass");
+  });
+
+  it("passes structured answer context into the refine decomposition", async () => {
+    const draft = localDecompose(aim);
+    const { gateway, calls } = recordingGateway();
+    const questions: ClarifyQuestion[] = [
+      {
+        id: "proof",
+        question: "What evidence should prove this is done?",
+        why_high_impact: "Shapes acceptance rules and eval.",
+        kind: "assumption",
+        allow_other: true,
+        source_dimension: "verifiability",
+        capture: {
+          category: "eval_signal",
+          scope: "global",
+          purpose: "define_eval",
+          improvesDimension: "verifiability",
+          reason: "test_refine_answer_context",
+        },
+        options: [
+          { label: "Passing smoke tests", tradeoff: "Repeatable and agent-checkable." },
+          { label: "Manual review", tradeoff: "Needs user confirmation." },
+        ],
+      },
+    ];
+
+    const r = await runRefine(
+      gateway,
+      aim.title,
+      aim.description,
+      draft,
+      questions,
+      [{ question_id: "proof", selected_label: "Passing smoke tests", other_text: null }],
+    );
+
+    expect(r.ok).toBe(true);
+    const decomposeCall = calls.find((call) => call.task === "decompose");
+    expect(decomposeCall?.prompt).toContain("Clarifications from the user");
+    expect(decomposeCall?.prompt).toContain("Known user context from previous aims");
+    expect(decomposeCall?.prompt).toContain("eval_signal:");
+    expect(decomposeCall?.prompt).toContain("Eval signal: Passing smoke tests.");
+    expect(decomposeCall?.prompt).toContain("Clarify question: What evidence should prove this is done?");
   });
 
   it("passes review action prompts into the refine decomposition", async () => {

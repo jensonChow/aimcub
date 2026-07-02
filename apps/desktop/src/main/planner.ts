@@ -11,6 +11,7 @@ import {
   decomposeWithQuality,
   clarify,
   buildRefinedDescription,
+  clarifyAnswersToMemories,
   type LlmGateway,
   type ClarifyAnswer,
   type ClarifyLearningReport,
@@ -41,6 +42,22 @@ function qualityRetry(result: DecomposeWithQualityResult): NonNullable<PlanResul
     attempts: result.attempts,
     firstQuality: result.firstQuality,
   };
+}
+
+function answerMemoriesForRefine(
+  questions: readonly ClarifyQuestion[],
+  answers: readonly ClarifyAnswer[],
+): PlanningMemory[] {
+  return clarifyAnswersToMemories(questions, answers).map((memory, index) => ({
+    id: `clarify.answer:${index}`,
+    content: memory.content,
+    kind: memory.kind,
+    category: memory.category,
+    source: memory.source,
+    confidence: 0.9,
+    goalId: null,
+    goal_id: null,
+  }));
 }
 
 export async function runDraft(
@@ -109,14 +126,15 @@ export async function runRefine(
   const refinedDescription = [buildRefinedDescription(description, questions, answers), reviewInstruction]
     .filter((part) => part.trim().length > 0)
     .join("\n\n");
-  const r = await decomposeWithQuality(gateway, { title, description: refinedDescription, memories, lineageLearning, decompositionLearning, decompositionStrategy, outputLanguage });
+  const refinedMemories = [...answerMemoriesForRefine(questions, answers), ...memories];
+  const r = await decomposeWithQuality(gateway, { title, description: refinedDescription, memories: refinedMemories, lineageLearning, decompositionLearning, decompositionStrategy, outputLanguage });
   if (r.output) {
     return {
       ok: true,
       output: r.output,
       errors: [],
       quality: r.quality,
-      review: reviewPlan({ plan: r.output, context: memories, quality: r.quality }),
+      review: reviewPlan({ plan: r.output, context: refinedMemories, quality: r.quality }),
       qualityRetry: qualityRetry(r),
     };
   }
