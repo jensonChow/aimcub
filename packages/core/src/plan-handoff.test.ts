@@ -194,6 +194,10 @@ describe("buildLocalHandoffManifest", () => {
         category: "project_fact",
         stepId: "loop_1",
       }),
+      expect.objectContaining({
+        category: "constraint",
+        source: "user_answer",
+      }),
     ]);
     expect(manifest.evalSignals).toEqual([
       "context meets the aim-specific standard.",
@@ -232,6 +236,11 @@ describe("buildLocalHandoffManifest", () => {
         category: "procedure",
         source: "selected_context",
         content: "Procedure: Run pnpm test before handing the task off.",
+      }),
+      expect.objectContaining({
+        category: "preference",
+        source: "selected_context",
+        content: "Preference: Keep status updates concise.",
       }),
     ]);
   });

@@ -270,12 +270,6 @@ export function buildPlanHandoffReport(input: BuildPlanHandoffReportInput): Plan
   };
 }
 
-function contextMatchesTask(context: LocalAgentHandoffContextItem, task: PlanHandoffTask): boolean {
-  if (task.contextGaps.some((gap) => gap.category === context.category)) return true;
-  if (context.category === "project_fact" || context.category === "procedure" || context.category === "eval_signal") return true;
-  return false;
-}
-
 function selectedContextCategory(context: PlanQualityContext): ContextCategory {
   switch (context.category) {
     case "preference":
@@ -318,12 +312,10 @@ function handoffContextCandidates(input: BuildLocalHandoffManifestInput): LocalA
 }
 
 function contextForTask(
-  task: PlanHandoffTask,
   contexts: readonly LocalAgentHandoffContextItem[],
   maxItems: number,
 ): LocalAgentHandoffContextItem[] {
   return contexts
-    .filter((context) => contextMatchesTask(context, task))
     .slice(0, maxItems)
     .map((context) => ({
       category: context.category,
@@ -345,7 +337,7 @@ function agentJob(
     title: task.title,
     status: "ready",
     prerequisiteKeys: task.prerequisiteKeys,
-    inputContext: contextForTask(task, contexts, maxContextItems),
+    inputContext: contextForTask(contexts, maxContextItems),
     expectedEvidence: task.expectedEvidence,
     evalSignal: task.evalSignal ?? "Complete the task according to the aim-specific acceptance rule.",
     acceptanceSummary: task.acceptanceSummary,
