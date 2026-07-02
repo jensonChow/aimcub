@@ -34,7 +34,7 @@ export function HomeView({
 }: HomeViewProps) {
   const { t } = useI18n();
   return (
-    <section>
+    <section style={{ maxWidth: 960 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 12, flexWrap: "wrap" }}>
         <div style={{ minWidth: 0 }}>
           <h2 style={{ margin: 0, fontSize: 22, letterSpacing: 0 }}>{t("home.recent")}</h2>

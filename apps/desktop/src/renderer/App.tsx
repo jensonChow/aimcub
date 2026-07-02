@@ -734,6 +734,7 @@ function AppInner() {
     ? reviewContextLineage({ goal: activeGoal, pendingContext: activeGoalPending, contextOutcomes: contextHistory })
     : null;
   const workspaceTitle = (viewing?.title ?? savedGoal?.title ?? title.trim()) || t(step === "home" ? "home.recent" : "shell.currentAim");
+  const showInspector = step !== "home";
 
   return (
     <div style={{ fontFamily: "system-ui, -apple-system, sans-serif", color: C.text, background: C.page, minHeight: "100vh" }}>
@@ -754,10 +755,14 @@ function AppInner() {
         <section style={mainShellStyle(compactShell)}>
           <header style={mainTopBarStyle(compactShell)}>
             <div style={{ minWidth: 0 }}>
-              <div style={{ color: C.text, fontSize: 17, fontWeight: 750, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {workspaceTitle}
-              </div>
-              <div style={{ color: C.muted, fontSize: 12, marginTop: 3 }}>{t("shell.subtitle")}</div>
+              {showInspector && (
+                <>
+                  <div style={{ color: C.text, fontSize: 15, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {workspaceTitle}
+                  </div>
+                  <div style={{ color: C.muted, fontSize: 12, marginTop: 3 }}>{t("shell.subtitle")}</div>
+                </>
+              )}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
               <LangToggle />
@@ -846,36 +851,38 @@ function AppInner() {
             )}
           </main>
 
-          <InspectorRail
-            activeTab={inspectorTab}
-            onTab={setInspectorTab}
-            events={planningTrace}
-            busyStep={activeBusyStep}
-            aimIntake={activeIntake}
-            decompositionStrategy={decompositionStrategy}
-            contextCandidates={contextCandidates}
-            contextProfile={contextProfile}
-            contextHealth={contextHealth}
-            contextLearning={contextLearning}
-            contextLineageLearning={contextLineageLearning}
-            contextDecompositionLearning={contextDecompositionLearning}
-            planningContext={activePlanningContext}
-            planningTools={activePlanningTools}
-            review={activeReview}
-            planQuality={planQuality}
-            qualityRetry={planQualityRetry}
-            plan={activePlan}
-            learning={activeLearning}
-            answerImpact={activeAnswerImpact}
-            captureFulfillment={activeCaptureFulfillment}
-            contextLineage={activeContextLineage}
-            onAcceptContext={acceptContextCandidate}
-            onRejectContext={rejectContextCandidate}
-            onArchiveContext={archiveContextMemory}
-            onDeprioritizeContext={deprioritizeContextMemory}
-            showTabs={false}
-            sticky={false}
-          />
+          {showInspector && (
+            <InspectorRail
+              activeTab={inspectorTab}
+              onTab={setInspectorTab}
+              events={planningTrace}
+              busyStep={activeBusyStep}
+              aimIntake={activeIntake}
+              decompositionStrategy={decompositionStrategy}
+              contextCandidates={contextCandidates}
+              contextProfile={contextProfile}
+              contextHealth={contextHealth}
+              contextLearning={contextLearning}
+              contextLineageLearning={contextLineageLearning}
+              contextDecompositionLearning={contextDecompositionLearning}
+              planningContext={activePlanningContext}
+              planningTools={activePlanningTools}
+              review={activeReview}
+              planQuality={planQuality}
+              qualityRetry={planQualityRetry}
+              plan={activePlan}
+              learning={activeLearning}
+              answerImpact={activeAnswerImpact}
+              captureFulfillment={activeCaptureFulfillment}
+              contextLineage={activeContextLineage}
+              onAcceptContext={acceptContextCandidate}
+              onRejectContext={rejectContextCandidate}
+              onArchiveContext={archiveContextMemory}
+              onDeprioritizeContext={deprioritizeContextMemory}
+              showTabs={false}
+              sticky={false}
+            />
+          )}
         </section>
       </div>
     </div>
@@ -912,8 +919,8 @@ function ClassicSidebar(props: {
     <aside style={classicSidebarStyle(props.compact)}>
       <div>
         <button onClick={props.onHome} style={sidebarBrandButton()}>
-          <span style={{ fontSize: 20, fontWeight: 800, letterSpacing: 0 }}>Aimcub</span>
-          <span style={{ color: "#948e84", fontSize: 12 }}>{t("shell.subtitle")}</span>
+          <span style={{ fontSize: 18, fontWeight: 750, letterSpacing: 0 }}>Aimcub</span>
+          <span style={{ color: C.muted, fontSize: 12 }}>{t("shell.subtitle")}</span>
         </button>
         <div style={{ display: "grid", gap: 8, marginTop: 18 }}>
           <button onClick={props.onNew} style={sidebarCommandButton(true)}>
@@ -939,36 +946,40 @@ function ClassicSidebar(props: {
             const plan = planOf(goal);
             return (
               <button key={goal.id} onClick={() => props.onOpen(goal)} style={sidebarGoalButton(selected)}>
-                <span style={{ display: "block", fontWeight: 650, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{goal.title}</span>
-                <span style={{ display: "block", color: selected ? "#aeb7bf" : "#827d74", fontSize: 12, marginTop: 4 }}>
+                <span style={{ display: "block", fontWeight: 620, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{goal.title}</span>
+                <span style={{ display: "block", color: C.muted, fontSize: 12, marginTop: 3 }}>
                   {t((plan?.nodes.length ?? 0) === 1 ? "common.milestone_one" : "common.milestone_other", { n: plan?.nodes.length ?? 0 })}
                 </span>
               </button>
             );
           })}
           {filteredGoals.length === 0 && (
-            <div style={{ color: "#827d74", fontSize: 13, padding: "8px 2px" }}>{t("shell.noSearchResults")}</div>
+            <div style={{ color: C.muted, fontSize: 13, padding: "8px 2px" }}>{t("shell.noSearchResults")}</div>
           )}
         </div>
       </div>
 
-      <div>
-        <SidebarSectionLabel label={t("shell.planningLayers")} value={t("shell.auditLayer")} />
-        <div style={{ display: "grid", gap: 7 }}>
-          {tabs.map((tab) => (
-            <button key={tab} onClick={() => props.onTab(tab)} style={sidebarNavButton(props.activeTab === tab)}>
-              {t(tabLabels[tab])}
-            </button>
-          ))}
+      {props.step !== "home" && (
+        <div>
+          <SidebarSectionLabel label={t("shell.planningLayers")} value={t("shell.auditLayer")} />
+          <div style={{ display: "grid", gap: 6 }}>
+            {tabs.map((tab) => (
+              <button key={tab} onClick={() => props.onTab(tab)} style={sidebarNavButton(props.activeTab === tab)}>
+                {t(tabLabels[tab])}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
-      <div style={{ marginTop: "auto", borderTop: "1px solid rgba(255, 255, 255, 0.08)", paddingTop: 12 }}>
-        <button onClick={() => props.onTab("context")} style={sidebarContextButton(props.activeTab === "context")}>
-          <span>{t("context.inbox")}</span>
-          <span style={sidebarCountPill()}>{props.pendingContextCount}</span>
-        </button>
-      </div>
+      {(props.step !== "home" || props.pendingContextCount > 0) && (
+        <div style={{ marginTop: "auto", borderTop: `1px solid ${C.border}`, paddingTop: 12 }}>
+          <button onClick={() => props.onTab("context")} style={sidebarContextButton(props.activeTab === "context")}>
+            <span>{t("context.inbox")}</span>
+            <span style={sidebarCountPill()}>{props.pendingContextCount}</span>
+          </button>
+        </div>
+      )}
     </aside>
   );
 }
@@ -976,8 +987,8 @@ function ClassicSidebar(props: {
 function SidebarSectionLabel(props: { label: string; value?: string }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline", marginBottom: 8 }}>
-      <div style={{ color: "#827d74", fontSize: 11, fontWeight: 800, letterSpacing: 0.5, textTransform: "uppercase" }}>{props.label}</div>
-      {props.value ? <div style={{ color: "#827d74", fontSize: 11, whiteSpace: "nowrap" }}>{props.value}</div> : null}
+      <div style={{ color: C.muted, fontSize: 11, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase" }}>{props.label}</div>
+      {props.value ? <div style={{ color: C.muted, fontSize: 11, whiteSpace: "nowrap" }}>{props.value}</div> : null}
     </div>
   );
 }
@@ -985,7 +996,7 @@ function SidebarSectionLabel(props: { label: string; value?: string }) {
 function classicShellStyle(compact: boolean): CSSProperties {
   return {
     display: "grid",
-    gridTemplateColumns: compact ? "1fr" : "292px minmax(0, 1fr)",
+    gridTemplateColumns: compact ? "1fr" : "268px minmax(0, 1fr)",
     minHeight: "100vh",
   };
 }
@@ -994,12 +1005,12 @@ function classicSidebarStyle(compact: boolean): CSSProperties {
   return {
     display: "grid",
     gridTemplateRows: compact ? "auto auto auto auto" : "auto minmax(0, 1fr) auto auto",
-    gap: 18,
-    background: "#17191d",
-    borderRight: compact ? "none" : "1px solid #2a2d33",
-    borderBottom: compact ? "1px solid #2a2d33" : "none",
-    boxShadow: compact ? "none" : "inset -1px 0 0 rgba(255, 255, 255, 0.02)",
-    padding: compact ? "18px 16px" : "22px 16px",
+    gap: 16,
+    background: "#f1f1ee",
+    borderRight: compact ? "none" : `1px solid ${C.border}`,
+    borderBottom: compact ? `1px solid ${C.border}` : "none",
+    boxShadow: "none",
+    padding: compact ? "16px 14px" : "18px 14px",
     boxSizing: "border-box",
     minWidth: 0,
   };
@@ -1008,7 +1019,7 @@ function classicSidebarStyle(compact: boolean): CSSProperties {
 function mainShellStyle(compact: boolean): CSSProperties {
   return {
     minWidth: 0,
-    padding: compact ? "18px 14px 44px" : "22px 30px 56px",
+    padding: compact ? "16px 14px 44px" : "22px 34px 56px",
     boxSizing: "border-box",
   };
 }
@@ -1020,7 +1031,7 @@ function mainTopBarStyle(compact: boolean): CSSProperties {
     justifyContent: "space-between",
     gap: 12,
     flexWrap: compact ? "wrap" : "nowrap",
-    marginBottom: 18,
+    marginBottom: 16,
   };
 }
 
@@ -1041,7 +1052,7 @@ function sidebarBrandButton(): CSSProperties {
     width: "100%",
     border: 0,
     background: "transparent",
-    color: "#f4efe7",
+    color: C.text,
     padding: 0,
     cursor: "pointer",
     textAlign: "left",
@@ -1053,12 +1064,12 @@ function sidebarSearchInputStyle(): CSSProperties {
     width: "100%",
     boxSizing: "border-box",
     padding: "9px 10px",
-    border: "1px solid rgba(255, 255, 255, 0.1)",
+    border: `1px solid ${C.border}`,
     borderRadius: 8,
     fontSize: 13,
     fontFamily: "inherit",
-    background: "rgba(255, 255, 255, 0.055)",
-    color: "#f1ece3",
+    background: "#fbfbf9",
+    color: C.text,
     marginBottom: 14,
     outline: "none",
   };
@@ -1067,14 +1078,14 @@ function sidebarSearchInputStyle(): CSSProperties {
 function sidebarCommandButton(primary: boolean): CSSProperties {
   return {
     width: "100%",
-    border: primary ? "1px solid rgba(132, 170, 190, 0.42)" : "1px solid rgba(255, 255, 255, 0.08)",
-    background: primary ? "#f0eee6" : "rgba(255, 255, 255, 0.04)",
-    color: primary ? "#15171a" : "#e7e1d8",
+    border: primary ? `1px solid ${C.border}` : "1px solid transparent",
+    background: primary ? "#ffffff" : "transparent",
+    color: primary ? C.text : C.muted,
     borderRadius: 8,
-    padding: "9px 11px",
+    padding: "8px 10px",
     cursor: "pointer",
     fontSize: 13,
-    fontWeight: 760,
+    fontWeight: 700,
     textAlign: "left",
   };
 }
@@ -1082,14 +1093,14 @@ function sidebarCommandButton(primary: boolean): CSSProperties {
 function sidebarNavButton(selected: boolean): CSSProperties {
   return {
     width: "100%",
-    border: `1px solid ${selected ? "rgba(119, 166, 194, 0.5)" : "transparent"}`,
-    background: selected ? "rgba(94, 128, 150, 0.22)" : "transparent",
-    color: selected ? "#f7f1e8" : "#b9b3aa",
+    border: `1px solid ${selected ? "#d4e5eb" : "transparent"}`,
+    background: selected ? C.accentBg : "transparent",
+    color: selected ? C.accent : C.muted,
     borderRadius: 8,
     padding: "8px 10px",
     cursor: "pointer",
     fontSize: 13,
-    fontWeight: selected ? 780 : 650,
+    fontWeight: selected ? 720 : 560,
     textAlign: "left",
   };
 }
@@ -1101,13 +1112,13 @@ function sidebarGoalButton(selected: boolean): CSSProperties {
     boxSizing: "border-box",
     overflow: "hidden",
     textAlign: "left",
-    border: `1px solid ${selected ? "rgba(119, 166, 194, 0.5)" : "transparent"}`,
-    background: selected ? "rgba(94, 128, 150, 0.22)" : "transparent",
+    border: `1px solid ${selected ? "#d4e5eb" : "transparent"}`,
+    background: selected ? C.accentBg : "transparent",
     borderRadius: 8,
-    padding: "9px 10px",
+    padding: "8px 10px",
     cursor: "pointer",
-    color: selected ? "#f7f1e8" : "#d8d2c8",
-    boxShadow: selected ? "inset 3px 0 0 #7aa6c2" : "none",
+    color: C.text,
+    boxShadow: selected ? `inset 3px 0 0 ${C.accent}` : "none",
   };
 }
 
@@ -1118,9 +1129,9 @@ function sidebarContextButton(selected: boolean): CSSProperties {
     gap: 10,
     alignItems: "center",
     width: "100%",
-    border: `1px solid ${selected ? "rgba(119, 166, 194, 0.5)" : "rgba(255, 255, 255, 0.1)"}`,
-    background: selected ? "rgba(94, 128, 150, 0.22)" : "rgba(255, 255, 255, 0.04)",
-    color: selected ? "#f7f1e8" : "#d8d2c8",
+    border: `1px solid ${selected ? "#d4e5eb" : C.border}`,
+    background: selected ? C.accentBg : "#fbfbf9",
+    color: selected ? C.accent : C.text,
     borderRadius: 8,
     padding: "9px 10px",
     cursor: "pointer",
@@ -1136,8 +1147,8 @@ function sidebarCountPill(): CSSProperties {
     display: "inline-grid",
     placeItems: "center",
     borderRadius: 999,
-    background: "rgba(255, 255, 255, 0.1)",
-    color: "#d8d2c8",
+    background: "#e5e5df",
+    color: C.muted,
     fontSize: 11,
     fontWeight: 800,
     padding: "0 7px",

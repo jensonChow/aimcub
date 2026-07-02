@@ -2,12 +2,12 @@ import type { CSSProperties } from "react";
 
 export const C = {
   text: "#202124",
-  muted: "#6d6a62",
-  border: "#dad4c9",
-  accent: "#2f6f89",
-  accentBg: "#e7f1f4",
-  surface: "#fffdfa",
-  page: "#efede7",
+  muted: "#6b6f76",
+  border: "#deded9",
+  accent: "#2f7187",
+  accentBg: "#eaf3f6",
+  surface: "#ffffff",
+  page: "#f7f7f4",
   danger: "#a33b35",
 };
 
@@ -16,7 +16,7 @@ export function card(): CSSProperties {
     background: C.surface,
     border: `1px solid ${C.border}`,
     borderRadius: 8,
-    boxShadow: "0 1px 1px rgba(28, 26, 22, 0.04)",
+    boxShadow: "0 1px 2px rgba(28, 26, 22, 0.035)",
     padding: "16px 18px",
     marginBottom: 12,
   };
