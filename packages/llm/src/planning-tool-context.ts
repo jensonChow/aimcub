@@ -23,6 +23,7 @@ export interface PlanningToolContextInput {
   includeWeb?: boolean;
   fetchWebResults?: boolean;
   webSearchLimit?: number;
+  writeDistilledMemoryCandidates?: boolean;
 }
 
 export interface PlanningToolFailure {
@@ -190,6 +191,24 @@ export async function collectPlanningToolContext(
       failures,
     );
     distillation = distillObservation ? distillObservation.data : null;
+  }
+
+  if (input.writeDistilledMemoryCandidates && distillation && registry.has("memory.write_candidate")) {
+    for (const candidate of distillation.durableMemoryCandidates) {
+      if (candidate.scope === "current_aim" && !input.currentAimId) continue;
+      addResult(
+        "memory.write_candidate",
+        await registry.execute("memory.write_candidate", {
+          content: candidate.content,
+          category: candidate.category,
+          scope: candidate.scope,
+          aimId: candidate.scope === "current_aim" ? input.currentAimId ?? undefined : undefined,
+          sourceToolCallId: "context.distill",
+        }, context),
+        observations,
+        failures,
+      );
+    }
   }
 
   const selection = selectPlanningMemoriesWithTrace({

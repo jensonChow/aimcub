@@ -33,6 +33,10 @@ function fetchWebResultsEnabled(): boolean {
   return flagEnabled(process.env.AIMCUB_FETCH_WEB_RESULTS);
 }
 
+function writeContextCandidatesEnabled(): boolean {
+  return flagEnabled(process.env.AIMCUB_WRITE_CONTEXT_CANDIDATES);
+}
+
 export function createDesktopFirstPartyToolRegistry() {
   const webRuntime = createWebResearchRuntimeFromEnv(process.env);
   return createAimcubToolRegistry({
@@ -51,12 +55,14 @@ export function desktopToolContext(): AimcubToolHandlerContext {
     permissions: [
       "memory.read",
       "context.distill",
+      ...(writeContextCandidatesEnabled() ? ["memory.write_candidate" as const] : []),
       ...(webResearchEnabled() ? ["network.search" as const, "network.fetch" as const] : []),
     ],
   };
 }
 
 export async function collectDesktopPlanningContext(req: DraftRequest): Promise<DesktopPlanningContext> {
+  const currentAimId = (req as { id?: unknown }).id;
   const [sourceMemories, toolContext] = await Promise.all([
     aimStore.listMemories(),
     collectPlanningToolContext(
@@ -65,8 +71,10 @@ export async function collectDesktopPlanningContext(req: DraftRequest): Promise<
       {
         title: req.title,
         description: req.description,
+        currentAimId: typeof currentAimId === "string" ? currentAimId : undefined,
         includeWeb: webResearchEnabled(),
         fetchWebResults: fetchWebResultsEnabled(),
+        writeDistilledMemoryCandidates: writeContextCandidatesEnabled(),
       },
     ),
   ]);

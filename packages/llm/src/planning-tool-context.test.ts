@@ -96,4 +96,95 @@ describe("planning tool context collector", () => {
     ]);
     expect(result.distillation?.missingQuestions.map((question) => question.id)).toContain("missing_eval_signal");
   });
+
+  it("writes distilled current-aim memory candidates when explicitly enabled", async () => {
+    const writes: Array<{ content: string; category: string; scope: string; aimId?: string }> = [];
+    const registry = createAimcubToolRegistry({
+      "memory.search": async () => ({
+        ok: true,
+        observation: {
+          summary: "Selected 0 planning memories.",
+          data: { memories: [] },
+          sources: [],
+        },
+      }),
+      "web.search": async () => ({
+        ok: true,
+        observation: {
+          summary: "Found 1 web result.",
+          data: {
+            results: [{
+              title: "Cambodia visa guidance",
+              url: "https://example.com/cambodia-visa",
+              snippet: "Current visa requirements and travel basics.",
+            }],
+          },
+          sources: [{ kind: "web", url: "https://example.com/cambodia-visa" }],
+        },
+      }),
+      "web.fetch": async () => ({
+        ok: true,
+        observation: {
+          summary: "Fetched Cambodia visa guidance.",
+          data: {
+            finalUrl: "https://example.com/cambodia-visa",
+            status: 200,
+            title: "Cambodia visa guidance",
+            text: "Travelers should check visa, passport validity, local transport, and health guidance before departure.",
+            truncated: false,
+          },
+          sources: [{ kind: "web", url: "https://example.com/cambodia-visa" }],
+        },
+      }),
+      "context.distill": createContextDistillHandler(),
+      "memory.write_candidate": async (input) => {
+        writes.push({
+          content: input.content,
+          category: input.category,
+          scope: input.scope,
+          aimId: input.aimId,
+        });
+        return {
+          ok: true,
+          observation: {
+            summary: "Created a pending memory candidate.",
+            data: { candidateId: `candidate-${writes.length}`, status: "pending" },
+            sources: [{ kind: "memory", uri: `memory:candidate-${writes.length}` }],
+          },
+        };
+      },
+    });
+
+    const result = await collectPlanningToolContext(
+      registry,
+      {
+        ...context,
+        aimId: "aim-1",
+        permissions: ["memory.read", "network.search", "network.fetch", "context.distill", "memory.write_candidate"],
+      },
+      {
+        title: "Plan a Cambodia trip",
+        currentAimId: "aim-1",
+        includeWeb: true,
+        fetchWebResults: true,
+        writeDistilledMemoryCandidates: true,
+      },
+    );
+
+    expect(result.failures).toEqual([]);
+    expect(result.distillation?.durableMemoryCandidates).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        scope: "current_aim",
+        category: "project_fact",
+        content: expect.stringContaining("Cambodia visa guidance"),
+      }),
+    ]));
+    expect(writes.length).toBeGreaterThan(0);
+    expect(writes[0]).toMatchObject({
+      category: "project_fact",
+      scope: "current_aim",
+      aimId: "aim-1",
+    });
+    expect(result.observations.map((observation) => observation.summary)).toContain("Created a pending memory candidate.");
+  });
 });

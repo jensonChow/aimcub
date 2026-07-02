@@ -5,6 +5,7 @@ import type {
   AimcubToolSource,
   ContextDistillInput,
   ContextDistillOutput,
+  LocalScanWorkspaceOutput,
   MemorySearchOutput,
   WebFetchOutput,
   WebSearchOutput,
@@ -31,6 +32,13 @@ function isWebSearchOutput(value: unknown): value is WebSearchOutput {
 
 function isWebFetchOutput(value: unknown): value is WebFetchOutput {
   return isRecord(value) && typeof value.finalUrl === "string" && typeof value.status === "number";
+}
+
+function isLocalScanWorkspaceOutput(value: unknown): value is LocalScanWorkspaceOutput {
+  return isRecord(value) &&
+    typeof value.root === "string" &&
+    typeof value.fileCount === "number" &&
+    Array.isArray(value.likelyProjectTypes);
 }
 
 function uniqueSources(observations: readonly AimcubToolObservation<unknown>[]): AimcubToolSource[] {
@@ -62,6 +70,10 @@ function summarizeObservation(observation: AimcubToolObservation<unknown>): stri
     const text = data.text ? ` — ${data.text.slice(0, 300)}` : "";
     return [`web page: ${title}(${data.finalUrl})${text}`];
   }
+  if (isLocalScanWorkspaceOutput(data)) {
+    const projectTypes = data.likelyProjectTypes.length > 0 ? data.likelyProjectTypes.join(", ") : "unknown project type";
+    return [`workspace: ${data.root} — ${data.fileCount} files, ${data.directoryCount} directories, ${projectTypes}`];
+  }
   return observation.summary ? [observation.summary] : [];
 }
 
@@ -91,6 +103,58 @@ function missingQuestions(input: ContextDistillInput): ContextDistillOutput["mis
     });
   }
   return questions.slice(0, MAX_MISSING_QUESTIONS);
+}
+
+function candidateContent(prefix: string, text: string): string {
+  return `${prefix}: ${text.replace(/\s+/g, " ").trim()}`.slice(0, 700);
+}
+
+function durableMemoryCandidates(input: ContextDistillInput): ContextDistillOutput["durableMemoryCandidates"] {
+  const candidates: ContextDistillOutput["durableMemoryCandidates"] = [];
+  const seen = new Set<string>();
+  const push = (candidate: ContextDistillOutput["durableMemoryCandidates"][number]) => {
+    const key = `${candidate.scope}\u0000${candidate.category}\u0000${candidate.content.toLowerCase()}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    candidates.push(candidate);
+  };
+
+  for (const observation of input.observations ?? []) {
+    const data = observation.data;
+    if (isWebSearchOutput(data)) {
+      for (const result of data.results.slice(0, 3)) {
+        push({
+          scope: "current_aim",
+          category: "project_fact",
+          content: candidateContent(
+            "Project fact",
+            `For "${input.aimTitle}", relevant web source: ${result.title}. ${result.snippet} Source: ${result.url}`,
+          ),
+        });
+      }
+    } else if (isWebFetchOutput(data)) {
+      push({
+        scope: "current_aim",
+        category: "project_fact",
+        content: candidateContent(
+          "Project fact",
+          `For "${input.aimTitle}", fetched source ${data.title ?? data.finalUrl}: ${data.text?.slice(0, 420) ?? "metadata only"} Source: ${data.finalUrl}`,
+        ),
+      });
+    } else if (isLocalScanWorkspaceOutput(data)) {
+      const projectTypes = data.likelyProjectTypes.length > 0 ? data.likelyProjectTypes.join(", ") : "unknown";
+      push({
+        scope: "current_aim",
+        category: "project_fact",
+        content: candidateContent(
+          "Project fact",
+          `For "${input.aimTitle}", workspace ${data.root} has ${data.fileCount} files, ${data.directoryCount} directories, likely project types: ${projectTypes}.`,
+        ),
+      });
+    }
+  }
+
+  return candidates.slice(0, 5);
 }
 
 export function createContextDistillHandler(): AimcubToolHandler<ContextDistillInput, ContextDistillOutput> {
@@ -124,7 +188,7 @@ export function createContextDistillHandler(): AimcubToolHandler<ContextDistillI
         : `No tool context was available for ${rawInput.aimTitle.trim()}.`,
       usedSources: uniqueSources(rawInput.observations),
       missingQuestions: missingQuestions(input),
-      durableMemoryCandidates: [],
+      durableMemoryCandidates: durableMemoryCandidates(input),
     };
 
     return {
