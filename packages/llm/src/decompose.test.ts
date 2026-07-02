@@ -542,13 +542,28 @@ describe("planQualityMetadata", () => {
   it("includes a derived handoff report when decomposition output is available", async () => {
     const result = await decomposeWithQuality(mockGateway(validPlan()), INPUT);
 
-    const metadata = planQualityMetadata(result);
+    const metadata = planQualityMetadata(result, null, {
+      selectedContext: [
+        {
+          content: "Procedure: Run pnpm test before handing off local agent work.",
+          category: "procedure",
+          confidence: 0.9,
+        },
+      ],
+    });
 
     expect(metadata.plan_handoff?.agentReady.map((task) => task.nodeKey)).toEqual(["m1", "m2"]);
     expect(metadata.plan_handoff?.agentReady[1]!.prerequisiteKeys).toEqual(["m1"]);
     expect(metadata.plan_handoff?.nextActions[0]).toBe("Queue 2 agent-ready tasks for local agent handoff.");
     expect(metadata.local_handoff_manifest?.agentQueue.map((job) => job.nodeKey)).toEqual(["m1", "m2"]);
     expect(metadata.local_handoff_manifest?.agentQueue[1]!.prerequisiteKeys).toEqual(["m1"]);
+    expect(metadata.local_handoff_manifest?.agentQueue[0]!.inputContext).toEqual([
+      expect.objectContaining({
+        category: "procedure",
+        source: "selected_context",
+        content: "Procedure: Run pnpm test before handing off local agent work.",
+      }),
+    ]);
     expect(metadata.local_handoff_manifest?.nextActions[0]).toBe("Prepare 2 local agent jobs for queueing.");
   });
 });

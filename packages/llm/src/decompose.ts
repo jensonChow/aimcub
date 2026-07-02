@@ -24,6 +24,7 @@ import {
   type LocalHandoffManifest,
   type PlanHandoffReport,
   type PlanQualityReport,
+  type PlanQualityContext,
   type PlanReviewReport,
   type PlanValidation,
 } from "@core/domain";
@@ -87,12 +88,18 @@ export interface PlanQualityMetadata extends Record<string, unknown> {
   local_handoff_manifest?: LocalHandoffManifest;
 }
 
+export interface PlanQualityMetadataOptions {
+  /** Context that shaped decomposition and should travel with future local-agent handoff jobs. */
+  selectedContext?: readonly PlanQualityContext[];
+}
+
 /** Persistable metadata for the selected decomposition and its quality retry loop. */
 export function planQualityMetadata(
   result: Pick<DecomposeWithQualityResult, "quality" | "retried" | "attempts" | "firstQuality"> & {
     output?: DecompositionOutput | null;
   },
   review?: PlanReviewReport | null,
+  options?: PlanQualityMetadataOptions,
 ): PlanQualityMetadata {
   const metadata: PlanQualityMetadata = {
     plan_quality: result.quality,
@@ -109,6 +116,7 @@ export function planQualityMetadata(
     metadata.local_handoff_manifest = buildLocalHandoffManifest({
       plan: result.output,
       handoff,
+      selectedContext: options?.selectedContext,
     });
   }
   return metadata;

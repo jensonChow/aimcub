@@ -633,7 +633,9 @@ async function runClarify(title: string, description: string | undefined, opts: 
       description,
       plan,
       metadata: {
-        ...planQualityMetadata({ quality, ...qualityRetry, output: plan }, review),
+        ...planQualityMetadata({ quality, ...qualityRetry, output: plan }, review, {
+          selectedContext: [...answerMemories, ...memories],
+        }),
         aim_intake: intake,
         planning_context: planning.report,
         ...(answerImpact ? { clarify_answer_impact: answerImpact } : {}),
@@ -685,7 +687,11 @@ async function runNew(title: string, description: string | undefined, json: bool
     title,
     description,
     plan: result.output,
-    metadata: { ...planQualityMetadata(result, review), aim_intake: intake, planning_context: planning.report },
+    metadata: {
+      ...planQualityMetadata(result, review, { selectedContext: memories }),
+      aim_intake: intake,
+      planning_context: planning.report,
+    },
   });
   const contextCandidates = await recordReviewContextCandidatesForStore(store, goal, review);
   if (json) {
@@ -992,7 +998,11 @@ async function runReplan(
     title,
     description,
     plan: result.output,
-    metadata: { ...planQualityMetadata(result, review), aim_intake: intake, planning_context: planning.report },
+    metadata: {
+      ...planQualityMetadata(result, review, { selectedContext: memories }),
+      aim_intake: intake,
+      planning_context: planning.report,
+    },
   });
   const contextCandidates = await recordReviewContextCandidatesForStore(store, res.goal, review);
 
