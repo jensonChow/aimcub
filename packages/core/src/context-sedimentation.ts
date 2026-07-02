@@ -3,6 +3,7 @@ import type {
   ContextAcquisitionChannel,
   ContextCaptureScope,
   ContextIntakeLoopReport,
+  ContextIntakeToolCallPlan,
 } from "./aim-intake";
 import { isPromptLikeContextCandidate } from "./context";
 import type {
@@ -54,6 +55,7 @@ export interface ContextSedimentationPendingStep {
   status: "pending" | "blocked";
   blocksPlanAcceptance: boolean;
   remainingOutputs: string[];
+  requiredTools: ContextIntakeToolCallPlan[];
   reason: string;
 }
 
@@ -207,6 +209,7 @@ function pendingSteps(
       status: step.status,
       blocksPlanAcceptance: step.blocksPlanAcceptance,
       remainingOutputs: step.remainingOutputs,
+      requiredTools: step.requiredTools,
       reason: step.reason,
     }));
 }

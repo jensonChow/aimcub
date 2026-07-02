@@ -5,6 +5,7 @@ import type {
   ContextIntakeLoopReport,
   ContextIntakeOutputKind,
   ContextIntakeLoopStep,
+  ContextIntakeToolCallPlan,
 } from "./aim-intake";
 
 export type ContextIntakeProgressSignalSource =
@@ -37,6 +38,7 @@ export interface ContextIntakeProgressStep {
   requestedUserInputCount: number;
   satisfiedOutputs: ContextIntakeOutputKind[];
   remainingOutputs: ContextIntakeOutputKind[];
+  requiredTools: ContextIntakeToolCallPlan[];
   blocksPlanAcceptance: boolean;
   reason: string;
 }
@@ -133,6 +135,20 @@ function pendingStatus(step: ContextIntakeLoopStep, matched: readonly ContextInt
   return "pending";
 }
 
+function requiredToolsForStep(
+  step: ContextIntakeLoopStep,
+  status: ContextIntakeProgressStatus,
+  remainingOutputs: readonly ContextIntakeOutputKind[],
+): ContextIntakeToolCallPlan[] {
+  if (status === "satisfied" || remainingOutputs.length === 0) return [];
+  return step.toolCalls.filter((tool) => {
+    if (step.status === "needs_connector") return tool.boundary === "external_connector";
+    if (step.status === "needs_permission") return tool.boundary === "first_party";
+    if (step.status === "needs_user") return tool.boundary === "user";
+    return true;
+  });
+}
+
 function progressReason(input: {
   step: ContextIntakeLoopStep;
   status: ContextIntakeProgressStatus;
@@ -163,6 +179,7 @@ function progressStep(
   const status: ContextIntakeProgressStatus = remainingOutputs.length === 0
     ? "satisfied"
     : pendingStatus(step, matched);
+  const requiredTools = requiredToolsForStep(step, status, remainingOutputs);
   return {
     stepId: step.id,
     acquisitionId: step.acquisitionId,
@@ -172,6 +189,7 @@ function progressStep(
     requestedUserInputCount,
     satisfiedOutputs,
     remainingOutputs,
+    requiredTools,
     blocksPlanAcceptance: step.blocksPlanAcceptance,
     reason: progressReason({ step, status, matchedSignalCount: matched.length, requestedUserInputCount, remainingOutputs }),
   };

@@ -185,6 +185,21 @@ describe("reviewContextIntakeProgress", () => {
     const personalDatabase = intake.loop.steps.find((step) => step.channel === "personal_database");
     expect(personalDatabase).toBeTruthy();
 
+    const blocked = reviewContextIntakeProgress({
+      loop: intake.loop,
+      signals: [],
+    });
+
+    expect(blocked.steps.find((step) => step.stepId === personalDatabase!.id)).toMatchObject({
+      status: "blocked",
+      requiredTools: expect.arrayContaining([
+        expect.objectContaining({
+          name: "external.notion",
+          boundary: "external_connector",
+        }),
+      ]),
+    });
+
     const memoryOnly = reviewContextIntakeProgress({
       loop: intake.loop,
       signals: [

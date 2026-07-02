@@ -249,4 +249,45 @@ describe("reviewContextSedimentation", () => {
     ]);
     expect(report.nextActions[0]).toContain("web_research");
   });
+
+  it("carries connector requirements into pending sedimentation steps", () => {
+    const connectorLoop = buildContextIntakeLoop({
+      readiness: "needs_targeted_context",
+      acquisition: [
+        {
+          id: "acq_personal_db",
+          channel: "personal_database",
+          priority: "high",
+          scope: "aim",
+          categories: ["project_fact", "preference"],
+          reason: "Personal notes should ground the aim.",
+          action: "Search connected personal sources.",
+          suggestedTools: ["memory.search", "external.notion", "external.gmail"],
+          memoryTargets: [
+            { scope: "aim", kind: "semantic", categories: ["project_fact"] },
+            { scope: "global", kind: "semantic", categories: ["preference"] },
+          ],
+        },
+      ],
+    });
+    const progress = reviewContextIntakeProgress({ loop: connectorLoop, signals: [] });
+    const report = reviewContextSedimentation({ loop: connectorLoop, progress });
+
+    expect(report.pendingSteps).toEqual([
+      expect.objectContaining({
+        channel: "personal_database",
+        status: "blocked",
+        requiredTools: expect.arrayContaining([
+          expect.objectContaining({
+            name: "external.notion",
+            boundary: "external_connector",
+          }),
+          expect.objectContaining({
+            name: "external.gmail",
+            boundary: "external_connector",
+          }),
+        ]),
+      }),
+    ]);
+  });
 });
