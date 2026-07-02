@@ -58,6 +58,14 @@ import {
 type Step = "home" | "aim" | "drafting" | "clarifying" | "questions" | "refining" | "plan";
 
 type AnswerMap = Record<string, { label: string | null; other: string }>;
+type PlanningTraceStatus = "pending" | "running" | "done" | "warning" | "error";
+type PlanningTraceEvent = {
+  id: string;
+  status: PlanningTraceStatus;
+  title: string;
+  detail: string;
+  at: string;
+};
 
 const DRAFT_UI_TIMEOUT_MS = 150_000;
 const CLARIFY_UI_TIMEOUT_MS = 75_000;
@@ -70,6 +78,10 @@ function withUiTimeout<T>(promise: Promise<T>, timeoutMs: number, message: strin
   return Promise.race([promise, timeout]).finally(() => {
     if (timer) clearTimeout(timer);
   });
+}
+
+function traceTime(): string {
+  return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
 export function App() {
@@ -93,6 +105,7 @@ function AppInner() {
   const [planReview, setPlanReview] = useState<PlanResult["review"]>(null);
   const [planQualityRetry, setPlanQualityRetry] = useState<PlanResult["qualityRetry"] | null>(null);
   const [planningContext, setPlanningContext] = useState<PlanningContextSelectionReport | null>(null);
+  const [planningTrace, setPlanningTrace] = useState<PlanningTraceEvent[]>([]);
   const [aimIntake, setAimIntake] = useState<AimIntakeReport | null>(null);
   const [decompositionStrategy, setDecompositionStrategy] = useState<DecompositionStrategyReport | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -205,6 +218,64 @@ function AppInner() {
       .filter((a) => a.selected_label || a.other_text);
   }, [clarifyOut, answers]);
 
+  function traceEvent(
+    id: string,
+    status: PlanningTraceStatus,
+    titleText: string,
+    detail: string,
+  ): PlanningTraceEvent {
+    return { id, status, title: titleText, detail, at: traceTime() };
+  }
+
+  function updatePlanningTrace(
+    id: string,
+    patch: Partial<Omit<PlanningTraceEvent, "id">>,
+  ) {
+    setPlanningTrace((events) =>
+      events.map((event) =>
+        event.id === id ? { ...event, ...patch, at: patch.at ?? traceTime() } : event,
+      ),
+    );
+  }
+
+  function upsertPlanningTrace(event: PlanningTraceEvent) {
+    setPlanningTrace((events) => {
+      const next = events.filter((item) => item.id !== event.id);
+      return [...next, event];
+    });
+  }
+
+  function describeContextTrace(report?: PlanningContextSelectionReport | null, intake?: AimIntakeReport | null): string {
+    return t("trace.contextDone", {
+      selected: report?.selected.length ?? 0,
+      ignored: report?.ignored.length ?? 0,
+      score: intake?.score ?? "-",
+    });
+  }
+
+  function describePlanTrace(plan: DecompositionOutput): string {
+    const summary = shortUiText(plan.rationale ?? plan.goal_summary ?? "");
+    return t(plan.nodes.length === 1 ? "trace.draftDone_one" : "trace.draftDone_other", {
+      n: plan.nodes.length,
+      summary: summary || "-",
+    });
+  }
+
+  function describeQualityTrace(
+    quality: PlanResult["quality"] | null | undefined,
+    retry: PlanResult["qualityRetry"] | null | undefined,
+  ): string {
+    if (!quality) return t("trace.qualityNone");
+    const retryText = retry?.retried
+      ? t("trace.retryYes", { attempts: retry.attempts })
+      : t("trace.retryNo", { attempts: retry?.attempts ?? 1 });
+    return t("trace.qualityDone", {
+      grade: quality.grade,
+      score: quality.score,
+      retry: retryText,
+    });
+  }
+
   function clearWizard() {
     setTitle("");
     setDescription("");
@@ -216,6 +287,7 @@ function AppInner() {
     setPlanReview(null);
     setPlanQualityRetry(null);
     setPlanningContext(null);
+    setPlanningTrace([]);
     setAimIntake(null);
     setDecompositionStrategy(null);
     setSavedAt(null);
@@ -335,27 +407,49 @@ function AppInner() {
       setShowSettings(true);
       return;
     }
+    const req = { title: title.trim(), description: description.trim() || undefined };
+    const providerText = provider ? providerLabel(provider, t) : "LLM";
     setError(null);
+    setPlanningTrace([
+      traceEvent("context", "running", t("trace.context"), t("trace.contextPending")),
+      traceEvent("draft", "pending", t("trace.draft"), t("trace.draftPending", { provider: providerText })),
+      traceEvent("quality", "pending", t("trace.quality"), t("trace.qualityPending")),
+      traceEvent("clarify", "pending", t("trace.clarify"), t("trace.clarifyPending")),
+    ]);
     setStep("drafting");
     try {
       const d = await withUiTimeout(
-        window.aimcub.draft({ title: title.trim(), description: description.trim() || undefined }),
+        window.aimcub.draft(req),
         DRAFT_UI_TIMEOUT_MS,
         t("err.draftTimeout", { seconds: Math.round(DRAFT_UI_TIMEOUT_MS / 1000) }),
       );
       setAimIntake(d.intake ?? null);
-      if (!d.ok || !d.output) throw new Error(d.errors.join("; ") || t("err.draft"));
+      setPlanningContext(d.planningContext ?? null);
+      updatePlanningTrace("context", {
+        status: "done",
+        detail: describeContextTrace(d.planningContext, d.intake ?? null),
+      });
+      if (!d.ok || !d.output) {
+        const message = d.errors.join("; ") || t("err.draft");
+        updatePlanningTrace("draft", { status: "error", detail: message });
+        throw new Error(message);
+      }
       setDraft(d.output);
       setPlanQuality(d.quality ?? null);
       setPlanReview(d.review ?? null);
       setPlanQualityRetry(d.qualityRetry ?? null);
-      setPlanningContext(d.planningContext ?? null);
+      updatePlanningTrace("draft", { status: "done", detail: describePlanTrace(d.output) });
+      updatePlanningTrace("quality", {
+        status: d.quality?.grade === "fail" ? "warning" : "done",
+        detail: describeQualityTrace(d.quality, d.qualityRetry),
+      });
       setStep("clarifying");
+      updatePlanningTrace("clarify", { status: "running", detail: t("trace.clarifyRunning") });
       try {
         const c = await withUiTimeout(
           window.aimcub.clarify({
-            title: title.trim(),
-            description: description.trim() || undefined,
+            title: req.title,
+            description: req.description,
             draft: d.output,
           }),
           CLARIFY_UI_TIMEOUT_MS,
@@ -364,10 +458,22 @@ function AppInner() {
         // Clarify is best-effort: if the model returns nothing usable, proceed with the draft
         // and an empty question set rather than blocking — the draft is already valid.
         setClarifyOut(c.output ?? { questions: [], assumptions: [] });
-        if (!c.ok) setError(c.errors.join("; ") || t("err.clarify"));
+        if (!c.ok) {
+          const message = c.errors.join("; ") || t("err.clarify");
+          updatePlanningTrace("clarify", { status: "warning", detail: message });
+          setError(message);
+        } else {
+          const questionCount = c.output?.questions.length ?? 0;
+          updatePlanningTrace("clarify", {
+            status: "done",
+            detail: t(questionCount === 1 ? "trace.clarifyDone_one" : "trace.clarifyDone_other", { n: questionCount }),
+          });
+        }
       } catch (e) {
         setClarifyOut({ questions: [], assumptions: [] });
-        setError(e instanceof Error ? e.message : String(e));
+        const message = e instanceof Error ? e.message : String(e);
+        updatePlanningTrace("clarify", { status: "warning", detail: message });
+        setError(message);
       }
       setStep("questions");
     } catch (e) {
@@ -382,10 +488,17 @@ function AppInner() {
     setError(null);
     if (useDraftAsIs) {
       setFinalPlan(sourcePlan);
+      upsertPlanningTrace(traceEvent("accept-draft", "done", t("trace.acceptDraft"), t("trace.acceptDraftDone")));
       setStep("plan");
       return;
     }
     setStep("refining");
+    upsertPlanningTrace(traceEvent(
+      "refine",
+      "running",
+      t("trace.refine"),
+      t("trace.refinePending", { answers: builtAnswers.length, review: reviewPrompt ? 1 : 0 }),
+    ));
     try {
       const r = await window.aimcub.refine({
         title: title.trim(),
@@ -396,7 +509,9 @@ function AppInner() {
         reviewPrompt,
       });
       if (!r.ok || !r.output) {
-        setError(r.errors.join("; ") || t("err.refine"));
+        const message = r.errors.join("; ") || t("err.refine");
+        updatePlanningTrace("refine", { status: "error", detail: message });
+        setError(message);
         setStep("questions");
         return;
       }
@@ -406,9 +521,20 @@ function AppInner() {
       setPlanQualityRetry(r.qualityRetry ?? null);
       setPlanningContext(r.planningContext ?? null);
       setAimIntake(r.intake ?? null);
+      updatePlanningTrace("context", {
+        status: "done",
+        detail: describeContextTrace(r.planningContext, r.intake ?? null),
+      });
+      updatePlanningTrace("refine", { status: "done", detail: describePlanTrace(r.output) });
+      updatePlanningTrace("quality", {
+        status: r.quality?.grade === "fail" ? "warning" : "done",
+        detail: describeQualityTrace(r.quality, r.qualityRetry),
+      });
       setStep("plan");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const message = e instanceof Error ? e.message : String(e);
+      updatePlanningTrace("refine", { status: "error", detail: message });
+      setError(message);
       setStep("questions");
     }
   }
@@ -473,6 +599,8 @@ function AppInner() {
         )}
 
         {error && <Notice tone="error">{error}</Notice>}
+
+        {step !== "home" && planningTrace.length > 0 && <PlanningProcessPanel events={planningTrace} />}
 
         {step === "home" && (
           <HomeView
@@ -568,6 +696,72 @@ function AppInner() {
         )}
       </div>
     </div>
+  );
+}
+
+function traceStatusMark(status: PlanningTraceStatus): string {
+  switch (status) {
+    case "done":
+      return "OK";
+    case "running":
+      return "...";
+    case "warning":
+      return "!";
+    case "error":
+      return "x";
+    case "pending":
+      return "-";
+  }
+}
+
+function traceStatusColor(status: PlanningTraceStatus): string {
+  switch (status) {
+    case "done":
+      return "#1a7f4b";
+    case "running":
+      return C.accent;
+    case "warning":
+      return "#8a6517";
+    case "error":
+      return C.danger;
+    case "pending":
+      return C.muted;
+  }
+}
+
+function PlanningProcessPanel(props: { events: PlanningTraceEvent[] }) {
+  const { t } = useI18n();
+  if (props.events.length === 0) return null;
+  return (
+    <section style={{ ...card(), background: "#f7f9fb" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline" }}>
+        <div style={{ fontWeight: 600, fontSize: 14 }}>{t("trace.title")}</div>
+        <div style={{ color: C.muted, fontSize: 12 }}>
+          {t("trace.count", { n: props.events.filter((event) => event.status === "done").length, total: props.events.length })}
+        </div>
+      </div>
+      <div style={{ display: "grid", gap: 9, marginTop: 12 }}>
+        {props.events.map((event) => {
+          const tone = traceStatusColor(event.status);
+          return (
+            <div key={event.id} style={{ display: "grid", gridTemplateColumns: "32px 1fr 64px", gap: 8, alignItems: "start" }}>
+              <div style={{ color: tone, fontFamily: "ui-monospace, monospace", fontSize: 12, fontWeight: 700 }}>
+                {traceStatusMark(event.status)}
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ color: C.text, fontSize: 13, fontWeight: 600 }}>{event.title}</div>
+                <div style={{ color: C.muted, fontSize: 12, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {event.detail}
+                </div>
+              </div>
+              <div style={{ color: C.muted, fontSize: 11, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                {event.at}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 

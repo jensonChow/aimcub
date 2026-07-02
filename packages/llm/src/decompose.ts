@@ -123,6 +123,8 @@ const SYSTEM_PROMPT = [
   "    * `commit_pattern` — matches commits by file path glob, message pattern, branch, or min file count.",
   "    * `ci_status` — matches a CI workflow conclusion (default conclusion: success).",
   "  Prefer `commit_pattern` for 'work was done' milestones and `ci_status` for 'it passes' milestones.",
+  "- `acceptance_rule.completion_mode` is ONLY `auto`, `manual`, or `auto_then_confirm`.",
+  "  Never put `mixed` there; `mixed` is valid only for `decomposition_contract.likely_owner`.",
   "- Only set a `ci_status` clause's `workflow` when the goal explicitly names a CI workflow;",
   "  otherwise leave it null and match on the conclusion alone. Workflow names are matched by",
   "  name, so a guessed name that doesn't exist means the milestone can never light up.",
@@ -390,6 +392,7 @@ function formatZodIssue(issue: { path: (string | number)[]; message: string }): 
 const COMMIT_MATCH_KEYS = ["path_glob", "min_files", "message_pattern", "branch"] as const;
 const CI_MATCH_KEYS = ["workflow", "conclusion"] as const;
 const ALL_MATCH_KEYS: readonly string[] = [...COMMIT_MATCH_KEYS, ...CI_MATCH_KEYS];
+const DEFAULT_COMPLETION_MODE = "auto_then_confirm";
 
 /** Recursively drop null values (the schema expresses optionality as `T | null`). */
 function stripNulls(value: unknown): unknown {
@@ -418,6 +421,12 @@ function nestClause(clause: Record<string, unknown>): Record<string, unknown> {
   return { ...rest, match };
 }
 
+function normalizeCompletionMode(value: unknown): unknown {
+  // Some providers confuse owner routing (`likely_owner: mixed`) with completion mode.
+  // Keep the plan usable while preserving the conservative user-confirmation default.
+  return value === "mixed" ? DEFAULT_COMPLETION_MODE : value;
+}
+
 /** Strip nulls + re-nest clauses so the raw model output parses against `DecompositionOutput`. */
 export function normalizeRawPlan(raw: unknown): unknown {
   const cleaned = stripNulls(raw);
@@ -430,6 +439,7 @@ export function normalizeRawPlan(raw: unknown): unknown {
       const rule = n.acceptance_rule;
       if (rule && typeof rule === "object" && !Array.isArray(rule)) {
         const r = rule as Record<string, unknown>;
+        if ("completion_mode" in r) r.completion_mode = normalizeCompletionMode(r.completion_mode);
         if (Array.isArray(r.clauses)) {
           r.clauses = r.clauses.map((c) =>
             c && typeof c === "object" && !Array.isArray(c)

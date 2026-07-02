@@ -78,7 +78,10 @@ const acceptanceRuleSchema = {
   properties: {
     logic: nullableEnum(logicEnum),
     clauses: { type: "array", items: acceptanceClauseSchema },
-    completion_mode: nullableEnum(completionModeEnum),
+    completion_mode: nullableEnum(
+      completionModeEnum,
+      "How completion is finalized. Use only auto, manual, or auto_then_confirm; never use mixed here.",
+    ),
   },
   required: ["logic", "clauses", "completion_mode"],
 } as const;

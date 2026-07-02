@@ -163,6 +163,7 @@ describe("decompose · happy path", () => {
     expect(call.system).toContain("decomposition_contract");
     expect(call.system).toContain("Default to `agent` for digital work");
     expect(call.system).toContain("Use `human` only for work that must happen in the physical world");
+    expect(call.system).toContain("Never put `mixed` there");
     expect(call.system).toContain("local context scanning or");
     expect(call.system).toContain("web research");
     expect(call.prompt).toContain(INPUT.title);
@@ -372,6 +373,15 @@ describe("decompose · happy path", () => {
     expect(result.validation.ok).toBe(true);
     // The user prompt should default the domain to `software`.
     expect((gw.calls[0] as LlmRequest).prompt).toContain("software");
+  });
+
+  it("normalizes owner/completion-mode confusion from providers", async () => {
+    const plan = validPlan();
+    (plan.nodes[0]!.acceptance_rule as Record<string, unknown>).completion_mode = "mixed";
+    const result = await decompose(mockGateway(plan), INPUT);
+
+    expect(result.validation.ok).toBe(true);
+    expect(result.output?.nodes[0]?.acceptance_rule.completion_mode).toBe("auto_then_confirm");
   });
 });
 
