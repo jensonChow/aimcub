@@ -4,6 +4,7 @@ import type {
   AimcubToolName,
   AimcubToolObservation,
   ContextDistillOutput,
+  LocalScanWorkspaceOutput,
   MemorySearchOutput,
   WebFetchOutput,
   WebSearchOutput,
@@ -23,6 +24,9 @@ export interface PlanningToolContextInput {
   includeWeb?: boolean;
   fetchWebResults?: boolean;
   webSearchLimit?: number;
+  includeLocal?: boolean;
+  workspaceRoot?: string;
+  localScanMaxDepth?: number;
   writeDistilledMemoryCandidates?: boolean;
 }
 
@@ -94,6 +98,26 @@ function webFetchOutputToPlanningMemory(output: WebFetchOutput): PlanningMemory 
   };
 }
 
+function localScanOutputToPlanningMemory(output: LocalScanWorkspaceOutput): PlanningMemory {
+  const manifests = output.manifests.slice(0, 8).map((manifest) => `${manifest.kind}: ${manifest.path}`);
+  return {
+    id: `local.scan_workspace:${output.root}`,
+    content: [
+      `Workspace scan: ${output.root}`,
+      `${output.fileCount} files and ${output.directoryCount} directories`,
+      output.likelyProjectTypes.length > 0 ? `Likely project types: ${output.likelyProjectTypes.join(", ")}` : undefined,
+      manifests.length > 0 ? `Manifests: ${manifests.join("; ")}` : undefined,
+      output.sensitivePathsExcluded.length > 0 ? `${output.sensitivePathsExcluded.length} sensitive paths excluded` : undefined,
+    ].filter(Boolean).join(" — "),
+    kind: "semantic",
+    category: "project_fact",
+    source: "local.scan_workspace",
+    confidence: 0.72,
+    goalId: null,
+    goal_id: null,
+  };
+}
+
 function collectMemoryData(observation: AimcubToolObservation<unknown>): PlanningMemory[] {
   const data = observation.data as Partial<MemorySearchOutput> | undefined;
   if (!data || !Array.isArray(data.memories)) return [];
@@ -110,6 +134,14 @@ function collectWebFetchData(observation: AimcubToolObservation<unknown>): Plann
   const data = observation.data as Partial<WebFetchOutput> | undefined;
   if (!data || typeof data.finalUrl !== "string" || typeof data.status !== "number") return [];
   return [webFetchOutputToPlanningMemory(data as WebFetchOutput)];
+}
+
+function collectLocalScanData(observation: AimcubToolObservation<unknown>): PlanningMemory[] {
+  const data = observation.data as Partial<LocalScanWorkspaceOutput> | undefined;
+  if (!data || typeof data.root !== "string" || typeof data.fileCount !== "number" || typeof data.directoryCount !== "number") {
+    return [];
+  }
+  return [localScanOutputToPlanningMemory(data as LocalScanWorkspaceOutput)];
 }
 
 function addResult<T>(
@@ -148,6 +180,21 @@ export async function collectPlanningToolContext(
     failures,
   );
   if (memoryObservation) planningMemories.push(...collectMemoryData(memoryObservation));
+
+  if (input.includeLocal && registry.has("local.scan_workspace")) {
+    const localScanRoot = input.workspaceRoot ?? context.workspaceRoot ?? ".";
+    const localScanObservation = addResult(
+      "local.scan_workspace",
+      await registry.execute("local.scan_workspace", {
+        root: localScanRoot,
+        maxDepth: input.localScanMaxDepth,
+        includeHidden: false,
+      }, context),
+      observations,
+      failures,
+    );
+    if (localScanObservation) planningMemories.push(...collectLocalScanData(localScanObservation));
+  }
 
   if (input.includeWeb) {
     const webSearchObservation = addResult(

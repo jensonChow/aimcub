@@ -2,6 +2,7 @@ import {
   collectPlanningToolContext,
   createAimcubToolRegistry,
   createContextDistillHandler,
+  createLocalReadOnlyToolHandlers,
   createMemorySearchHandler,
   createMemoryWriteCandidateHandler,
   createWebResearchRuntimeFromEnv,
@@ -37,9 +38,16 @@ function writeContextCandidatesEnabled(): boolean {
   return flagEnabled(process.env.AIMCUB_WRITE_CONTEXT_CANDIDATES);
 }
 
+function localContextRoot(): string | undefined {
+  const root = process.env.AIMCUB_LOCAL_CONTEXT_ROOT ?? process.env.AIMCUB_WORKSPACE_ROOT;
+  return root?.trim() ? root.trim() : undefined;
+}
+
 export function createDesktopFirstPartyToolRegistry() {
   const webRuntime = createWebResearchRuntimeFromEnv(process.env);
+  const localRoot = localContextRoot();
   return createAimcubToolRegistry({
+    ...(localRoot ? createLocalReadOnlyToolHandlers({ workspaceRoot: localRoot }) : {}),
     "memory.search": createMemorySearchHandler(aimStore),
     "memory.write_candidate": createMemoryWriteCandidateHandler(aimStore),
     "context.distill": createContextDistillHandler(),
@@ -49,12 +57,15 @@ export function createDesktopFirstPartyToolRegistry() {
 }
 
 export function desktopToolContext(): AimcubToolHandlerContext {
+  const localRoot = localContextRoot();
   return {
     ownerId: LOCAL_OWNER,
+    workspaceRoot: localRoot,
     now: () => new Date(),
     permissions: [
       "memory.read",
       "context.distill",
+      ...(localRoot ? ["filesystem.read" as const, "filesystem.search" as const] : []),
       ...(writeContextCandidatesEnabled() ? ["memory.write_candidate" as const] : []),
       ...(webResearchEnabled() ? ["network.search" as const, "network.fetch" as const] : []),
     ],
@@ -63,6 +74,7 @@ export function desktopToolContext(): AimcubToolHandlerContext {
 
 export async function collectDesktopPlanningContext(req: DraftRequest): Promise<DesktopPlanningContext> {
   const currentAimId = (req as { id?: unknown }).id;
+  const localRoot = localContextRoot();
   const [sourceMemories, toolContext] = await Promise.all([
     aimStore.listMemories(),
     collectPlanningToolContext(
@@ -74,6 +86,8 @@ export async function collectDesktopPlanningContext(req: DraftRequest): Promise<
         currentAimId: typeof currentAimId === "string" ? currentAimId : undefined,
         includeWeb: webResearchEnabled(),
         fetchWebResults: fetchWebResultsEnabled(),
+        includeLocal: Boolean(localRoot),
+        workspaceRoot: localRoot,
         writeDistilledMemoryCandidates: writeContextCandidatesEnabled(),
       },
     ),

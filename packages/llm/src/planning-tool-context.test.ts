@@ -97,6 +97,51 @@ describe("planning tool context collector", () => {
     expect(result.distillation?.missingQuestions.map((question) => question.id)).toContain("missing_eval_signal");
   });
 
+  it("collects local workspace scans into planning context", async () => {
+    const registry = createAimcubToolRegistry({
+      "memory.search": async () => ({
+        ok: true,
+        observation: {
+          summary: "Selected 0 planning memories.",
+          data: { memories: [] },
+          sources: [],
+        },
+      }),
+      "local.scan_workspace": async () => ({
+        ok: true,
+        observation: {
+          summary: "Scanned workspace .: 12 files, 3 directories.",
+          data: {
+            root: "/workspace/aimcub",
+            fileCount: 12,
+            directoryCount: 3,
+            likelyProjectTypes: ["node", "typescript"],
+            manifests: [{ path: "/workspace/aimcub/package.json", kind: "node-package" }],
+            ignoredPatterns: ["node_modules/"],
+            sensitivePathsExcluded: [".env"],
+          },
+          sources: [{ kind: "workspace", path: "/workspace/aimcub" }],
+        },
+      }),
+      "context.distill": createContextDistillHandler(),
+    });
+
+    const result = await collectPlanningToolContext(
+      registry,
+      { ...context, workspaceRoot: "/workspace/aimcub", permissions: ["memory.read", "filesystem.read", "context.distill"] },
+      {
+        title: "Use project files to plan Aimcub work",
+        includeLocal: true,
+        workspaceRoot: "/workspace/aimcub",
+      },
+    );
+
+    expect(result.failures).toEqual([]);
+    expect(result.memories.map((memory) => memory.source)).toContain("local.scan_workspace");
+    expect(result.memories[0]?.content).toContain("Workspace scan: /workspace/aimcub");
+    expect(result.distillation?.summary).toContain("workspace");
+  });
+
   it("writes distilled current-aim memory candidates when explicitly enabled", async () => {
     const writes: Array<{ content: string; category: string; scope: string; aimId?: string }> = [];
     const registry = createAimcubToolRegistry({

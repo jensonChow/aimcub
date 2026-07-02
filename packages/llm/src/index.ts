@@ -211,6 +211,12 @@ export type {
   MemoryWriteCandidateStore,
 } from "./memory-tools";
 export {
+  createLocalReadOnlyToolHandlers,
+} from "./local-tools";
+export type {
+  LocalToolRuntimeOptions,
+} from "./local-tools";
+export {
   createContextDistillHandler,
 } from "./context-distill";
 export {
