@@ -1,13 +1,13 @@
 import type { CSSProperties } from "react";
 
 export const C = {
-  text: "#202124",
-  muted: "#6b6f76",
-  border: "#deded9",
+  text: "#1f2328",
+  muted: "#6e7781",
+  border: "#d8dee4",
   accent: "#2f7187",
-  accentBg: "#eaf3f6",
+  accentBg: "#eef6f8",
   surface: "#ffffff",
-  page: "#f7f7f4",
+  page: "#fafafa",
   danger: "#a33b35",
 };
 

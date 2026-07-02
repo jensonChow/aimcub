@@ -1023,7 +1023,7 @@ function SessionDetails(props: {
 }) {
   const { t } = useI18n();
   return (
-    <details style={sessionDetailsStyle()}>
+    <details style={sessionDetailsStyle()} open={props.events.length > 0 || Boolean(props.busyStep)}>
       <summary style={sessionDetailsSummaryStyle()}>{t("chat.details")}</summary>
       <InspectorRail
         activeTab={props.activeTab}
@@ -1180,12 +1180,12 @@ function sessionChipStyle(): CSSProperties {
 
 function composerShellStyle(): CSSProperties {
   return {
-    width: "min(840px, 100%)",
+    width: "min(820px, 100%)",
     margin: "0 auto",
     border: `1px solid ${C.border}`,
     background: "#fff",
-    borderRadius: 14,
-    boxShadow: "0 14px 44px rgba(20, 20, 18, 0.08), 0 1px 2px rgba(20, 20, 18, 0.05)",
+    borderRadius: 16,
+    boxShadow: "0 10px 34px rgba(31, 35, 40, 0.08), 0 1px 2px rgba(31, 35, 40, 0.06)",
     padding: 10,
     boxSizing: "border-box",
   };
@@ -1246,8 +1246,8 @@ function composerSendButton(disabled: boolean): CSSProperties {
 
 function sessionDetailsStyle(): CSSProperties {
   return {
-    width: "min(840px, 100%)",
-    margin: "18px auto 0",
+    width: "min(820px, 100%)",
+    margin: "16px auto 0",
     color: C.muted,
   };
 }
@@ -1255,10 +1255,11 @@ function sessionDetailsStyle(): CSSProperties {
 function sessionDetailsSummaryStyle(): CSSProperties {
   return {
     cursor: "pointer",
-    fontSize: 12,
-    fontWeight: 700,
+    fontSize: 13,
+    fontWeight: 600,
     color: C.muted,
-    padding: "8px 0",
+    padding: "8px 0 10px",
+    listStyle: "none",
   };
 }
 
@@ -1366,7 +1367,7 @@ function appRootStyle(): CSSProperties {
     inset: 0,
     fontFamily: "system-ui, -apple-system, sans-serif",
     color: C.text,
-    background: "#f1f1ee",
+    background: "#f4f4f3",
     width: "100vw",
     height: "100vh",
     overflow: "hidden",
@@ -1376,7 +1377,7 @@ function appRootStyle(): CSSProperties {
 function classicShellStyle(compact: boolean): CSSProperties {
   return {
     display: "grid",
-    gridTemplateColumns: compact ? "1fr" : "268px minmax(0, 1fr)",
+    gridTemplateColumns: compact ? "1fr" : "264px minmax(0, 1fr)",
     gridTemplateRows: compact ? "auto minmax(0, 1fr)" : undefined,
     width: "100%",
     height: "100%",
@@ -1390,12 +1391,12 @@ function classicSidebarStyle(compact: boolean): CSSProperties {
   return {
     display: "grid",
     gridTemplateRows: compact ? "auto auto" : "auto minmax(0, 1fr)",
-    gap: 16,
-    background: "#f1f1ee",
+    gap: 18,
+    background: "#f4f4f3",
     borderRight: compact ? "none" : `1px solid ${C.border}`,
     borderBottom: compact ? `1px solid ${C.border}` : "none",
     boxShadow: "none",
-    padding: compact ? "16px 14px" : "18px 14px",
+    padding: compact ? "16px 14px" : "18px 12px 14px",
     boxSizing: "border-box",
     minWidth: 0,
     height: compact ? "auto" : "100%",
@@ -1427,16 +1428,19 @@ function mainTopBarStyle(compact: boolean): CSSProperties {
     justifyContent: "space-between",
     gap: 12,
     flexWrap: compact ? "wrap" : "nowrap",
-    padding: compact ? "16px 14px 14px" : "22px 34px 16px",
+    minHeight: 56,
+    padding: compact ? "12px 14px" : "10px 28px",
     boxSizing: "border-box",
     flex: "0 0 auto",
+    borderBottom: `1px solid ${C.border}`,
+    background: C.page,
   };
 }
 
 function contentSurfaceStyle(compact: boolean): CSSProperties {
   return {
     minWidth: 0,
-    padding: compact ? "0 14px 18px" : "0 34px 24px",
+    padding: compact ? "0 14px 18px" : "0 28px 24px",
     minHeight: 0,
     flex: 1,
     boxSizing: "border-box",
@@ -1447,12 +1451,12 @@ function contentSurfaceStyle(compact: boolean): CSSProperties {
 function sidebarBrandButton(): CSSProperties {
   return {
     display: "grid",
-    gap: 2,
+    gap: 1,
     width: "100%",
     border: 0,
     background: "transparent",
     color: C.text,
-    padding: 0,
+    padding: "0 2px",
     cursor: "pointer",
     textAlign: "left",
   };
@@ -1463,13 +1467,13 @@ function sidebarSearchInputStyle(): CSSProperties {
     width: "100%",
     boxSizing: "border-box",
     padding: "9px 10px",
-    border: `1px solid ${C.border}`,
+    border: "1px solid transparent",
     borderRadius: 8,
     fontSize: 13,
     fontFamily: "inherit",
-    background: "#fbfbf9",
+    background: "rgba(31, 35, 40, 0.045)",
     color: C.text,
-    marginBottom: 14,
+    marginBottom: 13,
     outline: "none",
   };
 }
@@ -1477,15 +1481,16 @@ function sidebarSearchInputStyle(): CSSProperties {
 function sidebarCommandButton(primary: boolean): CSSProperties {
   return {
     width: "100%",
-    border: primary ? `1px solid ${C.border}` : "1px solid transparent",
-    background: primary ? "#ffffff" : "transparent",
+    border: "1px solid transparent",
+    background: primary ? "rgba(255, 255, 255, 0.78)" : "transparent",
     color: primary ? C.text : C.muted,
     borderRadius: 8,
     padding: "8px 10px",
     cursor: "pointer",
     fontSize: 13,
-    fontWeight: 700,
+    fontWeight: primary ? 700 : 560,
     textAlign: "left",
+    boxShadow: primary ? "0 1px 1px rgba(31, 35, 40, 0.06)" : "none",
   };
 }
 
@@ -1511,13 +1516,13 @@ function sidebarGoalButton(selected: boolean): CSSProperties {
     boxSizing: "border-box",
     overflow: "hidden",
     textAlign: "left",
-    border: `1px solid ${selected ? "#d4e5eb" : "transparent"}`,
-    background: selected ? C.accentBg : "transparent",
+    border: "1px solid transparent",
+    background: selected ? "rgba(31, 35, 40, 0.065)" : "transparent",
     borderRadius: 8,
     padding: "8px 10px",
     cursor: "pointer",
     color: C.text,
-    boxShadow: selected ? `inset 3px 0 0 ${C.accent}` : "none",
+    boxShadow: "none",
   };
 }
 
@@ -1595,11 +1600,11 @@ function spinnerLineStyle(compact?: boolean): CSSProperties {
     gridTemplateColumns: "34px minmax(0, 1fr)",
     gap: 10,
     alignItems: "start",
-    background: "#f7f9fb",
-    border: `1px solid ${C.border}`,
+    background: compact ? "transparent" : "#f6f8fa",
+    border: compact ? "none" : `1px solid ${C.border}`,
     borderRadius: 8,
-    padding: compact ? "10px 11px" : "12px 14px",
-    marginTop: compact ? 12 : 14,
+    padding: compact ? "8px 0" : "12px 14px",
+    marginTop: compact ? 8 : 14,
   };
 }
 
@@ -1682,12 +1687,12 @@ function InspectorRail(props: {
   const hasActivity = Boolean(props.learning || props.answerImpact || props.captureFulfillment || props.contextLineage);
   return (
     <aside style={{ ...railSurface(), position: props.sticky ? "sticky" : "static", top: props.sticky ? 18 : undefined }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
-        <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>{t("shell.inspector")}</h2>
-        <span style={{ color: C.muted, fontSize: 12 }}>{t("shell.auditLayer")}</span>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
+        <h2 style={{ fontSize: 13, fontWeight: 650, margin: 0, color: C.text }}>{t("shell.inspector")}</h2>
+        <span style={{ color: C.muted, fontSize: 11 }}>{t("shell.auditLayer")}</span>
       </div>
       {props.showTabs !== false && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 6, marginBottom: 14 }}>
+        <div style={{ display: "flex", gap: 4, marginBottom: 14, flexWrap: "wrap" }}>
           {tabs.map((tab) => (
             <button key={tab} onClick={() => props.onTab(tab)} style={inspectorTabButton(props.activeTab === tab)}>
               {t(tabLabels[tab])}
@@ -1775,7 +1780,7 @@ function InspectorSectionTitle(props: { title: string }) {
 
 function InspectorEmpty(props: { title: string; body: string }) {
   return (
-    <div style={{ ...card(), background: "#f8fafc", color: C.muted }}>
+    <div style={emptyInspectorStyle()}>
       <div style={{ color: C.text, fontWeight: 600, fontSize: 14 }}>{props.title}</div>
       <div style={{ fontSize: 13, lineHeight: 1.5, marginTop: 6 }}>{props.body}</div>
     </div>
@@ -1850,13 +1855,19 @@ function ContextSourceCard(props: { title: string; body: string; status: string;
 
 function railSurface(): CSSProperties {
   return {
-    background: "rgba(255, 253, 250, 0.86)",
-    border: "1px solid rgba(119, 111, 98, 0.22)",
-    borderRadius: 10,
-    boxShadow: "0 12px 32px rgba(33, 29, 20, 0.05), 0 1px 1px rgba(33, 29, 20, 0.03)",
-    padding: 14,
+    background: "transparent",
+    borderTop: `1px solid ${C.border}`,
+    padding: "12px 0 0",
     boxSizing: "border-box",
     minWidth: 0,
+  };
+}
+
+function emptyInspectorStyle(): CSSProperties {
+  return {
+    color: C.muted,
+    borderTop: `1px solid ${C.border}`,
+    padding: "12px 0 2px",
   };
 }
 
@@ -1878,14 +1889,31 @@ function miniPill(color = C.muted): CSSProperties {
 
 function inspectorTabButton(selected: boolean): CSSProperties {
   return {
-    border: `1px solid ${selected ? "#b8cbe8" : C.border}`,
-    background: selected ? "#f3f7ff" : "#fff",
-    color: selected ? C.accent : C.text,
-    borderRadius: 7,
-    padding: "7px 6px",
+    border: "none",
+    background: selected ? "rgba(31, 35, 40, 0.08)" : "transparent",
+    color: selected ? C.text : C.muted,
+    borderRadius: 6,
+    padding: "6px 8px",
     cursor: "pointer",
     fontSize: 12,
-    fontWeight: selected ? 700 : 500,
+    fontWeight: selected ? 700 : 560,
+  };
+}
+
+function processPanelStyle(): CSSProperties {
+  return {
+    padding: "2px 0 4px",
+  };
+}
+
+function processEventRowStyle(): CSSProperties {
+  return {
+    display: "grid",
+    gridTemplateColumns: "30px minmax(0, 1fr) 62px",
+    gap: 8,
+    alignItems: "start",
+    borderTop: `1px solid ${C.border}`,
+    padding: "10px 0",
   };
 }
 
@@ -1926,7 +1954,7 @@ function PlanningProcessPanel(props: { events: PlanningTraceEvent[]; busyStep: B
     ?? props.events.find((event) => event.status === "pending")
     ?? null;
   return (
-    <section style={{ ...card(), background: "#f7f9fb" }}>
+    <section style={processPanelStyle()}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline" }}>
         <div style={{ fontWeight: 600, fontSize: 14 }}>{t("trace.title")}</div>
         <div style={{ color: C.muted, fontSize: 12 }}>
@@ -1934,11 +1962,11 @@ function PlanningProcessPanel(props: { events: PlanningTraceEvent[]; busyStep: B
         </div>
       </div>
       <SpinnerVerbLine step={props.busyStep} detail={currentEvent?.detail} compact />
-      <div style={{ display: "grid", gap: 9, marginTop: 12 }}>
+      <div style={{ display: "grid", gap: 0, marginTop: 8 }}>
         {props.events.map((event) => {
           const tone = traceStatusColor(event.status);
           return (
-            <div key={event.id} style={{ display: "grid", gridTemplateColumns: "32px minmax(0, 1fr) 64px", gap: 8, alignItems: "start" }}>
+            <div key={event.id} style={processEventRowStyle()}>
               <div style={{ color: tone, fontFamily: "ui-monospace, monospace", fontSize: 12, fontWeight: 700 }}>
                 {traceStatusMark(event.status)}
               </div>
