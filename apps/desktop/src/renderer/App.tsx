@@ -53,8 +53,6 @@ import {
 import {
   C,
   card,
-  inputStyle,
-  optionButton,
   primaryButton,
   secondaryButton,
 } from "./styles";
@@ -1458,6 +1456,120 @@ function planActionRowStyle(): CSSProperties {
   };
 }
 
+function clarifyListStyle(): CSSProperties {
+  return {
+    display: "grid",
+    marginTop: 16,
+    borderTop: `1px solid ${C.border}`,
+  };
+}
+
+function clarifyQuestionRowStyle(): CSSProperties {
+  return {
+    display: "grid",
+    gap: 10,
+    padding: "15px 0",
+    borderBottom: `1px solid ${C.border}`,
+  };
+}
+
+function clarifyQuestionHeaderStyle(): CSSProperties {
+  return {
+    display: "grid",
+    gridTemplateColumns: "20px minmax(0, 1fr)",
+    gap: 10,
+    alignItems: "start",
+  };
+}
+
+function clarifyQuestionNumberStyle(): CSSProperties {
+  return {
+    color: C.muted,
+    fontSize: 12,
+    fontWeight: 600,
+    paddingTop: 3,
+    fontVariantNumeric: "tabular-nums",
+  };
+}
+
+function clarifyChoicesStyle(): CSSProperties {
+  return {
+    display: "grid",
+    gap: 7,
+    marginLeft: 30,
+  };
+}
+
+function clarifyChoiceButtonStyle(selected: boolean): CSSProperties {
+  return {
+    display: "grid",
+    gap: 2,
+    width: "100%",
+    textAlign: "left",
+    border: "none",
+    borderLeft: `2px solid ${selected ? C.accent : C.border}`,
+    background: selected ? "rgba(47, 113, 135, 0.06)" : "transparent",
+    color: C.text,
+    cursor: "pointer",
+    fontFamily: "inherit",
+    fontSize: 13,
+    lineHeight: 1.4,
+    padding: "7px 10px",
+  };
+}
+
+function clarifyFreeformInputStyle(): CSSProperties {
+  return {
+    width: "calc(100% - 30px)",
+    marginLeft: 30,
+    border: "none",
+    borderBottom: `1px solid ${C.border}`,
+    background: "transparent",
+    color: C.text,
+    fontFamily: "inherit",
+    fontSize: 13,
+    outline: "none",
+    padding: "8px 0",
+  };
+}
+
+function clarifyDetailsStyle(): CSSProperties {
+  return {
+    color: C.muted,
+    fontSize: 12,
+    lineHeight: 1.45,
+    marginLeft: 30,
+  };
+}
+
+function clarifyAssumptionsStyle(): CSSProperties {
+  return {
+    color: C.muted,
+    fontSize: 12,
+    lineHeight: 1.45,
+    marginTop: 14,
+  };
+}
+
+function clarifyEmptyStyle(): CSSProperties {
+  return {
+    color: C.muted,
+    fontSize: 13,
+    lineHeight: 1.45,
+    marginTop: 14,
+  };
+}
+
+function clarifyActionRowStyle(): CSSProperties {
+  return {
+    display: "flex",
+    gap: 10,
+    alignItems: "center",
+    flexWrap: "wrap",
+    marginTop: 14,
+  };
+}
+
 function appRootStyle(): CSSProperties {
   return {
     position: "fixed",
@@ -2243,86 +2355,84 @@ function QuestionsStep(props: {
   const { clarify, answers } = props;
   return (
     <section style={threadSectionStyle()}>
-      <p style={{ color: C.muted, fontSize: 14, margin: "4px 0 16px" }}>{t("q.intro")}</p>
-
-      {clarify.questions.length === 0 && <Notice tone="info">{t("q.none")}</Notice>}
-
-      {clarify.questions.map((q) => {
-        const sourceLabel = q.source_dimension ? dimensionLabel(q.source_dimension, t) : null;
-        return (
-          <div key={q.id} style={card()}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <div style={{ fontWeight: 500, fontSize: 15 }}>{q.question}</div>
-              {sourceLabel && (
-                <span
-                  style={{
-                    border: `1px solid ${C.border}`,
-                    borderRadius: 999,
-                    color: C.muted,
-                    fontSize: 11,
-                    padding: "2px 7px",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {sourceLabel}
-                </span>
-              )}
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
-              {q.options.map((opt) => {
-                const selected = answers[q.id]?.label === opt.label;
-                return (
-                  <button
-                    key={opt.label}
-                    onClick={() => props.onAnswer(q.id, { label: selected ? null : opt.label })}
-                    style={optionButton(selected)}
-                  >
-                    <div style={{ fontWeight: 500 }}>{opt.label}</div>
-                    {opt.tradeoff && <div style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>{opt.tradeoff}</div>}
-                  </button>
-                );
-              })}
-            </div>
-            <input
-              value={answers[q.id]?.other ?? ""}
-              onChange={(e) => props.onAnswer(q.id, { other: e.target.value })}
-              placeholder={t("q.other")}
-              style={{ ...inputStyle(), marginTop: 8, fontSize: 13 }}
-            />
-            {(q.why_high_impact || (q.why_asked && q.why_asked.length > 0) || q.capture) && (
-              <details style={{ color: C.muted, fontSize: 12, lineHeight: 1.45, marginTop: 10 }}>
-                <summary style={{ cursor: "pointer", color: C.accent, fontWeight: 600 }}>{t("q.details")}</summary>
-                {q.why_high_impact && <div style={{ marginTop: 6 }}>{q.why_high_impact}</div>}
-                {q.why_asked && q.why_asked.length > 0 && (
-                  <div style={{ marginTop: 4 }}>
-                    {t("q.askedBecause")} {q.why_asked.map((why) => clarifyWhyLabel(why, t)).join(" · ")}
-                  </div>
-                )}
-                {q.capture && (
-                  <div style={{ marginTop: 4 }}>
-                    {captureContractLabel(q.capture, t)}
-                  </div>
-                )}
-              </details>
-            )}
-          </div>
-        );
-      })}
-
-      {clarify.assumptions.length > 0 && (
-        <div style={{ ...card(), background: "#f6f5f1" }}>
-          <div style={{ fontSize: 12, color: C.muted, marginBottom: 8 }}>{t("q.assuming")}</div>
-          {clarify.assumptions.map((a, i) => (
-            <div key={i} style={{ fontSize: 13, marginBottom: 4 }}>
-              • {a.statement} {a.default_value && <span style={{ color: C.muted }}>({a.default_value})</span>}
-            </div>
-          ))}
+      <div style={assistantTurnStyle()}>
+        <div style={assistantMetaStyle()}>
+          <span>Aimcub</span>
+          <span>{t("trace.clarify")}</span>
         </div>
-      )}
+        <div style={{ color: C.muted, fontSize: 14, lineHeight: 1.55, marginTop: 8 }}>{t("q.intro")}</div>
 
-      <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
-        <button onClick={props.onRefine} style={primaryButton(false)}>{t("q.refine")}</button>
-        <button onClick={props.onUseDraft} style={secondaryButton()}>{t("q.useDraft")}</button>
+        {clarify.questions.length === 0 && <div style={clarifyEmptyStyle()}>{t("q.none")}</div>}
+
+        <div style={clarifyListStyle()}>
+          {clarify.questions.map((q, i) => {
+            const sourceLabel = q.source_dimension ? dimensionLabel(q.source_dimension, t) : null;
+            return (
+              <div key={q.id} style={clarifyQuestionRowStyle()}>
+                <div style={clarifyQuestionHeaderStyle()}>
+                  <span style={clarifyQuestionNumberStyle()}>{i + 1}</span>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ color: C.text, fontSize: 15, fontWeight: 600, lineHeight: 1.45 }}>{q.question}</div>
+                    {sourceLabel && <div style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>{sourceLabel}</div>}
+                  </div>
+                </div>
+                <div style={clarifyChoicesStyle()}>
+                  {q.options.map((opt) => {
+                    const selected = answers[q.id]?.label === opt.label;
+                    return (
+                      <button
+                        key={opt.label}
+                        onClick={() => props.onAnswer(q.id, { label: selected ? null : opt.label })}
+                        style={clarifyChoiceButtonStyle(selected)}
+                      >
+                        <span style={{ fontWeight: 600 }}>{opt.label}</span>
+                        {opt.tradeoff && <span style={{ color: C.muted, fontSize: 12 }}>{opt.tradeoff}</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+                <input
+                  value={answers[q.id]?.other ?? ""}
+                  onChange={(e) => props.onAnswer(q.id, { other: e.target.value })}
+                  placeholder={t("q.other")}
+                  style={clarifyFreeformInputStyle()}
+                />
+                {(q.why_high_impact || (q.why_asked && q.why_asked.length > 0) || q.capture) && (
+                  <details style={clarifyDetailsStyle()}>
+                    <summary style={{ cursor: "pointer", color: C.muted, fontWeight: 600 }}>{t("q.details")}</summary>
+                    {q.why_high_impact && <div style={{ marginTop: 6 }}>{q.why_high_impact}</div>}
+                    {q.why_asked && q.why_asked.length > 0 && (
+                      <div style={{ marginTop: 4 }}>
+                        {t("q.askedBecause")} {q.why_asked.map((why) => clarifyWhyLabel(why, t)).join(" · ")}
+                      </div>
+                    )}
+                    {q.capture && (
+                      <div style={{ marginTop: 4 }}>
+                        {captureContractLabel(q.capture, t)}
+                      </div>
+                    )}
+                  </details>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {clarify.assumptions.length > 0 && (
+          <details style={clarifyAssumptionsStyle()}>
+            <summary style={{ cursor: "pointer", color: C.muted, fontWeight: 600 }}>{t("q.assuming")}</summary>
+            {clarify.assumptions.map((a, i) => (
+              <div key={i} style={{ marginTop: 5 }}>
+                {a.statement} {a.default_value && <span style={{ color: C.muted }}>({a.default_value})</span>}
+              </div>
+            ))}
+          </details>
+        )}
+
+        <div style={clarifyActionRowStyle()}>
+          <button onClick={props.onRefine} style={{ ...primaryButton(false), marginTop: 0 }}>{t("q.refine")}</button>
+          <button onClick={props.onUseDraft} style={{ ...secondaryButton(), marginTop: 0 }}>{t("q.useDraft")}</button>
+        </div>
       </div>
     </section>
   );
