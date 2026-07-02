@@ -272,7 +272,8 @@ export function reviewContextSedimentation(
     }));
   const pending = pendingSteps(input.progress);
   const shouldIterate = pending.some((step) => step.blocksPlanAcceptance);
-  const readyForDecomposition = !shouldIterate && (aimContext.length > 0 || !input.loop.shouldContinue);
+  const groundedContextCount = aimContext.length + durableMemoryCandidates.length;
+  const readyForDecomposition = !shouldIterate && (groundedContextCount > 0 || !input.loop.shouldContinue);
 
   return {
     version: 1,

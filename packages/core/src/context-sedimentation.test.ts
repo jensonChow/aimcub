@@ -140,6 +140,62 @@ describe("reviewContextSedimentation", () => {
     expect(report.shouldIterate).toBe(true);
   });
 
+  it("allows durable user context to unblock decomposition when blocking intake is satisfied", () => {
+    const durableOnlyLoop = buildContextIntakeLoop({
+      readiness: "needs_targeted_context",
+      acquisition: [
+        {
+          id: "acq_eval_preference",
+          channel: "questionnaire",
+          priority: "medium",
+          scope: "global",
+          categories: ["constraint"],
+          reason: "A reusable user preference can shape this plan and future aims.",
+          action: "Ask one targeted preference question.",
+          suggestedTools: ["context.ask_user", "memory.write_candidate"],
+          memoryTargets: [{
+            scope: "global",
+            kind: "semantic",
+            categories: ["constraint"],
+          }],
+        },
+      ],
+    });
+    const signals = [
+      {
+        source: "user_answer" as const,
+        channel: "questionnaire" as const,
+        category: "constraint" as const,
+        scope: "global" as const,
+        questionId: "q_constraint",
+        summary: "Constraint: Prefer a plan that can be delegated to local agents after approval.",
+      },
+    ];
+    const progress = reviewContextIntakeProgress({
+      loop: durableOnlyLoop,
+      signals,
+    });
+
+    const report = reviewContextSedimentation({
+      loop: durableOnlyLoop,
+      progress,
+      signals,
+    });
+
+    expect(report.aimContext).toEqual([]);
+    expect(report.durableMemoryCandidates).toEqual([
+      expect.objectContaining({
+        category: "constraint",
+        source: "user_stated",
+        channel: "questionnaire",
+        stepId: "loop_1",
+        originId: "q_constraint",
+      }),
+    ]);
+    expect(report.readyForDecomposition).toBe(true);
+    expect(report.shouldIterate).toBe(false);
+  });
+
   it("filters prompt-like context and deduplicates candidates", () => {
     const report = reviewContextSedimentation({
       loop,
