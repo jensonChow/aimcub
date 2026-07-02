@@ -124,6 +124,7 @@ export {
   planningContextReportsFromGoals,
   recordAssumptionContextCandidatesForStore,
   recordReviewContextCandidatesForStore,
+  recordSedimentationMemoryCandidatesForStore,
   reviewDecompositionStrategyForStore,
   selectPlanningContextForStore,
   summarizeClarifyLearningForStore,

@@ -12,6 +12,7 @@ import {
   type ContextAssumption,
   type ContextCandidate,
   type ContextLineageLearningReport,
+  type ContextSedimentationReport,
   type DecompositionLearningReport,
   type DecompositionStrategyReport,
   type PlanReviewReport,
@@ -220,4 +221,23 @@ export async function recordAssumptionContextCandidatesForStore(
   assumptions: readonly ContextAssumption[],
 ): Promise<Memory[]> {
   return recordContextCandidates(store, goal, extractMemoryCandidatesFromAssumptions({ goal, assumptions }));
+}
+
+export async function recordSedimentationMemoryCandidatesForStore(
+  store: Pick<ContextWorkflowStore, "addMemoryCandidate">,
+  sedimentation: ContextSedimentationReport | null | undefined,
+): Promise<Memory[]> {
+  const saved: Memory[] = [];
+  for (const candidate of sedimentation?.durableMemoryCandidates ?? []) {
+    const memory = await store.addMemoryCandidate({
+      goalId: null,
+      content: candidate.content,
+      kind: candidate.kind,
+      category: candidate.category,
+      source: candidate.source,
+      confidence: candidate.confidence,
+    });
+    if (memory.status === "pending") saved.push(memory);
+  }
+  return saved;
 }

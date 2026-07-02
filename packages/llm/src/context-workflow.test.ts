@@ -5,6 +5,7 @@ import type { Goal, Memory } from "@core/types";
 import {
   buildAimIntakeReport,
   planningContextReportsFromGoals,
+  recordSedimentationMemoryCandidatesForStore,
   selectPlanningContextForStore,
 } from "./context-workflow";
 
@@ -113,5 +114,90 @@ describe("context workflow", () => {
     expect(intake.coverage.profile.totalActive).toBe(1);
     expect(intake.coverage.selectedTotal).toBe(1);
     expect(intake.coverage.missingCoreCategories).not.toContain("eval_signal");
+  });
+
+  it("records sedimented durable context as global pending memory candidates", async () => {
+    const calls: Array<{
+      goalId?: string | null;
+      content: string;
+      kind?: Memory["kind"];
+      category?: Memory["category"];
+      source?: Memory["source"];
+      confidence?: number;
+    }> = [];
+
+    const saved = await recordSedimentationMemoryCandidatesForStore(
+      {
+        async addMemoryCandidate(input) {
+          calls.push(input);
+          return memory({
+            id: `10000000-0000-4000-8000-00000000000${calls.length + 3}`,
+            goal_id: input.goalId ?? null,
+            content: input.content,
+            kind: input.kind ?? "semantic",
+            category: input.category ?? "project_fact",
+            source: input.source ?? "agent_inferred",
+            confidence: input.confidence ?? 0.7,
+            status: calls.length === 2 ? "active" : "pending",
+          });
+        },
+      },
+      {
+        version: 1,
+        readyForDecomposition: true,
+        shouldIterate: false,
+        aimContextCount: 1,
+        durableMemoryCandidateCount: 2,
+        aimContext: [{
+          content: "Project fact: This context stays aim-local.",
+          category: "project_fact",
+          source: "distilled_context",
+          reason: "Aim-local context collected for the current decomposition.",
+        }],
+        durableMemoryCandidates: [
+          {
+            content: "Constraint: Always cite official documentation before travel planning.",
+            kind: "semantic",
+            category: "constraint",
+            source: "agent_inferred",
+            confidence: 0.74,
+            reason: "Durable constraint context collected during planning.",
+          },
+          {
+            content: "Preference: Keep planning output concise.",
+            kind: "semantic",
+            category: "preference",
+            source: "user_stated",
+            confidence: 0.82,
+            reason: "Durable preference context collected during planning.",
+          },
+        ],
+        pendingSteps: [],
+        nextActions: [],
+      },
+    );
+
+    expect(calls).toEqual([
+      expect.objectContaining({
+        goalId: null,
+        content: "Constraint: Always cite official documentation before travel planning.",
+        category: "constraint",
+        source: "agent_inferred",
+        confidence: 0.74,
+      }),
+      expect.objectContaining({
+        goalId: null,
+        content: "Preference: Keep planning output concise.",
+        category: "preference",
+        source: "user_stated",
+        confidence: 0.82,
+      }),
+    ]);
+    expect(saved).toHaveLength(1);
+    expect(saved[0]).toMatchObject({
+      status: "pending",
+      goal_id: null,
+      category: "constraint",
+    });
   });
 });

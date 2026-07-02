@@ -30,6 +30,7 @@ import {
   planningContextReportsFromGoals,
   recordAssumptionContextCandidatesForStore,
   recordReviewContextCandidatesForStore,
+  recordSedimentationMemoryCandidatesForStore,
   reviewDecompositionStrategyForStore,
   summarizeClarifyLearningForStore,
   summarizeContextCaptureLearningForStore,
@@ -389,6 +390,7 @@ export function registerIpc(): void {
       ...saved,
       answerImpact,
       contextCandidates: [
+        ...(await recordSedimentationMemoryCandidatesForStore(aimStore, contextSedimentation)),
         ...(await recordAssumptionContextCandidatesForStore(aimStore, saved.goal, req.assumptions ?? [])),
         ...(await recordReviewContextCandidatesForStore(aimStore, saved.goal, req.review)),
       ],
