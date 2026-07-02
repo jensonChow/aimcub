@@ -1425,14 +1425,13 @@ function milestoneRowStyle(open: boolean): CSSProperties {
 
 function milestoneIndexStyle(): CSSProperties {
   return {
-    width: 22,
+    width: 20,
     height: 22,
     display: "inline-grid",
     placeItems: "center",
-    borderRadius: 999,
-    background: "#eeeeea",
     color: C.muted,
     fontSize: 12,
+    fontWeight: 600,
     fontVariantNumeric: "tabular-nums",
   };
 }
@@ -1741,12 +1740,9 @@ function AimHeader(props: {
   description?: string | null;
   status: string;
   milestoneCount: number;
-  doneCount: number;
   nextAction: string;
 }) {
   const { t } = useI18n();
-  const total = Math.max(props.milestoneCount, 1);
-  const percent = Math.max(0, Math.min(100, Math.round((props.doneCount / total) * 100)));
   return (
     <section style={threadSectionStyle()}>
       <div style={userTurnStyle()}>
@@ -1761,14 +1757,9 @@ function AimHeader(props: {
           <span>{t(props.milestoneCount === 1 ? "common.milestone_one" : "common.milestone_other", { n: props.milestoneCount })}</span>
         </div>
         {props.description ? <div style={{ color: C.muted, fontSize: 14, lineHeight: 1.6, marginTop: 8 }}>{props.description}</div> : null}
-        <div style={{ marginTop: 14 }}>
-          <div style={{ height: 5, background: "#e8e8e4", borderRadius: 999, overflow: "hidden" }}>
-            <div style={{ height: "100%", width: `${percent}%`, background: C.accent }} />
-          </div>
-          <div style={{ color: C.text, fontSize: 13, marginTop: 9, lineHeight: 1.45 }}>
-            <span style={{ color: C.muted }}>{t("shell.nextAction")} </span>
-            {props.nextAction}
-          </div>
+        <div style={{ color: C.text, fontSize: 13, marginTop: 12, lineHeight: 1.45 }}>
+          <span style={{ color: C.muted }}>{t("shell.nextAction")} </span>
+          {props.nextAction}
         </div>
       </div>
     </section>
@@ -2101,22 +2092,6 @@ function emptyInspectorStyle(): CSSProperties {
   };
 }
 
-function miniPill(color = C.muted): CSSProperties {
-  return {
-    display: "inline-flex",
-    alignItems: "center",
-    border: `1px solid ${color === C.muted ? C.border : "#b8cbe8"}`,
-    borderRadius: 999,
-    color,
-    background: color === C.muted ? "#fff" : "#f3f7ff",
-    fontSize: 11,
-    fontWeight: 600,
-    padding: "3px 7px",
-    lineHeight: 1.1,
-    whiteSpace: "nowrap",
-  };
-}
-
 function inspectorTabButton(selected: boolean): CSSProperties {
   return {
     border: "none",
@@ -2369,12 +2344,7 @@ function MilestoneCards(props: { plan: DecompositionOutput }) {
               <div style={milestoneIndexStyle()}>{i + 1}</div>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontWeight: 650, overflow: "hidden", textOverflow: "ellipsis" }}>{n.title}</div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8, alignItems: "center" }}>
-                  <span style={miniPill()}>{contract ? decompositionOwnerLabel(contract.likely_owner, t) : t("plan.ownerUnknown")}</span>
-                  <span style={miniPill(C.accent)}>{t("shell.pending")}</span>
-                </div>
-                <div style={{ fontSize: 13, color: C.muted, marginTop: 9, lineHeight: 1.45 }}>
-                  <span style={{ color: C.text, fontWeight: 600 }}>{t("plan.completionStandard")} </span>
+                <div style={{ fontSize: 13, color: C.muted, marginTop: 5, lineHeight: 1.45 }}>
                   {shortUiText(completionStandard)}
                 </div>
               </div>
@@ -2429,7 +2399,6 @@ function PlanView(props: {
         description={props.description || plan.goal_summary}
         status={savedAt ? t("shell.savedAim") : t("shell.currentAim")}
         milestoneCount={n}
-        doneCount={0}
         nextAction={nextNode?.title ?? t("shell.noNextAction")}
       />
       <MilestoneCards plan={plan} />
@@ -2478,7 +2447,6 @@ function SavedGoalView(props: {
             description={goal.description}
             status={t("shell.savedAim")}
             milestoneCount={n}
-            doneCount={0}
             nextAction={nextNode?.title ?? t("shell.noNextAction")}
           />
           <MilestoneCards plan={plan} />
@@ -2490,7 +2458,6 @@ function SavedGoalView(props: {
             description={goal.description}
             status={t("shell.savedAim")}
             milestoneCount={0}
-            doneCount={0}
             nextAction={t("shell.noNextAction")}
           />
           <Notice tone="info">{t("saved.noPlan")}</Notice>
