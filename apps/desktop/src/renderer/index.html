@@ -12,12 +12,34 @@
         height: 100%;
         margin: 0;
         overflow: hidden;
-        background: #f4f4f3;
+        overscroll-behavior: none;
+        background: #fafafa;
       }
 
       #root {
         position: fixed;
         inset: 0;
+        display: flex;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+      }
+
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      ::-webkit-scrollbar-thumb {
+        background: rgba(31, 35, 40, 0.28);
+        background-clip: content-box;
+        border: 3px solid transparent;
+        border-radius: 999px;
       }
     </style>
   </head>

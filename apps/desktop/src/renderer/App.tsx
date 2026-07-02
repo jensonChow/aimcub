@@ -1193,14 +1193,18 @@ function agentWorkspaceStyle(): CSSProperties {
     display: "grid",
     gridTemplateRows: "minmax(0, 1fr) auto",
     height: "100%",
+    maxHeight: "100%",
     minHeight: 0,
+    overflow: "hidden",
   };
 }
 
 function conversationStreamStyle(): CSSProperties {
   return {
     minHeight: 0,
+    height: "100%",
     overflowY: "auto",
+    overscrollBehavior: "contain",
     padding: "24px 0 22px",
     boxSizing: "border-box",
   };
@@ -1410,33 +1414,41 @@ function appRootStyle(): CSSProperties {
     inset: 0,
     fontFamily: "system-ui, -apple-system, sans-serif",
     color: C.text,
-    background: "#f4f4f3",
-    width: "100vw",
-    height: "100vh",
+    background: C.page,
+    width: "100%",
+    height: "100%",
+    minHeight: 0,
     overflow: "hidden",
+    overscrollBehavior: "none",
   };
 }
 
 function classicShellStyle(compact: boolean, collapsed: boolean): CSSProperties {
   return {
+    position: "absolute",
+    inset: 0,
     display: "grid",
     gridTemplateColumns: compact ? "1fr" : collapsed ? "52px minmax(0, 1fr)" : "264px minmax(0, 1fr)",
     gridTemplateRows: compact ? "auto minmax(0, 1fr)" : undefined,
     width: "100%",
     height: "100%",
+    maxHeight: "100%",
     minHeight: 0,
     background: C.page,
     overflow: "hidden",
+    overscrollBehavior: "none",
   };
 }
 
 function classicSidebarStyle(compact: boolean, collapsed: boolean): CSSProperties {
   return {
+    position: compact ? "relative" : "sticky",
+    top: 0,
     display: "grid",
     gridTemplateRows: collapsed ? "repeat(3, 36px) minmax(0, 1fr)" : compact ? "auto auto" : "auto minmax(0, 1fr)",
     alignContent: collapsed ? "start" : undefined,
     gap: collapsed ? 8 : 18,
-    background: "#f4f4f3",
+    background: C.page,
     borderRight: compact ? "none" : `1px solid ${C.border}`,
     borderBottom: compact ? `1px solid ${C.border}` : "none",
     boxShadow: "none",
@@ -1444,10 +1456,10 @@ function classicSidebarStyle(compact: boolean, collapsed: boolean): CSSPropertie
     boxSizing: "border-box",
     minWidth: 0,
     height: compact ? "auto" : "100%",
+    maxHeight: compact ? undefined : "100%",
     minHeight: 0,
     overflowY: compact ? "visible" : "auto",
     overscrollBehavior: "contain",
-    scrollbarGutter: "stable",
   };
 }
 
@@ -1458,10 +1470,12 @@ function mainShellStyle(): CSSProperties {
     padding: 0,
     boxSizing: "border-box",
     height: "100%",
+    maxHeight: "100%",
     overflow: "hidden",
     display: "flex",
     flexDirection: "column",
     background: C.page,
+    overscrollBehavior: "none",
   };
 }
 
@@ -1489,6 +1503,9 @@ function contentSurfaceStyle(compact: boolean): CSSProperties {
     flex: 1,
     boxSizing: "border-box",
     overflow: "hidden",
+    display: "grid",
+    gridTemplateRows: "minmax(0, 1fr)",
+    overscrollBehavior: "none",
   };
 }
 
