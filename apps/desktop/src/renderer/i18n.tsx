@@ -63,6 +63,8 @@ export const STRINGS = {
   "chat.new": { en: "New chat", zh: "新对话" },
   "chat.home": { en: "Chats", zh: "对话" },
   "chat.search": { en: "Search chats", zh: "搜索对话" },
+  "chat.hideSidebar": { en: "Hide sidebar", zh: "收起侧栏" },
+  "chat.showSidebar": { en: "Show sidebar", zh: "展开侧栏" },
   "chat.sessions": { en: "Sessions", zh: "会话" },
   "chat.session_one": { en: "{n} session", zh: "{n} 个会话" },
   "chat.session_other": { en: "{n} sessions", zh: "{n} 个会话" },

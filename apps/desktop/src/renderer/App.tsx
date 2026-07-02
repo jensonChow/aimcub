@@ -188,6 +188,7 @@ function AppInner() {
   const [viewing, setViewing] = useState<Goal | null>(null);
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("process");
   const [composerText, setComposerText] = useState("");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const viewportWidth = useViewportWidth();
 
   useEffect(() => {
@@ -729,6 +730,7 @@ function AppInner() {
   }
 
   const compactShell = viewportWidth < 900;
+  const shellSidebarCollapsed = !compactShell && sidebarCollapsed;
   const activeBusyStep = isBusyStep(step) ? step : null;
   const activeGoal = viewing ?? savedGoal;
   const activeGoalPending = activeGoal
@@ -779,27 +781,29 @@ function AppInner() {
 
   return (
     <div style={appRootStyle()}>
-      <div style={classicShellStyle(compactShell)}>
+      <div style={classicShellStyle(compactShell, shellSidebarCollapsed)}>
         <ClassicSidebar
           compact={compactShell}
+          collapsed={shellSidebarCollapsed}
           goals={goals}
           currentGoal={activeGoal}
           step={step}
           onHome={goHome}
           onNew={startNew}
           onOpen={openGoal}
+          onToggleCollapsed={() => setSidebarCollapsed((value) => !value)}
         />
 
         <section style={mainShellStyle()}>
           <header style={mainTopBarStyle(compactShell)}>
             <div style={{ minWidth: 0 }}>
               {showSessionDetails && (
-                <>
+                <div style={{ minWidth: 0 }}>
                   <div style={{ color: C.text, fontSize: 15, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {workspaceTitle}
                   </div>
                   <div style={{ color: C.muted, fontSize: 12, marginTop: 3 }}>{t("shell.subtitle")}</div>
-                </>
+                </div>
               )}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
@@ -1061,12 +1065,14 @@ function SessionDetails(props: {
 
 function ClassicSidebar(props: {
   compact: boolean;
+  collapsed: boolean;
   goals: Goal[];
   currentGoal: Goal | null;
   step: Step;
   onHome: () => void;
   onNew: () => void;
   onOpen: (goal: Goal) => void;
+  onToggleCollapsed: () => void;
 }) {
   const { t } = useI18n();
   const [query, setQuery] = useState("");
@@ -1075,13 +1081,35 @@ function ClassicSidebar(props: {
     if (!q) return true;
     return `${goal.title} ${goal.description ?? ""}`.toLowerCase().includes(q);
   });
-  return (
-    <aside style={classicSidebarStyle(props.compact)}>
-      <div>
-        <button onClick={props.onHome} style={sidebarBrandButton()}>
-          <span style={{ fontSize: 18, fontWeight: 750, letterSpacing: 0 }}>Aimcub</span>
-          <span style={{ color: C.muted, fontSize: 12 }}>{t("shell.subtitle")}</span>
+  if (props.collapsed) {
+    return (
+      <aside style={classicSidebarStyle(props.compact, true)}>
+        <button onClick={props.onToggleCollapsed} style={collapsedSidebarButtonStyle(props.step === "home")} title={t("chat.showSidebar")} aria-label={t("chat.showSidebar")}>
+          A
         </button>
+        <button onClick={props.onNew} style={collapsedSidebarButtonStyle(false)} title={t("chat.new")} aria-label={t("chat.new")}>
+          +
+        </button>
+        <button onClick={props.onHome} style={collapsedSidebarButtonStyle(props.step === "home")} title={t("chat.home")} aria-label={t("chat.home")}>
+          C
+        </button>
+      </aside>
+    );
+  }
+  return (
+    <aside style={classicSidebarStyle(props.compact, false)}>
+      <div>
+        <div style={sidebarHeaderRowStyle()}>
+          <button onClick={props.onHome} style={sidebarBrandButton()}>
+            <span style={{ fontSize: 17, fontWeight: 750, letterSpacing: 0 }}>Aimcub</span>
+            <span style={{ color: C.muted, fontSize: 12 }}>{t("shell.subtitle")}</span>
+          </button>
+          {!props.compact && (
+            <button onClick={props.onToggleCollapsed} style={shellIconButtonStyle()} title={t("chat.hideSidebar")} aria-label={t("chat.hideSidebar")}>
+              &lt;&lt;
+            </button>
+          )}
+        </div>
         <div style={{ display: "grid", gap: 8, marginTop: 18 }}>
           <button onClick={props.onNew} style={sidebarCommandButton(true)}>
             {t("chat.new")}
@@ -1374,10 +1402,10 @@ function appRootStyle(): CSSProperties {
   };
 }
 
-function classicShellStyle(compact: boolean): CSSProperties {
+function classicShellStyle(compact: boolean, collapsed: boolean): CSSProperties {
   return {
     display: "grid",
-    gridTemplateColumns: compact ? "1fr" : "264px minmax(0, 1fr)",
+    gridTemplateColumns: compact ? "1fr" : collapsed ? "52px minmax(0, 1fr)" : "264px minmax(0, 1fr)",
     gridTemplateRows: compact ? "auto minmax(0, 1fr)" : undefined,
     width: "100%",
     height: "100%",
@@ -1387,16 +1415,17 @@ function classicShellStyle(compact: boolean): CSSProperties {
   };
 }
 
-function classicSidebarStyle(compact: boolean): CSSProperties {
+function classicSidebarStyle(compact: boolean, collapsed: boolean): CSSProperties {
   return {
     display: "grid",
-    gridTemplateRows: compact ? "auto auto" : "auto minmax(0, 1fr)",
-    gap: 18,
+    gridTemplateRows: collapsed ? "repeat(3, 36px) minmax(0, 1fr)" : compact ? "auto auto" : "auto minmax(0, 1fr)",
+    alignContent: collapsed ? "start" : undefined,
+    gap: collapsed ? 8 : 18,
     background: "#f4f4f3",
     borderRight: compact ? "none" : `1px solid ${C.border}`,
     borderBottom: compact ? `1px solid ${C.border}` : "none",
     boxShadow: "none",
-    padding: compact ? "16px 14px" : "18px 12px 14px",
+    padding: collapsed ? "12px 8px" : compact ? "16px 14px" : "18px 12px 14px",
     boxSizing: "border-box",
     minWidth: 0,
     height: compact ? "auto" : "100%",
@@ -1459,6 +1488,49 @@ function sidebarBrandButton(): CSSProperties {
     padding: "0 2px",
     cursor: "pointer",
     textAlign: "left",
+  };
+}
+
+function sidebarHeaderRowStyle(): CSSProperties {
+  return {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) 32px",
+    gap: 8,
+    alignItems: "start",
+  };
+}
+
+function shellIconButtonStyle(): CSSProperties {
+  return {
+    width: 32,
+    height: 32,
+    display: "inline-grid",
+    placeItems: "center",
+    border: "1px solid transparent",
+    borderRadius: 7,
+    background: "transparent",
+    color: C.muted,
+    cursor: "pointer",
+    fontSize: 11,
+    fontWeight: 700,
+    fontFamily: "ui-monospace, monospace",
+  };
+}
+
+function collapsedSidebarButtonStyle(selected: boolean): CSSProperties {
+  return {
+    width: 36,
+    height: 36,
+    display: "grid",
+    placeItems: "center",
+    border: "1px solid transparent",
+    borderRadius: 8,
+    background: selected ? "rgba(31, 35, 40, 0.08)" : "transparent",
+    color: selected ? C.text : C.muted,
+    cursor: "pointer",
+    fontSize: 13,
+    fontWeight: 750,
+    fontFamily: "system-ui, -apple-system, sans-serif",
   };
 }
 
