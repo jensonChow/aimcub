@@ -245,6 +245,74 @@ describe("buildLocalHandoffManifest", () => {
     ]);
   });
 
+  it("carries newly sedimented durable context into agent handoff jobs", () => {
+    const plan: DecompositionOutput = {
+      goal_summary: "Ship answer-aware handoff.",
+      domain: "software",
+      rationale: "Local agents need context collected during intake.",
+      nodes: [node("handoff", "agent")],
+      edges: [],
+    };
+
+    const manifest = buildLocalHandoffManifest({
+      plan,
+      aimContext: [
+        {
+          content: "Project fact: Use the connected workspace.",
+          category: "project_fact",
+          source: "tool_observation",
+          stepId: "loop_local",
+          reason: "Aim-scoped context collected through local_workspace.",
+        },
+      ],
+      durableMemoryCandidates: [
+        {
+          content: "Constraint: Keep local agent changes inside packages/core.",
+          kind: "semantic",
+          category: "constraint",
+          source: "user_stated",
+          confidence: 0.82,
+          stepId: "loop_questionnaire",
+          originId: "q_constraint",
+          reason: "Durable constraint context collected through questionnaire.",
+        },
+        {
+          content: "Constraint: Keep local agent changes inside packages/core.",
+          kind: "semantic",
+          category: "constraint",
+          source: "user_stated",
+          confidence: 0.82,
+          reason: "Duplicate candidate.",
+        },
+      ],
+      selectedContext: [
+        {
+          content: "Preference: Keep status updates concise.",
+          category: "preference",
+          confidence: 0.9,
+        },
+      ],
+    });
+
+    expect(manifest.agentQueue[0]!.inputContext).toEqual([
+      expect.objectContaining({
+        category: "project_fact",
+        source: "tool_observation",
+        stepId: "loop_local",
+      }),
+      expect.objectContaining({
+        category: "constraint",
+        source: "user_stated",
+        stepId: "loop_questionnaire",
+        content: "Constraint: Keep local agent changes inside packages/core.",
+      }),
+      expect.objectContaining({
+        category: "preference",
+        source: "selected_context",
+      }),
+    ]);
+  });
+
   it("keeps blocked agent and human-gated work out of the ready queue", () => {
     const plan: DecompositionOutput = {
       goal_summary: "Route local handoff work.",

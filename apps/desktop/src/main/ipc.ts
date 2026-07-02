@@ -312,6 +312,7 @@ export function registerIpc(): void {
     const localHandoffManifest = buildLocalHandoffManifest({
       plan: req.plan,
       aimContext: contextSedimentation.aimContext,
+      durableMemoryCandidates: contextSedimentation.durableMemoryCandidates,
       selectedContext: selectedContext.memories,
     });
 

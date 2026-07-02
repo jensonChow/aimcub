@@ -7,7 +7,7 @@ import type {
   DecompositionOwner,
   PlanNode,
 } from "@core/types";
-import type { ContextSedimentationAimContext } from "./context-sedimentation";
+import type { ContextSedimentationAimContext, ContextSedimentationMemoryCandidate } from "./context-sedimentation";
 import { inferContextCategory } from "./context";
 import type { PlanQualityContext } from "./plan-quality";
 
@@ -54,7 +54,7 @@ export interface BuildPlanHandoffReportInput {
 export interface LocalAgentHandoffContextItem {
   category: ContextCategory;
   content: string;
-  source: ContextSedimentationAimContext["source"] | "selected_context";
+  source: ContextSedimentationAimContext["source"] | ContextSedimentationMemoryCandidate["source"] | "selected_context";
   stepId?: string;
   reason: string;
 }
@@ -105,6 +105,7 @@ export interface BuildLocalHandoffManifestInput {
   plan: DecompositionOutput;
   handoff?: PlanHandoffReport;
   aimContext?: readonly ContextSedimentationAimContext[];
+  durableMemoryCandidates?: readonly ContextSedimentationMemoryCandidate[];
   selectedContext?: readonly PlanQualityContext[];
   maxContextItemsPerJob?: number;
 }
@@ -287,6 +288,13 @@ function selectedContextCategory(context: PlanQualityContext): ContextCategory {
 function handoffContextCandidates(input: BuildLocalHandoffManifestInput): LocalAgentHandoffContextItem[] {
   const rows: LocalAgentHandoffContextItem[] = [
     ...(input.aimContext ?? []).map((context) => ({
+      category: context.category,
+      content: context.content,
+      source: context.source,
+      ...(context.stepId ? { stepId: context.stepId } : {}),
+      reason: context.reason,
+    })),
+    ...(input.durableMemoryCandidates ?? []).map((context) => ({
       category: context.category,
       content: context.content,
       source: context.source,
