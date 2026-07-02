@@ -1,6 +1,7 @@
 import {
   collectPlanningToolContext,
   createAimcubToolRegistry,
+  createContextAskUserHandler,
   createContextDistillHandler,
   createLocalReadOnlyToolHandlers,
   createMemorySearchHandler,
@@ -52,6 +53,7 @@ export function createDesktopFirstPartyToolRegistry() {
     ...(localRoot ? createLocalReadOnlyToolHandlers({ workspaceRoot: localRoot }) : {}),
     "memory.search": createMemorySearchHandler(aimStore),
     "memory.write_candidate": createMemoryWriteCandidateHandler(aimStore),
+    "context.ask_user": createContextAskUserHandler(),
     "context.distill": createContextDistillHandler(),
     "web.search": webRuntime.search,
     "web.fetch": webRuntime.fetch,
@@ -66,6 +68,7 @@ export function desktopToolContext(): AimcubToolHandlerContext {
     now: () => new Date(),
     permissions: [
       "memory.read",
+      "user.ask",
       "context.distill",
       ...(localRoot ? ["filesystem.read" as const, "filesystem.search" as const] : []),
       ...(writeContextCandidatesEnabled() ? ["memory.write_candidate" as const] : []),
@@ -90,6 +93,7 @@ export async function collectDesktopPlanningContext(req: DraftRequest): Promise<
         fetchWebResults: fetchWebResultsEnabled(),
         includeLocal: Boolean(localRoot),
         workspaceRoot: localRoot,
+        askMissingQuestions: true,
         writeDistilledMemoryCandidates: writeContextCandidatesEnabled(),
       },
     ),

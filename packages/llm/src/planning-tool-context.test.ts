@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { createContextAskUserHandler } from "./context-ask-user";
 import { createContextDistillHandler } from "./context-distill";
 import { collectPlanningToolContext } from "./planning-tool-context";
 import { createAimcubToolRegistry } from "./tool-registry";
@@ -101,6 +102,46 @@ describe("planning tool context collector", () => {
     ]);
     expect(result.observationEvents.map((event) => event.toolName)).toEqual(["memory.search", "context.distill"]);
     expect(result.distillation?.missingQuestions.map((question) => question.id)).toContain("missing_eval_signal");
+  });
+
+  it("turns distilled missing context into structured user requests when enabled", async () => {
+    const registry = createAimcubToolRegistry({
+      "memory.search": async () => ({
+        ok: true,
+        observation: {
+          summary: "Selected 0 planning memories.",
+          data: { memories: [] },
+          sources: [],
+        },
+      }),
+      "context.distill": createContextDistillHandler(),
+      "context.ask_user": createContextAskUserHandler(),
+    });
+
+    const result = await collectPlanningToolContext(
+      registry,
+      { ...context, permissions: ["memory.read", "context.distill", "user.ask"] },
+      {
+        title: "Build Aimcub tool registry",
+        askMissingQuestions: true,
+      },
+    );
+
+    expect(result.failures).toEqual([]);
+    expect(result.observationEvents.map((event) => event.toolName)).toEqual([
+      "memory.search",
+      "context.distill",
+      "context.ask_user",
+    ]);
+    expect(result.observations.at(-1)).toMatchObject({
+      summary: "Prepared 2 user context questions.",
+      data: {
+        questions: [
+          expect.objectContaining({ id: "missing_planning_context", captureScope: "current_aim" }),
+          expect.objectContaining({ id: "missing_eval_signal", captureScope: "current_aim" }),
+        ],
+      },
+    });
   });
 
   it("collects local workspace scans into planning context", async () => {

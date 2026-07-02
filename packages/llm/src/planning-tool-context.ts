@@ -28,6 +28,7 @@ export interface PlanningToolContextInput {
   workspaceRoot?: string;
   localScanMaxDepth?: number;
   writeDistilledMemoryCandidates?: boolean;
+  askMissingQuestions?: boolean;
 }
 
 export interface PlanningToolFailure {
@@ -252,6 +253,23 @@ export async function collectPlanningToolContext(
       failures,
     );
     distillation = distillObservation ? distillObservation.data : null;
+  }
+
+  if (input.askMissingQuestions && distillation?.missingQuestions.length && registry.has("context.ask_user")) {
+    addResult(
+      "context.ask_user",
+      await registry.execute("context.ask_user", {
+        questions: distillation.missingQuestions.slice(0, 5).map((question) => ({
+          id: question.id,
+          question: question.question,
+          ...(question.category ? { category: question.category } : {}),
+          captureScope: "current_aim",
+        })),
+      }, context),
+      observations,
+      observationEvents,
+      failures,
+    );
   }
 
   if (input.writeDistilledMemoryCandidates && distillation && registry.has("memory.write_candidate")) {

@@ -819,7 +819,7 @@ export const BUILT_IN_TOOL_CONTRACTS = [
     description: "Represent missing-context questions as structured runtime requests instead of prose.",
     availability: "requires_user",
     permission: permission("user.ask", "low", "Ask the user for missing context."),
-    errors: ["invalid_input", "unavailable"],
+    errors: ["invalid_input", "permission_denied", "unavailable"],
     sourceMetadata: userSource,
     inputSchema: {
       type: "object",

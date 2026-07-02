@@ -234,6 +234,7 @@ export {
   createWebResearchRuntime,
   createWebResearchRuntimeFromEnv,
 } from "./web-research";
+export { createContextAskUserHandler } from "./context-ask-user";
 export type {
   BraveWebSearchClientOptions,
   WebResearchFetchPort,
