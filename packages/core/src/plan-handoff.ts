@@ -8,6 +8,8 @@ import type {
   PlanNode,
 } from "@core/types";
 import type { ContextSedimentationAimContext } from "./context-sedimentation";
+import { inferContextCategory } from "./context";
+import type { PlanQualityContext } from "./plan-quality";
 
 export type PlanHandoffReadiness = "ready" | "needs_context" | "needs_human" | "needs_review";
 
@@ -52,7 +54,7 @@ export interface BuildPlanHandoffReportInput {
 export interface LocalAgentHandoffContextItem {
   category: ContextCategory;
   content: string;
-  source: ContextSedimentationAimContext["source"];
+  source: ContextSedimentationAimContext["source"] | "selected_context";
   stepId?: string;
   reason: string;
 }
@@ -103,6 +105,7 @@ export interface BuildLocalHandoffManifestInput {
   plan: DecompositionOutput;
   handoff?: PlanHandoffReport;
   aimContext?: readonly ContextSedimentationAimContext[];
+  selectedContext?: readonly PlanQualityContext[];
   maxContextItemsPerJob?: number;
 }
 
@@ -267,18 +270,59 @@ export function buildPlanHandoffReport(input: BuildPlanHandoffReportInput): Plan
   };
 }
 
-function contextMatchesTask(context: ContextSedimentationAimContext, task: PlanHandoffTask): boolean {
+function contextMatchesTask(context: LocalAgentHandoffContextItem, task: PlanHandoffTask): boolean {
   if (task.contextGaps.some((gap) => gap.category === context.category)) return true;
   if (context.category === "project_fact" || context.category === "procedure" || context.category === "eval_signal") return true;
   return false;
 }
 
+function selectedContextCategory(context: PlanQualityContext): ContextCategory {
+  switch (context.category) {
+    case "preference":
+    case "constraint":
+    case "capability":
+    case "eval_signal":
+    case "project_fact":
+    case "procedure":
+      return context.category;
+    default:
+      return inferContextCategory(context.content, context.kind === "procedural" ? "procedure" : "project_fact");
+  }
+}
+
+function handoffContextCandidates(input: BuildLocalHandoffManifestInput): LocalAgentHandoffContextItem[] {
+  const rows: LocalAgentHandoffContextItem[] = [
+    ...(input.aimContext ?? []).map((context) => ({
+      category: context.category,
+      content: context.content,
+      source: context.source,
+      ...(context.stepId ? { stepId: context.stepId } : {}),
+      reason: context.reason,
+    })),
+    ...(input.selectedContext ?? [])
+      .filter((context) => context.content.trim().length > 0)
+      .map((context) => ({
+        category: selectedContextCategory(context),
+        content: context.content.trim(),
+        source: "selected_context" as const,
+        reason: "Selected planning context used during decomposition.",
+      })),
+  ];
+  const seen = new Set<string>();
+  return rows.filter((row) => {
+    const key = `${row.category}\u0000${row.content.toLowerCase()}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function contextForTask(
   task: PlanHandoffTask,
-  aimContext: readonly ContextSedimentationAimContext[],
+  contexts: readonly LocalAgentHandoffContextItem[],
   maxItems: number,
 ): LocalAgentHandoffContextItem[] {
-  return aimContext
+  return contexts
     .filter((context) => contextMatchesTask(context, task))
     .slice(0, maxItems)
     .map((context) => ({
@@ -292,7 +336,7 @@ function contextForTask(
 
 function agentJob(
   task: PlanHandoffTask,
-  aimContext: readonly ContextSedimentationAimContext[],
+  contexts: readonly LocalAgentHandoffContextItem[],
   maxContextItems: number,
 ): LocalAgentHandoffJob {
   return {
@@ -301,7 +345,7 @@ function agentJob(
     title: task.title,
     status: "ready",
     prerequisiteKeys: task.prerequisiteKeys,
-    inputContext: contextForTask(task, aimContext, maxContextItems),
+    inputContext: contextForTask(task, contexts, maxContextItems),
     expectedEvidence: task.expectedEvidence,
     evalSignal: task.evalSignal ?? "Complete the task according to the aim-specific acceptance rule.",
     acceptanceSummary: task.acceptanceSummary,
@@ -358,9 +402,10 @@ function manifestNextActions(input: {
 export function buildLocalHandoffManifest(input: BuildLocalHandoffManifestInput): LocalHandoffManifest {
   const report = input.handoff ?? buildPlanHandoffReport({ plan: input.plan });
   const maxContextItems = input.maxContextItemsPerJob ?? 6;
+  const contexts = handoffContextCandidates(input);
   const partial: Omit<LocalHandoffManifest, "nextActions"> = {
     version: 1,
-    agentQueue: report.agentReady.map((task) => agentJob(task, input.aimContext ?? [], maxContextItems)),
+    agentQueue: report.agentReady.map((task) => agentJob(task, contexts, maxContextItems)),
     blockedAgentQueue: report.agentBlocked.map(blockedJob),
     humanQueue: [
       ...report.humanRequired.map(humanTask),

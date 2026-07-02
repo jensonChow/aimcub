@@ -202,6 +202,40 @@ describe("buildLocalHandoffManifest", () => {
     expect(manifest.nextActions[0]).toBe("Prepare 2 local agent jobs for queueing.");
   });
 
+  it("carries selected planning context into agent handoff jobs", () => {
+    const plan: DecompositionOutput = {
+      goal_summary: "Ship selected context handoff.",
+      domain: "software",
+      rationale: "Local agents need the same context the planner used.",
+      nodes: [node("handoff", "agent")],
+      edges: [],
+    };
+
+    const manifest = buildLocalHandoffManifest({
+      plan,
+      selectedContext: [
+        {
+          content: "Procedure: Run pnpm test before handing the task off.",
+          category: "procedure",
+          confidence: 0.9,
+        },
+        {
+          content: "Preference: Keep status updates concise.",
+          category: "preference",
+          confidence: 0.9,
+        },
+      ],
+    });
+
+    expect(manifest.agentQueue[0]!.inputContext).toEqual([
+      expect.objectContaining({
+        category: "procedure",
+        source: "selected_context",
+        content: "Procedure: Run pnpm test before handing the task off.",
+      }),
+    ]);
+  });
+
   it("keeps blocked agent and human-gated work out of the ready queue", () => {
     const plan: DecompositionOutput = {
       goal_summary: "Route local handoff work.",

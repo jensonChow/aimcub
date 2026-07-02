@@ -398,6 +398,7 @@ export function registerIpc(): void {
     const localHandoffManifest = buildLocalHandoffManifest({
       plan: req.plan,
       aimContext: contextSedimentation.aimContext,
+      selectedContext: selectedContext.memories,
     });
 
     const saved = await aimStore.createGoal({
