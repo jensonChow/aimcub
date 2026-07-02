@@ -47,7 +47,7 @@ describe("reviewContextSedimentation", () => {
         {
           source: "tool_observation",
           channel: "web_research",
-          toolName: "web.search",
+          toolName: "web.fetch",
           category: "project_fact",
           scope: "aim",
           summary: "Project fact: Cambodia visa rules should be checked against official sources.",
@@ -70,7 +70,7 @@ describe("reviewContextSedimentation", () => {
         {
           source: "tool_observation",
           channel: "web_research",
-          toolName: "web.search",
+          toolName: "web.fetch",
           category: "project_fact",
           scope: "aim",
           summary: "Project fact: Cambodia visa rules should be checked against official sources.",
@@ -103,6 +103,41 @@ describe("reviewContextSedimentation", () => {
         originId: "q1",
       }),
     ]);
+  });
+
+  it("does not sediment search-only web observations as aim context", () => {
+    const progress = reviewContextIntakeProgress({
+      loop,
+      signals: [
+        {
+          source: "tool_observation",
+          channel: "web_research",
+          toolName: "web.search",
+          category: "project_fact",
+          scope: "aim",
+          summary: "Project fact: Search result snippets mention Cambodia visa rules.",
+        },
+      ],
+    });
+
+    const report = reviewContextSedimentation({
+      loop,
+      progress,
+      signals: [
+        {
+          source: "tool_observation",
+          channel: "web_research",
+          toolName: "web.search",
+          category: "project_fact",
+          scope: "aim",
+          summary: "Project fact: Search result snippets mention Cambodia visa rules.",
+        },
+      ],
+    });
+
+    expect(report.aimContext).toEqual([]);
+    expect(report.readyForDecomposition).toBe(false);
+    expect(report.shouldIterate).toBe(true);
   });
 
   it("filters prompt-like context and deduplicates candidates", () => {
