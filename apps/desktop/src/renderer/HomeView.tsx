@@ -1,7 +1,6 @@
 import type { Goal } from "@core/types";
 import type { ContextHealthRow, ContextLineageLearningReport, ContextProfileReport, DecompositionLearningReport } from "@core/domain";
 import type { ClarifyLearningReport } from "@core/llm";
-import { useState } from "react";
 
 import { useI18n } from "./i18n";
 import {
@@ -18,7 +17,7 @@ import {
   planOf,
   shortUiText,
 } from "./labels";
-import { C, card, inputStyle, linkButton, primaryButton, secondaryButton } from "./styles";
+import { C, card, linkButton, primaryButton, secondaryButton } from "./styles";
 
 interface HomeViewProps {
   goals: Goal[];
@@ -34,12 +33,6 @@ export function HomeView({
   onDelete,
 }: HomeViewProps) {
   const { t } = useI18n();
-  const [query, setQuery] = useState("");
-  const filteredGoals = goals.filter((goal) => {
-    const q = query.trim().toLowerCase();
-    if (!q) return true;
-    return `${goal.title} ${goal.description ?? ""}`.toLowerCase().includes(q);
-  });
   return (
     <section>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 12, flexWrap: "wrap" }}>
@@ -52,15 +45,6 @@ export function HomeView({
         <button onClick={onNew} style={{ ...primaryButton(false), marginTop: 0, whiteSpace: "nowrap" }}>{t("home.new")}</button>
       </div>
 
-      {goals.length > 0 && (
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={t("shell.searchAims")}
-          style={{ ...inputStyle(), marginBottom: 14 }}
-        />
-      )}
-
       {goals.length === 0 && (
         <div style={{ ...card(), minHeight: 220, display: "grid", placeItems: "center", textAlign: "center", borderStyle: "dashed" }}>
           <div style={{ maxWidth: 380 }}>
@@ -71,11 +55,7 @@ export function HomeView({
         </div>
       )}
 
-      {filteredGoals.length === 0 && goals.length > 0 && (
-        <div style={{ ...card(), color: C.muted, fontSize: 13 }}>{t("shell.noSearchResults")}</div>
-      )}
-
-      {filteredGoals.map((goal) => {
+      {goals.map((goal) => {
         const n = planOf(goal)?.nodes.length ?? 0;
         const description = goal.description?.trim();
         return (

@@ -736,7 +736,7 @@ function AppInner() {
   const workspaceTitle = (viewing?.title ?? savedGoal?.title ?? title.trim()) || t(step === "home" ? "home.recent" : "shell.currentAim");
 
   return (
-    <div style={{ fontFamily: "system-ui, -apple-system, sans-serif", color: C.text, background: "#f6f7f9", minHeight: "100vh" }}>
+    <div style={{ fontFamily: "system-ui, -apple-system, sans-serif", color: C.text, background: C.page, minHeight: "100vh" }}>
       <div style={classicShellStyle(compactShell)}>
         <ClassicSidebar
           compact={compactShell}
@@ -754,7 +754,7 @@ function AppInner() {
         <section style={mainShellStyle(compactShell)}>
           <header style={mainTopBarStyle(compactShell)}>
             <div style={{ minWidth: 0 }}>
-              <div style={{ color: C.text, fontSize: 17, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <div style={{ color: C.text, fontSize: 17, fontWeight: 750, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {workspaceTitle}
               </div>
               <div style={{ color: C.muted, fontSize: 12, marginTop: 3 }}>{t("shell.subtitle")}</div>
@@ -913,7 +913,7 @@ function ClassicSidebar(props: {
       <div>
         <button onClick={props.onHome} style={sidebarBrandButton()}>
           <span style={{ fontSize: 20, fontWeight: 800, letterSpacing: 0 }}>Aimcub</span>
-          <span style={{ color: C.muted, fontSize: 12 }}>{t("shell.subtitle")}</span>
+          <span style={{ color: "#948e84", fontSize: 12 }}>{t("shell.subtitle")}</span>
         </button>
         <div style={{ display: "grid", gap: 8, marginTop: 18 }}>
           <button onClick={props.onNew} style={sidebarCommandButton(true)}>
@@ -930,7 +930,7 @@ function ClassicSidebar(props: {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t("shell.searchAims")}
-          style={{ ...inputStyle(), fontSize: 13, padding: "9px 10px", marginBottom: 14 }}
+          style={sidebarSearchInputStyle()}
         />
         <SidebarSectionLabel label={t("shell.recentAims")} value={t(props.goals.length === 1 ? "home.aim_one" : "home.aim_other", { n: props.goals.length })} />
         <div style={{ display: "grid", gap: 7, maxHeight: props.compact ? 220 : "min(34vh, 330px)", overflow: "auto", paddingRight: 2 }}>
@@ -940,14 +940,14 @@ function ClassicSidebar(props: {
             return (
               <button key={goal.id} onClick={() => props.onOpen(goal)} style={sidebarGoalButton(selected)}>
                 <span style={{ display: "block", fontWeight: 650, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{goal.title}</span>
-                <span style={{ display: "block", color: C.muted, fontSize: 12, marginTop: 4 }}>
+                <span style={{ display: "block", color: selected ? "#aeb7bf" : "#827d74", fontSize: 12, marginTop: 4 }}>
                   {t((plan?.nodes.length ?? 0) === 1 ? "common.milestone_one" : "common.milestone_other", { n: plan?.nodes.length ?? 0 })}
                 </span>
               </button>
             );
           })}
           {filteredGoals.length === 0 && (
-            <div style={{ color: C.muted, fontSize: 13, padding: "8px 2px" }}>{t("shell.noSearchResults")}</div>
+            <div style={{ color: "#827d74", fontSize: 13, padding: "8px 2px" }}>{t("shell.noSearchResults")}</div>
           )}
         </div>
       </div>
@@ -963,7 +963,7 @@ function ClassicSidebar(props: {
         </div>
       </div>
 
-      <div style={{ marginTop: "auto", borderTop: `1px solid ${C.border}`, paddingTop: 12 }}>
+      <div style={{ marginTop: "auto", borderTop: "1px solid rgba(255, 255, 255, 0.08)", paddingTop: 12 }}>
         <button onClick={() => props.onTab("context")} style={sidebarContextButton(props.activeTab === "context")}>
           <span>{t("context.inbox")}</span>
           <span style={sidebarCountPill()}>{props.pendingContextCount}</span>
@@ -976,8 +976,8 @@ function ClassicSidebar(props: {
 function SidebarSectionLabel(props: { label: string; value?: string }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline", marginBottom: 8 }}>
-      <div style={{ color: C.muted, fontSize: 11, fontWeight: 800, letterSpacing: 0.5, textTransform: "uppercase" }}>{props.label}</div>
-      {props.value ? <div style={{ color: C.muted, fontSize: 11, whiteSpace: "nowrap" }}>{props.value}</div> : null}
+      <div style={{ color: "#827d74", fontSize: 11, fontWeight: 800, letterSpacing: 0.5, textTransform: "uppercase" }}>{props.label}</div>
+      {props.value ? <div style={{ color: "#827d74", fontSize: 11, whiteSpace: "nowrap" }}>{props.value}</div> : null}
     </div>
   );
 }
@@ -985,7 +985,7 @@ function SidebarSectionLabel(props: { label: string; value?: string }) {
 function classicShellStyle(compact: boolean): CSSProperties {
   return {
     display: "grid",
-    gridTemplateColumns: compact ? "1fr" : "286px minmax(0, 1fr)",
+    gridTemplateColumns: compact ? "1fr" : "292px minmax(0, 1fr)",
     minHeight: "100vh",
   };
 }
@@ -995,9 +995,10 @@ function classicSidebarStyle(compact: boolean): CSSProperties {
     display: "grid",
     gridTemplateRows: compact ? "auto auto auto auto" : "auto minmax(0, 1fr) auto auto",
     gap: 18,
-    background: "#fbfbfc",
-    borderRight: compact ? "none" : `1px solid ${C.border}`,
-    borderBottom: compact ? `1px solid ${C.border}` : "none",
+    background: "#17191d",
+    borderRight: compact ? "none" : "1px solid #2a2d33",
+    borderBottom: compact ? "1px solid #2a2d33" : "none",
+    boxShadow: compact ? "none" : "inset -1px 0 0 rgba(255, 255, 255, 0.02)",
     padding: compact ? "18px 16px" : "22px 16px",
     boxSizing: "border-box",
     minWidth: 0,
@@ -1007,7 +1008,7 @@ function classicSidebarStyle(compact: boolean): CSSProperties {
 function mainShellStyle(compact: boolean): CSSProperties {
   return {
     minWidth: 0,
-    padding: compact ? "18px 14px 44px" : "22px 28px 56px",
+    padding: compact ? "18px 14px 44px" : "22px 30px 56px",
     boxSizing: "border-box",
   };
 }
@@ -1019,20 +1020,17 @@ function mainTopBarStyle(compact: boolean): CSSProperties {
     justifyContent: "space-between",
     gap: 12,
     flexWrap: compact ? "wrap" : "nowrap",
-    marginBottom: 16,
+    marginBottom: 18,
   };
 }
 
 function contentSurfaceStyle(compact: boolean): CSSProperties {
   return {
     minWidth: 0,
-    background: "#fff",
-    border: `1px solid ${C.border}`,
-    borderRadius: 10,
-    padding: compact ? 16 : 24,
-    minHeight: compact ? 320 : 420,
+    padding: compact ? 2 : 0,
+    minHeight: compact ? 300 : 390,
     boxSizing: "border-box",
-    marginBottom: 14,
+    marginBottom: 16,
   };
 }
 
@@ -1043,24 +1041,40 @@ function sidebarBrandButton(): CSSProperties {
     width: "100%",
     border: 0,
     background: "transparent",
-    color: C.text,
+    color: "#f4efe7",
     padding: 0,
     cursor: "pointer",
     textAlign: "left",
   };
 }
 
+function sidebarSearchInputStyle(): CSSProperties {
+  return {
+    width: "100%",
+    boxSizing: "border-box",
+    padding: "9px 10px",
+    border: "1px solid rgba(255, 255, 255, 0.1)",
+    borderRadius: 8,
+    fontSize: 13,
+    fontFamily: "inherit",
+    background: "rgba(255, 255, 255, 0.055)",
+    color: "#f1ece3",
+    marginBottom: 14,
+    outline: "none",
+  };
+}
+
 function sidebarCommandButton(primary: boolean): CSSProperties {
   return {
     width: "100%",
-    border: `1px solid ${primary ? "#b8cbe8" : C.border}`,
-    background: primary ? C.accent : "#fff",
-    color: primary ? "#fff" : C.text,
+    border: primary ? "1px solid rgba(132, 170, 190, 0.42)" : "1px solid rgba(255, 255, 255, 0.08)",
+    background: primary ? "#f0eee6" : "rgba(255, 255, 255, 0.04)",
+    color: primary ? "#15171a" : "#e7e1d8",
     borderRadius: 8,
     padding: "9px 11px",
     cursor: "pointer",
     fontSize: 13,
-    fontWeight: 700,
+    fontWeight: 760,
     textAlign: "left",
   };
 }
@@ -1068,14 +1082,14 @@ function sidebarCommandButton(primary: boolean): CSSProperties {
 function sidebarNavButton(selected: boolean): CSSProperties {
   return {
     width: "100%",
-    border: `1px solid ${selected ? "#b8cbe8" : "transparent"}`,
-    background: selected ? "#eef4ff" : "transparent",
-    color: selected ? C.accent : C.text,
+    border: `1px solid ${selected ? "rgba(119, 166, 194, 0.5)" : "transparent"}`,
+    background: selected ? "rgba(94, 128, 150, 0.22)" : "transparent",
+    color: selected ? "#f7f1e8" : "#b9b3aa",
     borderRadius: 8,
     padding: "8px 10px",
     cursor: "pointer",
     fontSize: 13,
-    fontWeight: selected ? 750 : 600,
+    fontWeight: selected ? 780 : 650,
     textAlign: "left",
   };
 }
@@ -1087,13 +1101,13 @@ function sidebarGoalButton(selected: boolean): CSSProperties {
     boxSizing: "border-box",
     overflow: "hidden",
     textAlign: "left",
-    border: `1px solid ${selected ? "#b8cbe8" : "transparent"}`,
-    background: selected ? "#eef4ff" : "transparent",
+    border: `1px solid ${selected ? "rgba(119, 166, 194, 0.5)" : "transparent"}`,
+    background: selected ? "rgba(94, 128, 150, 0.22)" : "transparent",
     borderRadius: 8,
     padding: "9px 10px",
     cursor: "pointer",
-    color: C.text,
-    boxShadow: selected ? "inset 3px 0 0 #3266ad" : "none",
+    color: selected ? "#f7f1e8" : "#d8d2c8",
+    boxShadow: selected ? "inset 3px 0 0 #7aa6c2" : "none",
   };
 }
 
@@ -1104,9 +1118,9 @@ function sidebarContextButton(selected: boolean): CSSProperties {
     gap: 10,
     alignItems: "center",
     width: "100%",
-    border: `1px solid ${selected ? "#b8cbe8" : C.border}`,
-    background: selected ? "#eef4ff" : "#fff",
-    color: selected ? C.accent : C.text,
+    border: `1px solid ${selected ? "rgba(119, 166, 194, 0.5)" : "rgba(255, 255, 255, 0.1)"}`,
+    background: selected ? "rgba(94, 128, 150, 0.22)" : "rgba(255, 255, 255, 0.04)",
+    color: selected ? "#f7f1e8" : "#d8d2c8",
     borderRadius: 8,
     padding: "9px 10px",
     cursor: "pointer",
@@ -1122,8 +1136,8 @@ function sidebarCountPill(): CSSProperties {
     display: "inline-grid",
     placeItems: "center",
     borderRadius: 999,
-    background: "#f1f3f5",
-    color: C.muted,
+    background: "rgba(255, 255, 255, 0.1)",
+    color: "#d8d2c8",
     fontSize: 11,
     fontWeight: 800,
     padding: "0 7px",
@@ -1447,7 +1461,7 @@ function ContextSourcesPanel(props: {
 
 function ContextSourceCard(props: { title: string; body: string; status: string; tone: string }) {
   return (
-    <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: "#fff", padding: "10px 11px" }}>
+    <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: C.surface, padding: "10px 11px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline" }}>
         <div style={{ color: C.text, fontSize: 13, fontWeight: 600 }}>{props.title}</div>
         <div style={{ color: props.tone, fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>{props.status}</div>
@@ -1459,9 +1473,10 @@ function ContextSourceCard(props: { title: string; body: string; status: string;
 
 function railSurface(): CSSProperties {
   return {
-    background: "#fff",
-    border: `1px solid ${C.border}`,
+    background: "rgba(255, 253, 250, 0.86)",
+    border: "1px solid rgba(119, 111, 98, 0.22)",
     borderRadius: 10,
+    boxShadow: "0 12px 32px rgba(33, 29, 20, 0.05), 0 1px 1px rgba(33, 29, 20, 0.03)",
     padding: 14,
     boxSizing: "border-box",
     minWidth: 0,
