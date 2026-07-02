@@ -62,6 +62,7 @@ import {
 
 type Step = "home" | "aim" | "drafting" | "clarifying" | "questions" | "refining" | "plan";
 type InspectorTab = "process" | "context" | "quality" | "activity";
+type IconName = "chat" | "panelClose" | "panelOpen" | "plus" | "send";
 
 type AnswerMap = Record<string, { label: string | null; other: string }>;
 type PlanningTraceStatus = "pending" | "running" | "done" | "warning" | "error";
@@ -990,10 +991,45 @@ function ChatComposer(props: {
           title={t("chat.send")}
           aria-label={t("chat.send")}
         >
-          ↑
+          <Icon name="send" size={15} />
         </button>
       </div>
     </div>
+  );
+}
+
+function Icon(props: { name: IconName; size?: number }): JSX.Element {
+  const size = props.size ?? 16;
+  const common = {
+    fill: "none",
+    stroke: "currentColor",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    strokeWidth: 1.8,
+  } as const;
+  return (
+    <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" style={{ display: "block", flex: "0 0 auto" }}>
+      {props.name === "chat" && (
+        <>
+          <path {...common} d="M5 6.5h14a2 2 0 0 1 2 2v6.2a2 2 0 0 1-2 2H9.4L5 20v-3.3a2 2 0 0 1-2-2V8.5a2 2 0 0 1 2-2Z" />
+          <path {...common} d="M8 10h8M8 13h5" />
+        </>
+      )}
+      {props.name === "panelClose" && (
+        <>
+          <path {...common} d="M4 5h16v14H4zM9 5v14" />
+          <path {...common} d="m16 9-3 3 3 3" />
+        </>
+      )}
+      {props.name === "panelOpen" && (
+        <>
+          <path {...common} d="M4 5h16v14H4zM9 5v14" />
+          <path {...common} d="m13 9 3 3-3 3" />
+        </>
+      )}
+      {props.name === "plus" && <path {...common} d="M12 5v14M5 12h14" />}
+      {props.name === "send" && <path {...common} d="M5 12h13M13 6l6 6-6 6" />}
+    </svg>
   );
 }
 
@@ -1085,13 +1121,13 @@ function ClassicSidebar(props: {
     return (
       <aside style={classicSidebarStyle(props.compact, true)}>
         <button onClick={props.onToggleCollapsed} style={collapsedSidebarButtonStyle(props.step === "home")} title={t("chat.showSidebar")} aria-label={t("chat.showSidebar")}>
-          A
+          <Icon name="panelOpen" />
         </button>
         <button onClick={props.onNew} style={collapsedSidebarButtonStyle(false)} title={t("chat.new")} aria-label={t("chat.new")}>
-          +
+          <Icon name="plus" />
         </button>
         <button onClick={props.onHome} style={collapsedSidebarButtonStyle(props.step === "home")} title={t("chat.home")} aria-label={t("chat.home")}>
-          C
+          <Icon name="chat" />
         </button>
       </aside>
     );
@@ -1106,16 +1142,22 @@ function ClassicSidebar(props: {
           </button>
           {!props.compact && (
             <button onClick={props.onToggleCollapsed} style={shellIconButtonStyle()} title={t("chat.hideSidebar")} aria-label={t("chat.hideSidebar")}>
-              &lt;&lt;
+              <Icon name="panelClose" size={15} />
             </button>
           )}
         </div>
         <div style={{ display: "grid", gap: 8, marginTop: 18 }}>
           <button onClick={props.onNew} style={sidebarCommandButton(true)}>
-            {t("chat.new")}
+            <span style={sidebarButtonContentStyle()}>
+              <Icon name="plus" size={14} />
+              <span>{t("chat.new")}</span>
+            </span>
           </button>
           <button onClick={props.onHome} style={sidebarNavButton(props.step === "home")}>
-            {t("chat.home")}
+            <span style={sidebarButtonContentStyle()}>
+              <Icon name="chat" size={14} />
+              <span>{t("chat.home")}</span>
+            </span>
           </button>
         </div>
       </div>
@@ -1263,9 +1305,11 @@ function composerSendButton(disabled: boolean): CSSProperties {
     background: disabled ? "#d8d8d3" : C.text,
     color: "#fff",
     borderRadius: 999,
+    display: "inline-grid",
+    placeItems: "center",
     minWidth: 32,
     height: 32,
-    padding: "0 12px",
+    padding: 0,
     cursor: disabled ? "default" : "pointer",
     fontSize: 12,
     fontWeight: 700,
@@ -1497,6 +1541,15 @@ function sidebarHeaderRowStyle(): CSSProperties {
     gridTemplateColumns: "minmax(0, 1fr) 32px",
     gap: 8,
     alignItems: "start",
+  };
+}
+
+function sidebarButtonContentStyle(): CSSProperties {
+  return {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+    minWidth: 0,
   };
 }
 
