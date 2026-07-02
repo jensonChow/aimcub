@@ -24,7 +24,6 @@ export const STRINGS = {
   "common.milestone_one": { en: "{n} milestone", zh: "{n} 个里程碑" },
   "common.milestone_other": { en: "{n} milestones", zh: "{n} 个里程碑" },
 
-  "shell.subtitle": { en: "Aim OS for desktop planning", zh: "桌面端 Aim OS" },
   "shell.aims": { en: "Aims", zh: "目标" },
   "shell.searchAims": { en: "Search aims", zh: "搜索目标" },
   "shell.noSearchResults": { en: "No matching aims.", zh: "没有匹配的目标。" },

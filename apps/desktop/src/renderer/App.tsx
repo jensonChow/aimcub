@@ -800,11 +800,8 @@ function AppInner() {
           {showTopBar && (
             <header style={mainTopBarStyle(compactShell)}>
               <div style={{ minWidth: 0 }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ color: C.text, fontSize: 15, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {workspaceTitle}
-                  </div>
-                  <div style={{ color: C.muted, fontSize: 12, marginTop: 3 }}>{t("shell.subtitle")}</div>
+                <div style={{ color: C.text, fontSize: 13, fontWeight: 650, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {workspaceTitle}
                 </div>
               </div>
             </header>
@@ -1152,7 +1149,6 @@ function ClassicSidebar(props: {
         <div style={sidebarHeaderRowStyle()}>
           <button onClick={props.onHome} style={sidebarBrandButton()}>
             <span style={{ fontSize: 17, fontWeight: 750, letterSpacing: 0 }}>Aimcub</span>
-            <span style={{ color: C.muted, fontSize: 12 }}>{t("shell.subtitle")}</span>
           </button>
           {!props.compact && (
             <button onClick={props.onToggleCollapsed} style={shellIconButtonStyle()} title={t("chat.hideSidebar")} aria-label={t("chat.hideSidebar")}>
@@ -1648,8 +1644,8 @@ function mainTopBarStyle(compact: boolean): CSSProperties {
     justifyContent: "space-between",
     gap: 12,
     flexWrap: compact ? "wrap" : "nowrap",
-    minHeight: 56,
-    padding: compact ? "12px 14px" : "10px 28px",
+    minHeight: 44,
+    padding: compact ? "10px 14px" : "8px 28px",
     boxSizing: "border-box",
     flex: "0 0 auto",
     borderBottom: `1px solid ${C.border}`,
