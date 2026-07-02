@@ -47,6 +47,7 @@ Last updated: 2026-07-02
 - Desktop model-provider work now supports provider selection beyond Anthropic/OpenAI, including OpenAI-compatible providers such as DeepSeek, MiniMax, Z.ai, Gemini compatibility, Qwen/DashScope, and custom endpoints.
 - Recent DeepSeek fixes disabled unsupported structured-output assumptions for custom/OpenAI-compatible paths and added request-shaping for DeepSeek-style JSON responses. If providers fail, surface the model/provider error quickly instead of leaving Desktop stuck on "starting initial plan".
 - Clarify/decompose has been strengthened but is still not enough. It now asks more baseline context questions and routes more digital work to agents, but it is still mostly prompt-only. The next missing layer is a first-party planning tool substrate that lets the model inspect local context, search/read files, use memory, and optionally research the web before decomposing an aim.
+- The first unified built-in tool contract substrate now lives in `packages/llm/src/tool-contract.ts` and is exported from `@core/llm`. It defines contracts, permissions, structured observations, normalized errors, handler types, and a registry for `local.*`, `memory.*`, `web.*`, and `context.*` planning tools. Runtime handlers and Desktop permission UI are still next.
 
 ## Verification Notes
 
@@ -67,7 +68,7 @@ Last updated: 2026-07-02
 ## Recommended Next Work
 
 - Continue Desktop-first: split the aim creation/refinement and plan review panels out of `App.tsx`, then design the local orchestration cockpit around aims, agents, evidence, context, and eval.
-- Build the first-party built-in planning tools substrate before adding more planning prompts. Start with read/context tools, not execution tools.
+- Implement Desktop runtime handlers for the first-party built-in planning tools and wire them into pre-decomposition context gathering. Start with read/context tools, not execution tools.
 - Turn the Desktop home screen into a more useful cockpit: show the most recent active aim, pending context review, and the single best next action.
 - Keep CLI work incremental: split help into layers, preserve scriptability, and add command-dispatch smoke tests before adding more verbs.
 - Before a public open-source release, choose the license, add `CONTRIBUTING.md` and `SECURITY.md`, audit secrets/env examples, and separate public local-first docs from hosted online-platform deployment notes.

@@ -137,6 +137,57 @@ export { localDecompose } from "./local-decompose";
 export type { DecomposeRequest } from "./local-decompose";
 export { decompositionJsonSchema } from "./decomposition-schema";
 export type { DecompositionJsonSchema } from "./decomposition-schema";
+export {
+  BUILT_IN_TOOL_CONTRACTS,
+  BUILT_IN_TOOL_NAMES,
+  assertValidToolContracts,
+  getBuiltInToolContract,
+  isBuiltInToolName,
+  validateToolContracts,
+} from "./tool-contract";
+export type {
+  AimcubToolAvailability,
+  AimcubToolContract,
+  AimcubToolContractValidation,
+  AimcubToolErrorCode,
+  AimcubToolFailure,
+  AimcubToolHandler,
+  AimcubToolHandlerContext,
+  AimcubToolJsonPrimitive,
+  AimcubToolJsonSchema,
+  AimcubToolName,
+  AimcubToolObservation,
+  AimcubToolPermission,
+  AimcubToolPermissionKind,
+  AimcubToolResult,
+  AimcubToolRisk,
+  AimcubToolSource,
+  AimcubToolSourceKind,
+  ContextAskUserInput,
+  ContextAskUserOutput,
+  ContextDistillInput,
+  ContextDistillOutput,
+  LocalEditInput,
+  LocalEditOutput,
+  LocalGlobInput,
+  LocalGlobOutput,
+  LocalReadInput,
+  LocalReadOutput,
+  LocalScanWorkspaceInput,
+  LocalScanWorkspaceOutput,
+  LocalSearchInput,
+  LocalSearchOutput,
+  LocalWriteInput,
+  LocalWriteOutput,
+  MemorySearchInput,
+  MemorySearchOutput,
+  MemoryWriteCandidateInput,
+  MemoryWriteCandidateOutput,
+  WebFetchInput,
+  WebFetchOutput,
+  WebSearchInput,
+  WebSearchOutput,
+} from "./tool-contract";
 
 // Clarifying-questions step (the planning "feedback step").
 export {

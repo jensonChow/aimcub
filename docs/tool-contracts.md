@@ -1,0 +1,44 @@
+# Aimcub First-Party Tool Contracts
+
+Aimcub's built-in planning tools are owned by the Aimcub runtime and permission model. They are not MCP tools. MCP remains the external connector/plugin boundary; these contracts define the local substrate that the planning engine can ask the Desktop runtime to execute.
+
+The first contract surface lives in `packages/llm/src/tool-contract.ts` and is exported from `@core/llm`.
+
+## What A Contract Defines
+
+Each tool contract declares:
+
+- `name`: stable tool id, such as `local.read` or `web.search`.
+- `description`: short model-facing description.
+- `inputSchema`: JSON-schema-like input shape.
+- `outputSchema`: structured observation shape.
+- `permission`: Aimcub runtime permission kind, risk, and whether user approval is required.
+- `availability`: whether the tool needs a workspace, memory store, network provider, or user.
+- `errors`: normalized error codes.
+- `sourceMetadata`: source kinds the observation may cite.
+
+Handlers are deliberately separate from contracts. A later Desktop runtime layer should bind a contract to an `AimcubToolHandler`, enforce permissions, execute the tool, and return an `AimcubToolResult`.
+
+## Built-In Surface
+
+The v1 contract registry includes:
+
+- `local.read`
+- `local.write`
+- `local.edit`
+- `local.search`
+- `local.glob`
+- `local.scan_workspace`
+- `memory.search`
+- `memory.write_candidate`
+- `web.search`
+- `web.fetch`
+- `context.distill`
+- `context.ask_user`
+
+## Design Rules
+
+- Local and memory tools are first-party. Do not expose them through MCP.
+- Write/edit tools require explicit approval by default.
+- Web tools are optional provider-backed tools. If no provider is configured, the planner should record a missing web-research gap instead of blocking local planning.
+- Tool observations should cite sources as file, workspace, memory, web, user, or tool metadata so the Desktop Inspector can show process and context provenance.
