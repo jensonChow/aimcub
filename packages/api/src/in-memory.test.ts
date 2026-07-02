@@ -58,6 +58,19 @@ describe("user path — RLS-shaped reads", () => {
     expect(ms.map((m) => m.order_index)).toEqual([1, 2]);
   });
 
+  it("updateGoalPlan can persist plan quality metadata", async () => {
+    const repo = makeRepo();
+    const g = await repo.createGoal({ ownerId: OWNER_A, title: "G" });
+
+    const updated = await repo.updateGoalPlan(g.id, { nodes: [] }, "active", {
+      plan_quality: { grade: "pass", score: 100, issues: [] },
+    });
+
+    expect(updated.status).toBe("active");
+    expect(updated.plan_json).toEqual({ nodes: [] });
+    expect(updated.metadata).toMatchObject({ plan_quality: { grade: "pass", score: 100 } });
+  });
+
 });
 
 describe("invariant — evidence idempotency by (emitter_id, source_event_id)", () => {

@@ -11,11 +11,11 @@
  * Routing note: `routeModel(task)` returns Anthropic model ids only, so it does NOT apply
  * here. An OpenAI-compatible deployment uses the single configured `model` for every task.
  *
- * Structured output uses `response_format: { type: "json_schema", strict: true }`. Our
- * decompose/clarify schemas (all-required + nullable + additionalProperties:false) already
- * satisfy OpenAI strict mode. Strict-JSON support varies by model, but the callers
- * (`decompose`/`clarify`) are total + zod/validate-guarded, so a weak model just yields an
- * invalid plan that is reported as `{ ok:false }`, never a crash.
+ * Structured output prefers `response_format: { type: "json_schema", strict: true }`.
+ * Providers that only support JSON mode receive the schema as prompt text plus
+ * `response_format: { type: "json_object" }`; weaker compatible servers can use prompt-only
+ * JSON. The callers (`decompose`/`clarify`) are total + zod/validate-guarded, so a weak model
+ * yields an invalid plan that is reported as `{ ok:false }`, never a crash.
  */
 import type {
   LlmGateway,
@@ -24,12 +24,15 @@ import type {
   LlmUsage,
   UsageMeter,
 } from "./index";
+import type { MaxTokensParam, StructuredOutputMode } from "./providers";
 
 // The llm package tsconfig sets `types: []` (mirroring @core purity), so neither
 // @types/node nor the DOM lib is pulled in. Declare the one global we use — `fetch` —
 // narrowly, the same way `anthropic-gateway.ts` declares `process`. The platform's real
 // `fetch` (Node 18+/Electron/Bun/Deno) structurally satisfies this narrow signature.
 declare const fetch: OpenAiFetchPort;
+declare const setTimeout: (handler: () => void, timeoutMs: number) => unknown;
+declare const clearTimeout: (handle: unknown) => void;
 
 /** Minimal response surface we read from a fetch call. */
 export interface OpenAiFetchResponse {
@@ -63,31 +66,100 @@ export interface OpenAiGatewayOptions {
   client?: OpenAiFetchPort;
   /** Max output tokens per request. Defaults to a value comfortably above a full plan. */
   maxTokens?: number;
+  /** Transport timeout. Defaults to 60s so UI callers never wait forever. */
+  requestTimeoutMs?: number;
   /**
    * Which request field carries the token cap. Defaults to `max_completion_tokens` (the
    * current canonical field). Set to `max_tokens` only for legacy self-hosted servers that
    * reject the new name.
    */
   maxTokensParam?: MaxTokensParam;
+  /**
+   * Structured-output request shape. OpenAI/OpenRouter support `json_schema`; providers such
+   * as DeepSeek/Z.ai document `json_object`; compatible servers without either can use
+   * `prompt`, which embeds the schema in the prompt and omits `response_format`.
+   */
+  structuredOutputMode?: StructuredOutputMode;
+  /** Provider-specific request body defaults, e.g. DeepSeek thinking mode. */
+  requestBodyDefaults?: Record<string, unknown>;
 }
 
 interface ChatCompletionResponse {
-  choices?: Array<{ message?: { content?: string | null; refusal?: string | null } }>;
+  choices?: Array<{
+    finish_reason?: string | null;
+    message?: { content?: string | null; refusal?: string | null };
+  }>;
   usage?: { prompt_tokens?: number; completion_tokens?: number };
 }
 
-/** Which field carries the output-token cap (see {@link OpenAiGatewayOptions.maxTokensParam}). */
-export type MaxTokensParam = "max_completion_tokens" | "max_tokens";
-
 const DEFAULT_BASE_URL = "https://api.openai.com/v1";
 const DEFAULT_MAX_TOKENS = 8192;
+const DEFAULT_REQUEST_TIMEOUT_MS = 60_000;
 // `max_completion_tokens` is the current canonical field — OpenAI's reasoning models
 // (o-series, gpt-5.x) REJECT the legacy `max_tokens` with an HTTP 400, and OpenAI (all
 // tiers) + OpenRouter accept `max_completion_tokens`. Older self-hosted OpenAI-compatible
 // servers that only know `max_tokens` can opt back via `maxTokensParam`.
 const DEFAULT_MAX_TOKENS_PARAM: MaxTokensParam = "max_completion_tokens";
+const DEFAULT_STRUCTURED_OUTPUT_MODE: StructuredOutputMode = "json_schema";
 /** Schema name handed to `json_schema` — providers require a `^[A-Za-z0-9_-]+$` identifier. */
 const SCHEMA_NAME = "aimcub_structured_output";
+
+function isDeepSeekBaseUrl(baseURL: string): boolean {
+  try {
+    return new URL(baseURL).hostname === "api.deepseek.com";
+  } catch {
+    return baseURL.includes("api.deepseek.com");
+  }
+}
+
+function inferCompatibleDefaults(baseURL: string): { maxTokensParam?: MaxTokensParam; structuredOutputMode?: StructuredOutputMode } {
+  let host = "";
+  try {
+    host = new URL(baseURL).hostname;
+  } catch {
+    host = baseURL;
+  }
+  if (host.includes("api.deepseek.com")) return { maxTokensParam: "max_tokens", structuredOutputMode: "json_object" };
+  if (host.includes("api.z.ai")) return { maxTokensParam: "max_tokens", structuredOutputMode: "json_object" };
+  if (host.includes("api.minimax.io") || host.includes("api.minimaxi.com")) return { maxTokensParam: "max_tokens", structuredOutputMode: "prompt" };
+  if (host.includes("dashscope") || host.includes("maas.aliyuncs.com")) return { maxTokensParam: "max_tokens", structuredOutputMode: "prompt" };
+  if (host.includes("generativelanguage.googleapis.com")) return { maxTokensParam: "max_tokens", structuredOutputMode: "prompt" };
+  return {};
+}
+
+function inferRequestBodyDefaults(baseURL: string): Record<string, unknown> | undefined {
+  let host = "";
+  try {
+    host = new URL(baseURL).hostname;
+  } catch {
+    host = baseURL;
+  }
+  if (host.includes("api.deepseek.com")) return { thinking: { type: "disabled" } };
+  return undefined;
+}
+
+function appendSchemaInstruction(prompt: string, schema: unknown): string {
+  return [
+    prompt,
+    "",
+    "Structured output contract:",
+    "Return only valid JSON. Do not wrap the JSON in Markdown or add explanatory text.",
+    "The JSON must satisfy this JSON Schema:",
+    JSON.stringify(schema),
+  ].join("\n");
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: unknown;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`request timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer !== undefined) clearTimeout(timer);
+  });
+}
 
 export class OpenAiCompatibleLlmGateway implements LlmGateway {
   private readonly meter: UsageMeter;
@@ -97,6 +169,9 @@ export class OpenAiCompatibleLlmGateway implements LlmGateway {
   private readonly baseURL: string;
   private readonly maxTokens: number;
   private readonly maxTokensParam: MaxTokensParam;
+  private readonly structuredOutputMode: StructuredOutputMode;
+  private readonly requestBodyDefaults?: Record<string, unknown>;
+  private readonly requestTimeoutMs: number;
   private readonly fetchImpl: OpenAiFetchPort;
 
   constructor(opts: OpenAiGatewayOptions) {
@@ -106,7 +181,15 @@ export class OpenAiCompatibleLlmGateway implements LlmGateway {
     this.model = opts.model;
     this.baseURL = (opts.baseURL ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
     this.maxTokens = opts.maxTokens ?? DEFAULT_MAX_TOKENS;
-    this.maxTokensParam = opts.maxTokensParam ?? DEFAULT_MAX_TOKENS_PARAM;
+    this.requestTimeoutMs = opts.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+    const inferred = inferCompatibleDefaults(this.baseURL);
+    this.maxTokensParam =
+      opts.maxTokensParam ?? inferred.maxTokensParam ?? (isDeepSeekBaseUrl(this.baseURL) ? "max_tokens" : DEFAULT_MAX_TOKENS_PARAM);
+    this.structuredOutputMode =
+      opts.structuredOutputMode ??
+      inferred.structuredOutputMode ??
+      (isDeepSeekBaseUrl(this.baseURL) ? "json_object" : DEFAULT_STRUCTURED_OUTPUT_MODE);
+    this.requestBodyDefaults = opts.requestBodyDefaults ?? inferRequestBodyDefaults(this.baseURL);
     this.fetchImpl = opts.client ?? fetch;
   }
 
@@ -142,28 +225,40 @@ export class OpenAiCompatibleLlmGateway implements LlmGateway {
     // uses its single configured model.
     const messages: Array<{ role: "system" | "user"; content: string }> = [];
     if (req.system) messages.push({ role: "system", content: req.system });
-    messages.push({ role: "user", content: req.prompt });
+    const prompt =
+      structured && req.schema !== undefined && this.structuredOutputMode !== "json_schema"
+        ? appendSchemaInstruction(req.prompt, req.schema)
+        : req.prompt;
+    messages.push({ role: "user", content: prompt });
 
     const body: Record<string, unknown> = {
+      ...(this.requestBodyDefaults ?? {}),
       model: this.model,
       [this.maxTokensParam]: this.maxTokens,
       messages,
     };
     if (structured && req.schema !== undefined) {
-      body.response_format = {
-        type: "json_schema",
-        json_schema: { name: SCHEMA_NAME, schema: req.schema, strict: true },
-      };
+      if (this.structuredOutputMode === "json_object") {
+        body.response_format = { type: "json_object" };
+      } else if (this.structuredOutputMode === "json_schema") {
+        body.response_format = {
+          type: "json_schema",
+          json_schema: { name: SCHEMA_NAME, schema: req.schema, strict: true },
+        };
+      }
     }
 
-    const response = await this.fetchImpl(`${this.baseURL}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify(body),
-    });
+    const response = await withTimeout(
+      this.fetchImpl(`${this.baseURL}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify(body),
+      }),
+      this.requestTimeoutMs,
+    );
 
     const raw = await response.text();
     if (!response.ok) {
@@ -180,7 +275,11 @@ export class OpenAiCompatibleLlmGateway implements LlmGateway {
 
     // A strict-mode safety refusal arrives as `message.refusal` with null content. Surface
     // it as a real error rather than letting empty content become a confusing JSON-parse fail.
-    const message = data.choices?.[0]?.message;
+    const choice = data.choices?.[0];
+    if (choice?.finish_reason === "length") {
+      throw new Error("structured output was truncated by the provider (finish_reason=length); try again with a shorter aim or a larger output budget");
+    }
+    const message = choice?.message;
     if (message?.refusal) {
       throw new Error(`model refused: ${message.refusal}`);
     }

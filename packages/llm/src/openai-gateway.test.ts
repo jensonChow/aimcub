@@ -71,7 +71,7 @@ describe("OpenAiCompatibleLlmGateway · request shaping", () => {
       meter,
       ownerId: "o",
       apiKey: "secret-key",
-      model: "deepseek-chat",
+      model: "custom-chat-model",
       baseURL: "https://openrouter.ai/api/v1/",
       client,
     });
@@ -83,7 +83,7 @@ describe("OpenAiCompatibleLlmGateway · request shaping", () => {
     expect(url).toBe("https://openrouter.ai/api/v1/chat/completions"); // trailing slash trimmed
     expect(init.headers.authorization).toBe("Bearer secret-key");
     const body = JSON.parse(init.body) as { model: string; messages: Array<{ role: string; content: string }> };
-    expect(body.model).toBe("deepseek-chat");
+    expect(body.model).toBe("custom-chat-model");
     expect(body.messages[0]).toEqual({ role: "system", content: "be terse" });
     expect(body.messages[1]).toEqual({ role: "user", content: "x" });
   });
@@ -129,6 +129,37 @@ describe("OpenAiCompatibleLlmGateway · request shaping", () => {
     expect(body.max_completion_tokens).toBeUndefined();
   });
 
+  it("uses DeepSeek-compatible request defaults for api.deepseek.com", async () => {
+    const payload = { ok: true };
+    const { client, impl } = fakeFetch(JSON.stringify(payload));
+    const { meter } = recordingMeter();
+    const gw = new OpenAiCompatibleLlmGateway({
+      meter,
+      ownerId: "o",
+      apiKey: "k",
+      model: "deepseek-v4-pro",
+      baseURL: "https://api.deepseek.com",
+      client,
+    });
+
+    await gw.completeStructured<typeof payload>({ task: "decompose", prompt: "give me json", schema: { type: "object" } });
+
+    const body = JSON.parse(impl.mock.calls[0]![1].body) as {
+      model: string;
+      max_tokens?: number;
+      max_completion_tokens?: number;
+      messages: Array<{ role: string; content: string }>;
+      response_format?: { type: string; json_schema?: unknown };
+      thinking?: { type: string };
+    };
+    expect(body.model).toBe("deepseek-v4-pro");
+    expect(body.max_tokens).toBeDefined();
+    expect(body.max_completion_tokens).toBeUndefined();
+    expect(body.response_format).toEqual({ type: "json_object" });
+    expect(body.thinking).toEqual({ type: "disabled" });
+    expect(body.messages[0]!.content).toContain("The JSON must satisfy this JSON Schema:");
+  });
+
   it("omits response_format on a plain (non-structured) complete", async () => {
     const { client, impl } = fakeFetch("ok");
     const { meter } = recordingMeter();
@@ -138,6 +169,34 @@ describe("OpenAiCompatibleLlmGateway · request shaping", () => {
 
     const body = JSON.parse(impl.mock.calls[0]![1].body) as Record<string, unknown>;
     expect(body.response_format).toBeUndefined();
+  });
+
+  it("supports prompt-only structured output for compatible providers without response_format", async () => {
+    const payload = { ok: true };
+    const { client, impl } = fakeFetch(JSON.stringify(payload));
+    const { meter } = recordingMeter();
+    const gw = new OpenAiCompatibleLlmGateway({
+      meter,
+      ownerId: "o",
+      apiKey: "k",
+      model: "MiniMax-M3",
+      baseURL: "https://api.minimax.io/v1",
+      client,
+    });
+
+    await gw.completeStructured<typeof payload>({ task: "decompose", prompt: "give me json", schema: { type: "object" } });
+
+    const body = JSON.parse(impl.mock.calls[0]![1].body) as {
+      max_tokens?: number;
+      max_completion_tokens?: number;
+      messages: Array<{ role: string; content: string }>;
+      response_format?: unknown;
+    };
+    expect(body.max_tokens).toBeDefined();
+    expect(body.max_completion_tokens).toBeUndefined();
+    expect(body.response_format).toBeUndefined();
+    expect(body.messages[0]!.content).toContain("Return only valid JSON");
+    expect(body.messages[0]!.content).toContain("\"type\":\"object\"");
   });
 });
 
@@ -172,6 +231,28 @@ describe("OpenAiCompatibleLlmGateway · completeStructured", () => {
 });
 
 describe("OpenAiCompatibleLlmGateway · transport errors", () => {
+  it("times out a request that never resolves", async () => {
+    vi.useFakeTimers();
+    try {
+      const client = vi.fn(() => new Promise<OpenAiFetchResponse>(() => {})) as unknown as OpenAiFetchPort;
+      const { meter } = recordingMeter();
+      const gw = new OpenAiCompatibleLlmGateway({
+        meter,
+        ownerId: "o",
+        apiKey: "k",
+        model: "gpt-x",
+        client,
+        requestTimeoutMs: 25,
+      });
+
+      const promise = expect(gw.complete({ task: "classify", prompt: "x" })).rejects.toThrow(/request timed out after 25ms/);
+      await vi.advanceTimersByTimeAsync(25);
+      await promise;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("throws on a non-2xx response, including the status and body", async () => {
     const { client } = fakeFetch("rate limited", { ok: false, status: 429 });
     const { meter } = recordingMeter();
@@ -186,6 +267,18 @@ describe("OpenAiCompatibleLlmGateway · transport errors", () => {
     const gw = new OpenAiCompatibleLlmGateway({ meter, ownerId: "o", apiKey: "k", model: "gpt-x", client });
 
     await expect(gw.complete({ task: "classify", prompt: "x" })).rejects.toThrow(/response was not valid JSON/);
+  });
+
+  it("surfaces provider truncation before JSON parsing", async () => {
+    const body = JSON.stringify({
+      choices: [{ finish_reason: "length", message: { content: "{\"unfinished\":\"json" } }],
+      usage: { prompt_tokens: 3, completion_tokens: 8192 },
+    });
+    const { client } = rawFetch(body);
+    const { meter } = recordingMeter();
+    const gw = new OpenAiCompatibleLlmGateway({ meter, ownerId: "o", apiKey: "k", model: "gpt-x", client });
+
+    await expect(gw.completeStructured({ task: "decompose", prompt: "x", schema: {} })).rejects.toThrow(/truncated/);
   });
 });
 

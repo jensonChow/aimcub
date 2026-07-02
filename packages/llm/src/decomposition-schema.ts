@@ -31,6 +31,8 @@ const nullableEnum = (values: readonly string[], description?: string) => ({
 
 const estEffortEnum = ["xs", "s", "m", "l", "xl"] as const;
 const goalDomainEnum = ["software", "career", "learning", "health", "creative", "custom"] as const;
+const contextCategoryEnum = ["preference", "constraint", "capability", "eval_signal", "project_fact", "procedure"] as const;
+const decompositionOwnerEnum = ["human", "agent", "either", "mixed"] as const;
 const logicEnum = ["any", "all"] as const;
 const completionModeEnum = ["auto", "manual", "auto_then_confirm"] as const;
 const ciConclusionEnum = ["success", "failure", "cancelled", "timed_out", "skipped"] as const;
@@ -81,6 +83,44 @@ const acceptanceRuleSchema = {
   required: ["logic", "clauses", "completion_mode"],
 } as const;
 
+const decompositionContextGapSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    category: { type: "string", enum: contextCategoryEnum },
+    question: { type: "string", description: "The precise user/context question that would change this milestone." },
+    reason: { type: "string", description: "Why this missing context matters for this milestone." },
+  },
+  required: ["category", "question", "reason"],
+} as const;
+
+const decompositionContractSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    why: { type: "string", description: "Why this milestone exists as a separate unit in the aim decomposition." },
+    definition_of_done: { type: "string", description: "Concrete done state for this milestone, in user-facing terms." },
+    required_evidence: {
+      type: "array",
+      minItems: 1,
+      description: "Evidence artifacts/events that should prove this milestone complete.",
+      items: { type: "string" },
+    },
+    likely_owner: {
+      type: "string",
+      enum: decompositionOwnerEnum,
+      description: "Who is most likely to advance this milestone: human, agent, either, or mixed.",
+    },
+    context_gaps: {
+      type: "array",
+      description: "Missing context that would materially change this milestone. Empty array when none is needed.",
+      items: decompositionContextGapSchema,
+    },
+    eval_signal: { type: "string", description: "The personalized evaluation signal this milestone is trying to satisfy." },
+  },
+  required: ["why", "definition_of_done", "required_evidence", "likely_owner", "context_gaps", "eval_signal"],
+} as const;
+
 const planNodeSchema = {
   type: "object",
   additionalProperties: false,
@@ -91,8 +131,9 @@ const planNodeSchema = {
     est_effort: nullableEnum(estEffortEnum),
     xp_reward: { type: ["integer", "null"], description: "Positive effort/contribution weight credited on completion." },
     acceptance_rule: acceptanceRuleSchema,
+    decomposition_contract: decompositionContractSchema,
   },
-  required: ["key", "title", "description", "est_effort", "xp_reward", "acceptance_rule"],
+  required: ["key", "title", "description", "est_effort", "xp_reward", "acceptance_rule", "decomposition_contract"],
 } as const;
 
 const planEdgeSchema = {

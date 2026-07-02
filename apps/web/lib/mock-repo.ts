@@ -64,7 +64,11 @@ export function materialize(
       acceptance_rule: node.acceptance_rule,
       xp_reward: node.xp_reward,
       completed_at: status === "completed" ? isoDaysFromNow(-1) : null,
-      metadata: { est_effort: node.est_effort, plan_key: node.key },
+      metadata: {
+        est_effort: node.est_effort,
+        plan_key: node.key,
+        ...(node.decomposition_contract ? { decomposition_contract: node.decomposition_contract } : {}),
+      },
     } satisfies Milestone;
   });
 }

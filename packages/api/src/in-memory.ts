@@ -163,10 +163,15 @@ export class InMemoryAimcubRepo implements AimcubRepo {
       .sort((a, b) => a.order_index - b.order_index);
   }
 
-  async updateGoalPlan(goalId: string, planJson: unknown, status: Goal["status"] = "active"): Promise<Goal> {
+  async updateGoalPlan(
+    goalId: string,
+    planJson: unknown,
+    status: Goal["status"] = "active",
+    metadata?: Record<string, unknown>,
+  ): Promise<Goal> {
     const goal = this.goals.get(goalId);
     if (!goal) throw new Error(`goal not found: ${goalId}`);
-    const updated: Goal = { ...goal, plan_json: planJson, status };
+    const updated: Goal = { ...goal, plan_json: planJson, status, metadata: metadata ?? goal.metadata };
     this.goals.set(goalId, updated);
     return updated;
   }

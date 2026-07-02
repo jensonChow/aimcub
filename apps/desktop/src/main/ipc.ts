@@ -1,42 +1,220 @@
 /**
  * Registers the IPC handlers the renderer calls through the preload bridge.
  * Goal persistence is delegated to the shared `@core/store` (so the CLI sees the same
- * aims). Clarifying answers are folded into `user_stated` memories — the first concrete
- * writes toward the memory pillar.
+ * aims). Clarifying answers are folded into dimension-aware `user_stated` memories — the
+ * first concrete writes toward the memory pillar.
  */
 import { ipcMain } from "electron";
 
 import type { Goal } from "@core/types";
 import type { NewMemory } from "@core/store";
+import {
+  critiquePlan,
+  reviewContextCaptureFulfillment,
+  reviewContextHealth,
+  reviewContextProfile,
+  reviewPlan,
+  type DecompositionLearningReport,
+} from "@core/domain";
+import {
+  buildAimIntakeReport,
+  planQualityMetadata,
+  clarifyAnswersToMemories,
+  planningContextReportsFromGoals,
+  recordAssumptionContextCandidatesForStore,
+  recordReviewContextCandidatesForStore,
+  reviewDecompositionStrategyForStore,
+  selectPlanningContextForStore,
+  summarizeClarifyLearningForStore,
+  summarizeContextCaptureLearningForStore,
+  summarizeContextLineageLearningForStore,
+  summarizeDecompositionLearningForStore,
+  traceClarifyAnswerImpact,
+} from "@core/llm";
 
 import {
   IPC,
+  type AcceptContextCandidateRequest,
   type ClarifyRequest,
+  type DeprioritizeContextMemoryRequest,
   type DraftRequest,
   type ProviderConfig,
   type ProviderStatus,
+  type ProviderTestResult,
   type RefineRequest,
   type SaveRequest,
   type SavedGoal,
 } from "../shared/ipc";
 import { runClarify, runDraft, runRefine } from "./planner";
 import { aimStore } from "./store";
-import { buildGateway, getProviderStatus, setProviderConfig } from "./gateway";
+import { buildGateway, getProviderStatus, setProviderConfig, testProviderConfig } from "./gateway";
+
+async function planningContext(input: {
+  title: string;
+  description?: string;
+  limit?: number;
+}) {
+  return selectPlanningContextForStore(aimStore, input);
+}
+
+async function clarifyLearning() {
+  return summarizeClarifyLearningForStore(aimStore);
+}
+
+async function captureLearning() {
+  return summarizeContextCaptureLearningForStore(aimStore);
+}
+
+async function contextLineageLearning() {
+  return summarizeContextLineageLearningForStore(aimStore);
+}
+
+async function decompositionLearning() {
+  return summarizeDecompositionLearningForStore(aimStore);
+}
+
+async function decompositionStrategy(
+  title: string,
+  description?: string,
+  learning?: DecompositionLearningReport | null,
+) {
+  return reviewDecompositionStrategyForStore(aimStore, title, description, learning);
+}
 
 export function registerIpc(): void {
-  ipcMain.handle(IPC.draft, (_e, req: DraftRequest) => runDraft(buildGateway(), req.title, req.description));
-
-  ipcMain.handle(IPC.clarify, (_e, req: ClarifyRequest) =>
-    runClarify(buildGateway(), req.title, req.description, req.draft),
+  ipcMain.handle(IPC.intake, async (_e, req: DraftRequest) =>
+    buildAimIntakeReport({
+      title: req.title,
+      description: req.description,
+      planning: await planningContext(req),
+      lineageLearning: await contextLineageLearning(),
+    }),
   );
 
-  ipcMain.handle(IPC.refine, (_e, req: RefineRequest) =>
-    runRefine(buildGateway(), req.title, req.description, req.draft, req.questions, req.answers),
-  );
+  ipcMain.handle(IPC.draft, async (_e, req: DraftRequest) => {
+    const selectedContext = await planningContext(req);
+    const [lineageLearning, decompositionLearningReport] = await Promise.all([contextLineageLearning(), decompositionLearning()]);
+    const decompositionStrategyReport = await decompositionStrategy(req.title, req.description, decompositionLearningReport);
+    const draft = await runDraft(
+      buildGateway(),
+      req.title,
+      req.description,
+      selectedContext.memories,
+      lineageLearning,
+      decompositionLearningReport,
+      decompositionStrategyReport,
+    );
+    return {
+      ...draft,
+      intake: buildAimIntakeReport({
+        title: req.title,
+        description: req.description,
+        planning: selectedContext,
+        draftReview: draft.review ?? null,
+        lineageLearning,
+      }),
+      planningContext: selectedContext.report,
+    };
+  });
+
+  ipcMain.handle(IPC.clarify, async (_e, req: ClarifyRequest) => {
+    const selectedContext = await planningContext(req);
+    const [lineageLearning, decompositionLearningReport] = await Promise.all([contextLineageLearning(), decompositionLearning()]);
+    const decompositionStrategyReport = await decompositionStrategy(req.title, req.description, decompositionLearningReport);
+    const draftReview = reviewPlan({ plan: req.draft, context: selectedContext.memories });
+    const intake = buildAimIntakeReport({
+      title: req.title,
+      description: req.description,
+      planning: selectedContext,
+      draftReview,
+      lineageLearning,
+    });
+    return runClarify(
+      buildGateway(),
+      req.title,
+      req.description,
+      req.draft,
+      selectedContext.memories,
+      await clarifyLearning(),
+      await captureLearning(),
+      intake,
+      draftReview,
+      lineageLearning,
+      decompositionStrategyReport,
+    );
+  });
+
+  ipcMain.handle(IPC.refine, async (_e, req: RefineRequest) => {
+    const selectedContext = await planningContext(req);
+    const [lineageLearning, decompositionLearningReport] = await Promise.all([contextLineageLearning(), decompositionLearning()]);
+    const decompositionStrategyReport = await decompositionStrategy(req.title, req.description, decompositionLearningReport);
+    const refined = await runRefine(
+      buildGateway(),
+      req.title,
+      req.description,
+      req.draft,
+      req.questions,
+      req.answers,
+      selectedContext.memories,
+      req.reviewPrompt,
+      lineageLearning,
+      decompositionLearningReport,
+      decompositionStrategyReport,
+    );
+    return {
+      ...refined,
+      intake: buildAimIntakeReport({
+        title: req.title,
+        description: req.description,
+        planning: selectedContext,
+        draftReview: refined.review ?? null,
+        lineageLearning,
+      }),
+      planningContext: selectedContext.report,
+    };
+  });
 
   ipcMain.handle(IPC.listGoals, (): Promise<Goal[]> => aimStore.listGoals());
 
   ipcMain.handle(IPC.deleteGoal, (_e, id: string): Promise<void> => aimStore.deleteGoal(id));
+
+  ipcMain.handle(IPC.listContextCandidates, () => aimStore.listMemoryCandidates());
+
+  ipcMain.handle(IPC.listContextHistory, () => aimStore.listMemoryHistory());
+
+  ipcMain.handle(IPC.listContextProfile, async () =>
+    reviewContextProfile({ memories: await aimStore.listMemories() }),
+  );
+
+  ipcMain.handle(IPC.listContextHealth, async () => {
+    const [goals, memories] = await Promise.all([aimStore.listGoals(), aimStore.listMemories()]);
+    return reviewContextHealth({
+      memories,
+      traces: planningContextReportsFromGoals(goals),
+    });
+  });
+
+  ipcMain.handle(IPC.listContextLearning, () => clarifyLearning());
+
+  ipcMain.handle(IPC.listContextLineageLearning, () => contextLineageLearning());
+
+  ipcMain.handle(IPC.listContextDecompositionLearning, () => decompositionLearning());
+
+  ipcMain.handle(IPC.listContextDecompositionStrategy, async (_e, req: DraftRequest) =>
+    decompositionStrategy(req.title, req.description),
+  );
+
+  ipcMain.handle(IPC.archiveContextMemory, (_e, id: string) => aimStore.archiveMemory(id));
+
+  ipcMain.handle(IPC.deprioritizeContextMemory, (_e, req: DeprioritizeContextMemoryRequest) =>
+    aimStore.deprioritizeMemory({ id: req.id, confidence: req.confidence }),
+  );
+
+  ipcMain.handle(IPC.acceptContextCandidate, (_e, req: AcceptContextCandidateRequest) =>
+    aimStore.acceptMemoryCandidate({ id: req.id, content: req.content, goalId: req.scope === "global" ? null : undefined }),
+  );
+
+  ipcMain.handle(IPC.rejectContextCandidate, (_e, id: string) => aimStore.rejectMemoryCandidate(id));
 
   ipcMain.handle(IPC.getProviderConfig, async (): Promise<ProviderStatus> => getProviderStatus());
 
@@ -44,22 +222,64 @@ export function registerIpc(): void {
     setProviderConfig(config),
   );
 
-  ipcMain.handle(IPC.saveGoal, async (_e, req: SaveRequest): Promise<SavedGoal> => {
-    // Fold the user's clarifying answers into memory contents (question text → answer).
-    const questionById = new Map(req.questions.map((q) => [q.id, q]));
-    const memories: NewMemory[] = req.answers
-      .map((a) => ({ a, text: a.other_text?.trim() || a.selected_label?.trim() || "" }))
-      .filter((x) => x.text.length > 0)
-      .map(({ a, text }) => {
-        const label = questionById.get(a.question_id)?.question ?? a.question_id;
-        return { content: `${label} → ${text}`, source: "user_stated" };
-      });
+  ipcMain.handle(IPC.testProviderConfig, async (_e, config: ProviderConfig): Promise<ProviderTestResult> =>
+    testProviderConfig(config),
+  );
 
-    return aimStore.createGoal({
+  ipcMain.handle(IPC.saveGoal, async (_e, req: SaveRequest): Promise<SavedGoal> => {
+    const selectedContext = await planningContext({ title: req.title, description: req.description });
+    const lineageLearning = await contextLineageLearning();
+    const memories: NewMemory[] = clarifyAnswersToMemories(req.questions, req.answers);
+    const answerImpact = req.answers.length > 0
+      ? traceClarifyAnswerImpact({
+          questions: req.questions,
+          answers: req.answers,
+          beforePlan: req.draft ?? null,
+          afterPlan: req.plan,
+          beforeQuality: req.draft ? critiquePlan({ plan: req.draft, context: selectedContext.memories }) : null,
+          afterQuality: req.quality ?? null,
+      })
+      : null;
+    const captureFulfillment = reviewContextCaptureFulfillment({
+      questions: req.questions,
+      answers: req.answers,
+      memories,
+      impacts: answerImpact?.rows ?? [],
+    });
+
+    const saved = await aimStore.createGoal({
       title: req.title,
       description: req.description,
       plan: req.plan,
+      metadata: {
+        ...(req.quality !== undefined || req.qualityRetry || req.review
+          ? planQualityMetadata({
+              quality: req.quality ?? null,
+              retried: req.qualityRetry?.retried ?? false,
+              attempts: req.qualityRetry?.attempts ?? 1,
+              firstQuality: req.qualityRetry?.firstQuality ?? null,
+            }, req.review)
+          : {}),
+        aim_intake: buildAimIntakeReport({
+          title: req.title,
+          description: req.description,
+          planning: selectedContext,
+          draftReview: req.review ?? null,
+          lineageLearning,
+        }),
+        planning_context: selectedContext.report,
+        ...(answerImpact ? { clarify_answer_impact: answerImpact } : {}),
+        ...(captureFulfillment.total > 0 ? { context_capture_fulfillment: captureFulfillment } : {}),
+      },
       memories,
     });
+    return {
+      ...saved,
+      answerImpact,
+      contextCandidates: [
+        ...(await recordAssumptionContextCandidatesForStore(aimStore, saved.goal, req.assumptions ?? [])),
+        ...(await recordReviewContextCandidatesForStore(aimStore, saved.goal, req.review)),
+      ],
+    };
   });
 }

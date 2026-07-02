@@ -6,8 +6,9 @@
 
 /** 2026 model IDs (lean-first: aim decompose/replan use Sonnet, high-frequency classify/extract use Haiku; Opus reserved for explicit overrides on hard reasoning). */
 export const Models = {
+  fable: "claude-fable-5",
   opus: "claude-opus-4-8",
-  sonnet: "claude-sonnet-4-6",
+  sonnet: "claude-sonnet-5",
   haiku: "claude-haiku-4-5-20251001",
 } as const;
 export type ModelId = (typeof Models)[keyof typeof Models];
@@ -51,8 +52,8 @@ export interface LlmRequest {
   prompt: string;
   /** JSON Schema enforcing structured output (decomposition uses flat nodes+edges). */
   schema?: unknown;
-  /** Override the routing (rare). */
-  model?: ModelId;
+  /** Override the routing (rare). Provider gateways may accept non-Anthropic model ids. */
+  model?: string;
 }
 
 export interface LlmResponse<T = string> {
@@ -80,16 +81,82 @@ export type {
   OpenAiFetchPort,
   OpenAiFetchResponse,
 } from "./openai-gateway";
-export { decompose } from "./decompose";
-export type { DecomposeInput, DecomposeResult } from "./decompose";
+export {
+  LLM_PROVIDER_CATALOG,
+  LLM_PROVIDER_IDS,
+  getDefaultBaseURL,
+  getDefaultModel,
+  getLlmProviderDefinition,
+  isLlmProvider,
+  modelBelongsToProvider,
+} from "./providers";
+export type {
+  BuiltInLlmProvider,
+  LlmModelOption,
+  LlmProtocol,
+  MaxTokensParam,
+  LlmProvider,
+  LlmProviderDefinition,
+  StructuredOutputMode,
+} from "./providers";
+export { decompose, decomposeWithQuality, planQualityMetadata } from "./decompose";
+export type {
+  DecomposeInput,
+  DecomposeResult,
+  DecomposeWithQualityResult,
+  PlanQualityMetadata,
+  PlanQualityRetryMetadata,
+} from "./decompose";
+export { selectPlanningMemories, selectPlanningMemoriesWithTrace } from "./planning-context";
+export type {
+  PlanningContextSelectionReport,
+  PlanningContextSelectionResult,
+  PlanningContextSelectionRow,
+  PlanningContextScope,
+  PlanningMemory,
+  SelectPlanningMemoriesInput,
+} from "./planning-context";
+export {
+  buildAimIntakeReport,
+  planningContextReportsFromGoals,
+  recordAssumptionContextCandidatesForStore,
+  recordReviewContextCandidatesForStore,
+  reviewDecompositionStrategyForStore,
+  selectPlanningContextForStore,
+  summarizeClarifyLearningForStore,
+  summarizeContextCaptureLearningForStore,
+  summarizeContextLineageLearningForStore,
+  summarizeDecompositionLearningForStore,
+} from "./context-workflow";
+export type {
+  ContextWorkflowSnapshot,
+  ContextWorkflowStore,
+  PlanningContextForAim,
+} from "./context-workflow";
 export { localDecompose } from "./local-decompose";
 export type { DecomposeRequest } from "./local-decompose";
 export { decompositionJsonSchema } from "./decomposition-schema";
 export type { DecompositionJsonSchema } from "./decomposition-schema";
 
 // Clarifying-questions step (the planning "feedback step").
-export { clarify, validateClarify, buildRefinedDescription } from "./clarify";
+export {
+  clarify,
+  validateClarify,
+  buildRefinedDescription,
+  clarifyAnswersToMemories,
+  clarifyImpactReportFromMetadata,
+  summarizeClarifyLearning,
+  traceClarifyAnswerImpact,
+} from "./clarify";
 export type {
+  ClarifyAnswerMemory,
+  ClarifyAnswerImpactReport,
+  ClarifyAnswerImpactRow,
+  ClarifyAnswerImpactSignal,
+  ClarifyAnswerQualityDelta,
+  ClarifyLearningRecommendation,
+  ClarifyLearningReport,
+  ClarifyLearningRow,
   ClarifyInput,
   ClarifyResult,
   ClarifyOutput,
@@ -98,6 +165,9 @@ export type {
   ClarifyAnswer,
   ClarifyAssumption,
   ClarifyQuestionKind,
+  ClarifyQuestionWhy,
+  ClarifyQuestionWhyCode,
+  ClarifyQuestionSourceDimension,
   ClarifyValidation,
 } from "./clarify";
 export { clarifyJsonSchema } from "./clarify-schema";

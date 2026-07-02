@@ -13,6 +13,7 @@ import { createInterface } from "node:readline/promises";
 import { stdin as procStdin, stdout as procStdout } from "node:process";
 
 import type { ProviderSettings } from "@core/store";
+import { getDefaultBaseURL, getDefaultModel, getLlmProviderDefinition } from "@core/llm/providers";
 
 import { normalizeProvider, type ProviderName, type SetupInput } from "./config";
 
@@ -80,25 +81,29 @@ export async function promptSetup(current: ProviderSettings | null): Promise<Set
     // Provider first, validated + re-prompted, so a typo can't waste the rest of the wizard.
     const defProvider = current?.provider ?? "anthropic";
     for (;;) {
-      const raw = (await rl.question(`Provider [anthropic | openai-compatible] (${defProvider}): `)).trim() || defProvider;
+      const raw =
+        (await rl.question(`Provider [anthropic | openai | deepseek | minimax | zai | google | qwen | openai-compatible] (${defProvider}): `)).trim() ||
+        defProvider;
       const norm = normalizeProvider(raw);
       if (norm) {
         provider = norm;
         break;
       }
-      procStdout.write(`  "${raw}" is not a known provider. Use "anthropic" or "openai-compatible".\n`);
+      procStdout.write(`  "${raw}" is not a known provider.\n`);
     }
 
-    if (provider === "openai-compatible") {
-      const defModel = current?.provider === "openai-compatible" ? current?.model : undefined;
-      model = (await rl.question(`Model${defModel ? ` (${defModel})` : " (e.g. deepseek/deepseek-chat)"}: `)).trim() || undefined;
-      const defBase = current?.provider === "openai-compatible" ? current?.baseURL : undefined;
+    const providerDef = getLlmProviderDefinition(provider);
+    if (providerDef?.protocol === "openai-compatible") {
+      const defModel = current?.provider === provider ? current?.model : getDefaultModel(provider);
+      model = (await rl.question(`Model${defModel ? ` (${defModel})` : " (required)"}: `)).trim() || undefined;
+      const defBase = current?.provider === provider ? current?.baseURL : getDefaultBaseURL(provider);
       baseURL =
-        (await rl.question(`Base URL${defBase ? ` (${defBase})` : " (Enter for https://api.openai.com/v1)"}: `)).trim() ||
+        (await rl.question(`Base URL${defBase ? ` (${defBase})` : " (OpenAI-compatible /v1 root)"}: `)).trim() ||
         undefined;
     } else {
       const defModel = current?.provider === "anthropic" ? current?.model : undefined;
-      model = (await rl.question(`Model (optional${defModel ? `, ${defModel}` : ", Enter for default"}): `)).trim() || undefined;
+      const defaultModel = defModel || getDefaultModel("anthropic");
+      model = (await rl.question(`Model (${defaultModel}): `)).trim() || undefined;
     }
   } finally {
     rl.close();

@@ -13,8 +13,26 @@ automatically. As you (and your agents) work, a durable context forms — your
 **Core positioning**: a coding agent (Claude Code, etc.) is just one of many
 "evidence emitters," reporting in via MCP; git/CI webhooks are another class of
 emitter. The MCP server is the human/agent connection point. The developer
-scenario is simply the first subset to light up. See [`docs/vision.md`](docs/vision.md)
+scenario is simply the first subset to light up. The desktop app is now the fixed
+local entry for planning and provider/model setup. See [`docs/vision.md`](docs/vision.md)
 for the full direction.
+
+## Open-source posture
+
+Aimcub is intended to be open source as a local-first planning and agent
+orchestration product. The local desktop loop and shared `@core` packages should
+remain usable, inspectable, and hackable without relying on a closed hosted
+service.
+
+The brand boundary is: **open local planning architecture, online aim platform**.
+The local product should own planning, agent management, provider configuration,
+context capture, and eval transparency. The online product should own multi-user
+collaboration, cross-device sync, team permissions, managed infrastructure, and
+the future aim-sharing platform.
+
+Hosted Supabase-backed surfaces can add networked value, but the core
+aim/context/eval architecture should stay transparent. License choice is
+intentionally TBD before public release.
 
 ## Architecture principles
 
@@ -34,6 +52,7 @@ packages/
   llm/         @core/llm         Claude gateway (model routing + metering) + goal decomposition
   ui-tokens/   @ui/tokens        design tokens
 apps/
+  desktop/    Electron desktop app           — fixed local entry
   web/         Next.js @ Vercel              — active
   mcp/         MCP server (Streamable HTTP)  — active
   ios/         Expo RN                       — v2 (placeholder)
@@ -57,10 +76,35 @@ apps/
 ```bash
 corepack enable pnpm
 pnpm install
+pnpm desktop      # fixed local desktop entry
 pnpm build        # turbo full build
 pnpm test         # @core/domain unit tests
 pnpm core:purity  # verify core has zero platform dependencies
 ```
+
+Desktop-specific commands should be launched from the repo root:
+
+```bash
+pnpm desktop        # run the current Electron desktop app
+pnpm desktop:build  # build the current desktop app
+pnpm desktop:pack   # produce a local macOS app directory
+```
+
+Optional live provider smoke tests:
+
+```bash
+# Runs real structured-output requests against selected providers.
+# Omit AIMCUB_LIVE_PROVIDERS to require all built-ins:
+# anthropic, openai, deepseek, minimax, zai, google, qwen.
+AIMCUB_LIVE_PROVIDERS=deepseek,qwen \
+DEEPSEEK_API_KEY=... \
+QWEN_API_KEY=... \
+pnpm test:live-providers
+```
+
+Provider-specific model/base URL overrides use
+`AIMCUB_LIVE_<PROVIDER>_MODEL` and `AIMCUB_LIVE_<PROVIDER>_BASE_URL`, for
+example `AIMCUB_LIVE_DEEPSEEK_MODEL=deepseek-v4-flash`.
 
 ## Roadmap (with falsifiable gates)
 

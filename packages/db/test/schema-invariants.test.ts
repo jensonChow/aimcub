@@ -28,6 +28,8 @@ const flat = flatMigration("0001_init.sql");
 const flatMetrics = flatMigration("0009_metrics.sql");
 const flatBackstops = flatMigration("0010_v1b_integrity_backstops.sql");
 const flatDrop = flatMigration("0011_drop_emotional_shell.sql");
+const flatContextCategory = flatMigration("0012_memory_context_category.sql");
+const flatMemoryStatus = flatMigration("0013_memory_deprioritized_status.sql");
 
 describe("0001_init.sql — core invariants", () => {
   it("evidence is idempotent: unique on (emitter_id, source_event_id) where source_event_id is not null", () => {
@@ -126,5 +128,28 @@ describe("0011_drop_emotional_shell.sql — the shell is gone", () => {
 
   it("tightens the jobs type domain to the surviving job kinds", () => {
     expect(flatDrop).toMatch(/check \(type in \('judge_evidence', 'extract_memory'\)\)/i);
+  });
+});
+
+describe("0012_memory_context_category.sql — typed planning memory", () => {
+  it("adds the lean context category enum and an active-memory lookup index", () => {
+    expect(flatContextCategory).toMatch(/alter table memories add column if not exists category text not null default 'project_fact'/i);
+    expect(flatContextCategory).toContain("'preference'");
+    expect(flatContextCategory).toContain("'constraint'");
+    expect(flatContextCategory).toContain("'capability'");
+    expect(flatContextCategory).toContain("'eval_signal'");
+    expect(flatContextCategory).toContain("'project_fact'");
+    expect(flatContextCategory).toContain("'procedure'");
+    expect(flatContextCategory).toMatch(/create index if not exists memories_owner_category_idx/i);
+  });
+});
+
+describe("0013_memory_deprioritized_status.sql — context priority lifecycle", () => {
+  it("allows deprioritized memories without treating them as active planning input", () => {
+    expect(flatMemoryStatus).toMatch(/drop constraint if exists memories_status_check/i);
+    expect(flatMemoryStatus).toContain("'active'");
+    expect(flatMemoryStatus).toContain("'pending'");
+    expect(flatMemoryStatus).toContain("'deprioritized'");
+    expect(flatMemoryStatus).toContain("'deleted'");
   });
 });

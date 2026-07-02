@@ -9,10 +9,15 @@
   },
   "type": "module",
   "scripts": {
+    "desktop": "pnpm --filter @app/desktop dev",
+    "desktop:dev": "pnpm --filter @app/desktop dev",
+    "desktop:build": "pnpm --filter @app/desktop build",
+    "desktop:pack": "pnpm --filter @app/desktop pack",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",
     "test": "turbo run test",
+    "test:live-providers": "pnpm --filter @core/llm run test:live-providers",
     "core:purity": "pnpm --filter @core/domain --filter @core/types run purity"
   },
   "devDependencies": {

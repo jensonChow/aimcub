@@ -238,6 +238,7 @@ export type Database = {
       }
       memories: {
         Row: {
+          category: string
           confidence: number
           content: string
           created_at: string
@@ -250,6 +251,7 @@ export type Database = {
           superseded_by: string | null
         }
         Insert: {
+          category?: string
           confidence?: number
           content: string
           created_at?: string
@@ -262,6 +264,7 @@ export type Database = {
           superseded_by?: string | null
         }
         Update: {
+          category?: string
           confidence?: number
           content?: string
           created_at?: string

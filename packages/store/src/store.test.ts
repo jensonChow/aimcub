@@ -17,6 +17,15 @@ import {
   type ProviderSettings,
 } from "./index";
 
+const CONTRACT = {
+  why: "Scaffolding creates a runnable base before feature work starts.",
+  definition_of_done: "The project has an initialized runnable skeleton.",
+  required_evidence: ["A trusted init commit."],
+  likely_owner: "agent",
+  context_gaps: [],
+  eval_signal: "The milestone is done when the repository can run from its scaffold.",
+};
+
 /** A small, semantically valid plan (passes validatePlan: unique keys, acyclic, edges ref nodes). */
 const PLAN = {
   goal_summary: "Build a CLI todo app",
@@ -29,6 +38,7 @@ const PLAN = {
       description: "Init the project.",
       est_effort: "s",
       xp_reward: 10,
+      decomposition_contract: CONTRACT,
       acceptance_rule: {
         logic: "all",
         threshold: 1,
@@ -118,6 +128,7 @@ describe("materialize", () => {
     expect(ms[0]!.depends_on_id).toBeNull();
     expect(ms[1]!.depends_on_id).toBe(ms[0]!.id);
     expect(ms[0]!.goal_id).toBe("goal-1");
+    expect(ms[0]!.metadata.decomposition_contract).toEqual(CONTRACT);
   });
 });
 
@@ -187,12 +198,25 @@ describe("mergeMilestones · re-plan invariants", () => {
 describe("createJsonFileStore · updateGoal", () => {
   it("re-plans a saved aim and persists the new plan", async () => {
     const store = freshStore();
-    const { goal } = await store.createGoal({ title: "Build a CLI todo app", plan: PLAN });
+    const { goal } = await store.createGoal({
+      title: "Build a CLI todo app",
+      plan: PLAN,
+      metadata: { source: "test" },
+    });
 
-    const updated = await store.updateGoal({ id: goal.id, description: "now with a release step", plan: REPLAN });
+    const updated = await store.updateGoal({
+      id: goal.id,
+      description: "now with a release step",
+      plan: REPLAN,
+      metadata: { plan_quality: { grade: "pass", score: 100, issues: [] } },
+    });
     expect(updated).not.toBeNull();
     expect(updated!.goal.description).toBe("now with a release step");
     expect(updated!.goal.plan_json).toEqual(REPLAN);
+    expect(updated!.goal.metadata).toMatchObject({
+      source: "test",
+      plan_quality: { grade: "pass", score: 100 },
+    });
     expect(updated!.milestones.map((m) => m.title).sort()).toEqual(["Implement", "Polish", "Scaffold"]);
     expect(updated!.milestones.find((m) => m.title === "Implement")!.status).toBe("skipped");
 
@@ -220,6 +244,7 @@ describe("createJsonFileStore · round-trip", () => {
     });
     expect(milestones).toHaveLength(2);
     expect(goal.title).toBe("Build a CLI todo app");
+    expect(goal.metadata).toEqual({});
 
     const list = await store.listGoals();
     expect(list).toHaveLength(1);
@@ -247,8 +272,313 @@ describe("createJsonFileStore · round-trip", () => {
   it("drops empty-content memories", async () => {
     const store = freshStore();
     const { goal } = await store.createGoal({ title: "x", plan: PLAN, memories: [{ content: "  " }] });
-    // No assertion on memories via the public API (none exposed yet); just ensure no throw + goal created.
     expect(goal.id).toBeTruthy();
+    expect(await store.listMemories(goal.id)).toEqual([]);
+  });
+});
+
+describe("createJsonFileStore · memories/context", () => {
+  it("lists memories globally and per aim, newest first", async () => {
+    const store = freshStore();
+    const { goal } = await store.createGoal({
+      title: "Context aim",
+      plan: PLAN,
+      memories: [{ content: "User prefers production-ready plans.", kind: "semantic", confidence: 0.9 }],
+    });
+    await store.addMemory({ content: "User works on macOS.", kind: "semantic", goalId: null });
+
+    const all = await store.listMemories();
+    expect(all.map((m) => m.content)).toContain("User works on macOS.");
+    expect(all.map((m) => m.content)).toContain("User prefers production-ready plans.");
+
+    const scoped = await store.listMemories(goal.id);
+    expect(scoped).toHaveLength(1);
+    expect(scoped[0]!.confidence).toBe(0.9);
+    expect(scoped[0]!.category).toBe("project_fact");
+  });
+
+  it("rejects empty memory content", async () => {
+    const store = freshStore();
+    await expect(store.addMemory({ content: "  " })).rejects.toThrow(/required/i);
+  });
+
+  it("keeps inferred context pending until the user accepts it", async () => {
+    const store = freshStore();
+    const { goal } = await store.createGoal({ title: "Context aim", plan: PLAN });
+
+    const candidate = await store.addMemoryCandidate({
+      goalId: goal.id,
+      content: "Preference: User prefers CLI-first workflows.",
+      kind: "semantic",
+      category: "preference",
+      source: "evidence_derived",
+      confidence: 0.8,
+    });
+
+    expect(await store.listMemories()).toEqual([]);
+    expect(await store.listMemoryCandidates(goal.id)).toHaveLength(1);
+
+    const accepted = await store.acceptMemoryCandidate({ id: candidate.id, content: "Preference: CLI-first tools." });
+    expect(accepted?.status).toBe("active");
+    expect(accepted?.category).toBe("preference");
+    expect(accepted?.confidence).toBe(0.9);
+    expect((await store.listMemoryCandidates()).map((m) => m.id)).not.toContain(candidate.id);
+    expect((await store.listMemories()).map((m) => m.content)).toContain("Preference: CLI-first tools.");
+  });
+
+  it("keeps explicit confidence when accepting a context candidate", async () => {
+    const store = freshStore();
+    const candidate = await store.addMemoryCandidate({
+      content: "Eval signal: User wants tests and screenshots before calling UI work done.",
+      confidence: 0.6,
+    });
+
+    const accepted = await store.acceptMemoryCandidate({ id: candidate.id, confidence: 0.75 });
+
+    expect(accepted?.status).toBe("active");
+    expect(accepted?.confidence).toBe(0.75);
+  });
+
+  it("requires prompt-like context candidates to be edited into actual answers", async () => {
+    const store = freshStore();
+    const candidate = await store.addMemoryCandidate({
+      content:
+        'Eval signal: For "Context aim", pending answer needed: Ask what would make this aim count as genuinely complete.',
+      category: "eval_signal",
+      confidence: 0.6,
+    });
+
+    await expect(store.acceptMemoryCandidate({ id: candidate.id })).rejects.toThrow(/actual answer/i);
+    expect((await store.listMemoryCandidates()).map((m) => m.id)).toContain(candidate.id);
+
+    const accepted = await store.acceptMemoryCandidate({
+      id: candidate.id,
+      content: "Eval signal: Done means tests pass and screenshots prove the flow.",
+    });
+
+    expect(accepted?.status).toBe("active");
+    expect(accepted?.confidence).toBe(0.9);
+    expect(accepted?.content).toBe("Eval signal: Done means tests pass and screenshots prove the flow.");
+  });
+
+  it("requires unapplied-context review prompts to be edited before accept", async () => {
+    const store = freshStore();
+    const candidate = await store.addMemoryCandidate({
+      content:
+        'Eval signal: For "Context aim", confirm whether this constraint context should shape the aim: Keep @core pure.',
+      category: "eval_signal",
+      confidence: 0.6,
+    });
+
+    await expect(store.acceptMemoryCandidate({ id: candidate.id })).rejects.toThrow(/actual answer/i);
+    expect((await store.listMemoryCandidates()).map((m) => m.id)).toContain(candidate.id);
+  });
+
+  it("can promote a scoped context candidate to global context on accept", async () => {
+    const store = freshStore();
+    const { goal } = await store.createGoal({ title: "Context aim", plan: PLAN });
+    const candidate = await store.addMemoryCandidate({
+      goalId: goal.id,
+      content: "Preference: User prefers CLI-first workflows.",
+    });
+
+    const accepted = await store.acceptMemoryCandidate({ id: candidate.id, goalId: null });
+
+    expect(accepted?.status).toBe("active");
+    expect(accepted?.goal_id).toBeNull();
+    expect(await store.listMemories(goal.id)).toEqual([]);
+    expect((await store.listMemories()).map((m) => m.id)).toContain(candidate.id);
+  });
+
+  it("dedupes a promoted candidate against existing global context", async () => {
+    const store = freshStore();
+    const { goal } = await store.createGoal({ title: "Context aim", plan: PLAN });
+    const global = await store.addMemory({ content: "Preference: CLI first", goalId: null });
+    const candidate = await store.addMemoryCandidate({ goalId: goal.id, content: "Preference: CLI first" });
+
+    const accepted = await store.acceptMemoryCandidate({ id: candidate.id, goalId: null });
+    const snapshot = await store.exportData();
+
+    expect(accepted?.id).toBe(global.id);
+    expect(snapshot.memories.find((m) => m.id === candidate.id)?.status).toBe("deleted");
+    expect(snapshot.memories.find((m) => m.id === candidate.id)?.superseded_by).toBe(global.id);
+    expect((await store.listMemories()).filter((m) => m.content === "Preference: CLI first")).toHaveLength(1);
+  });
+
+  it("strengthens existing active context when accepting a duplicate candidate", async () => {
+    const store = freshStore();
+    const { goal } = await store.createGoal({ title: "Context aim", plan: PLAN });
+    const global = await store.addMemory({
+      content: "Eval signal: Done means tests pass and the user can inspect the result.",
+      goalId: null,
+      confidence: 0.55,
+    });
+    const candidate = await store.addMemoryCandidate({
+      content: "Eval signal: Done means tests pass and the user can inspect the result.",
+      goalId: goal.id,
+      confidence: 0.6,
+    });
+
+    const accepted = await store.acceptMemoryCandidate({ id: candidate.id, goalId: null });
+    const snapshot = await store.exportData();
+
+    expect(accepted?.id).toBe(global.id);
+    expect(accepted?.confidence).toBe(0.9);
+    expect(snapshot.memories.find((m) => m.id === candidate.id)?.status).toBe("deleted");
+    expect(snapshot.memories.find((m) => m.id === candidate.id)?.superseded_by).toBe(global.id);
+  });
+
+  it("rejects pending context candidates without deleting active memories", async () => {
+    const store = freshStore();
+    const candidate = await store.addMemoryCandidate({ content: "Eval signal: User verified the CLI." });
+    await store.addMemory({ content: "User works on macOS." });
+
+    const rejected = await store.rejectMemoryCandidate(candidate.id);
+    expect(rejected?.status).toBe("deleted");
+    expect(await store.listMemoryCandidates()).toEqual([]);
+    expect((await store.listMemories()).map((m) => m.content)).toEqual(["User works on macOS."]);
+  });
+
+  it("dedupes pending and active memories by normalized content", async () => {
+    const store = freshStore();
+    const first = await store.addMemoryCandidate({ content: "Preference: CLI first" });
+    const second = await store.addMemoryCandidate({ content: " Preference:  CLI first " });
+    expect(second.id).toBe(first.id);
+
+    const active = await store.addMemory({ content: "Preference: CLI first" });
+    expect(active.id).toBe(first.id);
+    expect(active.status).toBe("active");
+    expect(active.category).toBe("preference");
+    expect(await store.listMemoryCandidates()).toEqual([]);
+  });
+
+  it("archives active memories without touching pending candidates", async () => {
+    const store = freshStore();
+    const active = await store.addMemory({ content: "Project fact: Old setup used Stripe." });
+    const candidate = await store.addMemoryCandidate({ content: "Preference: CLI first" });
+
+    const archived = await store.archiveMemory(active.id);
+    const snapshot = await store.exportData();
+
+    expect(archived?.status).toBe("deleted");
+    expect((await store.listMemories()).map((m) => m.id)).not.toContain(active.id);
+    expect((await store.listMemoryCandidates()).map((m) => m.id)).toContain(candidate.id);
+    expect(snapshot.memories.find((m) => m.id === active.id)?.status).toBe("deleted");
+  });
+
+  it("deprioritizes active memories without deleting their history", async () => {
+    const store = freshStore();
+    const memory = await store.addMemory({ content: "Preference: Verbose reports.", confidence: 0.9 });
+
+    await expect(store.deprioritizeMemory({ id: memory.id, confidence: 2 })).rejects.toThrow(/0 to 1/);
+    const updated = await store.deprioritizeMemory({ id: memory.id });
+
+    const snapshot = await store.exportData();
+    expect(updated?.status).toBe("deprioritized");
+    expect(updated?.confidence).toBe(0.5);
+    expect((await store.listMemories()).map((m) => m.id)).not.toContain(memory.id);
+    expect(snapshot.memories.find((m) => m.id === memory.id)?.status).toBe("deprioritized");
+  });
+
+  it("lists memory history across context review outcomes", async () => {
+    const store = freshStore();
+    const acceptedCandidate = await store.addMemoryCandidate({ content: "Procedure: Run pnpm test." });
+    const rejectedCandidate = await store.addMemoryCandidate({ content: "Constraint: No budget constraint." });
+    const deprioritized = await store.addMemory({ content: "Preference: Verbose reports.", confidence: 0.9 });
+
+    await store.acceptMemoryCandidate({ id: acceptedCandidate.id });
+    await store.rejectMemoryCandidate(rejectedCandidate.id);
+    await store.deprioritizeMemory({ id: deprioritized.id });
+
+    expect((await store.listMemoryCandidates()).map((m) => m.id)).toEqual([]);
+    expect((await store.listMemories()).map((m) => m.content)).toEqual(["Procedure: Run pnpm test."]);
+    expect((await store.listMemoryHistory()).map((m) => m.status).sort()).toEqual(["active", "deleted", "deprioritized"]);
+  });
+
+  it("reactivates deprioritized duplicates when the user states them again", async () => {
+    const store = freshStore();
+    const memory = await store.addMemory({ content: "Preference: Verbose reports.", confidence: 0.9 });
+    await store.deprioritizeMemory({ id: memory.id });
+
+    const active = await store.addMemory({ content: "Preference: Verbose reports.", confidence: 1 });
+
+    expect(active.id).toBe(memory.id);
+    expect(active.status).toBe("active");
+    expect(active.confidence).toBe(1);
+    expect((await store.listMemories()).map((m) => m.id)).toContain(memory.id);
+  });
+});
+
+describe("createJsonFileStore · evidence and confirmations", () => {
+  it("appends trusted evidence and auto-completes matching milestones", async () => {
+    const store = freshStore();
+    const { goal, milestones } = await store.createGoal({ title: "Build a CLI todo app", plan: PLAN });
+
+    const result = await store.addEvidence({
+      goalId: goal.id,
+      milestoneId: milestones[0]!.id,
+      emitterId: "00000000-0000-4000-8000-0000000000aa",
+      kind: "git_commit",
+      sourceEventId: "sha-1",
+      summary: "init",
+      payload: { sha: "sha-1", message: "init project", files: ["src/index.ts"] },
+      trustScore: 1,
+    });
+
+    expect(result.deduped).toBe(false);
+    expect(result.completions).toHaveLength(1);
+    expect(result.completions[0]!.decided_by).toBe("rule_auto");
+    const got = await store.getGoal(goal.id);
+    expect(got!.milestones[0]!.status).toBe("completed");
+  });
+
+  it("dedupes evidence by emitter/source event", async () => {
+    const store = freshStore();
+    const { goal, milestones } = await store.createGoal({ title: "Build a CLI todo app", plan: PLAN });
+    const input = {
+      goalId: goal.id,
+      milestoneId: milestones[0]!.id,
+      emitterId: "00000000-0000-4000-8000-0000000000aa",
+      kind: "git_commit" as const,
+      sourceEventId: "sha-1",
+      payload: { sha: "sha-1", message: "init", files: ["a.ts"] },
+      trustScore: 1,
+    };
+
+    const first = await store.addEvidence(input);
+    const second = await store.addEvidence(input);
+    expect(second.deduped).toBe(true);
+    expect(second.evidence.id).toBe(first.evidence.id);
+    expect(await store.listEvidence(goal.id)).toHaveLength(1);
+  });
+
+  it("manual confirmation creates user_confirm completion for an auto_then_confirm milestone", async () => {
+    const store = freshStore();
+    const { goal, milestones } = await store.createGoal({ title: "Build a CLI todo app", plan: PLAN });
+
+    const result = await store.confirmMilestone({ goalId: goal.id, milestoneId: milestones[1]!.id });
+    expect(result).not.toBeNull();
+    expect(result!.evidence?.kind).toBe("manual_check");
+    expect(result!.completion?.decided_by).toBe("user_confirm");
+
+    const got = await store.getGoal(goal.id);
+    expect(got!.milestones[1]!.status).toBe("completed");
+  });
+});
+
+describe("createJsonFileStore · export/import", () => {
+  it("exports and merges a snapshot", async () => {
+    const a = freshStore();
+    const { goal } = await a.createGoal({ title: "Portable aim", plan: PLAN });
+    const snapshot = await a.exportData();
+
+    const b = freshStore();
+    const result = await b.importData(snapshot);
+    expect(result.goals).toBe(1);
+    expect((await b.getGoal(goal.id))?.goal.title).toBe("Portable aim");
+
+    const second = await b.importData(snapshot);
+    expect(second.goals).toBe(0);
   });
 });
 
@@ -264,8 +594,20 @@ describe("provider settings (settings.json shared by desktop + CLI)", () => {
     const cfg: ProviderSettings = {
       provider: "openai-compatible",
       apiKey: "sk-file",
-      model: "deepseek/deepseek-chat",
+      model: "custom-chat-model",
       baseURL: "https://openrouter.ai/api/v1",
+    };
+    saveSettings(cfg, dir);
+    expect(loadSettings(dir)).toEqual(cfg);
+  });
+
+  it("round-trips a built-in direct provider config", () => {
+    const dir = freshDir();
+    const cfg: ProviderSettings = {
+      provider: "deepseek",
+      apiKey: "sk-file",
+      model: "deepseek-v4-pro",
+      baseURL: "https://api.deepseek.com",
     };
     saveSettings(cfg, dir);
     expect(loadSettings(dir)).toEqual(cfg);
@@ -286,7 +628,7 @@ describe("provider settings (settings.json shared by desktop + CLI)", () => {
 
   it("returns null for an unknown provider on file", () => {
     const dir = freshDir();
-    writeFileSync(settingsPath(dir), JSON.stringify({ provider: "gemini", apiKey: "k" }), "utf8");
+    writeFileSync(settingsPath(dir), JSON.stringify({ provider: "unknown-ai", apiKey: "k" }), "utf8");
     expect(loadSettings(dir)).toBeNull();
   });
 });

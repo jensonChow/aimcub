@@ -86,6 +86,40 @@ describe("AnthropicLlmGateway · model routing via routeModel", () => {
     const body = create.mock.calls[0]![0] as { model: string };
     expect(body.model).toBe(Models.haiku);
   });
+
+  it("honors a fixed model configured on the gateway", async () => {
+    const { client, create } = fakeClient("ok");
+    const { meter } = recordingMeter();
+    const gw = new AnthropicLlmGateway({ meter, ownerId: "o", client, model: "claude-opus-4-8" });
+
+    await gw.complete({ task: "classify", prompt: "x" });
+
+    const body = create.mock.calls[0]![0] as { model: string };
+    expect(body.model).toBe("claude-opus-4-8");
+  });
+});
+
+describe("AnthropicLlmGateway · transport errors", () => {
+  it("times out a request that never resolves", async () => {
+    vi.useFakeTimers();
+    try {
+      const create = vi.fn(() => new Promise(() => {}));
+      const client: AnthropicClientPort = { messages: { create: create as never } };
+      const { meter } = recordingMeter();
+      const gw = new AnthropicLlmGateway({
+        meter,
+        ownerId: "o",
+        client,
+        requestTimeoutMs: 25,
+      });
+
+      const promise = expect(gw.complete({ task: "classify", prompt: "x" })).rejects.toThrow(/request timed out after 25ms/);
+      await vi.advanceTimersByTimeAsync(25);
+      await promise;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("resolveAnthropicApiKey · BYO-key precedence", () => {

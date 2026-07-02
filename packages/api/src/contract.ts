@@ -43,7 +43,12 @@ export interface AimcubRepo {
   listGoals(ownerId: string): Promise<Goal[]>;
   listMilestones(goalId: string): Promise<Milestone[]>;
   /** Persist the decomposition snapshot on the goal and (by default) activate it. RLS-scoped to the caller. */
-  updateGoalPlan(goalId: string, planJson: unknown, status?: Goal["status"]): Promise<Goal>;
+  updateGoalPlan(
+    goalId: string,
+    planJson: unknown,
+    status?: Goal["status"],
+    metadata?: Record<string, unknown>,
+  ): Promise<Goal>;
 
   // Server path (service_role)
   insertMilestones(milestones: Milestone[]): Promise<Milestone[]>;

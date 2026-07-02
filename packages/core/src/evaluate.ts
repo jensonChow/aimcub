@@ -53,6 +53,12 @@ function ciMatches(m: CiStatusMatch, p: CiPayload): boolean {
   return p.conclusion === m.conclusion;
 }
 
+function manualConfirmMatches(ev: Evidence): boolean {
+  if (ev.kind !== "manual_check") return false;
+  const confirmed = ev.payload.confirmed;
+  return confirmed === true || confirmed === undefined;
+}
+
 function evidenceMatchesClause(clause: AcceptanceClause, ev: Evidence): boolean {
   // Verifiable clause: must come from a trusted source (signature-verified webhook / authenticated MCP).
   if (clause.auto_verifiable && ev.trust_score < AUTO_VERIFY_MIN_TRUST) return false;
@@ -68,8 +74,9 @@ function evidenceMatchesClause(clause: AcceptanceClause, ev: Evidence): boolean 
       const parsed = CiPayload.safeParse(ev.payload);
       return parsed.success && ciMatches(clause.match, parsed.data);
     }
-    // Evaluators reserved for v3 are not yet implemented in v1 — match no evidence.
     case "manual_confirm":
+      return manualConfirmMatches(ev);
+    // Evaluators reserved for v3 are not yet implemented in v1 — match no evidence.
     case "file_uploaded":
     case "url":
     case "llm_judge":

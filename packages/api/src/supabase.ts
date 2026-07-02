@@ -158,11 +158,18 @@ export class SupabaseAimcubRepo implements AimcubRepo {
     return unwrap(res) ?? [];
   }
 
-  async updateGoalPlan(goalId: string, planJson: unknown, status: Goal["status"] = "active"): Promise<Goal> {
+  async updateGoalPlan(
+    goalId: string,
+    planJson: unknown,
+    status: Goal["status"] = "active",
+    metadata?: Record<string, unknown>,
+  ): Promise<Goal> {
     // User path: RLS's own_write policy guarantees the caller can only touch their own goal.
+    const row: Partial<Goal> = { plan_json: planJson, status };
+    if (metadata) row.metadata = metadata;
     const res = await this.user
       .from<Goal>("goals")
-      .update({ plan_json: planJson, status } as Partial<Goal>)
+      .update(row)
       .eq("id", goalId)
       .select()
       .single();

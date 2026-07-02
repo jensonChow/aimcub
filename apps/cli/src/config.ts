@@ -8,8 +8,15 @@
  * is the pure validator behind `aimcub setup` (no I/O).
  */
 import type { ProviderSettings } from "@core/store";
+import {
+  getDefaultBaseURL,
+  getDefaultModel,
+  getLlmProviderDefinition,
+  isLlmProvider,
+  type LlmProvider,
+} from "@core/llm/providers";
 
-export type ProviderName = "anthropic" | "openai-compatible";
+export type ProviderName = LlmProvider;
 
 /** Where a resolved value came from (for `aimcub config` provenance). */
 export type Source = "env" | "settings.json" | "default";
@@ -33,14 +40,29 @@ export interface ResolvedProvider {
 /** Per-provider key env vars, in precedence order (AIMCUB_API_KEY wins). */
 const KEY_VARS: Record<ProviderName, readonly string[]> = {
   anthropic: ["AIMCUB_API_KEY", "ANTHROPIC_API_KEY"],
+  openai: ["AIMCUB_API_KEY", "OPENAI_API_KEY"],
+  deepseek: ["AIMCUB_API_KEY", "DEEPSEEK_API_KEY"],
+  minimax: ["AIMCUB_API_KEY", "MINIMAX_API_KEY"],
+  zai: ["AIMCUB_API_KEY", "ZAI_API_KEY", "ZHIPUAI_API_KEY"],
+  google: ["AIMCUB_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"],
+  qwen: ["AIMCUB_API_KEY", "DASHSCOPE_API_KEY", "QWEN_API_KEY"],
   "openai-compatible": ["AIMCUB_API_KEY", "OPENAI_API_KEY"],
 };
 
-/** Normalize a provider string (`openai` is accepted as an alias). */
+/** Normalize a provider string plus common aliases. */
 export function normalizeProvider(raw: string): ProviderName | null {
-  const s = raw.trim();
-  if (s === "anthropic") return "anthropic";
-  if (s === "openai-compatible" || s === "openai") return "openai-compatible";
+  const s = raw.trim().toLowerCase();
+  const aliases: Record<string, ProviderName> = {
+    claude: "anthropic",
+    gemini: "google",
+    dashscope: "qwen",
+    "z.ai": "zai",
+    zhipu: "zai",
+    glm: "zai",
+    custom: "openai-compatible",
+  };
+  if (isLlmProvider(s)) return s;
+  if (aliases[s]) return aliases[s];
   return null;
 }
 
@@ -89,13 +111,15 @@ export function resolveProvider(
 
   const envModel = env.AIMCUB_MODEL?.trim();
   const settingsModel = settingsMatch ? settings!.model?.trim() : undefined;
-  const model = envModel || settingsModel || null;
-  const modelSource: Source | null = envModel ? "env" : settingsModel ? "settings.json" : null;
+  const defaultModel = provider ? getDefaultModel(provider) : "";
+  const model = envModel || settingsModel || defaultModel || null;
+  const modelSource: Source | null = envModel ? "env" : settingsModel ? "settings.json" : defaultModel ? "default" : null;
 
   const envBaseURL = env.AIMCUB_BASE_URL?.trim();
   const settingsBaseURL = settingsMatch ? settings!.baseURL?.trim() : undefined;
-  const baseURL = envBaseURL || settingsBaseURL || null;
-  const baseURLSource: Source | null = envBaseURL ? "env" : settingsBaseURL ? "settings.json" : null;
+  const defaultBaseURL = provider ? getDefaultBaseURL(provider) : undefined;
+  const baseURL = envBaseURL || settingsBaseURL || defaultBaseURL || null;
+  const baseURLSource: Source | null = envBaseURL ? "env" : settingsBaseURL ? "settings.json" : defaultBaseURL ? "default" : null;
 
   return { providerLabel, provider, providerSource, apiKey, keySource, model, modelSource, baseURL, baseURLSource };
 }
@@ -110,13 +134,14 @@ export function redactKey(key: string): string {
 /** Render the resolved config for `aimcub config` (key redacted, with provenance). Pure. */
 export function formatConfig(r: ResolvedProvider, dataDir: string, version: string, settingsFile: string): string {
   const src = (s: Source | string | null): string => (s ? `  (from ${s})` : "");
+  const def = r.provider ? getLlmProviderDefinition(r.provider) : null;
   const lines = [
     `aimcub ${version}`,
-    `provider:  ${r.providerLabel}${r.provider ? src(r.providerSource) : "  (unknown — use anthropic | openai-compatible)"}`,
+    `provider:  ${r.providerLabel}${r.provider ? src(r.providerSource) : "  (unknown — use anthropic | openai | deepseek | minimax | zai | google | qwen | openai-compatible)"}`,
     `api key:   ${r.keySource ? `${redactKey(r.apiKey)}${src(r.keySource)}` : "(not set)"}`,
   ];
-  if (r.provider === "openai-compatible") {
-    lines.push(`model:     ${r.model ? `${r.model}${src(r.modelSource)}` : "(not set — required for openai-compatible)"}`);
+  if (def?.protocol === "openai-compatible") {
+    lines.push(`model:     ${r.model ? `${r.model}${src(r.modelSource)}` : "(not set — required for custom endpoints)"}`);
     lines.push(`base url:  ${r.baseURL ? `${r.baseURL}${src(r.baseURLSource)}` : "https://api.openai.com/v1 (default)"}`);
   } else {
     lines.push(`model:     ${r.model ? `${r.model}${src(r.modelSource)}` : "(provider default)"}`);
@@ -153,22 +178,23 @@ export function buildSettingsFromInput(input: SetupInput, current: ProviderSetti
   const errors: string[] = [];
   const provider = normalizeProvider(input.provider);
   if (!provider) {
-    return { errors: [`Unknown provider "${input.provider}". Use "anthropic" or "openai-compatible".`] };
+    return { errors: [`Unknown provider "${input.provider}". Use "anthropic", "openai", "deepseek", "minimax", "zai", "google", "qwen", or "openai-compatible".`] };
   }
+  const def = getLlmProviderDefinition(provider);
   const sameProvider = current?.provider === provider;
 
   const apiKey = input.apiKey.trim() || (sameProvider ? current!.apiKey : "");
   if (!apiKey) errors.push("API key is required.");
 
-  const model = input.model?.trim() || (sameProvider ? current?.model : undefined) || undefined;
-  // baseURL is only meaningful for openai-compatible; never persist one for anthropic (the
-  // Anthropic gateway ignores it, so saving it would be a silent no-op).
+  const model = input.model?.trim() || (sameProvider ? current?.model : undefined) || def?.defaultModel || undefined;
+  // baseURL is only meaningful for OpenAI-compatible providers; never persist one for
+  // anthropic because the native gateway ignores it.
   const baseURL =
-    provider === "openai-compatible"
-      ? input.baseURL?.trim() || (sameProvider ? current?.baseURL : undefined) || undefined
+    def?.protocol === "openai-compatible"
+      ? input.baseURL?.trim() || (sameProvider ? current?.baseURL : undefined) || def.baseURL || undefined
       : undefined;
-  if (provider === "openai-compatible" && !model) {
-    errors.push("Model is required for the openai-compatible provider (e.g. deepseek/deepseek-chat).");
+  if (def?.protocol === "openai-compatible" && !model) {
+    errors.push("Model is required for custom OpenAI-compatible endpoints.");
   }
 
   if (errors.length > 0) return { errors };

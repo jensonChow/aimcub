@@ -10,11 +10,14 @@
  * Every call reports `LlmUsage` to an injected `UsageMeter` (for quota / circuit-breaker).
  */
 import Anthropic from "@anthropic-ai/sdk";
+import type { Message, MessageCreateParamsNonStreaming } from "@anthropic-ai/sdk/resources/messages/messages";
 
 // Narrow ambient for the one Node global we use. The package tsconfig sets `types: []`
 // (mirroring @core purity), so @types/node is not pulled in — we declare just `process.env`
 // rather than widening the type surface for the whole package.
 declare const process: { env: Record<string, string | undefined> };
+declare const setTimeout: (handler: () => void, timeoutMs: number) => unknown;
+declare const clearTimeout: (handle: unknown) => void;
 
 import {
   routeModel,
@@ -22,7 +25,6 @@ import {
   type LlmRequest,
   type LlmResponse,
   type LlmUsage,
-  type ModelId,
   type UsageMeter,
 } from "./index";
 
@@ -45,6 +47,10 @@ export interface AnthropicGatewayOptions {
   apiKey?: string;
   /** Max output tokens per request. Defaults to a value comfortably above a full plan. */
   maxTokens?: number;
+  /** Transport timeout. Defaults to 60s so UI callers never wait forever. */
+  requestTimeoutMs?: number;
+  /** Optional fixed model selected by a UI/config; omitted keeps task-based routing. */
+  model?: string;
 }
 
 /**
@@ -54,31 +60,24 @@ export interface AnthropicGatewayOptions {
  */
 export interface AnthropicClientPort {
   messages: {
-    create(body: AnthropicCreateBody): Promise<AnthropicMessageResponse>;
-  };
-}
-
-interface AnthropicCreateBody {
-  model: string;
-  max_tokens: number;
-  system?: string;
-  messages: Array<{ role: "user" | "assistant"; content: string }>;
-  output_config?: {
-    format?: { type: "json_schema"; schema: Record<string, unknown> };
-  };
-}
-
-interface AnthropicMessageResponse {
-  content: Array<{ type: string; text?: string }>;
-  usage: {
-    input_tokens: number;
-    output_tokens: number;
-    cache_read_input_tokens?: number | null;
-    cache_creation_input_tokens?: number | null;
+    create(body: MessageCreateParamsNonStreaming): Promise<Message>;
   };
 }
 
 const DEFAULT_MAX_TOKENS = 8192;
+const DEFAULT_REQUEST_TIMEOUT_MS = 60_000;
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: unknown;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`request timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer !== undefined) clearTimeout(timer);
+  });
+}
 
 /**
  * Resolve the API key: an explicit `opts.apiKey` (BYO-key) wins over the env var. Pure +
@@ -96,6 +95,8 @@ export class AnthropicLlmGateway implements LlmGateway {
   private readonly meter: UsageMeter;
   private readonly ownerId: string;
   private readonly maxTokens: number;
+  private readonly requestTimeoutMs: number;
+  private readonly model?: string;
   private readonly injectedClient?: AnthropicClientPort;
   private readonly apiKey?: string;
   private cachedClient?: AnthropicClientPort;
@@ -104,6 +105,8 @@ export class AnthropicLlmGateway implements LlmGateway {
     this.meter = opts.meter;
     this.ownerId = opts.ownerId;
     this.maxTokens = opts.maxTokens ?? DEFAULT_MAX_TOKENS;
+    this.requestTimeoutMs = opts.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+    this.model = opts.model;
     this.injectedClient = opts.client;
     this.apiKey = opts.apiKey;
   }
@@ -133,10 +136,10 @@ export class AnthropicLlmGateway implements LlmGateway {
 
   /** Shared request path: route the model, call the SDK, normalize usage, meter it. */
   private async invoke(req: LlmRequest): Promise<{ text: string; usage: LlmUsage }> {
-    const model: ModelId = req.model ?? routeModel(req.task);
+    const model = req.model ?? this.model ?? routeModel(req.task);
     const client = this.getClient();
 
-    const body: AnthropicCreateBody = {
+    const body: MessageCreateParamsNonStreaming = {
       model,
       max_tokens: this.maxTokens,
       messages: [{ role: "user", content: req.prompt }],
@@ -150,7 +153,7 @@ export class AnthropicLlmGateway implements LlmGateway {
 
     // TODO(v1a-live): this is the only real network call. Add retry / circuit-breaker /
     // prompt-caching breakpoints here once we are exercising it against the live API.
-    const response = await client.messages.create(body);
+    const response = await withTimeout(client.messages.create(body), this.requestTimeoutMs);
 
     const text = extractText(response);
     const usage: LlmUsage = {
@@ -179,9 +182,9 @@ export class AnthropicLlmGateway implements LlmGateway {
 }
 
 /** Concatenate the `text` blocks of an Anthropic message response. */
-function extractText(response: AnthropicMessageResponse): string {
+function extractText(response: Message): string {
   return response.content
-    .filter((block) => block.type === "text" && typeof block.text === "string")
-    .map((block) => block.text ?? "")
+    .filter((block): block is Extract<Message["content"][number], { type: "text" }> => block.type === "text")
+    .map((block) => block.text)
     .join("");
 }

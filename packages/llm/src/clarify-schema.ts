@@ -21,7 +21,8 @@ const nullableEnum = (values: readonly string[], description?: string) => ({
   ...(description ? { description } : {}),
 });
 
-const questionKindEnum = ["scope", "involvement", "assumption", "constraint"] as const;
+const questionKindEnum = ["scope", "involvement", "assumption", "constraint", "capability"] as const;
+const sourceDimensionEnum = ["verifiability", "granularity", "distinctness", "context_fit"] as const;
 
 /** One option the user can pick — a hypothesis the planner proposes, with its trade-off. */
 const optionSchema = {
@@ -45,10 +46,14 @@ const questionSchema = {
       description: "How the answer most changes the plan (value-of-information).",
     },
     kind: nullableEnum(questionKindEnum, "What the question pins down."),
+    source_dimension: nullableEnum(
+      sourceDimensionEnum,
+      "The plan-quality dimension this question most improves, or null when it is general discovery.",
+    ),
     allow_other: { type: ["boolean", "null"], description: "Free-text is always allowed; set true." },
     options: { type: "array", description: ">= 2 hypothesis options with trade-offs.", items: optionSchema },
   },
-  required: ["id", "question", "why_high_impact", "kind", "allow_other", "options"],
+  required: ["id", "question", "why_high_impact", "kind", "source_dimension", "allow_other", "options"],
 } as const;
 
 /** A low-impact unknown we DEFAULTED rather than asked about (default-and-disclose). */
@@ -69,7 +74,7 @@ export const clarifyJsonSchema = {
   properties: {
     questions: {
       type: "array",
-      description: "Only the few high-impact questions worth asking (0-5). Fewer is better.",
+      description: "A compact but sufficient context intake set (0-7), covering durable and aim-local context.",
       items: questionSchema,
     },
     assumptions: {
