@@ -116,7 +116,7 @@ describe("context workflow", () => {
     expect(intake.coverage.missingCoreCategories).not.toContain("eval_signal");
   });
 
-  it("records sedimented durable context as global pending memory candidates", async () => {
+  it("records sedimented inferred context as global pending memory candidates", async () => {
     const calls: Array<{
       goalId?: string | null;
       content: string;
@@ -138,7 +138,7 @@ describe("context workflow", () => {
             category: input.category ?? "project_fact",
             source: input.source ?? "agent_inferred",
             confidence: input.confidence ?? 0.7,
-            status: calls.length === 2 ? "active" : "pending",
+            status: "pending",
           });
         },
       },
@@ -184,13 +184,6 @@ describe("context workflow", () => {
         category: "constraint",
         source: "agent_inferred",
         confidence: 0.74,
-      }),
-      expect.objectContaining({
-        goalId: null,
-        content: "Preference: Keep planning output concise.",
-        category: "preference",
-        source: "user_stated",
-        confidence: 0.82,
       }),
     ]);
     expect(saved).toHaveLength(1);

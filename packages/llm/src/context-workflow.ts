@@ -229,6 +229,7 @@ export async function recordSedimentationMemoryCandidatesForStore(
 ): Promise<Memory[]> {
   const saved: Memory[] = [];
   for (const candidate of sedimentation?.durableMemoryCandidates ?? []) {
+    if (candidate.source === "user_stated") continue;
     const memory = await store.addMemoryCandidate({
       goalId: null,
       content: candidate.content,
