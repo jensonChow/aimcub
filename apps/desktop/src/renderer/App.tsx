@@ -706,7 +706,7 @@ function AppInner() {
     }
   }
 
-  const compactShell = viewportWidth < 760;
+  const compactShell = viewportWidth < 900;
   const activeBusyStep = isBusyStep(step) ? step : null;
   const activeGoal = viewing ?? savedGoal;
   const activeGoalPending = activeGoal
@@ -736,56 +736,57 @@ function AppInner() {
   const workspaceTitle = (viewing?.title ?? savedGoal?.title ?? title.trim()) || t(step === "home" ? "home.recent" : "shell.currentAim");
 
   return (
-    <div style={{ fontFamily: "system-ui, -apple-system, sans-serif", color: C.text, background: "#f4f6f8", minHeight: "100vh" }}>
-      <div style={{ maxWidth: 1180, margin: "0 auto", padding: compactShell ? "18px 14px 48px" : "24px 28px 56px" }}>
-        <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, gap: 12 }}>
-          <button
-            onClick={goHome}
-            style={{ border: 0, background: "transparent", padding: 0, cursor: "pointer", textAlign: "left" }}
-            title="Home"
-          >
-            <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: 0, color: C.text }}>Aimcub</div>
-            <div style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>{t("shell.subtitle")}</div>
-          </button>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-            <LangToggle />
-            <button onClick={() => setShowSettings((v) => !v)} style={chipButton()}>
-              {provider?.configured ? providerLabel(provider, t) : t("provider.setup")}
-            </button>
-          </div>
-        </header>
-
-        {showSettings && (
-          <div style={{ marginBottom: 14 }}>
-            <ProviderForm
-              status={provider}
-              onSaved={(s) => {
-                setProvider(s);
-                if (s.configured) setShowSettings(false);
-              }}
-              onClose={() => setShowSettings(false)}
-            />
-          </div>
-        )}
-
-        {error && (
-          <div style={{ marginBottom: 14 }}>
-            <Notice tone="error">{error}</Notice>
-          </div>
-        )}
-
-        <WorkspaceBar
+    <div style={{ fontFamily: "system-ui, -apple-system, sans-serif", color: C.text, background: "#f6f7f9", minHeight: "100vh" }}>
+      <div style={classicShellStyle(compactShell)}>
+        <ClassicSidebar
           compact={compactShell}
+          goals={goals}
+          currentGoal={activeGoal}
           step={step}
-          title={workspaceTitle}
-          goalsCount={goals.length}
+          activeTab={inspectorTab}
           pendingContextCount={contextCandidates.length}
           onHome={goHome}
           onNew={startNew}
+          onOpen={openGoal}
+          onTab={setInspectorTab}
         />
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 14 }}>
-          <main style={{ minWidth: 0, background: "#fff", border: `1px solid ${C.border}`, borderRadius: 10, padding: compactShell ? 16 : 24, minHeight: compactShell ? 320 : 420, boxSizing: "border-box" }}>
+        <section style={mainShellStyle(compactShell)}>
+          <header style={mainTopBarStyle(compactShell)}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ color: C.text, fontSize: 17, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {workspaceTitle}
+              </div>
+              <div style={{ color: C.muted, fontSize: 12, marginTop: 3 }}>{t("shell.subtitle")}</div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+              <LangToggle />
+              <button onClick={() => setShowSettings((v) => !v)} style={chipButton()}>
+                {provider?.configured ? providerLabel(provider, t) : t("provider.setup")}
+              </button>
+            </div>
+          </header>
+
+          {showSettings && (
+            <div style={{ marginBottom: 14 }}>
+              <ProviderForm
+                status={provider}
+                onSaved={(s) => {
+                  setProvider(s);
+                  if (s.configured) setShowSettings(false);
+                }}
+                onClose={() => setShowSettings(false)}
+              />
+            </div>
+          )}
+
+          {error && (
+            <div style={{ marginBottom: 14 }}>
+              <Notice tone="error">{error}</Notice>
+            </div>
+          )}
+
+          <main style={contentSurfaceStyle(compactShell)}>
             {step === "home" && (
               <HomeView
                 goals={goals}
@@ -872,89 +873,260 @@ function AppInner() {
             onRejectContext={rejectContextCandidate}
             onArchiveContext={archiveContextMemory}
             onDeprioritizeContext={deprioritizeContextMemory}
+            showTabs={false}
             sticky={false}
           />
-        </div>
+        </section>
       </div>
     </div>
   );
 }
 
-function WorkspaceBar(props: {
+function ClassicSidebar(props: {
   compact: boolean;
+  goals: Goal[];
+  currentGoal: Goal | null;
   step: Step;
-  title: string;
-  goalsCount: number;
+  activeTab: InspectorTab;
   pendingContextCount: number;
   onHome: () => void;
   onNew: () => void;
+  onOpen: (goal: Goal) => void;
+  onTab: (tab: InspectorTab) => void;
 }) {
   const { t } = useI18n();
+  const [query, setQuery] = useState("");
+  const filteredGoals = props.goals.filter((goal) => {
+    const q = query.trim().toLowerCase();
+    if (!q) return true;
+    return `${goal.title} ${goal.description ?? ""}`.toLowerCase().includes(q);
+  });
+  const tabs: InspectorTab[] = ["process", "context", "quality", "activity"];
+  const tabLabels = {
+    process: "shell.tab.process",
+    context: "shell.tab.context",
+    quality: "shell.tab.quality",
+    activity: "shell.tab.activity",
+  } as const;
   return (
-    <nav style={workspaceBarStyle(props.compact)}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: "1 1 auto" }}>
-        <button onClick={props.onHome} style={workspaceBarButton(props.step === "home")}>
-          {t("shell.aims")}
+    <aside style={classicSidebarStyle(props.compact)}>
+      <div>
+        <button onClick={props.onHome} style={sidebarBrandButton()}>
+          <span style={{ fontSize: 20, fontWeight: 800, letterSpacing: 0 }}>Aimcub</span>
+          <span style={{ color: C.muted, fontSize: 12 }}>{t("shell.subtitle")}</span>
         </button>
-        <button onClick={props.onNew} style={workspaceBarButton(props.step === "aim")}>
-          {t("home.new")}
-        </button>
-        <div style={{ minWidth: 0, color: C.text, fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {props.title}
+        <div style={{ display: "grid", gap: 8, marginTop: 18 }}>
+          <button onClick={props.onNew} style={sidebarCommandButton(true)}>
+            {t("home.new")}
+          </button>
+          <button onClick={props.onHome} style={sidebarNavButton(props.step === "home")}>
+            {t("shell.aims")}
+          </button>
         </div>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-        <span style={workspaceBadgeStyle()}>
-          {t(props.goalsCount === 1 ? "home.aim_one" : "home.aim_other", { n: props.goalsCount })}
-        </span>
-        <span style={workspaceBadgeStyle()}>
-          {t(props.pendingContextCount === 1 ? "shell.pendingContext_one" : "shell.pendingContext_other", { n: props.pendingContextCount })}
-        </span>
+
+      <div style={{ minHeight: 0 }}>
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t("shell.searchAims")}
+          style={{ ...inputStyle(), fontSize: 13, padding: "9px 10px", marginBottom: 14 }}
+        />
+        <SidebarSectionLabel label={t("shell.recentAims")} value={t(props.goals.length === 1 ? "home.aim_one" : "home.aim_other", { n: props.goals.length })} />
+        <div style={{ display: "grid", gap: 7, maxHeight: props.compact ? 220 : "min(34vh, 330px)", overflow: "auto", paddingRight: 2 }}>
+          {filteredGoals.map((goal) => {
+            const selected = props.currentGoal?.id === goal.id;
+            const plan = planOf(goal);
+            return (
+              <button key={goal.id} onClick={() => props.onOpen(goal)} style={sidebarGoalButton(selected)}>
+                <span style={{ display: "block", fontWeight: 650, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{goal.title}</span>
+                <span style={{ display: "block", color: C.muted, fontSize: 12, marginTop: 4 }}>
+                  {t((plan?.nodes.length ?? 0) === 1 ? "common.milestone_one" : "common.milestone_other", { n: plan?.nodes.length ?? 0 })}
+                </span>
+              </button>
+            );
+          })}
+          {filteredGoals.length === 0 && (
+            <div style={{ color: C.muted, fontSize: 13, padding: "8px 2px" }}>{t("shell.noSearchResults")}</div>
+          )}
+        </div>
       </div>
-    </nav>
+
+      <div>
+        <SidebarSectionLabel label={t("shell.planningLayers")} value={t("shell.auditLayer")} />
+        <div style={{ display: "grid", gap: 7 }}>
+          {tabs.map((tab) => (
+            <button key={tab} onClick={() => props.onTab(tab)} style={sidebarNavButton(props.activeTab === tab)}>
+              {t(tabLabels[tab])}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ marginTop: "auto", borderTop: `1px solid ${C.border}`, paddingTop: 12 }}>
+        <button onClick={() => props.onTab("context")} style={sidebarContextButton(props.activeTab === "context")}>
+          <span>{t("context.inbox")}</span>
+          <span style={sidebarCountPill()}>{props.pendingContextCount}</span>
+        </button>
+      </div>
+    </aside>
   );
 }
 
-function workspaceBarStyle(compact: boolean): CSSProperties {
+function SidebarSectionLabel(props: { label: string; value?: string }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline", marginBottom: 8 }}>
+      <div style={{ color: C.muted, fontSize: 11, fontWeight: 800, letterSpacing: 0.5, textTransform: "uppercase" }}>{props.label}</div>
+      {props.value ? <div style={{ color: C.muted, fontSize: 11, whiteSpace: "nowrap" }}>{props.value}</div> : null}
+    </div>
+  );
+}
+
+function classicShellStyle(compact: boolean): CSSProperties {
+  return {
+    display: "grid",
+    gridTemplateColumns: compact ? "1fr" : "286px minmax(0, 1fr)",
+    minHeight: "100vh",
+  };
+}
+
+function classicSidebarStyle(compact: boolean): CSSProperties {
+  return {
+    display: "grid",
+    gridTemplateRows: compact ? "auto auto auto auto" : "auto minmax(0, 1fr) auto auto",
+    gap: 18,
+    background: "#fbfbfc",
+    borderRight: compact ? "none" : `1px solid ${C.border}`,
+    borderBottom: compact ? `1px solid ${C.border}` : "none",
+    padding: compact ? "18px 16px" : "22px 16px",
+    boxSizing: "border-box",
+    minWidth: 0,
+  };
+}
+
+function mainShellStyle(compact: boolean): CSSProperties {
+  return {
+    minWidth: 0,
+    padding: compact ? "18px 14px 44px" : "22px 28px 56px",
+    boxSizing: "border-box",
+  };
+}
+
+function mainTopBarStyle(compact: boolean): CSSProperties {
   return {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
     flexWrap: compact ? "wrap" : "nowrap",
+    marginBottom: 16,
+  };
+}
+
+function contentSurfaceStyle(compact: boolean): CSSProperties {
+  return {
+    minWidth: 0,
     background: "#fff",
     border: `1px solid ${C.border}`,
     borderRadius: 10,
-    padding: compact ? "10px 11px" : "10px 12px",
-    marginBottom: 14,
+    padding: compact ? 16 : 24,
+    minHeight: compact ? 320 : 420,
     boxSizing: "border-box",
+    marginBottom: 14,
   };
 }
 
-function workspaceBarButton(selected: boolean): CSSProperties {
+function sidebarBrandButton(): CSSProperties {
   return {
-    border: `1px solid ${selected ? "#b8cbe8" : C.border}`,
-    background: selected ? "#f3f7ff" : "#fff",
-    color: selected ? C.accent : C.text,
-    borderRadius: 7,
-    padding: "7px 10px",
+    display: "grid",
+    gap: 2,
+    width: "100%",
+    border: 0,
+    background: "transparent",
+    color: C.text,
+    padding: 0,
     cursor: "pointer",
-    fontSize: 12,
-    fontWeight: selected ? 700 : 600,
-    whiteSpace: "nowrap",
+    textAlign: "left",
   };
 }
 
-function workspaceBadgeStyle(): CSSProperties {
+function sidebarCommandButton(primary: boolean): CSSProperties {
   return {
-    border: `1px solid ${C.border}`,
+    width: "100%",
+    border: `1px solid ${primary ? "#b8cbe8" : C.border}`,
+    background: primary ? C.accent : "#fff",
+    color: primary ? "#fff" : C.text,
+    borderRadius: 8,
+    padding: "9px 11px",
+    cursor: "pointer",
+    fontSize: 13,
+    fontWeight: 700,
+    textAlign: "left",
+  };
+}
+
+function sidebarNavButton(selected: boolean): CSSProperties {
+  return {
+    width: "100%",
+    border: `1px solid ${selected ? "#b8cbe8" : "transparent"}`,
+    background: selected ? "#eef4ff" : "transparent",
+    color: selected ? C.accent : C.text,
+    borderRadius: 8,
+    padding: "8px 10px",
+    cursor: "pointer",
+    fontSize: 13,
+    fontWeight: selected ? 750 : 600,
+    textAlign: "left",
+  };
+}
+
+function sidebarGoalButton(selected: boolean): CSSProperties {
+  return {
+    width: "100%",
+    minWidth: 0,
+    boxSizing: "border-box",
+    overflow: "hidden",
+    textAlign: "left",
+    border: `1px solid ${selected ? "#b8cbe8" : "transparent"}`,
+    background: selected ? "#eef4ff" : "transparent",
+    borderRadius: 8,
+    padding: "9px 10px",
+    cursor: "pointer",
+    color: C.text,
+    boxShadow: selected ? "inset 3px 0 0 #3266ad" : "none",
+  };
+}
+
+function sidebarContextButton(selected: boolean): CSSProperties {
+  return {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 10,
+    alignItems: "center",
+    width: "100%",
+    border: `1px solid ${selected ? "#b8cbe8" : C.border}`,
+    background: selected ? "#eef4ff" : "#fff",
+    color: selected ? C.accent : C.text,
+    borderRadius: 8,
+    padding: "9px 10px",
+    cursor: "pointer",
+    fontSize: 13,
+    fontWeight: 650,
+  };
+}
+
+function sidebarCountPill(): CSSProperties {
+  return {
+    minWidth: 22,
+    height: 22,
+    display: "inline-grid",
+    placeItems: "center",
     borderRadius: 999,
+    background: "#f1f3f5",
     color: C.muted,
-    background: "#fff",
     fontSize: 11,
-    fontWeight: 600,
-    padding: "4px 8px",
-    whiteSpace: "nowrap",
+    fontWeight: 800,
+    padding: "0 7px",
   };
 }
 
@@ -1103,6 +1275,7 @@ function InspectorRail(props: {
   onRejectContext: (candidate: Memory) => void;
   onArchiveContext: (id: string) => void;
   onDeprioritizeContext: (id: string) => void;
+  showTabs?: boolean;
   sticky: boolean;
 }) {
   const { t } = useI18n();
@@ -1122,13 +1295,15 @@ function InspectorRail(props: {
         <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>{t("shell.inspector")}</h2>
         <span style={{ color: C.muted, fontSize: 12 }}>{t("shell.auditLayer")}</span>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 6, marginBottom: 14 }}>
-        {tabs.map((tab) => (
-          <button key={tab} onClick={() => props.onTab(tab)} style={inspectorTabButton(props.activeTab === tab)}>
-            {t(tabLabels[tab])}
-          </button>
-        ))}
-      </div>
+      {props.showTabs !== false && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 6, marginBottom: 14 }}>
+          {tabs.map((tab) => (
+            <button key={tab} onClick={() => props.onTab(tab)} style={inspectorTabButton(props.activeTab === tab)}>
+              {t(tabLabels[tab])}
+            </button>
+          ))}
+        </div>
+      )}
 
       {props.activeTab === "process" && (
         props.events.length > 0 ? <PlanningProcessPanel events={props.events} busyStep={props.busyStep} /> : <InspectorEmpty title={t("shell.noProcess")} body={t("shell.noProcessBody")} />
