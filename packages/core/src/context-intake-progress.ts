@@ -64,9 +64,15 @@ function signalMatchesStep(signal: ContextIntakeProgressSignal, step: ContextInt
   return false;
 }
 
-function groundsAimContext(signal: ContextIntakeProgressSignal, step: ContextIntakeLoopStep): boolean {
-  if (step.channel === "web_research" && signal.source === "tool_observation") {
+function toolObservationGroundsAimContext(signal: ContextIntakeProgressSignal, step: ContextIntakeLoopStep): boolean {
+  if (signal.source !== "tool_observation") return false;
+  if (step.channel === "web_research") {
     return signal.toolName === "web.fetch";
+  }
+  if (step.channel === "personal_database") {
+    return typeof signal.toolName === "string" && step.toolCalls.some((tool) =>
+      tool.name === signal.toolName && tool.boundary === "external_connector",
+    );
   }
   return true;
 }
@@ -86,8 +92,7 @@ function outputSatisfied(
       return signals.some((signal) =>
         signalMatchesStep(signal, step) &&
         signal.source !== "user_request" &&
-        groundsAimContext(signal, step) &&
-        (signal.scope === "aim" || signal.source === "tool_observation"),
+        (signal.source === "tool_observation" ? toolObservationGroundsAimContext(signal, step) : signal.scope === "aim"),
       );
     case "durable_memory_candidate":
       return signals.some((signal) =>

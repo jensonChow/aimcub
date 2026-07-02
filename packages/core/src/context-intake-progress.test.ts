@@ -175,6 +175,64 @@ describe("reviewContextIntakeProgress", () => {
     });
   });
 
+  it("does not treat memory search alone as personal database aim context", () => {
+    const intake = reviewAimIntake({
+      title: "Plan from my Notion travel notes",
+      description: "Use my personal notes and known preferences.",
+      selectedContext: [],
+      memories: [],
+    });
+    const personalDatabase = intake.loop.steps.find((step) => step.channel === "personal_database");
+    expect(personalDatabase).toBeTruthy();
+
+    const memoryOnly = reviewContextIntakeProgress({
+      loop: intake.loop,
+      signals: [
+        {
+          source: "tool_observation",
+          channel: "personal_database",
+          toolName: "memory.search",
+          scope: "global",
+          category: "preference",
+          summary: "Preference: Keep travel plans lightweight.",
+        },
+      ],
+    });
+
+    expect(memoryOnly.steps.find((step) => step.stepId === personalDatabase!.id)).toMatchObject({
+      status: "blocked",
+      satisfiedOutputs: ["durable_memory_candidate"],
+      remainingOutputs: ["aim_context"],
+    });
+
+    const connected = reviewContextIntakeProgress({
+      loop: intake.loop,
+      signals: [
+        {
+          source: "tool_observation",
+          channel: "personal_database",
+          toolName: "external.notion",
+          category: "project_fact",
+          summary: "Found the user's Cambodia travel note.",
+        },
+        {
+          source: "tool_observation",
+          channel: "personal_database",
+          toolName: "memory.search",
+          scope: "global",
+          category: "preference",
+          summary: "Preference: Keep travel plans lightweight.",
+        },
+      ],
+    });
+
+    expect(connected.steps.find((step) => step.stepId === personalDatabase!.id)).toMatchObject({
+      status: "satisfied",
+      satisfiedOutputs: expect.arrayContaining(["aim_context", "durable_memory_candidate"]),
+      remainingOutputs: [],
+    });
+  });
+
   it("requires fetched web source context before satisfying web research intake", () => {
     const intake = reviewAimIntake({
       title: "Research latest Cambodia travel docs",
