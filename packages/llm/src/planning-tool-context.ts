@@ -125,6 +125,25 @@ function localScanOutputToPlanningMemory(output: LocalScanWorkspaceOutput): Plan
   };
 }
 
+function distillationCandidatesToPlanningMemories(
+  output: ContextDistillOutput,
+  currentAimId: string | null | undefined,
+): PlanningMemory[] {
+  return output.durableMemoryCandidates.map((candidate, index) => {
+    const goalId = candidate.scope === "current_aim" ? currentAimId ?? null : null;
+    return {
+      id: `context.distill:${candidate.scope}:${candidate.category}:${index}`,
+      content: candidate.content,
+      kind: candidate.category === "procedure" ? "procedural" : "semantic",
+      category: candidate.category,
+      source: "context.distill",
+      confidence: candidate.scope === "current_aim" ? 0.78 : 0.72,
+      goalId,
+      goal_id: goalId,
+    };
+  });
+}
+
 function collectMemoryData(observation: AimcubToolObservation<unknown>): PlanningMemory[] {
   const data = observation.data as Partial<MemorySearchOutput> | undefined;
   if (!data || !Array.isArray(data.memories)) return [];
@@ -253,6 +272,9 @@ export async function collectPlanningToolContext(
       failures,
     );
     distillation = distillObservation ? distillObservation.data : null;
+    if (distillation) {
+      planningMemories.push(...distillationCandidatesToPlanningMemories(distillation, input.currentAimId));
+    }
   }
 
   if (input.askMissingQuestions && distillation?.missingQuestions.length && registry.has("context.ask_user")) {

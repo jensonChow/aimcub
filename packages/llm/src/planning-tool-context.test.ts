@@ -186,7 +186,7 @@ describe("planning tool context collector", () => {
 
     expect(result.failures).toEqual([]);
     expect(result.memories.map((memory) => memory.source)).toContain("local.scan_workspace");
-    expect(result.memories[0]?.content).toContain("Workspace scan: /workspace/aimcub");
+    expect(result.memories.find((memory) => memory.source === "local.scan_workspace")?.content).toContain("Workspace scan: /workspace/aimcub");
     expect(result.distillation?.summary).toContain("workspace");
   });
 
@@ -268,6 +268,13 @@ describe("planning tool context collector", () => {
     expect(result.distillation?.durableMemoryCandidates).toEqual(expect.arrayContaining([
       expect.objectContaining({
         scope: "current_aim",
+        category: "project_fact",
+        content: expect.stringContaining("Cambodia visa guidance"),
+      }),
+    ]));
+    expect(result.memories).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        source: "context.distill",
         category: "project_fact",
         content: expect.stringContaining("Cambodia visa guidance"),
       }),
