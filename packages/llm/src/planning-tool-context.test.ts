@@ -72,6 +72,7 @@ describe("planning tool context collector", () => {
     expect(result.report.selected).toHaveLength(2);
     expect(result.distillation?.summary).toContain("User prefers TypeScript");
     expect(result.distillation?.summary).toContain("Aimcub research");
+    expect(result.distillation?.durableMemoryCandidates).toEqual([]);
   });
 
   it("records tool failures without blocking local context", async () => {

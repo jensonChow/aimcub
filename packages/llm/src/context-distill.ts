@@ -121,18 +121,7 @@ function durableMemoryCandidates(input: ContextDistillInput): ContextDistillOutp
 
   for (const observation of input.observations ?? []) {
     const data = observation.data;
-    if (isWebSearchOutput(data)) {
-      for (const result of data.results.slice(0, 3)) {
-        push({
-          scope: "current_aim",
-          category: "project_fact",
-          content: candidateContent(
-            "Project fact",
-            `For "${input.aimTitle}", relevant web source: ${result.title}. ${result.snippet} Source: ${result.url}`,
-          ),
-        });
-      }
-    } else if (isWebFetchOutput(data)) {
+    if (isWebFetchOutput(data)) {
       push({
         scope: "current_aim",
         category: "project_fact",
