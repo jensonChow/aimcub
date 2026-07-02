@@ -83,7 +83,7 @@ export class SupabaseDataPort implements DataPort {
       output,
       metadata: {
         ...metadata,
-        ...planQualityMetadata({ quality: review.quality, retried: false, attempts: 1, firstQuality: review.quality }, review),
+        ...planQualityMetadata({ quality: review.quality, retried: false, attempts: 1, firstQuality: review.quality, output }, review),
       },
     };
   }

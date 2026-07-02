@@ -268,6 +268,7 @@ export function registerIpc(): void {
               retried: req.qualityRetry?.retried ?? false,
               attempts: req.qualityRetry?.attempts ?? 1,
               firstQuality: req.qualityRetry?.firstQuality ?? null,
+              output: req.plan,
             }, req.review)
           : {}),
         aim_intake: buildAimIntakeReport({

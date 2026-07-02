@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { decompose, decomposeWithQuality, type DecomposeInput } from "./decompose";
+import { decompose, decomposeWithQuality, planQualityMetadata, type DecomposeInput } from "./decompose";
 import type { LlmGateway, LlmRequest, LlmResponse, LlmUsage } from "./index";
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -535,6 +535,18 @@ describe("decompose · malformed model output (returned, never thrown)", () => {
     expect(result.output).toBeNull();
     expect(result.usage).toBeNull();
     expect(result.validation.errors[0]).toContain("boom: 503");
+  });
+});
+
+describe("planQualityMetadata", () => {
+  it("includes a derived handoff report when decomposition output is available", async () => {
+    const result = await decomposeWithQuality(mockGateway(validPlan()), INPUT);
+
+    const metadata = planQualityMetadata(result);
+
+    expect(metadata.plan_handoff?.agentReady.map((task) => task.nodeKey)).toEqual(["m1", "m2"]);
+    expect(metadata.plan_handoff?.agentReady[1]!.prerequisiteKeys).toEqual(["m1"]);
+    expect(metadata.plan_handoff?.nextActions[0]).toBe("Queue 2 agent-ready tasks for local agent handoff.");
   });
 });
 

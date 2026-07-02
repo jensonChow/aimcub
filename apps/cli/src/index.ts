@@ -633,7 +633,7 @@ async function runClarify(title: string, description: string | undefined, opts: 
       description,
       plan,
       metadata: {
-        ...planQualityMetadata({ quality, ...qualityRetry }, review),
+        ...planQualityMetadata({ quality, ...qualityRetry, output: plan }, review),
         aim_intake: intake,
         planning_context: planning.report,
         ...(answerImpact ? { clarify_answer_impact: answerImpact } : {}),

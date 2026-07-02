@@ -8,6 +8,7 @@ export * from "./glob";
 export * from "./evaluate";
 export * from "./plan";
 export * from "./plan-quality";
+export * from "./plan-handoff";
 export * from "./evidence";
 export * from "./context";
 export * from "./context-capture";
