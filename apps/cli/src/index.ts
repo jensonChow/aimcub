@@ -31,9 +31,13 @@ import {
   reviewAimLearning,
   reviewContextLineage,
   reviewContextCaptureFulfillment,
+  reviewContextIntakeProgress,
+  reviewContextSedimentation,
   reviewPlan,
   reviewContextHealth,
   reviewContextProfile,
+  type AimIntakeReport,
+  type ContextIntakeProgressSignal,
   type ContextLineageLearningReport,
   type DecompositionLearningReport,
   type DecompositionStrategyReport,
@@ -48,6 +52,8 @@ import {
   planningContextReportsFromGoals,
   recordAssumptionContextCandidatesForStore,
   recordReviewContextCandidatesForStore,
+  recordSedimentationAimContextForStore,
+  recordSedimentationMemoryCandidatesForStore,
   reviewDecompositionStrategyForStore,
   selectPlanningContextForStore,
   summarizeClarifyLearningForStore,
@@ -76,7 +82,7 @@ import type {
 } from "@core/types";
 
 import { resolveProvider, formatConfig, buildSettingsFromInput, type SetupInput } from "./config";
-import { parseAnswers, answersToMemories, promptAnswers } from "./answers";
+import { parseAnswers, answersToIntakeSignals, answersToMemories, promptAnswers } from "./answers";
 import { promptSetup } from "./setup";
 import { completionScript, normalizeShell } from "./completion";
 import { buildDoctorReport, formatDoctor } from "./doctor";
@@ -400,6 +406,22 @@ async function planningContext(input: {
   return selectPlanningContextForStore(store, input);
 }
 
+function contextIntakeArtifacts(
+  intake: AimIntakeReport,
+  signals: readonly ContextIntakeProgressSignal[] = [],
+) {
+  const intakeProgress = reviewContextIntakeProgress({
+    loop: intake.loop,
+    signals,
+  });
+  const contextSedimentation = reviewContextSedimentation({
+    loop: intake.loop,
+    progress: intakeProgress,
+    signals,
+  });
+  return { intakeProgress, contextSedimentation };
+}
+
 async function clarifyLearning() {
   return summarizeClarifyLearningForStore(store);
 }
@@ -607,6 +629,8 @@ async function runClarify(title: string, description: string | undefined, opts: 
   }
   const review = reviewPlan({ plan, context: memories, quality });
   const intake = buildAimIntakeReport({ title, description, planning, draftReview: review, lineageLearning });
+  const answerSignals = answersToIntakeSignals(questions, answers);
+  const { intakeProgress, contextSedimentation } = contextIntakeArtifacts(intake, answerSignals);
   const answerImpact = answers.length > 0
     ? traceClarifyAnswerImpact({
         questions,
@@ -637,6 +661,8 @@ async function runClarify(title: string, description: string | undefined, opts: 
           selectedContext: [...answerMemories, ...memories],
         }),
         aim_intake: intake,
+        context_intake_progress: intakeProgress,
+        context_sedimentation: contextSedimentation,
         planning_context: planning.report,
         ...(answerImpact ? { clarify_answer_impact: answerImpact } : {}),
         ...(captureFulfillment.total > 0 ? { context_capture_fulfillment: captureFulfillment } : {}),
@@ -644,13 +670,15 @@ async function runClarify(title: string, description: string | undefined, opts: 
       memories: answerMemories,
     });
     contextCandidates = [
+      ...(await recordSedimentationAimContextForStore(store, saved.goal, contextSedimentation)),
+      ...(await recordSedimentationMemoryCandidatesForStore(store, contextSedimentation)),
       ...(await recordAssumptionContextCandidatesForStore(store, saved.goal, assumptions)),
       ...(await recordReviewContextCandidatesForStore(store, saved.goal, review)),
     ];
   }
 
   if (opts.json) {
-    out(JSON.stringify({ questions, assumptions, plan, quality, qualityRetry, review, intake, planningContext: planning.report, clarifyLearning: learning, captureLearning: captureLearningReport, lineageLearning, decompositionLearning: decompositionLearningReport, decompositionStrategy: decompositionStrategyReport, answerImpact, captureFulfillment, ...(saved ? { goal: saved.goal, milestones: saved.milestones, contextCandidates } : {}) }, null, 2));
+    out(JSON.stringify({ questions, assumptions, plan, quality, qualityRetry, review, intake, contextIntakeProgress: intakeProgress, contextSedimentation, planningContext: planning.report, clarifyLearning: learning, captureLearning: captureLearningReport, lineageLearning, decompositionLearning: decompositionLearningReport, decompositionStrategy: decompositionStrategyReport, answerImpact, captureFulfillment, ...(saved ? { goal: saved.goal, milestones: saved.milestones, contextCandidates } : {}) }, null, 2));
     return;
   }
   // When we never refined but there were forks, surface them so the user sees what was assumed.
@@ -683,6 +711,7 @@ async function runNew(title: string, description: string | undefined, json: bool
   const qualityRetry = { retried: result.retried, attempts: result.attempts, firstQuality: result.firstQuality };
   const review = reviewPlan({ plan: result.output, context: memories, quality: result.quality });
   const intake = buildAimIntakeReport({ title, description, planning, draftReview: review, lineageLearning });
+  const { intakeProgress, contextSedimentation } = contextIntakeArtifacts(intake);
   const { goal, milestones } = await store.createGoal({
     title,
     description,
@@ -690,12 +719,14 @@ async function runNew(title: string, description: string | undefined, json: bool
     metadata: {
       ...planQualityMetadata(result, review, { selectedContext: memories }),
       aim_intake: intake,
+      context_intake_progress: intakeProgress,
+      context_sedimentation: contextSedimentation,
       planning_context: planning.report,
     },
   });
   const contextCandidates = await recordReviewContextCandidatesForStore(store, goal, review);
   if (json) {
-    out(JSON.stringify({ goal, milestones, quality: result.quality, qualityRetry, review, intake, planningContext: planning.report, lineageLearning, decompositionLearning: decompositionLearningReport, decompositionStrategy: decompositionStrategyReport, contextCandidates }, null, 2));
+    out(JSON.stringify({ goal, milestones, quality: result.quality, qualityRetry, review, intake, contextIntakeProgress: intakeProgress, contextSedimentation, planningContext: planning.report, lineageLearning, decompositionLearning: decompositionLearningReport, decompositionStrategy: decompositionStrategyReport, contextCandidates }, null, 2));
     return;
   }
   out(`Created aim ${goal.id}`);
@@ -989,6 +1020,7 @@ async function runReplan(
   const qualityRetry = { retried: result.retried, attempts: result.attempts, firstQuality: result.firstQuality };
   const review = reviewPlan({ plan: result.output, context: memories, quality: result.quality });
   const intake = buildAimIntakeReport({ title: nextTitle, description: nextDescription, planning, draftReview: review, lineageLearning });
+  const { intakeProgress, contextSedimentation } = contextIntakeArtifacts(intake);
   const merged = planMerge(
     got.milestones.map((m) => ({ id: m.id, title: m.title, status: m.status })),
     result.output,
@@ -1001,13 +1033,15 @@ async function runReplan(
     metadata: {
       ...planQualityMetadata(result, review, { selectedContext: memories }),
       aim_intake: intake,
+      context_intake_progress: intakeProgress,
+      context_sedimentation: contextSedimentation,
       planning_context: planning.report,
     },
   });
   const contextCandidates = await recordReviewContextCandidatesForStore(store, res.goal, review);
 
   if (json) {
-    out(JSON.stringify({ goal: res.goal, milestones: res.milestones, merge: merged, quality: result.quality, qualityRetry, review, intake, planningContext: planning.report, lineageLearning, decompositionLearning: decompositionLearningReport, decompositionStrategy: decompositionStrategyReport, contextCandidates }, null, 2));
+    out(JSON.stringify({ goal: res.goal, milestones: res.milestones, merge: merged, quality: result.quality, qualityRetry, review, intake, contextIntakeProgress: intakeProgress, contextSedimentation, planningContext: planning.report, lineageLearning, decompositionLearning: decompositionLearningReport, decompositionStrategy: decompositionStrategyReport, contextCandidates }, null, 2));
     return;
   }
   out(formatMergeSummary(merged));

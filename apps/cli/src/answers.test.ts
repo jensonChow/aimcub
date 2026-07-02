@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ClarifyQuestion } from "@core/llm";
 
-import { parseAnswers, answersToMemories } from "./answers";
+import { parseAnswers, answersToIntakeSignals, answersToMemories } from "./answers";
 
 const QUESTIONS: ClarifyQuestion[] = [
   {
@@ -106,5 +106,50 @@ describe("answersToMemories", () => {
     expect(memories.map((m) => m.category)).toEqual(["eval_signal", "eval_signal"]);
     expect(memories[0]!.content).toContain("Eval signal: Passing CLI smoke test.");
     expect(memories[1]!.content).toContain("Source dimension: distinctness.");
+  });
+});
+
+describe("answersToIntakeSignals", () => {
+  it("uses question capture contracts for intake progress signals", () => {
+    const signals = answersToIntakeSignals(
+      [
+        {
+          ...QUESTIONS[0]!,
+          capture: {
+            category: "procedure",
+            scope: "aim",
+            purpose: "document_procedure",
+            improvesDimension: "verifiability",
+            reason: "test_capture_contract",
+          },
+        },
+      ],
+      [{ question_id: "scope", selected_label: "Run pnpm test before release", other_text: null }],
+    );
+
+    expect(signals).toEqual([
+      {
+        source: "user_answer",
+        channel: "questionnaire",
+        category: "procedure",
+        scope: "aim",
+        questionId: "scope",
+        summary: "Run pnpm test before release",
+      },
+    ]);
+  });
+
+  it("falls back to aim-scoped inferred context for legacy questions", () => {
+    const signals = answersToIntakeSignals(QUESTIONS, [
+      { question_id: "scope", selected_label: "Production", other_text: null },
+    ]);
+
+    expect(signals).toEqual([
+      expect.objectContaining({
+        category: "constraint",
+        scope: "aim",
+        summary: "Production",
+      }),
+    ]);
   });
 });

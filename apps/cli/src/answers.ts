@@ -10,6 +10,7 @@
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 
+import type { ContextIntakeProgressSignal } from "@core/domain";
 import { clarifyAnswersToMemories } from "@core/llm";
 import type { ClarifyAnswer, ClarifyQuestion } from "@core/llm";
 import type { NewMemory } from "@core/store";
@@ -72,6 +73,28 @@ function questionCaptureLabel(question: ClarifyQuestion): string {
 /** Fold answers into `user_stated` memories — mirrors the desktop save path. Pure. */
 export function answersToMemories(questions: ClarifyQuestion[], answers: ClarifyAnswer[]): NewMemory[] {
   return clarifyAnswersToMemories(questions, answers);
+}
+
+/** Fold answers into intake-progress signals so CLI-saved aims retain the context loop state. */
+export function answersToIntakeSignals(
+  questions: ClarifyQuestion[],
+  answers: ClarifyAnswer[],
+): ContextIntakeProgressSignal[] {
+  const questionById = new Map(questions.map((question) => [question.id, question]));
+  return answers.flatMap((answer): ContextIntakeProgressSignal[] => {
+    const text = answer.other_text?.trim() || answer.selected_label?.trim();
+    if (!text) return [];
+    const question = questionById.get(answer.question_id);
+    const inferredMemory = clarifyAnswersToMemories(questions, [answer])[0];
+    return [{
+      source: "user_answer",
+      channel: "questionnaire",
+      category: question?.capture?.category ?? inferredMemory?.category,
+      scope: question?.capture?.scope ?? "aim",
+      questionId: answer.question_id,
+      summary: text,
+    }];
+  });
 }
 
 /** Interactively ask each question on the TTY and collect the answers (empty input = skip). */
