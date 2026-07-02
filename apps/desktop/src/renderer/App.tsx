@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 
 import type { DecompositionOutput, Goal, Memory } from "@core/types";
 import { reviewAimLearning, reviewContextLineage } from "@core/domain";
@@ -7,7 +7,15 @@ import type { ClarifyOutput, ClarifyAnswer, ClarifyAnswerImpactReport, ClarifyLe
 import type { PlanResult, ProviderStatus } from "../shared/ipc";
 
 import { summarizeRule } from "./summarize";
-import { HomeView } from "./HomeView";
+import { ContextInbox } from "./ContextInbox";
+import {
+  ContextHealthPanel,
+  ContextLearningPanel,
+  ContextLineageLearningPanel,
+  ContextProfilePanel,
+  DecompositionLearningPanel,
+  HomeView,
+} from "./HomeView";
 import { I18nProvider, useI18n } from "./i18n";
 import { LangToggle } from "./LangToggle";
 import { Notice } from "./Notice";
@@ -29,6 +37,7 @@ import {
   decompositionStrategyFocusLabel,
   decompositionStrategyPriorityLabel,
   dimensionLabel,
+  formatDate,
   fulfillmentStatusColor,
   fulfillmentStatusLabel,
   fulfillmentStatusMark,
@@ -49,13 +58,13 @@ import {
   chipButton,
   inputStyle,
   labelStyle,
-  linkButton,
   optionButton,
   primaryButton,
   secondaryButton,
 } from "./styles";
 
 type Step = "home" | "aim" | "drafting" | "clarifying" | "questions" | "refining" | "plan";
+type InspectorTab = "process" | "context" | "quality" | "activity";
 
 type AnswerMap = Record<string, { label: string | null; other: string }>;
 type PlanningTraceStatus = "pending" | "running" | "done" | "warning" | "error";
@@ -82,6 +91,16 @@ function withUiTimeout<T>(promise: Promise<T>, timeoutMs: number, message: strin
 
 function traceTime(): string {
   return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+function useViewportWidth(): number {
+  const [width, setWidth] = useState(() => (typeof window === "undefined" ? 1440 : window.innerWidth));
+  useEffect(() => {
+    const onResize = () => setWidth(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  return width;
 }
 
 export function App() {
@@ -124,6 +143,8 @@ function AppInner() {
   const [contextLineageLearning, setContextLineageLearning] = useState<ContextLineageLearningReport | null>(null);
   const [contextDecompositionLearning, setContextDecompositionLearning] = useState<DecompositionLearningReport | null>(null);
   const [viewing, setViewing] = useState<Goal | null>(null);
+  const [inspectorTab, setInspectorTab] = useState<InspectorTab>("process");
+  const viewportWidth = useViewportWidth();
 
   useEffect(() => {
     window.aimcub
@@ -299,6 +320,7 @@ function AppInner() {
   function goHome() {
     setError(null);
     setViewing(null);
+    setInspectorTab("context");
     clearWizard();
     refreshGoals();
     refreshContextCandidates();
@@ -314,6 +336,7 @@ function AppInner() {
   function startNew() {
     setError(null);
     setViewing(null);
+    setInspectorTab("context");
     clearWizard();
     setStep("aim");
   }
@@ -321,6 +344,7 @@ function AppInner() {
   function openGoal(g: Goal) {
     setError(null);
     setViewing(g);
+    setInspectorTab(reviewOf(g) ? "quality" : "context");
     setStep("plan");
   }
 
@@ -410,6 +434,7 @@ function AppInner() {
     const req = { title: title.trim(), description: description.trim() || undefined };
     const providerText = provider ? providerLabel(provider, t) : "LLM";
     setError(null);
+    setInspectorTab("process");
     setPlanningTrace([
       traceEvent("context", "running", t("trace.context"), t("trace.contextPending")),
       traceEvent("draft", "pending", t("trace.draft"), t("trace.draftPending", { provider: providerText })),
@@ -489,10 +514,12 @@ function AppInner() {
     if (useDraftAsIs) {
       setFinalPlan(sourcePlan);
       upsertPlanningTrace(traceEvent("accept-draft", "done", t("trace.acceptDraft"), t("trace.acceptDraftDone")));
+      setInspectorTab("quality");
       setStep("plan");
       return;
     }
     setStep("refining");
+    setInspectorTab("process");
     upsertPlanningTrace(traceEvent(
       "refine",
       "running",
@@ -530,6 +557,7 @@ function AppInner() {
         status: r.quality?.grade === "fail" ? "warning" : "done",
         detail: describeQualityTrace(r.quality, r.qualityRetry),
       });
+      setInspectorTab("quality");
       setStep("plan");
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
@@ -559,6 +587,7 @@ function AppInner() {
       setSavedGoal(res.goal);
       setSavedContextCandidateCount(res.contextCandidates?.length ?? 0);
       setSavedContextCandidates(res.contextCandidates ?? []);
+      setInspectorTab("activity");
       refreshGoals();
       refreshContextCandidates();
       refreshContextHistory();
@@ -572,14 +601,44 @@ function AppInner() {
     }
   }
 
+  const compactShell = viewportWidth < 1000;
+  const activeGoal = viewing ?? savedGoal;
+  const activeGoalPending = activeGoal
+    ? pendingContextForGoal(activeGoal, activeGoal.id === savedGoal?.id ? savedContextCandidates : contextCandidates)
+    : [];
+  const activePlan = viewing ? planOf(viewing) : finalPlan;
+  const activeReview = viewing ? reviewOf(viewing) : planReview;
+  const activeIntake = viewing ? aimIntakeOf(viewing) : savedGoal ? aimIntakeOf(savedGoal) ?? aimIntake : aimIntake;
+  const activePlanningContext = viewing
+    ? planningContextOf(viewing)
+    : savedGoal
+      ? planningContextOf(savedGoal) ?? planningContext
+      : planningContext;
+  const activeLearning = activeGoal
+    ? reviewAimLearning({ goal: activeGoal, pendingContext: activeGoalPending, contextOutcomes: contextHistory })
+    : null;
+  const activeAnswerImpact = activeGoal ? clarifyImpactOf(activeGoal) : null;
+  const activeCaptureFulfillment = activeGoal ? contextCaptureFulfillmentOf(activeGoal) : null;
+  const activeContextLineage = activeGoal
+    ? reviewContextLineage({ goal: activeGoal, pendingContext: activeGoalPending, contextOutcomes: contextHistory })
+    : null;
+  const shellStyle: CSSProperties = compactShell
+    ? { display: "grid", gridTemplateColumns: "1fr", gap: 14 }
+    : { display: "grid", gridTemplateColumns: "248px minmax(360px, 1fr) 300px", gap: 16, alignItems: "start" };
+
   return (
-    <div style={{ fontFamily: "system-ui, -apple-system, sans-serif", color: C.text, background: C.page, minHeight: "100vh" }}>
-      <div style={{ maxWidth: 760, margin: "0 auto", padding: "28px 24px 64px" }}>
-        <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0, cursor: "pointer" }} onClick={goHome} title="Home">
-            Aimcub
-          </h1>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+    <div style={{ fontFamily: "system-ui, -apple-system, sans-serif", color: C.text, background: "#f4f6f8", minHeight: "100vh" }}>
+      <div style={{ maxWidth: 1580, margin: "0 auto", padding: compactShell ? "18px 14px 48px" : "24px 24px 56px" }}>
+        <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, gap: 12 }}>
+          <button
+            onClick={goHome}
+            style={{ border: 0, background: "transparent", padding: 0, cursor: "pointer", textAlign: "left" }}
+            title="Home"
+          >
+            <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: 0, color: C.text }}>Aimcub</div>
+            <div style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>{t("shell.subtitle")}</div>
+          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
             <LangToggle />
             <button onClick={() => setShowSettings((v) => !v)} style={chipButton()}>
               {provider?.configured ? providerLabel(provider, t) : t("provider.setup")}
@@ -588,115 +647,461 @@ function AppInner() {
         </header>
 
         {showSettings && (
-          <ProviderForm
-            status={provider}
-            onSaved={(s) => {
-              setProvider(s);
-              if (s.configured) setShowSettings(false);
-            }}
-            onClose={() => setShowSettings(false)}
-          />
+          <div style={{ marginBottom: 14 }}>
+            <ProviderForm
+              status={provider}
+              onSaved={(s) => {
+                setProvider(s);
+                if (s.configured) setShowSettings(false);
+              }}
+              onClose={() => setShowSettings(false)}
+            />
+          </div>
         )}
 
-        {error && <Notice tone="error">{error}</Notice>}
+        {error && (
+          <div style={{ marginBottom: 14 }}>
+            <Notice tone="error">{error}</Notice>
+          </div>
+        )}
 
-        {step !== "home" && planningTrace.length > 0 && <PlanningProcessPanel events={planningTrace} />}
+        <div style={shellStyle}>
+          {!compactShell && (
+            <AimSidebar
+              goals={goals}
+              currentGoal={viewing}
+              step={step}
+              pendingContextCount={contextCandidates.length}
+              onHome={goHome}
+              onNew={startNew}
+              onOpen={openGoal}
+            />
+          )}
 
-        {step === "home" && (
-          <HomeView
-            goals={goals}
+          <main style={{ minWidth: 0, background: "#fff", border: `1px solid ${C.border}`, borderRadius: 10, padding: compactShell ? 16 : 22, minHeight: compactShell ? 360 : "calc(100vh - 132px)", boxSizing: "border-box" }}>
+            {step === "home" && (
+              <HomeView
+                goals={goals}
+                onNew={startNew}
+                onOpen={openGoal}
+                onDelete={removeGoal}
+              />
+            )}
+
+            {step === "aim" && (
+              <AimForm
+                title={title}
+                description={description}
+                disabled={!configured}
+                onTitle={setTitle}
+                onDescription={setDescription}
+                onSubmit={startDraft}
+                onCancel={goHome}
+              />
+            )}
+
+            {(step === "drafting" || step === "clarifying" || step === "refining") && (
+              <BusyPlanState step={step} title={title.trim()} description={description.trim()} />
+            )}
+
+            {step === "questions" && clarifyOut && (
+              <QuestionsStep
+                clarify={clarifyOut}
+                answers={answers}
+                onAnswer={(id, patch) => setAnswers((m) => ({ ...m, [id]: { label: null, other: "", ...m[id], ...patch } }))}
+                onRefine={() => refine(false)}
+                onUseDraft={() => refine(true)}
+              />
+            )}
+
+            {step === "plan" && viewing && (
+              <SavedGoalView
+                goal={viewing}
+                onBack={goHome}
+                onDelete={() => removeGoal(viewing)}
+              />
+            )}
+
+            {step === "plan" && !viewing && finalPlan && (
+              <PlanView
+                plan={finalPlan}
+                title={title.trim() || t("shell.currentAim")}
+                description={description.trim() || undefined}
+                review={planReview}
+                savedAt={savedAt}
+                contextCandidateCount={savedContextCandidateCount}
+                onSave={save}
+                onRefineWithReview={(prompt) => refine(false, prompt)}
+                onReset={startNew}
+                onHome={goHome}
+              />
+            )}
+          </main>
+
+          <InspectorRail
+            activeTab={inspectorTab}
+            onTab={setInspectorTab}
+            events={planningTrace}
+            aimIntake={activeIntake}
+            decompositionStrategy={decompositionStrategy}
             contextCandidates={contextCandidates}
             contextProfile={contextProfile}
             contextHealth={contextHealth}
             contextLearning={contextLearning}
             contextLineageLearning={contextLineageLearning}
             contextDecompositionLearning={contextDecompositionLearning}
-            onNew={startNew}
-            onOpen={openGoal}
-            onDelete={removeGoal}
+            planningContext={activePlanningContext}
+            review={activeReview}
+            planQuality={planQuality}
+            qualityRetry={planQualityRetry}
+            plan={activePlan}
+            learning={activeLearning}
+            answerImpact={activeAnswerImpact}
+            captureFulfillment={activeCaptureFulfillment}
+            contextLineage={activeContextLineage}
             onAcceptContext={acceptContextCandidate}
             onRejectContext={rejectContextCandidate}
             onArchiveContext={archiveContextMemory}
             onDeprioritizeContext={deprioritizeContextMemory}
+            sticky={!compactShell}
           />
-        )}
-
-        {step === "aim" && (
-          <>
-            <AimForm
-              title={title}
-              description={description}
-              disabled={!configured}
-              onTitle={setTitle}
-              onDescription={setDescription}
-              onSubmit={startDraft}
-              onCancel={goHome}
-            />
-            <AimIntakePanel report={aimIntake} />
-            <DecompositionStrategyPanel report={decompositionStrategy} />
-          </>
-        )}
-
-        {(step === "drafting" || step === "clarifying" || step === "refining") && (
-          <Notice tone="info">
-            {step === "drafting" ? t("status.drafting") : step === "clarifying" ? t("status.clarifying") : t("status.refining")}
-          </Notice>
-        )}
-
-        {step === "questions" && clarifyOut && (
-          <QuestionsStep
-            clarify={clarifyOut}
-            intake={aimIntake}
-            answers={answers}
-            onAnswer={(id, patch) => setAnswers((m) => ({ ...m, [id]: { label: null, other: "", ...m[id], ...patch } }))}
-            onRefine={() => refine(false)}
-            onUseDraft={() => refine(true)}
-          />
-        )}
-
-        {step === "plan" && viewing && (
-          <SavedGoalView
-            goal={viewing}
-            contextCandidates={contextCandidates}
-            contextHistory={contextHistory}
-            onBack={goHome}
-            onDelete={() => removeGoal(viewing)}
-          />
-        )}
-
-        {step === "plan" && !viewing && finalPlan && (
-          <PlanView
-            plan={finalPlan}
-            review={planReview}
-            intake={savedGoal ? aimIntakeOf(savedGoal) ?? aimIntake : aimIntake}
-            learning={savedGoal
-              ? reviewAimLearning({
-                  goal: savedGoal,
-                  pendingContext: pendingContextForGoal(savedGoal, savedContextCandidates),
-                  contextOutcomes: contextHistory,
-                })
-              : null}
-            answerImpact={savedGoal ? clarifyImpactOf(savedGoal) : null}
-            captureFulfillment={savedGoal ? contextCaptureFulfillmentOf(savedGoal) : null}
-            contextLineage={savedGoal
-              ? reviewContextLineage({
-                  goal: savedGoal,
-                  pendingContext: pendingContextForGoal(savedGoal, savedContextCandidates),
-                  contextOutcomes: contextHistory,
-                })
-              : null}
-            planningContext={savedGoal ? planningContextOf(savedGoal) ?? planningContext : planningContext}
-            savedAt={savedAt}
-            contextCandidateCount={savedContextCandidateCount}
-            onSave={save}
-            onRefineWithReview={(prompt) => refine(false, prompt)}
-            onReset={startNew}
-            onHome={goHome}
-          />
-        )}
+        </div>
       </div>
     </div>
   );
+}
+
+function AimSidebar(props: {
+  goals: Goal[];
+  currentGoal: Goal | null;
+  step: Step;
+  pendingContextCount: number;
+  onHome: () => void;
+  onNew: () => void;
+  onOpen: (goal: Goal) => void;
+}) {
+  const { t } = useI18n();
+  const [query, setQuery] = useState("");
+  const filtered = props.goals.filter((goal) => {
+    const q = query.trim().toLowerCase();
+    if (!q) return true;
+    return `${goal.title} ${goal.description ?? ""}`.toLowerCase().includes(q);
+  });
+  return (
+    <aside style={railSurface()}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 14 }}>
+        <button onClick={props.onHome} style={{ ...linkLikeButton(), fontWeight: props.step === "home" ? 700 : 600 }}>
+          {t("shell.aims")}
+        </button>
+        <button onClick={props.onNew} style={{ ...primaryButton(false), marginTop: 0, padding: "7px 10px", fontSize: 12, whiteSpace: "nowrap" }}>
+          {t("home.new")}
+        </button>
+      </div>
+      <input
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder={t("shell.searchAims")}
+        style={{ ...inputStyle(), fontSize: 13, padding: "9px 10px", marginBottom: 12 }}
+      />
+      <div style={{ color: C.muted, fontSize: 12, marginBottom: 8 }}>
+        {props.goals.length === 0 ? t("home.none") : t(props.goals.length === 1 ? "home.aim_one" : "home.aim_other", { n: props.goals.length })}
+      </div>
+      <div style={{ display: "grid", gap: 8 }}>
+        {filtered.slice(0, 24).map((goal) => {
+          const selected = props.currentGoal?.id === goal.id;
+          const plan = planOf(goal);
+          return (
+            <button key={goal.id} onClick={() => props.onOpen(goal)} style={sidebarAimButton(selected)}>
+              <span style={{ display: "block", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{goal.title}</span>
+              <span style={{ display: "block", color: C.muted, fontSize: 12, marginTop: 4 }}>
+                {t((plan?.nodes.length ?? 0) === 1 ? "common.milestone_one" : "common.milestone_other", { n: plan?.nodes.length ?? 0 })}
+                {goal.created_at ? ` · ${formatDate(goal.created_at)}` : ""}
+              </span>
+            </button>
+          );
+        })}
+        {filtered.length === 0 && (
+          <div style={{ color: C.muted, fontSize: 13, padding: "14px 2px" }}>{t("shell.noSearchResults")}</div>
+        )}
+      </div>
+      <div style={{ borderTop: `1px solid ${C.border}`, marginTop: 16, paddingTop: 12, color: C.muted, fontSize: 12 }}>
+        {t(props.pendingContextCount === 1 ? "shell.pendingContext_one" : "shell.pendingContext_other", { n: props.pendingContextCount })}
+      </div>
+    </aside>
+  );
+}
+
+function AimHeader(props: {
+  title: string;
+  description?: string | null;
+  status: string;
+  milestoneCount: number;
+  doneCount: number;
+  nextAction: string;
+}) {
+  const { t } = useI18n();
+  const total = Math.max(props.milestoneCount, 1);
+  const percent = Math.max(0, Math.min(100, Math.round((props.doneCount / total) * 100)));
+  return (
+    <section style={{ marginBottom: 18 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 14, flexWrap: "wrap" }}>
+        <div style={{ minWidth: 0, flex: "1 1 360px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span style={miniPill(C.accent)}>{props.status}</span>
+            <span style={{ color: C.muted, fontSize: 12 }}>
+              {t(props.milestoneCount === 1 ? "common.milestone_one" : "common.milestone_other", { n: props.milestoneCount })}
+            </span>
+          </div>
+          <h2 style={{ margin: "10px 0 0", fontSize: 28, lineHeight: 1.15, letterSpacing: 0 }}>{props.title}</h2>
+          {props.description ? <p style={{ color: C.muted, fontSize: 14, lineHeight: 1.6, margin: "10px 0 0" }}>{props.description}</p> : null}
+        </div>
+        <div style={{ minWidth: 220, flex: "0 0 240px", border: `1px solid ${C.border}`, borderRadius: 8, padding: 12, background: "#f8fafc" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", color: C.muted, fontSize: 12, marginBottom: 8 }}>
+            <span>{t("shell.progress")}</span>
+            <span>{t("shell.progressValue", { done: props.doneCount, total: props.milestoneCount })}</span>
+          </div>
+          <div style={{ height: 7, background: "#e7ebf0", borderRadius: 999, overflow: "hidden" }}>
+            <div style={{ height: "100%", width: `${percent}%`, background: C.accent }} />
+          </div>
+          <div style={{ color: C.text, fontSize: 12, marginTop: 10, lineHeight: 1.4 }}>
+            <span style={{ color: C.muted }}>{t("shell.nextAction")} </span>
+            {props.nextAction}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function BusyPlanState(props: { step: Step; title: string; description: string }) {
+  const { t } = useI18n();
+  const message = props.step === "drafting"
+    ? t("status.drafting")
+    : props.step === "clarifying"
+      ? t("status.clarifying")
+      : t("status.refining");
+  return (
+    <section>
+      <Notice tone="info">{message}</Notice>
+      <div style={{ ...card(), background: "#f8fafc", marginTop: 14 }}>
+        <div style={{ color: C.muted, fontSize: 12, marginBottom: 6 }}>{t("shell.currentAim")}</div>
+        <h2 style={{ margin: 0, fontSize: 24, letterSpacing: 0 }}>{props.title || t("shell.untitledAim")}</h2>
+        {props.description ? <p style={{ color: C.muted, fontSize: 14, lineHeight: 1.55, margin: "8px 0 0" }}>{props.description}</p> : null}
+        <div style={{ color: C.muted, fontSize: 12, marginTop: 14 }}>{t("shell.processLivesInInspector")}</div>
+      </div>
+    </section>
+  );
+}
+
+function InspectorRail(props: {
+  activeTab: InspectorTab;
+  onTab: (tab: InspectorTab) => void;
+  events: PlanningTraceEvent[];
+  aimIntake: AimIntakeReport | null;
+  decompositionStrategy: DecompositionStrategyReport | null;
+  contextCandidates: Memory[];
+  contextProfile: ContextProfileReport | null;
+  contextHealth: ContextHealthRow[];
+  contextLearning: ClarifyLearningReport | null;
+  contextLineageLearning: ContextLineageLearningReport | null;
+  contextDecompositionLearning: DecompositionLearningReport | null;
+  planningContext: PlanningContextSelectionReport | null;
+  review: PlanResult["review"] | null;
+  planQuality: PlanResult["quality"] | null;
+  qualityRetry: PlanResult["qualityRetry"] | null;
+  plan: DecompositionOutput | null;
+  learning: AimLearningReport | null;
+  answerImpact: ClarifyAnswerImpactReport | null;
+  captureFulfillment: ContextCaptureFulfillmentReport | null;
+  contextLineage: ContextLineageReport | null;
+  onAcceptContext: (candidate: Memory, content: string, scope: "aim" | "global") => void;
+  onRejectContext: (candidate: Memory) => void;
+  onArchiveContext: (id: string) => void;
+  onDeprioritizeContext: (id: string) => void;
+  sticky: boolean;
+}) {
+  const { t } = useI18n();
+  const tabs: InspectorTab[] = ["process", "context", "quality", "activity"];
+  const tabLabels = {
+    process: "shell.tab.process",
+    context: "shell.tab.context",
+    quality: "shell.tab.quality",
+    activity: "shell.tab.activity",
+  } as const;
+  const hasContext = Boolean(
+    props.contextCandidates.length ||
+      props.aimIntake ||
+      props.planningContext ||
+      ((props.contextProfile?.totalActive ?? 0) + (props.contextProfile?.totalPending ?? 0)) ||
+      props.contextHealth.length ||
+      props.contextLearning ||
+      props.contextLineageLearning ||
+      props.contextDecompositionLearning,
+  );
+  const hasQuality = Boolean(props.review || props.planQuality || props.decompositionStrategy);
+  const hasActivity = Boolean(props.learning || props.answerImpact || props.captureFulfillment || props.contextLineage);
+  return (
+    <aside style={{ ...railSurface(), position: props.sticky ? "sticky" : "static", top: props.sticky ? 18 : undefined }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
+        <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>{t("shell.inspector")}</h2>
+        <span style={{ color: C.muted, fontSize: 12 }}>{t("shell.auditLayer")}</span>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 14 }}>
+        {tabs.map((tab) => (
+          <button key={tab} onClick={() => props.onTab(tab)} style={inspectorTabButton(props.activeTab === tab)}>
+            {t(tabLabels[tab])}
+          </button>
+        ))}
+      </div>
+
+      {props.activeTab === "process" && (
+        props.events.length > 0 ? <PlanningProcessPanel events={props.events} /> : <InspectorEmpty title={t("shell.noProcess")} body={t("shell.noProcessBody")} />
+      )}
+
+      {props.activeTab === "context" && (
+        hasContext ? (
+          <div>
+            <InspectorSectionTitle title={t("shell.context.pending")} />
+            <ContextInbox candidates={props.contextCandidates} onAccept={props.onAcceptContext} onReject={props.onRejectContext} />
+            <InspectorSectionTitle title={t("shell.context.usedMissing")} />
+            <AimIntakePanel report={props.aimIntake} />
+            <PlanningContextPanel report={props.planningContext} />
+            <InspectorSectionTitle title={t("shell.context.learned")} />
+            <ContextProfilePanel report={props.contextProfile} />
+            <ContextHealthPanel rows={props.contextHealth} onArchive={props.onArchiveContext} onDeprioritize={props.onDeprioritizeContext} />
+            <ContextLearningPanel report={props.contextLearning} />
+            <ContextLineageLearningPanel report={props.contextLineageLearning} />
+            <DecompositionLearningPanel report={props.contextDecompositionLearning} />
+          </div>
+        ) : (
+          <InspectorEmpty title={t("shell.noContext")} body={t("shell.noContextBody")} />
+        )
+      )}
+
+      {props.activeTab === "quality" && (
+        hasQuality ? (
+          <div>
+            {props.review && <PlanReviewPanel review={props.review} />}
+            {!props.review && props.planQuality && <QualitySnapshot quality={props.planQuality} retry={props.qualityRetry} />}
+            <DecompositionStrategyPanel report={props.decompositionStrategy} />
+          </div>
+        ) : (
+          <InspectorEmpty title={t("shell.noQuality")} body={t("shell.noQualityBody")} />
+        )
+      )}
+
+      {props.activeTab === "activity" && (
+        hasActivity ? (
+          <div>
+            <AimLearningPanel report={props.learning} />
+            <ClarifyImpactPanel report={props.answerImpact} plan={props.plan} />
+            <ContextCaptureFulfillmentPanel report={props.captureFulfillment} />
+            <ContextLineagePanel report={props.contextLineage} />
+          </div>
+        ) : (
+          <InspectorEmpty title={t("shell.noActivity")} body={t("shell.noActivityBody")} />
+        )
+      )}
+    </aside>
+  );
+}
+
+function QualitySnapshot(props: { quality: NonNullable<PlanResult["quality"]>; retry: PlanResult["qualityRetry"] | null }) {
+  const { t } = useI18n();
+  const tone = props.quality.grade === "fail" ? C.danger : props.quality.grade === "warn" ? "#8a6517" : "#1a7f4b";
+  return (
+    <div style={{ ...card(), background: "#fbfaf7" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline" }}>
+        <div style={{ fontWeight: 600, fontSize: 14 }}>{t("review.quality")}</div>
+        <div style={{ color: tone, fontSize: 13 }}>{props.quality.grade} · {props.quality.score}/100</div>
+      </div>
+      <div style={{ color: C.muted, fontSize: 12, marginTop: 8 }}>
+        {props.retry?.retried ? t("trace.retryYes", { attempts: props.retry.attempts }) : t("trace.retryNo", { attempts: props.retry?.attempts ?? 1 })}
+      </div>
+    </div>
+  );
+}
+
+function InspectorSectionTitle(props: { title: string }) {
+  return <div style={{ color: C.muted, fontSize: 11, fontWeight: 700, letterSpacing: 0, textTransform: "uppercase", margin: "2px 0 8px" }}>{props.title}</div>;
+}
+
+function InspectorEmpty(props: { title: string; body: string }) {
+  return (
+    <div style={{ ...card(), background: "#f8fafc", color: C.muted }}>
+      <div style={{ color: C.text, fontWeight: 600, fontSize: 14 }}>{props.title}</div>
+      <div style={{ fontSize: 13, lineHeight: 1.5, marginTop: 6 }}>{props.body}</div>
+    </div>
+  );
+}
+
+function railSurface(): CSSProperties {
+  return {
+    background: "#fff",
+    border: `1px solid ${C.border}`,
+    borderRadius: 10,
+    padding: 14,
+    boxSizing: "border-box",
+    minWidth: 0,
+  };
+}
+
+function miniPill(color = C.muted): CSSProperties {
+  return {
+    display: "inline-flex",
+    alignItems: "center",
+    border: `1px solid ${color === C.muted ? C.border : "#b8cbe8"}`,
+    borderRadius: 999,
+    color,
+    background: color === C.muted ? "#fff" : "#f3f7ff",
+    fontSize: 11,
+    fontWeight: 600,
+    padding: "3px 7px",
+    lineHeight: 1.1,
+    whiteSpace: "nowrap",
+  };
+}
+
+function linkLikeButton(): CSSProperties {
+  return {
+    border: 0,
+    background: "transparent",
+    color: C.text,
+    padding: 0,
+    cursor: "pointer",
+    fontSize: 15,
+    textAlign: "left",
+  };
+}
+
+function sidebarAimButton(selected: boolean): CSSProperties {
+  return {
+    width: "100%",
+    minWidth: 0,
+    boxSizing: "border-box",
+    overflow: "hidden",
+    textAlign: "left",
+    border: `1px solid ${selected ? "#b8cbe8" : C.border}`,
+    background: selected ? "#f3f7ff" : "#fff",
+    borderRadius: 8,
+    padding: "10px 11px",
+    cursor: "pointer",
+    color: C.text,
+    boxShadow: selected ? "inset 3px 0 0 #2f6fc8" : "none",
+  };
+}
+
+function inspectorTabButton(selected: boolean): CSSProperties {
+  return {
+    border: `1px solid ${selected ? "#b8cbe8" : C.border}`,
+    background: selected ? "#f3f7ff" : "#fff",
+    color: selected ? C.accent : C.text,
+    borderRadius: 7,
+    padding: "7px 6px",
+    cursor: "pointer",
+    fontSize: 12,
+    fontWeight: selected ? 700 : 500,
+  };
 }
 
 function traceStatusMark(status: PlanningTraceStatus): string {
@@ -845,7 +1250,6 @@ function AimForm(props: {
 
 function QuestionsStep(props: {
   clarify: ClarifyOutput;
-  intake?: AimIntakeReport | null;
   answers: AnswerMap;
   onAnswer: (id: string, patch: Partial<{ label: string | null; other: string }>) => void;
   onRefine: () => void;
@@ -855,7 +1259,6 @@ function QuestionsStep(props: {
   const { clarify, answers } = props;
   return (
     <section>
-      <AimIntakePanel report={props.intake} />
       <p style={{ color: C.muted, fontSize: 14, margin: "4px 0 16px" }}>{t("q.intro")}</p>
 
       {clarify.questions.length === 0 && <Notice tone="info">{t("q.none")}</Notice>}
@@ -939,24 +1342,35 @@ function QuestionsStep(props: {
 /** The milestone list — shared by the fresh-plan view and the saved-goal view. */
 function MilestoneCards(props: { plan: DecompositionOutput }) {
   const { t } = useI18n();
+  const [openKey, setOpenKey] = useState<string | null>(null);
   return (
-    <>
+    <div style={{ display: "grid", gap: 10 }}>
       {props.plan.nodes.map((n, i) => {
         const contract = n.decomposition_contract;
+        const open = openKey === n.key;
         return (
-          <div key={n.key} style={card()}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-              <div style={{ fontWeight: 500 }}>
-                <span style={{ color: C.muted, marginRight: 8 }}>{i + 1}.</span>
-                {n.title}
+          <div key={n.key} style={{ ...card(), marginBottom: 0, borderColor: open ? "#b8cbe8" : C.border }}>
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12, alignItems: "start" }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <span style={{ color: C.muted, fontSize: 12, fontVariantNumeric: "tabular-nums" }}>{i + 1}</span>
+                  <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis" }}>{n.title}</span>
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8, alignItems: "center" }}>
+                  <span style={miniPill()}>{contract ? decompositionOwnerLabel(contract.likely_owner, t) : t("plan.ownerUnknown")}</span>
+                  <span style={miniPill(C.accent)}>{t("shell.pending")}</span>
+                  <span style={{ color: C.muted, fontSize: 12, fontFamily: "ui-monospace, monospace" }}>+{n.xp_reward} xp</span>
+                </div>
+                <div style={{ fontSize: 12, color: C.accent, marginTop: 9, lineHeight: 1.45 }}>
+                  {summarizeRule(n.acceptance_rule)}
+                </div>
               </div>
-              <span style={{ color: C.muted, fontSize: 12, whiteSpace: "nowrap" }}>+{n.xp_reward} xp</span>
+              <button onClick={() => setOpenKey(open ? null : n.key)} style={{ ...secondaryButton(), marginTop: 0, padding: "6px 9px", fontSize: 12 }}>
+                {t(open ? "plan.hideDetails" : "plan.details")}
+              </button>
             </div>
-            {n.description && <div style={{ color: C.muted, fontSize: 13, marginTop: 4 }}>{n.description}</div>}
-            <div style={{ fontSize: 12, color: C.accent, marginTop: 8, fontFamily: "ui-monospace, monospace" }}>
-              ✓ {summarizeRule(n.acceptance_rule)}
-            </div>
-            {contract && (
+            {open && n.description && <div style={{ color: C.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>{n.description}</div>}
+            {open && contract && (
               <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}`, color: C.muted, fontSize: 12 }}>
                 <div style={{ fontWeight: 600, color: C.text, marginBottom: 4 }}>
                   {t("plan.contract")} · {decompositionOwnerLabel(contract.likely_owner, t)}
@@ -974,19 +1388,15 @@ function MilestoneCards(props: { plan: DecompositionOutput }) {
           </div>
         );
       })}
-    </>
+    </div>
   );
 }
 
 function PlanView(props: {
   plan: DecompositionOutput;
+  title: string;
+  description?: string;
   review?: PlanResult["review"] | null;
-  intake?: AimIntakeReport | null;
-  learning?: AimLearningReport | null;
-  answerImpact?: ClarifyAnswerImpactReport | null;
-  captureFulfillment?: ContextCaptureFulfillmentReport | null;
-  contextLineage?: ContextLineageReport | null;
-  planningContext?: PlanningContextSelectionReport | null;
   savedAt: string | null;
   contextCandidateCount: number;
   onSave: () => void;
@@ -998,18 +1408,17 @@ function PlanView(props: {
   const { plan, savedAt } = props;
   const n = plan.nodes.length;
   const reviewPrompt = props.review?.actions.find((action) => action.refinePrompt)?.refinePrompt;
+  const nextNode = plan.nodes[0];
   return (
     <section>
-      <p style={{ color: C.muted, fontSize: 14, margin: "4px 0 16px" }}>
-        {t(n === 1 ? "plan.summary_one" : "plan.summary_other", { n })}
-      </p>
-      <AimIntakePanel report={props.intake} />
-      <AimLearningPanel report={props.learning} />
-      <ClarifyImpactPanel report={props.answerImpact} plan={plan} />
-      <ContextCaptureFulfillmentPanel report={props.captureFulfillment} />
-      <ContextLineagePanel report={props.contextLineage} />
-      {props.review && <PlanReviewPanel review={props.review} />}
-      <PlanningContextPanel report={props.planningContext} />
+      <AimHeader
+        title={props.title}
+        description={props.description || plan.goal_summary}
+        status={savedAt ? t("shell.savedAim") : t("shell.currentAim")}
+        milestoneCount={n}
+        doneCount={0}
+        nextAction={nextNode?.title ?? t("shell.noNextAction")}
+      />
       <MilestoneCards plan={plan} />
 
       <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 8 }}>
@@ -1039,54 +1448,40 @@ function PlanView(props: {
 
 function SavedGoalView(props: {
   goal: Goal;
-  contextCandidates: Memory[];
-  contextHistory: Memory[];
   onBack: () => void;
   onDelete: () => void;
 }) {
   const { t } = useI18n();
   const { goal } = props;
   const plan = planOf(goal);
-  const review = reviewOf(goal);
-  const intake = aimIntakeOf(goal);
-  const learning = reviewAimLearning({
-    goal,
-    pendingContext: pendingContextForGoal(goal, props.contextCandidates),
-    contextOutcomes: props.contextHistory,
-  });
-  const answerImpact = clarifyImpactOf(goal);
-  const captureFulfillment = contextCaptureFulfillmentOf(goal);
-  const contextLineage = reviewContextLineage({
-    goal,
-    pendingContext: pendingContextForGoal(goal, props.contextCandidates),
-    contextOutcomes: props.contextHistory,
-  });
-  const planningContext = planningContextOf(goal);
   const n = plan?.nodes.length ?? 0;
+  const nextNode = plan?.nodes[0];
   return (
     <section>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, margin: "4px 0 12px" }}>
-        <h2 style={{ fontSize: 17, fontWeight: 600, margin: 0 }}>{goal.title}</h2>
-        <button onClick={props.onBack} style={linkButton()}>{t("common.back")}</button>
-      </div>
-      {goal.description && <p style={{ color: C.muted, fontSize: 13, margin: "0 0 14px" }}>{goal.description}</p>}
-
       {plan && plan.nodes.length > 0 ? (
         <>
-          <p style={{ color: C.muted, fontSize: 13, margin: "0 0 12px" }}>
-            {t(n === 1 ? "saved.count_one" : "saved.count_other", { n })}
-          </p>
-          <AimIntakePanel report={intake} />
-          <AimLearningPanel report={learning} />
-          <ClarifyImpactPanel report={answerImpact} plan={plan} />
-          <ContextCaptureFulfillmentPanel report={captureFulfillment} />
-          <ContextLineagePanel report={contextLineage} />
-          {review && <PlanReviewPanel review={review} />}
-          <PlanningContextPanel report={planningContext} />
+          <AimHeader
+            title={goal.title}
+            description={goal.description}
+            status={t("shell.savedAim")}
+            milestoneCount={n}
+            doneCount={0}
+            nextAction={nextNode?.title ?? t("shell.noNextAction")}
+          />
           <MilestoneCards plan={plan} />
         </>
       ) : (
-        <Notice tone="info">{t("saved.noPlan")}</Notice>
+        <>
+          <AimHeader
+            title={goal.title}
+            description={goal.description}
+            status={t("shell.savedAim")}
+            milestoneCount={0}
+            doneCount={0}
+            nextAction={t("shell.noNextAction")}
+          />
+          <Notice tone="info">{t("saved.noPlan")}</Notice>
+        </>
       )}
 
       <div style={{ display: "flex", gap: 10, marginTop: 8 }}>

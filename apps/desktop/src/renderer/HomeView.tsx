@@ -1,9 +1,8 @@
-import type { Goal, Memory } from "@core/types";
+import type { Goal } from "@core/types";
 import type { ContextHealthRow, ContextLineageLearningReport, ContextProfileReport, DecompositionLearningReport } from "@core/domain";
 import type { ClarifyLearningReport } from "@core/llm";
 
 import { useI18n } from "./i18n";
-import { ContextInbox } from "./ContextInbox";
 import {
   capturePurposeLabel,
   contextCategoryLabel,
@@ -22,77 +21,52 @@ import { C, card, linkButton, primaryButton, secondaryButton } from "./styles";
 
 interface HomeViewProps {
   goals: Goal[];
-  contextCandidates: Memory[];
-  contextProfile: ContextProfileReport | null;
-  contextHealth: ContextHealthRow[];
-  contextLearning: ClarifyLearningReport | null;
-  contextLineageLearning: ContextLineageLearningReport | null;
-  contextDecompositionLearning: DecompositionLearningReport | null;
   onNew: () => void;
   onOpen: (g: Goal) => void;
   onDelete: (g: Goal) => void;
-  onAcceptContext: (candidate: Memory, content: string, scope: "aim" | "global") => void;
-  onRejectContext: (candidate: Memory) => void;
-  onArchiveContext: (id: string) => void;
-  onDeprioritizeContext: (id: string) => void;
 }
 
 export function HomeView({
   goals,
-  contextCandidates,
-  contextProfile,
-  contextHealth,
-  contextLearning,
-  contextLineageLearning,
-  contextDecompositionLearning,
   onNew,
   onOpen,
   onDelete,
-  onAcceptContext,
-  onRejectContext,
-  onArchiveContext,
-  onDeprioritizeContext,
 }: HomeViewProps) {
   const { t } = useI18n();
   return (
     <section>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-        <span style={{ color: C.muted, fontSize: 14 }}>
-          {goals.length === 0 ? t("home.none") : t(goals.length === 1 ? "home.aim_one" : "home.aim_other", { n: goals.length })}
-        </span>
-        <button onClick={onNew} style={{ ...primaryButton(false), marginTop: 0 }}>{t("home.new")}</button>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 12, flexWrap: "wrap" }}>
+        <div style={{ minWidth: 0 }}>
+          <h2 style={{ margin: 0, fontSize: 22, letterSpacing: 0 }}>{t("home.recent")}</h2>
+          <div style={{ color: C.muted, fontSize: 13, marginTop: 4 }}>
+            {goals.length === 0 ? t("home.none") : t(goals.length === 1 ? "home.aim_one" : "home.aim_other", { n: goals.length })}
+          </div>
+        </div>
+        <button onClick={onNew} style={{ ...primaryButton(false), marginTop: 0, whiteSpace: "nowrap" }}>{t("home.new")}</button>
       </div>
 
-      <ContextInbox
-        candidates={contextCandidates}
-        onAccept={onAcceptContext}
-        onReject={onRejectContext}
-      />
-
-      <ContextProfilePanel report={contextProfile} />
-
-      <ContextHealthPanel
-        rows={contextHealth}
-        onArchive={onArchiveContext}
-        onDeprioritize={onDeprioritizeContext}
-      />
-
-      <ContextLearningPanel report={contextLearning} />
-
-      <ContextLineageLearningPanel report={contextLineageLearning} />
-
-      <DecompositionLearningPanel report={contextDecompositionLearning} />
-
       {goals.length === 0 && (
-        <div style={{ ...card(), color: C.muted, fontSize: 14 }}>{t("home.emptyHelp")}</div>
+        <div style={{ ...card(), minHeight: 220, display: "grid", placeItems: "center", textAlign: "center", borderStyle: "dashed" }}>
+          <div style={{ maxWidth: 380 }}>
+            <h3 style={{ margin: 0, fontSize: 24, letterSpacing: 0 }}>{t("home.emptyTitle")}</h3>
+            <p style={{ color: C.muted, fontSize: 14, lineHeight: 1.6, margin: "10px 0 18px" }}>{t("home.emptyHelp")}</p>
+            <button onClick={onNew} style={{ ...primaryButton(false), marginTop: 0, whiteSpace: "nowrap" }}>{t("home.new")}</button>
+          </div>
+        </div>
       )}
 
       {goals.map((goal) => {
         const n = planOf(goal)?.nodes.length ?? 0;
+        const description = goal.description?.trim();
         return (
-          <div key={goal.id} style={{ ...card(), display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, cursor: "pointer" }} onClick={() => onOpen(goal)}>
+          <div key={goal.id} style={{ ...card(), display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, cursor: "pointer" }} onClick={() => onOpen(goal)}>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{goal.title}</div>
+              {description ? (
+                <div style={{ color: C.muted, fontSize: 13, marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {description}
+                </div>
+              ) : null}
               <div style={{ color: C.muted, fontSize: 12, marginTop: 3 }}>
                 {t(n === 1 ? "common.milestone_one" : "common.milestone_other", { n })}
                 {goal.created_at ? ` · ${formatDate(goal.created_at)}` : ""}
@@ -112,7 +86,7 @@ export function HomeView({
   );
 }
 
-function ContextProfilePanel({ report }: { report: ContextProfileReport | null }) {
+export function ContextProfilePanel({ report }: { report: ContextProfileReport | null }) {
   const { t } = useI18n();
   if (!report || report.totalActive + report.totalPending === 0) return null;
   const gaps = report.gaps.slice(0, 3);
@@ -153,7 +127,7 @@ function ContextProfilePanel({ report }: { report: ContextProfileReport | null }
   );
 }
 
-function ContextLearningPanel({ report }: { report: ClarifyLearningReport | null }) {
+export function ContextLearningPanel({ report }: { report: ClarifyLearningReport | null }) {
   const { t } = useI18n();
   if (!report || report.total_answered === 0) return null;
   const rows = report.rows.filter((row) => row.answered_count > 0);
@@ -190,7 +164,7 @@ function ContextLearningPanel({ report }: { report: ClarifyLearningReport | null
   );
 }
 
-function ContextLineageLearningPanel({ report }: { report: ContextLineageLearningReport | null }) {
+export function ContextLineageLearningPanel({ report }: { report: ContextLineageLearningReport | null }) {
   const { t } = useI18n();
   if (!report || report.totalQuestions === 0) return null;
   const rows = report.rows.filter((row) => row.askedCount > 0).slice(0, 5);
@@ -242,7 +216,7 @@ function ContextLineageLearningPanel({ report }: { report: ContextLineageLearnin
   );
 }
 
-function DecompositionLearningPanel({ report }: { report: DecompositionLearningReport | null }) {
+export function DecompositionLearningPanel({ report }: { report: DecompositionLearningReport | null }) {
   const { t } = useI18n();
   if (!report || report.rows.length === 0) return null;
   const rows = report.rows.slice(0, 5);
@@ -300,7 +274,7 @@ function DecompositionLearningPanel({ report }: { report: DecompositionLearningR
   );
 }
 
-function ContextHealthPanel({
+export function ContextHealthPanel({
   rows,
   onArchive,
   onDeprioritize,
