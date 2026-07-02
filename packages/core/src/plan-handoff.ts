@@ -7,7 +7,12 @@ import type {
   DecompositionOwner,
   PlanNode,
 } from "@core/types";
-import type { ContextSedimentationAimContext, ContextSedimentationMemoryCandidate } from "./context-sedimentation";
+import type {
+  ContextSedimentationAimContext,
+  ContextSedimentationMemoryCandidate,
+  ContextSedimentationPendingStep,
+  ContextSedimentationReport,
+} from "./context-sedimentation";
 import { inferContextCategory } from "./context";
 import type { PlanQualityContext } from "./plan-quality";
 
@@ -99,10 +104,18 @@ export interface LocalHumanHandoffTask {
 
 export interface LocalHandoffManifest {
   version: 1;
+  contextGate?: LocalHandoffContextGate;
   agentQueue: LocalAgentHandoffJob[];
   blockedAgentQueue: LocalAgentBlockedJob[];
   humanQueue: LocalHumanHandoffTask[];
   evalSignals: string[];
+  nextActions: string[];
+}
+
+export interface LocalHandoffContextGate {
+  readyForDecomposition: boolean;
+  shouldIterate: boolean;
+  pendingSteps: ContextSedimentationPendingStep[];
   nextActions: string[];
 }
 
@@ -111,6 +124,7 @@ export interface BuildLocalHandoffManifestInput {
   handoff?: PlanHandoffReport;
   aimContext?: readonly ContextSedimentationAimContext[];
   durableMemoryCandidates?: readonly ContextSedimentationMemoryCandidate[];
+  contextSedimentation?: Pick<ContextSedimentationReport, "readyForDecomposition" | "shouldIterate" | "pendingSteps" | "nextActions"> | null;
   selectedContext?: readonly PlanQualityContext[];
   maxContextItemsPerJob?: number;
 }
@@ -502,6 +516,14 @@ function manifestNextActions(input: {
   report: PlanHandoffReport;
 }): string[] {
   const actions: string[] = [];
+  if (input.manifest.contextGate?.shouldIterate || input.manifest.contextGate?.readyForDecomposition === false) {
+    const pendingCount = input.manifest.contextGate.pendingSteps.length;
+    actions.push(
+      pendingCount > 0
+        ? `Finish ${pendingCount} context intake step${pendingCount === 1 ? "" : "s"} before one-click handoff.`
+        : "Collect grounded context before one-click handoff.",
+    );
+  }
   if (input.manifest.agentQueue.length > 0) {
     actions.push(`Prepare ${input.manifest.agentQueue.length} local agent job${input.manifest.agentQueue.length === 1 ? "" : "s"} for queueing.`);
   }
@@ -523,8 +545,17 @@ export function buildLocalHandoffManifest(input: BuildLocalHandoffManifestInput)
   const maxContextItems = input.maxContextItemsPerJob ?? 6;
   const contexts = handoffContextCandidates(input);
   const tasksByKey = taskMap(report);
+  const contextGate = input.contextSedimentation
+    ? {
+        readyForDecomposition: input.contextSedimentation.readyForDecomposition,
+        shouldIterate: input.contextSedimentation.shouldIterate,
+        pendingSteps: [...input.contextSedimentation.pendingSteps],
+        nextActions: [...input.contextSedimentation.nextActions],
+      }
+    : undefined;
   const partial: Omit<LocalHandoffManifest, "nextActions"> = {
     version: 1,
+    ...(contextGate ? { contextGate } : {}),
     agentQueue: report.agentReady.map((task) =>
       agentJob(task, contexts, maxContextItems, humanPrerequisiteKeys(task, tasksByKey)),
     ),

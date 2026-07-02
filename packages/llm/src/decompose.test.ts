@@ -566,6 +566,28 @@ describe("planQualityMetadata", () => {
           reason: "Durable eval signal captured during intake.",
         },
       ],
+      contextSedimentation: {
+        readyForDecomposition: false,
+        shouldIterate: true,
+        pendingSteps: [
+          {
+            stepId: "loop_web",
+            channel: "web_research",
+            status: "blocked",
+            blocksPlanAcceptance: true,
+            remainingOutputs: ["aim_context"],
+            requiredTools: [
+              {
+                name: "web.fetch",
+                boundary: "first_party",
+                reason: "Fetch bounded source text before handoff.",
+              },
+            ],
+            reason: "web_research context intake is waiting on needs permission.",
+          },
+        ],
+        nextActions: ["Resolve permission or connector setup for 1 blocked context step."],
+      },
       selectedContext: [
         {
           content: "Procedure: Run pnpm test before handing off local agent work.",
@@ -602,7 +624,16 @@ describe("planQualityMetadata", () => {
     expect(metadata.local_handoff_manifest?.evalSignals).toContain(
       "Eval signal: Trusted source events should become idempotent evidence rows.",
     );
-    expect(metadata.local_handoff_manifest?.nextActions[0]).toBe("Prepare 2 local agent jobs for queueing.");
+    expect(metadata.local_handoff_manifest?.contextGate).toMatchObject({
+      readyForDecomposition: false,
+      pendingSteps: [
+        expect.objectContaining({
+          stepId: "loop_web",
+          channel: "web_research",
+        }),
+      ],
+    });
+    expect(metadata.local_handoff_manifest?.nextActions[0]).toBe("Finish 1 context intake step before one-click handoff.");
   });
 });
 

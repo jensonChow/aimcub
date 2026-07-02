@@ -660,6 +660,7 @@ async function runClarify(title: string, description: string | undefined, opts: 
         ...planQualityMetadata({ quality, ...qualityRetry, output: plan }, review, {
           aimContext: contextSedimentation.aimContext,
           durableMemoryCandidates: contextSedimentation.durableMemoryCandidates,
+          contextSedimentation,
           selectedContext: [...answerMemories, ...memories],
         }),
         aim_intake: intake,
@@ -722,6 +723,7 @@ async function runNew(title: string, description: string | undefined, json: bool
       ...planQualityMetadata(result, review, {
         aimContext: contextSedimentation.aimContext,
         durableMemoryCandidates: contextSedimentation.durableMemoryCandidates,
+        contextSedimentation,
         selectedContext: memories,
       }),
       aim_intake: intake,
@@ -1040,6 +1042,7 @@ async function runReplan(
       ...planQualityMetadata(result, review, {
         aimContext: contextSedimentation.aimContext,
         durableMemoryCandidates: contextSedimentation.durableMemoryCandidates,
+        contextSedimentation,
         selectedContext: memories,
       }),
       aim_intake: intake,

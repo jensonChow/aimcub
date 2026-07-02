@@ -314,6 +314,7 @@ export function registerIpc(): void {
       plan: req.plan,
       aimContext: contextSedimentation.aimContext,
       durableMemoryCandidates: contextSedimentation.durableMemoryCandidates,
+      contextSedimentation,
       selectedContext: selectedContext.memories,
     });
 

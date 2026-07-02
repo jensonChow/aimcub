@@ -21,6 +21,7 @@ import {
   type ContextLineageLearningReport,
   type ContextSedimentationAimContext,
   type ContextSedimentationMemoryCandidate,
+  type ContextSedimentationReport,
   type DecompositionLearningReport,
   type DecompositionStrategyReport,
   type LocalHandoffManifest,
@@ -97,6 +98,8 @@ export interface PlanQualityMetadataOptions {
   aimContext?: readonly ContextSedimentationAimContext[];
   /** Pending durable context collected during the current intake loop. */
   durableMemoryCandidates?: readonly ContextSedimentationMemoryCandidate[];
+  /** Current intake-loop readiness so future local-agent handoff can respect unresolved context. */
+  contextSedimentation?: Pick<ContextSedimentationReport, "readyForDecomposition" | "shouldIterate" | "pendingSteps" | "nextActions"> | null;
 }
 
 /** Persistable metadata for the selected decomposition and its quality retry loop. */
@@ -124,6 +127,7 @@ export function planQualityMetadata(
       handoff,
       aimContext: options?.aimContext,
       durableMemoryCandidates: options?.durableMemoryCandidates,
+      contextSedimentation: options?.contextSedimentation,
       selectedContext: options?.selectedContext,
     });
   }

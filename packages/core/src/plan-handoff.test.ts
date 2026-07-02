@@ -438,6 +438,59 @@ describe("buildLocalHandoffManifest", () => {
     ]);
   });
 
+  it("carries pending context intake as a gate before one-click handoff", () => {
+    const plan: DecompositionOutput = {
+      goal_summary: "Prepare local agent work after context intake.",
+      domain: "software",
+      rationale: "Agent-ready tasks still need the current aim context gate.",
+      nodes: [node("inspect", "agent")],
+      edges: [],
+    };
+
+    const manifest = buildLocalHandoffManifest({
+      plan,
+      contextSedimentation: {
+        readyForDecomposition: false,
+        shouldIterate: true,
+        pendingSteps: [
+          {
+            stepId: "loop_web",
+            channel: "web_research",
+            status: "blocked",
+            blocksPlanAcceptance: true,
+            remainingOutputs: ["aim_context"],
+            requiredTools: [
+              {
+                name: "web.fetch",
+                boundary: "first_party",
+                reason: "Fetch selected sources before accepting the decomposition.",
+              },
+            ],
+            reason: "web_research context intake is waiting on needs permission.",
+          },
+        ],
+        nextActions: ["Resolve permission or connector setup for 1 blocked context step."],
+      },
+    });
+
+    expect(manifest.agentQueue.map((job) => job.nodeKey)).toEqual(["inspect"]);
+    expect(manifest.contextGate).toMatchObject({
+      readyForDecomposition: false,
+      shouldIterate: true,
+      pendingSteps: [
+        expect.objectContaining({
+          channel: "web_research",
+          requiredTools: [
+            expect.objectContaining({
+              name: "web.fetch",
+            }),
+          ],
+        }),
+      ],
+    });
+    expect(manifest.nextActions[0]).toBe("Finish 1 context intake step before one-click handoff.");
+  });
+
   it("keeps blocked agent and human-gated work out of the ready queue", () => {
     const plan: DecompositionOutput = {
       goal_summary: "Route local handoff work.",
