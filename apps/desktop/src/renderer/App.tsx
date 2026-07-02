@@ -778,7 +778,7 @@ function AppInner() {
   }
 
   return (
-    <div style={{ fontFamily: "system-ui, -apple-system, sans-serif", color: C.text, background: C.page, width: "100%", height: "100vh", overflow: "hidden" }}>
+    <div style={appRootStyle()}>
       <div style={classicShellStyle(compactShell)}>
         <ClassicSidebar
           compact={compactShell}
@@ -790,7 +790,7 @@ function AppInner() {
           onOpen={openGoal}
         />
 
-        <section style={mainShellStyle(compactShell)}>
+        <section style={mainShellStyle()}>
           <header style={mainTopBarStyle(compactShell)}>
             <div style={{ minWidth: 0 }}>
               {showSessionDetails && (
@@ -914,7 +914,7 @@ function AppInner() {
                 onSubmit={submitComposerPrompt}
                 meta={provider?.configured ? providerLabel(provider, t) : t("provider.setup")}
                 onMetaClick={() => setShowSettings((v) => !v)}
-            />
+              />
             </section>
           </main>
         </section>
@@ -1262,13 +1262,126 @@ function sessionDetailsSummaryStyle(): CSSProperties {
   };
 }
 
+function threadSectionStyle(): CSSProperties {
+  return {
+    width: "min(820px, 100%)",
+    margin: "0 auto 16px",
+  };
+}
+
+function userTurnStyle(): CSSProperties {
+  return {
+    display: "flex",
+    justifyContent: "flex-end",
+    marginBottom: 18,
+  };
+}
+
+function userBubbleStyle(): CSSProperties {
+  return {
+    maxWidth: "min(640px, 82%)",
+    background: "#eeeeea",
+    color: C.text,
+    borderRadius: 16,
+    padding: "11px 14px",
+    fontSize: 14,
+    lineHeight: 1.5,
+  };
+}
+
+function assistantTurnStyle(): CSSProperties {
+  return {
+    color: C.text,
+    fontSize: 14,
+    lineHeight: 1.55,
+  };
+}
+
+function assistantMetaStyle(): CSSProperties {
+  return {
+    display: "flex",
+    gap: 8,
+    flexWrap: "wrap",
+    color: C.muted,
+    fontSize: 12,
+    fontWeight: 650,
+  };
+}
+
+function milestoneListStyle(): CSSProperties {
+  return {
+    width: "min(820px, 100%)",
+    margin: "0 auto",
+    borderTop: `1px solid ${C.border}`,
+  };
+}
+
+function milestoneRowStyle(open: boolean): CSSProperties {
+  return {
+    borderBottom: `1px solid ${C.border}`,
+    background: open ? "rgba(255, 255, 255, 0.62)" : "transparent",
+    padding: "14px 0",
+  };
+}
+
+function milestoneIndexStyle(): CSSProperties {
+  return {
+    width: 22,
+    height: 22,
+    display: "inline-grid",
+    placeItems: "center",
+    borderRadius: 999,
+    background: "#eeeeea",
+    color: C.muted,
+    fontSize: 12,
+    fontVariantNumeric: "tabular-nums",
+  };
+}
+
+function inlineDetailButtonStyle(): CSSProperties {
+  return {
+    border: "none",
+    background: "transparent",
+    color: C.muted,
+    cursor: "pointer",
+    fontSize: 12,
+    padding: "2px 0",
+  };
+}
+
+function planActionRowStyle(): CSSProperties {
+  return {
+    width: "min(820px, 100%)",
+    margin: "14px auto 0",
+    display: "flex",
+    gap: 10,
+    alignItems: "center",
+    flexWrap: "wrap",
+  };
+}
+
+function appRootStyle(): CSSProperties {
+  return {
+    position: "fixed",
+    inset: 0,
+    fontFamily: "system-ui, -apple-system, sans-serif",
+    color: C.text,
+    background: "#f1f1ee",
+    width: "100vw",
+    height: "100vh",
+    overflow: "hidden",
+  };
+}
+
 function classicShellStyle(compact: boolean): CSSProperties {
   return {
     display: "grid",
     gridTemplateColumns: compact ? "1fr" : "268px minmax(0, 1fr)",
     gridTemplateRows: compact ? "auto minmax(0, 1fr)" : undefined,
     width: "100%",
-    height: "100vh",
+    height: "100%",
+    minHeight: 0,
+    background: C.page,
     overflow: "hidden",
   };
 }
@@ -1285,20 +1398,25 @@ function classicSidebarStyle(compact: boolean): CSSProperties {
     padding: compact ? "16px 14px" : "18px 14px",
     boxSizing: "border-box",
     minWidth: 0,
-    height: compact ? "auto" : "100vh",
-    overflow: "hidden",
+    height: compact ? "auto" : "100%",
+    minHeight: 0,
+    overflowY: compact ? "visible" : "auto",
+    overscrollBehavior: "contain",
+    scrollbarGutter: "stable",
   };
 }
 
-function mainShellStyle(compact: boolean): CSSProperties {
+function mainShellStyle(): CSSProperties {
   return {
     minWidth: 0,
-    padding: compact ? "16px 14px 44px" : "22px 34px 56px",
+    minHeight: 0,
+    padding: 0,
     boxSizing: "border-box",
-    height: "100vh",
+    height: "100%",
     overflow: "hidden",
     display: "flex",
     flexDirection: "column",
+    background: C.page,
   };
 }
 
@@ -1309,14 +1427,16 @@ function mainTopBarStyle(compact: boolean): CSSProperties {
     justifyContent: "space-between",
     gap: 12,
     flexWrap: compact ? "wrap" : "nowrap",
-    marginBottom: 16,
+    padding: compact ? "16px 14px 14px" : "22px 34px 16px",
+    boxSizing: "border-box",
+    flex: "0 0 auto",
   };
 }
 
 function contentSurfaceStyle(compact: boolean): CSSProperties {
   return {
     minWidth: 0,
-    padding: compact ? 2 : 0,
+    padding: compact ? "0 14px 18px" : "0 34px 24px",
     minHeight: 0,
     flex: 1,
     boxSizing: "border-box",
@@ -1413,27 +1533,24 @@ function AimHeader(props: {
   const total = Math.max(props.milestoneCount, 1);
   const percent = Math.max(0, Math.min(100, Math.round((props.doneCount / total) * 100)));
   return (
-    <section style={{ marginBottom: 18 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 14, flexWrap: "wrap" }}>
-        <div style={{ minWidth: 0, flex: "1 1 360px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <span style={miniPill(C.accent)}>{props.status}</span>
-            <span style={{ color: C.muted, fontSize: 12 }}>
-              {t(props.milestoneCount === 1 ? "common.milestone_one" : "common.milestone_other", { n: props.milestoneCount })}
-            </span>
-          </div>
-          <h2 style={{ margin: "10px 0 0", fontSize: 28, lineHeight: 1.15, letterSpacing: 0 }}>{props.title}</h2>
-          {props.description ? <p style={{ color: C.muted, fontSize: 14, lineHeight: 1.6, margin: "10px 0 0" }}>{props.description}</p> : null}
+    <section style={threadSectionStyle()}>
+      <div style={userTurnStyle()}>
+        <div style={userBubbleStyle()}>
+          {props.title}
         </div>
-        <div style={{ minWidth: 220, flex: "0 0 240px", border: `1px solid ${C.border}`, borderRadius: 8, padding: 12, background: "#f8fafc" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", color: C.muted, fontSize: 12, marginBottom: 8 }}>
-            <span>{t("shell.progress")}</span>
-            <span>{t("shell.progressValue", { done: props.doneCount, total: props.milestoneCount })}</span>
-          </div>
-          <div style={{ height: 7, background: "#e7ebf0", borderRadius: 999, overflow: "hidden" }}>
+      </div>
+      <div style={assistantTurnStyle()}>
+        <div style={assistantMetaStyle()}>
+          <span>Aimcub</span>
+          <span>{props.status}</span>
+          <span>{t(props.milestoneCount === 1 ? "common.milestone_one" : "common.milestone_other", { n: props.milestoneCount })}</span>
+        </div>
+        {props.description ? <div style={{ color: C.muted, fontSize: 14, lineHeight: 1.6, marginTop: 8 }}>{props.description}</div> : null}
+        <div style={{ marginTop: 14 }}>
+          <div style={{ height: 5, background: "#e8e8e4", borderRadius: 999, overflow: "hidden" }}>
             <div style={{ height: "100%", width: `${percent}%`, background: C.accent }} />
           </div>
-          <div style={{ color: C.text, fontSize: 12, marginTop: 10, lineHeight: 1.4 }}>
+          <div style={{ color: C.text, fontSize: 13, marginTop: 9, lineHeight: 1.45 }}>
             <span style={{ color: C.muted }}>{t("shell.nextAction")} </span>
             {props.nextAction}
           </div>
@@ -1506,14 +1623,17 @@ function BusyPlanState(props: { step: Step; title: string; description: string }
       ? t("status.clarifying")
       : t("status.refining");
   return (
-    <section>
-      <Notice tone="info">{message}</Notice>
-      <SpinnerVerbLine step={props.step} />
-      <div style={{ ...card(), background: "#f8fafc", marginTop: 14 }}>
-        <div style={{ color: C.muted, fontSize: 12, marginBottom: 6 }}>{t("shell.currentAim")}</div>
-        <h2 style={{ margin: 0, fontSize: 24, letterSpacing: 0 }}>{props.title || t("shell.untitledAim")}</h2>
-        {props.description ? <p style={{ color: C.muted, fontSize: 14, lineHeight: 1.55, margin: "8px 0 0" }}>{props.description}</p> : null}
-        <div style={{ color: C.muted, fontSize: 12, marginTop: 14 }}>{t("shell.processLivesInInspector")}</div>
+    <section style={threadSectionStyle()}>
+      <div style={userTurnStyle()}>
+        <div style={userBubbleStyle()}>{props.title || t("shell.untitledAim")}</div>
+      </div>
+      <div style={assistantTurnStyle()}>
+        <div style={assistantMetaStyle()}>
+          <span>Aimcub</span>
+          <span>{message}</span>
+        </div>
+        <SpinnerVerbLine step={props.step} />
+        {props.description ? <div style={{ color: C.muted, fontSize: 14, lineHeight: 1.55, marginTop: 10 }}>{props.description}</div> : null}
       </div>
     </section>
   );
@@ -1887,7 +2007,7 @@ function QuestionsStep(props: {
   const { t } = useI18n();
   const { clarify, answers } = props;
   return (
-    <section>
+    <section style={threadSectionStyle()}>
       <p style={{ color: C.muted, fontSize: 14, margin: "4px 0 16px" }}>{t("q.intro")}</p>
 
       {clarify.questions.length === 0 && <Notice tone="info">{t("q.none")}</Notice>}
@@ -1978,19 +2098,17 @@ function MilestoneCards(props: { plan: DecompositionOutput }) {
   const { t } = useI18n();
   const [openKey, setOpenKey] = useState<string | null>(null);
   return (
-    <div style={{ display: "grid", gap: 10 }}>
+    <div style={milestoneListStyle()}>
       {props.plan.nodes.map((n, i) => {
         const contract = n.decomposition_contract;
         const open = openKey === n.key;
         const completionStandard = contract?.definition_of_done || n.description || n.title;
         return (
-          <div key={n.key} style={{ ...card(), marginBottom: 0, borderColor: open ? "#b8cbe8" : C.border }}>
-            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12, alignItems: "start" }}>
+          <div key={n.key} style={milestoneRowStyle(open)}>
+            <div style={{ display: "grid", gridTemplateColumns: "26px minmax(0, 1fr) auto", gap: 10, alignItems: "start" }}>
+              <div style={milestoneIndexStyle()}>{i + 1}</div>
               <div style={{ minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                  <span style={{ color: C.muted, fontSize: 12, fontVariantNumeric: "tabular-nums" }}>{i + 1}</span>
-                  <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis" }}>{n.title}</span>
-                </div>
+                <div style={{ fontWeight: 650, overflow: "hidden", textOverflow: "ellipsis" }}>{n.title}</div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8, alignItems: "center" }}>
                   <span style={miniPill()}>{contract ? decompositionOwnerLabel(contract.likely_owner, t) : t("plan.ownerUnknown")}</span>
                   <span style={miniPill(C.accent)}>{t("shell.pending")}</span>
@@ -2000,13 +2118,13 @@ function MilestoneCards(props: { plan: DecompositionOutput }) {
                   {shortUiText(completionStandard)}
                 </div>
               </div>
-              <button onClick={() => setOpenKey(open ? null : n.key)} style={{ ...secondaryButton(), marginTop: 0, padding: "6px 9px", fontSize: 12 }}>
+              <button onClick={() => setOpenKey(open ? null : n.key)} style={inlineDetailButtonStyle()}>
                 {t(open ? "plan.hideDetails" : "plan.details")}
               </button>
             </div>
-            {open && n.description && <div style={{ color: C.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>{n.description}</div>}
+            {open && n.description && <div style={{ color: C.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5, paddingLeft: 36 }}>{n.description}</div>}
             {open && contract && (
-              <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}`, color: C.muted, fontSize: 12 }}>
+              <div style={{ marginTop: 10, marginLeft: 36, paddingTop: 10, borderTop: `1px solid ${C.border}`, color: C.muted, fontSize: 12 }}>
                 <div style={{ fontWeight: 600, color: C.text, marginBottom: 4 }}>
                   {t("plan.contract")} · {decompositionOwnerLabel(contract.likely_owner, t)}
                 </div>
@@ -2056,7 +2174,7 @@ function PlanView(props: {
       />
       <MilestoneCards plan={plan} />
 
-      <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 8 }}>
+      <div style={planActionRowStyle()}>
         {savedAt ? (
           <>
             <span style={{ color: "#1a7f4b", fontSize: 14 }}>{t("plan.saved")}</span>
@@ -2067,13 +2185,13 @@ function PlanView(props: {
                 })}
               </span>
             )}
-            <button onClick={props.onHome} style={secondaryButton()}>{t("plan.backToAims")}</button>
+            <button onClick={props.onHome} style={{ ...secondaryButton(), marginTop: 0 }}>{t("plan.backToAims")}</button>
           </>
         ) : (
           <>
-            <button onClick={props.onSave} style={primaryButton(false)}>{t("plan.save")}</button>
-            {reviewPrompt && <button onClick={() => props.onRefineWithReview(reviewPrompt)} style={secondaryButton()}>{t("plan.refineReview")}</button>}
-            <button onClick={props.onReset} style={secondaryButton()}>{t("plan.startOver")}</button>
+            <button onClick={props.onSave} style={{ ...primaryButton(false), marginTop: 0 }}>{t("plan.save")}</button>
+            {reviewPrompt && <button onClick={() => props.onRefineWithReview(reviewPrompt)} style={{ ...secondaryButton(), marginTop: 0 }}>{t("plan.refineReview")}</button>}
+            <button onClick={props.onReset} style={{ ...secondaryButton(), marginTop: 0 }}>{t("plan.startOver")}</button>
           </>
         )}
       </div>
@@ -2119,9 +2237,9 @@ function SavedGoalView(props: {
         </>
       )}
 
-      <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
-        <button onClick={props.onBack} style={secondaryButton()}>{t("plan.backToAims")}</button>
-        <button onClick={props.onDelete} style={{ ...secondaryButton(), color: C.danger, borderColor: "#e7c9c9" }}>{t("common.delete")}</button>
+      <div style={planActionRowStyle()}>
+        <button onClick={props.onBack} style={{ ...secondaryButton(), marginTop: 0 }}>{t("plan.backToAims")}</button>
+        <button onClick={props.onDelete} style={{ ...secondaryButton(), marginTop: 0, color: C.danger, borderColor: "#e7c9c9" }}>{t("common.delete")}</button>
       </div>
     </section>
   );
