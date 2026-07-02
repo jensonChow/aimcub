@@ -162,7 +162,10 @@ describe("decompose · happy path", () => {
     expect(call.system).toContain("Aimcub");
     expect(call.system).toContain("decomposition_contract");
     expect(call.system).toContain("Default to `agent` for digital work");
+    expect(call.system).toContain("Agent-owned milestones must be handoff-ready");
     expect(call.system).toContain("Use `human` only for work that must happen in the physical world");
+    expect(call.system).toContain("split it into");
+    expect(call.system).toContain("likely_owner` must agree with `required_evidence`");
     expect(call.system).toContain("Never put `mixed` there");
     expect(call.system).toContain("local context scanning or");
     expect(call.system).toContain("web research");

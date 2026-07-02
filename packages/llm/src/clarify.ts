@@ -617,6 +617,14 @@ function renderAimIntake(intake: AimIntakeReport | null | undefined): string {
       lines.push(`- [${question.priority}] ${question.category} · ${question.source} · ${question.reason}: ${question.prompt}`);
     }
   }
+  if (intake.acquisition?.length > 0) {
+    lines.push("Recommended context acquisition channels:");
+    for (const row of intake.acquisition.slice(0, 5)) {
+      const tools = row.suggestedTools.length > 0 ? ` · tools: ${row.suggestedTools.join(", ")}` : "";
+      const categories = row.categories.length > 0 ? ` · categories: ${row.categories.join(", ")}` : "";
+      lines.push(`- [${row.priority}] ${row.channel} · ${row.scope}${categories}${tools}: ${row.action}`);
+    }
+  }
   if (intake.nextActions.length > 0) {
     lines.push("Intake next actions:");
     for (const action of intake.nextActions.slice(0, 3)) lines.push(`- ${action}`);

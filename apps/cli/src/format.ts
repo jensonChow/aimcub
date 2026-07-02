@@ -730,6 +730,14 @@ export function formatAimIntake(report: AimIntakeReport): string {
     const capture = formatCaptureContract(question.capture);
     if (capture) lines.push(`     ${capture}`);
   }
+  for (const row of (report.acquisition ?? []).slice(0, 4)) {
+    const categories = row.categories.length > 0
+      ? ` · ${row.categories.map((category) => category.replace("_", "-")).join(", ")}`
+      : "";
+    const tools = row.suggestedTools.length > 0 ? ` · tools ${row.suggestedTools.join(", ")}` : "";
+    lines.push(`   acquire: [${row.priority}] ${row.channel.replace("_", "-")} · ${row.scope}${categories}${tools}`);
+    lines.push(`     ${row.action}`);
+  }
   for (const action of report.nextActions.slice(0, 4)) {
     lines.push(`   action: ${action}`);
   }

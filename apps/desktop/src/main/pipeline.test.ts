@@ -269,6 +269,7 @@ describe("desktop planner · with a gateway (real @core/llm pipeline)", () => {
             prompt: "Ask what proves this aim is complete.",
           },
         ],
+        acquisition: [],
         nextActions: ["Answer 1 high-priority intake question before accepting a plan."],
       },
     );

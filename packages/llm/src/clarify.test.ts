@@ -711,6 +711,25 @@ describe("clarify · happy path", () => {
             prompt: "Ask what would make this aim count as genuinely complete.",
           },
         ],
+        acquisition: [
+          {
+            id: "acq_1",
+            channel: "web_research",
+            priority: "high",
+            scope: "aim",
+            categories: ["project_fact", "procedure"],
+            reason: "External docs may shape this aim.",
+            action: "Run first-party web research before finalizing milestones.",
+            suggestedTools: ["web.search", "web.fetch"],
+            memoryTargets: [
+              {
+                scope: "aim",
+                kind: "semantic",
+                categories: ["project_fact", "procedure"],
+              },
+            ],
+          },
+        ],
         nextActions: ["Answer 1 high-priority intake question before accepting a plan."],
       },
     });
@@ -720,6 +739,9 @@ describe("clarify · happy path", () => {
     expect(gw.calls[0]!.prompt).toContain("needs_targeted_context");
     expect(gw.calls[0]!.prompt).toContain("Missing core context: eval_signal, procedure");
     expect(gw.calls[0]!.prompt).toContain("Ask what would make this aim count as genuinely complete");
+    expect(gw.calls[0]!.prompt).toContain("Recommended context acquisition channels");
+    expect(gw.calls[0]!.prompt).toContain("web_research");
+    expect(gw.calls[0]!.prompt).toContain("web.search");
   });
 
   it("includes draft plan review gaps so high-value questions target decomposition quality", async () => {
@@ -907,6 +929,7 @@ describe("clarify · happy path", () => {
             prompt: "Ask for non-negotiable scope boundaries.",
           },
         ],
+        acquisition: [],
         nextActions: ["Answer 1 targeted intake question if it would change scope or evidence."],
       },
     });

@@ -204,6 +204,7 @@ describe("formatPlanPretty", () => {
           prompt: "Ask what counts as complete.",
         },
       ],
+      acquisition: [],
       nextActions: ["Answer 1 high-priority intake question before accepting a plan."],
     });
 
@@ -580,6 +581,25 @@ describe("formatAimIntake", () => {
           },
         },
       ],
+      acquisition: [
+        {
+          id: "acq_1",
+          channel: "web_research",
+          priority: "high",
+          scope: "aim",
+          categories: ["project_fact", "procedure"],
+          reason: "Need current docs.",
+          action: "Run first-party web research before finalizing milestones.",
+          suggestedTools: ["web.search", "web.fetch"],
+          memoryTargets: [
+            {
+              scope: "aim",
+              kind: "semantic",
+              categories: ["project_fact", "procedure"],
+            },
+          ],
+        },
+      ],
       nextActions: ["Answer 1 high-priority intake question before accepting a plan."],
     });
 
@@ -588,6 +608,8 @@ describe("formatAimIntake", () => {
     expect(text).toContain("missing core context: eval-signal, procedure");
     expect(text).toContain("thin_aim_statement");
     expect(text).toContain("capture: global eval-signal · define-eval · improves verifiability");
+    expect(text).toContain("acquire: [high] web-research · aim · project-fact, procedure");
+    expect(text).toContain("tools web.search, web.fetch");
     expect(text).toContain("Answer 1 high-priority intake question");
   });
 });

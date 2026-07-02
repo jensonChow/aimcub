@@ -58,7 +58,65 @@ describe("reviewAimIntake", () => {
       purpose: "define_eval",
       improvesDimension: "verifiability",
     });
+    expect(report.acquisition.map((row) => row.channel)).toEqual(expect.arrayContaining([
+      "local_workspace",
+      "conversation",
+      "questionnaire",
+    ]));
+    expect(report.acquisition.find((row) => row.channel === "local_workspace")).toMatchObject({
+      priority: "high",
+      scope: "aim",
+      suggestedTools: expect.arrayContaining(["local.scan_workspace", "local.search", "local.read"]),
+      memoryTargets: [
+        {
+          scope: "aim",
+          kind: "semantic",
+          categories: expect.arrayContaining(["project_fact", "procedure"]),
+        },
+      ],
+    });
     expect(report.nextActions).toContain("Review pending context candidates so future aims need fewer questions.");
+  });
+
+  it("recommends local, personal, web, conversational, and questionnaire context acquisition channels", () => {
+    const report = reviewAimIntake({
+      title: "Plan a Cambodia trip using current travel information",
+      description: "Use my Notion travel notes and any local folder I attach, then ask only the decisions that still need my input.",
+      memories: [],
+      selectedContext: [],
+    });
+
+    expect(report.readiness).toBe("needs_targeted_context");
+    expect(report.acquisition.map((row) => row.channel)).toEqual(expect.arrayContaining([
+      "local_workspace",
+      "personal_database",
+      "web_research",
+      "conversation",
+      "questionnaire",
+    ]));
+    expect(report.acquisition.find((row) => row.channel === "web_research")).toMatchObject({
+      priority: "high",
+      scope: "aim",
+      categories: expect.arrayContaining(["project_fact", "procedure", "eval_signal"]),
+      suggestedTools: ["web.search", "web.fetch", "memory.write_candidate"],
+      memoryTargets: [
+        {
+          scope: "aim",
+          kind: "semantic",
+          categories: expect.arrayContaining(["project_fact", "procedure", "eval_signal"]),
+        },
+      ],
+    });
+    expect(report.acquisition.find((row) => row.channel === "personal_database")).toMatchObject({
+      suggestedTools: expect.arrayContaining(["external.notion"]),
+      memoryTargets: expect.arrayContaining([
+        expect.objectContaining({
+          scope: "global",
+          categories: expect.arrayContaining(["preference", "constraint", "capability"]),
+        }),
+      ]),
+    });
+    expect(report.acquisition.find((row) => row.channel === "questionnaire")?.memoryTargets.length).toBeGreaterThan(0);
   });
 
   it("uses draft review gaps and quality actions to mark a plan as needing refinement", () => {
