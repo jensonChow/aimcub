@@ -14,11 +14,13 @@ import {
   reviewContextHealth,
   reviewContextIntakeProgress,
   reviewContextProfile,
+  reviewContextSedimentation,
   reviewPlan,
   type ContextCategory,
   type ContextAcquisitionChannel,
   type ContextCaptureScope,
   type ContextIntakeProgressSignal,
+  type ContextSedimentationCandidateInput,
   type DecompositionLearningReport,
 } from "@core/domain";
 import {
@@ -128,6 +130,20 @@ function contextIntakeSignals(input: {
     });
   }
   return signals;
+}
+
+function contextSedimentationCandidates(
+  planning: DesktopPlanningContext,
+): ContextSedimentationCandidateInput[] {
+  return (planning.toolDistillation?.durableMemoryCandidates ?? []).flatMap((candidate) => {
+    if (!isContextCategory(candidate.category)) return [];
+    return [{
+      content: candidate.content,
+      category: candidate.category,
+      scope: scopeForCandidate(candidate.scope),
+      source: "distilled_context",
+    }];
+  });
 }
 
 async function clarifyLearning() {
@@ -329,13 +345,20 @@ export function registerIpc(): void {
       draftReview: req.review ?? null,
       lineageLearning,
     });
+    const intakeSignals = contextIntakeSignals({
+      planning: selectedContext,
+      questions: req.questions,
+      answers: req.answers,
+    });
     const intakeProgress = reviewContextIntakeProgress({
       loop: intake.loop,
-      signals: contextIntakeSignals({
-        planning: selectedContext,
-        questions: req.questions,
-        answers: req.answers,
-      }),
+      signals: intakeSignals,
+    });
+    const contextSedimentation = reviewContextSedimentation({
+      loop: intake.loop,
+      progress: intakeProgress,
+      signals: intakeSignals,
+      candidates: contextSedimentationCandidates(selectedContext),
     });
 
     const saved = await aimStore.createGoal({
@@ -354,6 +377,7 @@ export function registerIpc(): void {
           : {}),
         aim_intake: intake,
         context_intake_progress: intakeProgress,
+        context_sedimentation: contextSedimentation,
         planning_context: selectedContext.report,
         planning_tools: planningToolTrace(selectedContext),
         ...(answerImpact ? { clarify_answer_impact: answerImpact } : {}),
