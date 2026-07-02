@@ -91,6 +91,40 @@ describe("reviewContextIntakeProgress", () => {
     });
   });
 
+  it("tracks requested user input without treating it as an answer", () => {
+    const intake = reviewAimIntake({
+      title: "Plan",
+      description: "",
+      selectedContext: [],
+      memories: [],
+    });
+    const questionnaire = intake.loop.steps.find((step) => step.channel === "questionnaire");
+    expect(questionnaire).toBeTruthy();
+
+    const progress = reviewContextIntakeProgress({
+      loop: intake.loop,
+      signals: [
+        {
+          source: "user_request",
+          channel: "questionnaire",
+          scope: "aim",
+          category: "project_fact",
+          questionId: "missing_planning_context",
+          summary: "Asked the user what context should shape the aim.",
+        },
+      ],
+    });
+
+    expect(progress.steps.find((step) => step.stepId === questionnaire!.id)).toMatchObject({
+      status: "pending",
+      matchedSignalCount: 1,
+      requestedUserInputCount: 1,
+      satisfiedOutputs: [],
+      remainingOutputs: ["aim_context", "durable_memory_candidate", "clarifying_answer"],
+      reason: expect.stringContaining("waiting on 1 user request"),
+    });
+  });
+
   it("selects the next unsatisfied acceptance-blocking step", () => {
     const intake = reviewAimIntake({
       title: "Research latest travel docs and save the plan in Notion",

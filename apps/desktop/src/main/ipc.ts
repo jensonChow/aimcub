@@ -28,6 +28,7 @@ import {
   buildAimIntakeReport,
   planQualityMetadata,
   clarifyAnswersToMemories,
+  type ContextAskUserOutput,
   planningContextReportsFromGoals,
   recordAssumptionContextCandidatesForStore,
   recordReviewContextCandidatesForStore,
@@ -95,6 +96,34 @@ function isContextCategory(value: unknown): value is ContextCategory {
     value === "procedure";
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isContextAskUserOutput(value: unknown): value is ContextAskUserOutput {
+  return isRecord(value) &&
+    typeof value.requestId === "string" &&
+    Array.isArray(value.questions);
+}
+
+function scopeForAskUserQuestion(scope: string | undefined): ContextCaptureScope | undefined {
+  if (scope === "global") return "global";
+  if (scope === "current_aim") return "aim";
+  return undefined;
+}
+
+function contextAskUserSignals(output: ContextAskUserOutput): ContextIntakeProgressSignal[] {
+  return output.questions.map((question) => ({
+    source: "user_request",
+    toolName: "context.ask_user",
+    channel: "questionnaire",
+    category: isContextCategory(question.category) ? question.category : undefined,
+    scope: scopeForAskUserQuestion(question.captureScope),
+    questionId: question.id,
+    summary: question.question,
+  }));
+}
+
 function contextIntakeSignals(input: {
   planning: DesktopPlanningContext;
   questions: SaveRequest["questions"];
@@ -102,6 +131,10 @@ function contextIntakeSignals(input: {
 }): ContextIntakeProgressSignal[] {
   const signals: ContextIntakeProgressSignal[] = [];
   for (const event of input.planning.toolObservationEvents) {
+    if (event.toolName === "context.ask_user" && isContextAskUserOutput(event.observation.data)) {
+      signals.push(...contextAskUserSignals(event.observation.data));
+      continue;
+    }
     signals.push({
       source: event.toolName === "memory.write_candidate" ? "memory_candidate" : "tool_observation",
       toolName: event.toolName,

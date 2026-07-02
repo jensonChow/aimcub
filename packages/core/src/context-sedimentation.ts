@@ -130,6 +130,7 @@ function scopeForSignal(signal: ContextIntakeProgressSignal): ContextCaptureScop
 
 function candidatesFromSignals(signals: readonly ContextIntakeProgressSignal[]): ContextSedimentationCandidateInput[] {
   return signals.flatMap((signal): ContextSedimentationCandidateInput[] => {
+    if (signal.source === "user_request") return [];
     const content = cleanText(signal.summary);
     const scope = scopeForSignal(signal);
     if (!content || !scope || !signal.category) return [];

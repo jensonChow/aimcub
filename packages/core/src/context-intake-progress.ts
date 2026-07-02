@@ -10,6 +10,7 @@ import type {
 export type ContextIntakeProgressSignalSource =
   | "tool_observation"
   | "memory_candidate"
+  | "user_request"
   | "user_answer";
 
 export type ContextIntakeProgressStatus =
@@ -33,6 +34,7 @@ export interface ContextIntakeProgressStep {
   channel: ContextAcquisitionChannel;
   status: ContextIntakeProgressStatus;
   matchedSignalCount: number;
+  requestedUserInputCount: number;
   satisfiedOutputs: ContextIntakeOutputKind[];
   remainingOutputs: ContextIntakeOutputKind[];
   blocksPlanAcceptance: boolean;
@@ -76,6 +78,7 @@ function outputSatisfied(
     case "aim_context":
       return signals.some((signal) =>
         signalMatchesStep(signal, step) &&
+        signal.source !== "user_request" &&
         (signal.scope === "aim" || signal.source === "tool_observation"),
       );
     case "durable_memory_candidate":
@@ -95,6 +98,7 @@ function progressReason(input: {
   step: ContextIntakeLoopStep;
   status: ContextIntakeProgressStatus;
   matchedSignalCount: number;
+  requestedUserInputCount: number;
   remainingOutputs: readonly ContextIntakeOutputKind[];
 }): string {
   if (input.status === "satisfied") {
@@ -102,6 +106,9 @@ function progressReason(input: {
   }
   if (input.status === "blocked") {
     return `${input.step.channel} context intake is waiting on ${input.step.status.replace(/_/g, " ")}.`;
+  }
+  if (input.requestedUserInputCount > 0) {
+    return `${input.step.channel} context intake is waiting on ${input.requestedUserInputCount} user request${input.requestedUserInputCount === 1 ? "" : "s"} and still needs ${input.remainingOutputs.join(", ")}.`;
   }
   return `${input.step.channel} context intake still needs ${input.remainingOutputs.join(", ")}.`;
 }
@@ -111,6 +118,7 @@ function progressStep(
   signals: readonly ContextIntakeProgressSignal[],
 ): ContextIntakeProgressStep {
   const matched = signals.filter((signal) => signalMatchesStep(signal, step));
+  const requestedUserInputCount = matched.filter((signal) => signal.source === "user_request").length;
   const satisfiedOutputs = step.outputs.filter((output) => outputSatisfied(output, step, matched));
   const remainingOutputs = step.outputs.filter((output) => !satisfiedOutputs.includes(output));
   const status: ContextIntakeProgressStatus = remainingOutputs.length === 0
@@ -122,10 +130,11 @@ function progressStep(
     channel: step.channel,
     status,
     matchedSignalCount: matched.length,
+    requestedUserInputCount,
     satisfiedOutputs,
     remainingOutputs,
     blocksPlanAcceptance: step.blocksPlanAcceptance,
-    reason: progressReason({ step, status, matchedSignalCount: matched.length, remainingOutputs }),
+    reason: progressReason({ step, status, matchedSignalCount: matched.length, requestedUserInputCount, remainingOutputs }),
   };
 }
 
