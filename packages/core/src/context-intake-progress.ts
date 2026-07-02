@@ -97,8 +97,28 @@ function outputSatisfied(
   }
 }
 
-function pendingStatus(step: ContextIntakeLoopStep): ContextIntakeProgressStatus {
-  if (step.status === "needs_permission" || step.status === "needs_connector") return "blocked";
+function runtimeBlocked(step: ContextIntakeLoopStep, matched: readonly ContextIntakeProgressSignal[]): boolean {
+  if (step.status === "needs_permission") {
+    return !matched.some((signal) =>
+      signal.source === "tool_observation" || signal.source === "memory_candidate",
+    );
+  }
+  if (step.status === "needs_connector") {
+    const connectorTools = new Set(step.toolCalls
+      .filter((tool) => tool.boundary === "external_connector")
+      .map((tool) => tool.name));
+    return connectorTools.size > 0 &&
+      !matched.some((signal) =>
+        signal.source === "tool_observation" &&
+        typeof signal.toolName === "string" &&
+        connectorTools.has(signal.toolName),
+      );
+  }
+  return false;
+}
+
+function pendingStatus(step: ContextIntakeLoopStep, matched: readonly ContextIntakeProgressSignal[]): ContextIntakeProgressStatus {
+  if (runtimeBlocked(step, matched)) return "blocked";
   return "pending";
 }
 
@@ -131,7 +151,7 @@ function progressStep(
   const remainingOutputs = step.outputs.filter((output) => !satisfiedOutputs.includes(output));
   const status: ContextIntakeProgressStatus = remainingOutputs.length === 0
     ? "satisfied"
-    : pendingStatus(step);
+    : pendingStatus(step, matched);
   return {
     stepId: step.id,
     acquisitionId: step.acquisitionId,

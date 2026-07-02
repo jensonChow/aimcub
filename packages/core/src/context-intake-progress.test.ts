@@ -153,6 +153,28 @@ describe("reviewContextIntakeProgress", () => {
     expect(progress.nextActions.join(" ")).toContain("context intake");
   });
 
+  it("keeps permission-required intake blocked before any tool observation", () => {
+    const intake = reviewAimIntake({
+      title: "Research latest travel docs",
+      description: "Need current web information.",
+      selectedContext: [],
+      memories: [],
+    });
+    const webResearch = intake.loop.steps.find((step) => step.channel === "web_research");
+    expect(webResearch).toBeTruthy();
+
+    const progress = reviewContextIntakeProgress({
+      loop: intake.loop,
+      signals: [],
+    });
+
+    expect(progress.steps.find((step) => step.stepId === webResearch!.id)).toMatchObject({
+      status: "blocked",
+      satisfiedOutputs: [],
+      remainingOutputs: ["aim_context"],
+    });
+  });
+
   it("requires fetched web source context before satisfying web research intake", () => {
     const intake = reviewAimIntake({
       title: "Research latest Cambodia travel docs",
@@ -178,7 +200,7 @@ describe("reviewContextIntakeProgress", () => {
     });
 
     expect(searchOnly.steps.find((step) => step.stepId === webResearch!.id)).toMatchObject({
-      status: "blocked",
+      status: "pending",
       satisfiedOutputs: [],
       remainingOutputs: ["aim_context"],
     });
