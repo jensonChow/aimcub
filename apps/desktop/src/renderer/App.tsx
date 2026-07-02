@@ -64,6 +64,7 @@ type IconName = "chat" | "panelClose" | "panelOpen" | "plus" | "send";
 type AnswerMap = Record<string, { label: string | null; other: string }>;
 type PlanningTraceStatus = "pending" | "running" | "done" | "warning" | "error";
 type BusyStep = Extract<Step, "drafting" | "clarifying" | "refining">;
+type ElectronDragStyle = CSSProperties & { WebkitAppRegion?: "drag" | "no-drag" };
 type PlanningTraceEvent = {
   id: string;
   status: PlanningTraceStatus;
@@ -1598,7 +1599,7 @@ function classicShellStyle(compact: boolean, collapsed: boolean): CSSProperties 
   };
 }
 
-function classicSidebarStyle(compact: boolean, collapsed: boolean): CSSProperties {
+function classicSidebarStyle(compact: boolean, collapsed: boolean): ElectronDragStyle {
   return {
     position: compact ? "relative" : "sticky",
     top: 0,
@@ -1618,6 +1619,7 @@ function classicSidebarStyle(compact: boolean, collapsed: boolean): CSSPropertie
     minHeight: 0,
     overflowY: compact ? "visible" : "auto",
     overscrollBehavior: "contain",
+    WebkitAppRegion: compact ? undefined : "drag",
   };
 }
 
@@ -1637,7 +1639,7 @@ function mainShellStyle(): CSSProperties {
   };
 }
 
-function mainTopBarStyle(compact: boolean): CSSProperties {
+function mainTopBarStyle(compact: boolean): ElectronDragStyle {
   return {
     display: "flex",
     alignItems: "center",
@@ -1650,6 +1652,7 @@ function mainTopBarStyle(compact: boolean): CSSProperties {
     flex: "0 0 auto",
     borderBottom: `1px solid ${C.border}`,
     background: C.page,
+    WebkitAppRegion: compact ? undefined : "drag",
   };
 }
 
