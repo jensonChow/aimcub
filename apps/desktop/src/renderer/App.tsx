@@ -840,7 +840,7 @@ function AppInner() {
             <section style={agentWorkspaceStyle()}>
               <div style={conversationStreamStyle()}>
                 {(step === "home" || step === "aim") && (
-                  <ChatStart goals={goals} onOpen={openGoal} />
+                  <ChatStart />
                 )}
 
                 {(step === "drafting" || step === "clarifying" || step === "refining") && (
@@ -928,27 +928,14 @@ function AppInner() {
   );
 }
 
-function ChatStart(props: {
-  goals: Goal[];
-  onOpen: (goal: Goal) => void;
-}) {
+function ChatStart() {
   const { t } = useI18n();
-  const recent = props.goals.slice(0, 4);
   return (
     <div style={chatStartStyle()}>
       <div style={{ color: C.accent, fontSize: 13, fontWeight: 700, marginBottom: 14 }}>Aimcub</div>
       <h1 style={{ margin: 0, fontSize: 34, lineHeight: 1.1, letterSpacing: 0, fontWeight: 740 }}>
         {t("chat.greeting")}
       </h1>
-      {recent.length > 0 && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 22 }}>
-          {recent.map((goal) => (
-            <button key={goal.id} onClick={() => props.onOpen(goal)} style={sessionChipStyle()}>
-              {goal.title.length > 46 ? `${goal.title.slice(0, 45)}...` : goal.title}
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -1229,22 +1216,6 @@ function chatStartStyle(): CSSProperties {
     margin: "0 auto",
     paddingBottom: 72,
     boxSizing: "border-box",
-  };
-}
-
-function sessionChipStyle(): CSSProperties {
-  return {
-    border: `1px solid ${C.border}`,
-    background: "#fff",
-    color: C.text,
-    borderRadius: 8,
-    padding: "8px 10px",
-    cursor: "pointer",
-    fontSize: 13,
-    maxWidth: 260,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
   };
 }
 
