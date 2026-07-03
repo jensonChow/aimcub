@@ -58,12 +58,17 @@ Last updated: 2026-07-03
 - Local goal creation now materializes routing assignments from decomposition contracts. Agent execution through Desktop creates a `Run`, records low-trust evidence with attribution, finishes the run, and sediments pending context candidates. Manual child-aim decomposition is stored as a first-class sub-aim relation instead of only `metadata`.
 - The current Aim OS model is local-store first. Supabase schema parity is still future work; do not assume hosted Web has these orchestration tables until migrations and API adapters are added.
 - Desktop renderer has been reset from the old debug-heavy 3,500-line panel into a compact Aim OS cockpit MVP. The new first screen centers the actual flow: aim intake, context questions, sub-aim/eval preview, assignment/run/evidence/eval cockpit, context inbox, and runtime settings. It intentionally keeps rough MVP styling and reuses existing IPC instead of adding new product logic in the renderer.
+- Latest mainline commits to preserve as the current baseline:
+  - `873a404` — local Aim OS orchestration model.
+  - `793f623` — Desktop UI reset around the Aim OS cockpit.
+- The Desktop app was launched successfully after the UI reset with `PATH=/private/tmp/aimcub-pnpm9-bin:$PATH pnpm desktop`. The Electron window uses the renderer dev server at `http://localhost:5173/`.
 
 ## Verification Notes
 
 - The project declares `pnpm@9.15.0`, but the Codex runtime's bare `pnpm` may resolve to pnpm 11.7.0 and misread the legacy `package.json` `pnpm.overrides` field.
 - Use this prefix when running full gates from Codex:
   `PATH=/private/tmp/aimcub-pnpm9-bin:$PATH pnpm <command>`
+- Use the same PATH prefix when launching Desktop from Codex. Running `/private/tmp/aimcub-pnpm9-bin/pnpm desktop` without the PATH prefix can still fail because the root script invokes a nested bare `pnpm`, which may resolve to pnpm 11 and abort with `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`.
 - Verified after the v1b wrap-up:
   - `PATH=/private/tmp/aimcub-pnpm9-bin:$PATH pnpm build`
   - `PATH=/private/tmp/aimcub-pnpm9-bin:$PATH pnpm test`
