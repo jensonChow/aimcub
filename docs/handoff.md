@@ -45,6 +45,7 @@ Last updated: 2026-07-03
   `ProviderForm.tsx`, `ContextInbox.tsx`, and `HomeView.tsx`; keep splitting plan and aim-flow
   panels before adding orchestration controls.
 - Root Desktop entry is fixed at `pnpm desktop` / `pnpm desktop:dev`; keep this as the stable way to launch the current Desktop app.
+- Desktop now enforces a single app instance in `apps/desktop/src/main/index.ts`. In development macOS may still label the Dock app as `Electron`, but duplicate launches should focus the existing window instead of opening another Aimcub window. When manually cleaning old dev runs, quit `Electron` as well as `Aimcub`.
 - Desktop model-provider work now supports provider selection beyond Anthropic/OpenAI, including OpenAI-compatible providers such as DeepSeek, MiniMax, Z.ai, Gemini compatibility, Qwen/DashScope, and custom endpoints.
 - Recent DeepSeek fixes disabled unsupported structured-output assumptions for custom/OpenAI-compatible paths and added request-shaping for DeepSeek-style JSON responses. If providers fail, surface the model/provider error quickly instead of leaving Desktop stuck on "starting initial plan".
 - Clarify/decompose has been strengthened but is still not enough. It now asks more baseline context questions and routes more digital work to agents, but it is still mostly prompt-only. The next missing layer is a first-party planning tool substrate that lets the model inspect local context, search/read files, use memory, and optionally research the web before decomposing an aim.
@@ -58,13 +59,13 @@ Last updated: 2026-07-03
 
 - The project declares `pnpm@9.15.0`, but the Codex runtime's bare `pnpm` may resolve to pnpm 11.7.0 and misread the legacy `package.json` `pnpm.overrides` field.
 - Use this prefix when running full gates from Codex:
-  `PATH=/Users/jenson/.local/node/bin:$PATH corepack pnpm <command>`
+  `PATH=/private/tmp/aimcub-pnpm9-bin:$PATH pnpm <command>`
 - Verified after the v1b wrap-up:
-  - `PATH=/Users/jenson/.local/node/bin:$PATH corepack pnpm build`
-  - `PATH=/Users/jenson/.local/node/bin:$PATH corepack pnpm test`
-  - `PATH=/Users/jenson/.local/node/bin:$PATH corepack pnpm typecheck`
-  - `PATH=/Users/jenson/.local/node/bin:$PATH corepack pnpm lint`
-  - `PATH=/Users/jenson/.local/node/bin:$PATH corepack pnpm core:purity`
+  - `PATH=/private/tmp/aimcub-pnpm9-bin:$PATH pnpm build`
+  - `PATH=/private/tmp/aimcub-pnpm9-bin:$PATH pnpm test`
+  - `PATH=/private/tmp/aimcub-pnpm9-bin:$PATH pnpm typecheck`
+  - `PATH=/private/tmp/aimcub-pnpm9-bin:$PATH pnpm lint`
+  - `PATH=/private/tmp/aimcub-pnpm9-bin:$PATH pnpm core:purity`
   - `git diff --check`
 - CLI smoke checks:
   - `AIMCUB_HOME=/private/tmp/aimcub-cli-smoke-first-run node apps/cli/dist/index.js`
