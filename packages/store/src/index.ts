@@ -228,6 +228,15 @@ export interface ProviderSettings {
   model?: string;
 }
 
+export type WebResearchSettingsProvider = "brave";
+
+export interface WebResearchSettings {
+  provider: WebResearchSettingsProvider;
+  apiKey: string;
+  enabled: boolean;
+  fetchPages: boolean;
+}
+
 function isProviderSettingsProvider(value: unknown): value is ProviderSettingsProvider {
   return typeof value === "string" && PROVIDER_SETTINGS_PROVIDERS.includes(value as ProviderSettingsProvider);
 }
@@ -235,6 +244,11 @@ function isProviderSettingsProvider(value: unknown): value is ProviderSettingsPr
 /** Path to the provider settings file (sibling to the aim store). */
 export function settingsPath(dataDir: string = defaultDataDir()): string {
   return join(dataDir, "settings.json");
+}
+
+/** Path to first-party web research provider settings. */
+export function webResearchSettingsPath(dataDir: string = defaultDataDir()): string {
+  return join(dataDir, "web-settings.json");
 }
 
 /**
@@ -272,6 +286,34 @@ export function saveSettings(config: ProviderSettings, dataDir: string = default
   const p = settingsPath(dataDir);
   writeFileSync(p, JSON.stringify(config, null, 2), { encoding: "utf8", mode: 0o600 });
   // mode on writeFileSync only applies on create; enforce it on overwrite too.
+  try {
+    chmodSync(p, 0o600);
+  } catch {
+    /* best-effort (e.g. Windows) */
+  }
+}
+
+export function loadWebResearchSettings(dataDir: string = defaultDataDir()): WebResearchSettings | null {
+  try {
+    const p = webResearchSettingsPath(dataDir);
+    if (!existsSync(p)) return null;
+    const s = JSON.parse(readFileSync(p, "utf8")) as Record<string, unknown>;
+    if (s.provider !== "brave") return null;
+    return {
+      provider: "brave",
+      apiKey: typeof s.apiKey === "string" ? s.apiKey : "",
+      enabled: typeof s.enabled === "boolean" ? s.enabled : Boolean(typeof s.apiKey === "string" && s.apiKey.trim()),
+      fetchPages: typeof s.fetchPages === "boolean" ? s.fetchPages : true,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function saveWebResearchSettings(config: WebResearchSettings, dataDir: string = defaultDataDir()): void {
+  mkdirSync(dataDir, { recursive: true });
+  const p = webResearchSettingsPath(dataDir);
+  writeFileSync(p, JSON.stringify(config, null, 2), { encoding: "utf8", mode: 0o600 });
   try {
     chmodSync(p, 0o600);
   } catch {

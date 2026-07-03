@@ -50,11 +50,15 @@ import {
   type RefineRequest,
   type SaveRequest,
   type SavedGoal,
+  type WebResearchConfig,
+  type WebResearchStatus,
+  type WebResearchTestResult,
 } from "../shared/ipc";
 import { runClarify, runDraft, runRefine } from "./planner";
 import { aimStore } from "./store";
 import { buildGateway, getProviderStatus, setProviderConfig, testProviderConfig } from "./gateway";
 import { collectDesktopPlanningContext, type DesktopPlanningContext } from "./tools";
+import { getWebResearchStatus, setWebResearchConfig, testWebResearchConfig } from "./web-research-settings";
 
 async function planningContext(input: {
   title: string;
@@ -269,6 +273,16 @@ export function registerIpc(): void {
 
   ipcMain.handle(IPC.testProviderConfig, async (_e, config: ProviderConfig): Promise<ProviderTestResult> =>
     testProviderConfig(config),
+  );
+
+  ipcMain.handle(IPC.getWebResearchConfig, async (): Promise<WebResearchStatus> => getWebResearchStatus());
+
+  ipcMain.handle(IPC.setWebResearchConfig, async (_e, config: WebResearchConfig): Promise<WebResearchStatus> =>
+    setWebResearchConfig(config),
+  );
+
+  ipcMain.handle(IPC.testWebResearchConfig, async (_e, config: WebResearchConfig): Promise<WebResearchTestResult> =>
+    testWebResearchConfig(config),
   );
 
   ipcMain.handle(IPC.saveGoal, async (_e, req: SaveRequest): Promise<SavedGoal> => {

@@ -12,9 +12,13 @@ import {
   mergeMilestones,
   defaultDataDir,
   loadSettings,
+  loadWebResearchSettings,
   saveSettings,
+  saveWebResearchSettings,
   settingsPath,
+  webResearchSettingsPath,
   type ProviderSettings,
+  type WebResearchSettings,
 } from "./index";
 
 const CONTRACT = {
@@ -630,5 +634,38 @@ describe("provider settings (settings.json shared by desktop + CLI)", () => {
     const dir = freshDir();
     writeFileSync(settingsPath(dir), JSON.stringify({ provider: "unknown-ai", apiKey: "k" }), "utf8");
     expect(loadSettings(dir)).toBeNull();
+  });
+});
+
+describe("web research settings (web-settings.json)", () => {
+  const freshDir = (): string => mkdtempSync(join(tmpdir(), "aimcub-web-settings-"));
+
+  it("returns null when no web research settings are on file", () => {
+    expect(loadWebResearchSettings(freshDir())).toBeNull();
+  });
+
+  it("round-trips a Brave search config", () => {
+    const dir = freshDir();
+    const cfg: WebResearchSettings = {
+      provider: "brave",
+      apiKey: "brave-key",
+      enabled: true,
+      fetchPages: true,
+    };
+    saveWebResearchSettings(cfg, dir);
+    expect(loadWebResearchSettings(dir)).toEqual(cfg);
+  });
+
+  it("writes web-settings.json with owner-only (0600) perms", () => {
+    const dir = freshDir();
+    saveWebResearchSettings({ provider: "brave", apiKey: "brave-key", enabled: true, fetchPages: true }, dir);
+    const mode = statSync(webResearchSettingsPath(dir)).mode & 0o777;
+    expect(mode).toBe(0o600);
+  });
+
+  it("returns null for an unknown web research provider", () => {
+    const dir = freshDir();
+    writeFileSync(webResearchSettingsPath(dir), JSON.stringify({ provider: "unknown", apiKey: "k" }), "utf8");
+    expect(loadWebResearchSettings(dir)).toBeNull();
   });
 });

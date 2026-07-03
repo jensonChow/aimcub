@@ -25,6 +25,9 @@ const api: AimcubApi = {
   getProviderConfig: () => ipcRenderer.invoke(IPC.getProviderConfig),
   setProviderConfig: (config) => ipcRenderer.invoke(IPC.setProviderConfig, config),
   testProviderConfig: (config) => ipcRenderer.invoke(IPC.testProviderConfig, config),
+  getWebResearchConfig: () => ipcRenderer.invoke(IPC.getWebResearchConfig),
+  setWebResearchConfig: (config) => ipcRenderer.invoke(IPC.setWebResearchConfig, config),
+  testWebResearchConfig: (config) => ipcRenderer.invoke(IPC.testWebResearchConfig, config),
 };
 
 contextBridge.exposeInMainWorld("aimcub", api);

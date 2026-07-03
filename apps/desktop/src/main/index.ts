@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import { registerIpc } from "./ipc";
 import { loadProviderConfig } from "./gateway";
+import { loadWebResearchConfig } from "./web-research-settings";
 
 function createWindow(): void {
   const win = new BrowserWindow({
@@ -33,6 +34,7 @@ function createWindow(): void {
 app.whenReady().then(() => {
   // Load the persisted provider config into memory, then wire IPC.
   loadProviderConfig();
+  loadWebResearchConfig();
   registerIpc();
   createWindow();
   app.on("activate", () => {

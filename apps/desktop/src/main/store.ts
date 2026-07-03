@@ -17,4 +17,4 @@ export const aimStore: AimStore = createJsonFileStore(defaultDataDir());
  * Provider settings persistence (settings.json) lives in `@core/store`, shared with the CLI.
  * `@core/store`'s `ProviderSettings` is structurally the desktop's `ProviderConfig`.
  */
-export { loadSettings, saveSettings } from "@core/store";
+export { loadSettings, loadWebResearchSettings, saveSettings, saveWebResearchSettings } from "@core/store";

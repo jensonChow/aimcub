@@ -151,6 +151,31 @@ export interface ProviderTestResult {
   latencyMs: number;
 }
 
+export interface WebResearchConfig {
+  provider: "brave";
+  /** Leave blank on update to keep the already-stored key. */
+  apiKey: string;
+  enabled: boolean;
+  fetchPages: boolean;
+}
+
+export interface WebResearchStatus {
+  configured: boolean;
+  provider: "brave";
+  enabled: boolean;
+  fetchPages: boolean;
+  hasApiKey: boolean;
+  keySource: "env" | "settings" | null;
+}
+
+export interface WebResearchTestResult {
+  ok: boolean;
+  provider: "brave";
+  resultCount: number;
+  error: string | null;
+  latencyMs: number;
+}
+
 /** The typed surface exposed on `window.aimcub` by the preload bridge. */
 export interface AimcubApi {
   intake(req: DraftRequest): Promise<AimIntakeReport>;
@@ -175,6 +200,9 @@ export interface AimcubApi {
   getProviderConfig(): Promise<ProviderStatus>;
   setProviderConfig(config: ProviderConfig): Promise<ProviderStatus>;
   testProviderConfig(config: ProviderConfig): Promise<ProviderTestResult>;
+  getWebResearchConfig(): Promise<WebResearchStatus>;
+  setWebResearchConfig(config: WebResearchConfig): Promise<WebResearchStatus>;
+  testWebResearchConfig(config: WebResearchConfig): Promise<WebResearchTestResult>;
 }
 
 /** Channel names — kept in one place so main and preload can't drift. */
@@ -201,6 +229,9 @@ export const IPC = {
   getProviderConfig: "aimcub:getProviderConfig",
   setProviderConfig: "aimcub:setProviderConfig",
   testProviderConfig: "aimcub:testProviderConfig",
+  getWebResearchConfig: "aimcub:getWebResearchConfig",
+  setWebResearchConfig: "aimcub:setWebResearchConfig",
+  testWebResearchConfig: "aimcub:testWebResearchConfig",
 } as const;
 
 declare global {

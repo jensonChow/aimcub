@@ -6,7 +6,6 @@ import {
   createLocalReadOnlyToolHandlers,
   createMemorySearchHandler,
   createMemoryWriteCandidateHandler,
-  createWebResearchRuntimeFromEnv,
   type AimcubToolHandlerContext,
   type AimcubToolObservation,
   type ContextDistillOutput,
@@ -18,6 +17,7 @@ import {
 
 import type { DraftRequest } from "../shared/ipc";
 import { aimStore, LOCAL_OWNER } from "./store";
+import { createDesktopWebResearchRuntime, resolveWebResearchConfig, webResearchDisabledBySettings } from "./web-research-settings";
 
 export interface DesktopPlanningContext extends PlanningContextForAim {
   toolObservations: Array<AimcubToolObservation<unknown>>;
@@ -37,16 +37,12 @@ function envFlag(name: string): boolean | null {
   return flagEnabled(value);
 }
 
-function hasWebSearchProvider(): boolean {
-  return Boolean(process.env.AIMCUB_BRAVE_SEARCH_API_KEY ?? process.env.BRAVE_SEARCH_API_KEY);
-}
-
 function webResearchEnabled(): boolean {
-  return envFlag("AIMCUB_ENABLE_WEB_RESEARCH") ?? hasWebSearchProvider();
+  return resolveWebResearchConfig().enabled;
 }
 
 function fetchWebResultsEnabled(): boolean {
-  return envFlag("AIMCUB_FETCH_WEB_RESULTS") ?? webResearchEnabled();
+  return resolveWebResearchConfig().fetchPages;
 }
 
 function writeContextCandidatesEnabled(): boolean {
@@ -65,13 +61,15 @@ function aimLikelyNeedsWeb(req: DraftRequest): boolean {
 }
 
 function shouldAttemptWebResearch(req: DraftRequest): boolean {
+  const resolved = resolveWebResearchConfig();
   const explicit = envFlag("AIMCUB_ENABLE_WEB_RESEARCH");
   if (explicit === false) return false;
-  return explicit === true || hasWebSearchProvider() || aimLikelyNeedsWeb(req);
+  if (explicit !== true && webResearchDisabledBySettings()) return false;
+  return explicit === true || Boolean(resolved.apiKey) || aimLikelyNeedsWeb(req);
 }
 
 export function createDesktopFirstPartyToolRegistry() {
-  const webRuntime = createWebResearchRuntimeFromEnv(process.env);
+  const webRuntime = createDesktopWebResearchRuntime();
   const localRoot = localContextRoot();
   return createAimcubToolRegistry({
     ...(localRoot ? createLocalReadOnlyToolHandlers({ workspaceRoot: localRoot }) : {}),
