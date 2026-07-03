@@ -776,6 +776,7 @@ function AppInner() {
   const showTopBar = showSessionDetails;
   const providerMeta = provider?.configured ? providerLabel(provider, t) : t("provider.setup");
   const composerDisabled = Boolean(activeBusyStep);
+  const showComposer = step === "plan" && !viewing && Boolean(finalPlan) && !savedAt;
   const composerPlaceholder = step === "plan" && !viewing && finalPlan
     ? t("chat.followupPlaceholder")
     : t("chat.placeholder");
@@ -933,15 +934,17 @@ function AppInner() {
                   />
                 )}
               </div>
-              <ChatComposer
-                value={composerText}
-                placeholder={composerPlaceholder}
-                disabled={composerDisabled}
-                onChange={setComposerText}
-                onSubmit={submitComposerPrompt}
-                meta={providerMeta}
-                onMetaClick={() => setShowSettings((v) => !v)}
-              />
+              {showComposer && (
+                <ChatComposer
+                  value={composerText}
+                  placeholder={composerPlaceholder}
+                  disabled={composerDisabled}
+                  onChange={setComposerText}
+                  onSubmit={submitComposerPrompt}
+                  meta={providerMeta}
+                  onMetaClick={() => setShowSettings((v) => !v)}
+                />
+              )}
             </section>
           </main>
         </section>
