@@ -10,6 +10,7 @@ import { getDefaultBaseURL, getDefaultModel, getLlmProviderDefinition } from "@c
 
 import { LOCAL_OWNER, loadSettings, saveSettings } from "./store";
 import type { ProviderConfig, ProviderStatus, ProviderTestResult } from "../shared/ipc";
+import { LocalCliLlmGateway } from "./local-cli-gateway";
 
 const noopMeter = { async record(): Promise<void> {} };
 const DESKTOP_LLM_REQUEST_TIMEOUT_MS = 45_000;
@@ -145,7 +146,8 @@ export async function testProviderConfig(input: ProviderConfig): Promise<Provide
   }
 }
 
-/** Build a gateway from the current config, or null when nothing usable is configured. */
+/** Build a gateway from the current config, falling back to local CLI planning when no API provider is configured. */
 export function buildGateway(): LlmGateway | null {
-  return current ? buildGatewayFromConfig(current) : null;
+  if (current && isConfigured(current)) return buildGatewayFromConfig(current);
+  return new LocalCliLlmGateway();
 }

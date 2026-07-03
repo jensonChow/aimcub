@@ -111,6 +111,7 @@ export interface ClarifyOutput {
 export interface ClarifyAnswer {
   question_id: string;
   selected_label: string | null;
+  selected_labels?: string[] | null;
   other_text: string | null;
 }
 
@@ -1003,7 +1004,7 @@ function buildClarifyPrompt(input: ClarifyInput, maxQuestions: number): string {
   if (input.priorAnswers && input.priorAnswers.length > 0) {
     lines.push("", "The user already answered:");
     for (const a of input.priorAnswers) {
-      const ans = a.other_text?.trim() || a.selected_label?.trim() || "";
+      const ans = clarifyAnswerText(a);
       lines.push(`- ${a.question_id}: ${ans}`);
     }
     lines.push("", "Ask only what is STILL unresolved and high-impact.");
@@ -1153,7 +1154,13 @@ function sentence(value: string): string {
 }
 
 function clarifyAnswerText(answer: ClarifyAnswer): string {
-  return cleanMemoryText(answer.other_text ?? "") || cleanMemoryText(answer.selected_label ?? "");
+  if (!Array.isArray(answer.selected_labels) || answer.selected_labels.length === 0) {
+    return cleanMemoryText(answer.other_text ?? "") || cleanMemoryText(answer.selected_label ?? "");
+  }
+  const selected = answer.selected_labels.map((label) => cleanMemoryText(label)).filter(Boolean).join("; ");
+  return [selected, cleanMemoryText(answer.other_text ?? "")]
+    .filter(Boolean)
+    .join(selected ? "; " : "");
 }
 
 /** Recursively drop null values (the schema expresses optionality as `T | null`). */
@@ -1523,7 +1530,7 @@ export function buildRefinedDescription(
   const byId = new Map(questions.map((q) => [q.id, q]));
   const lines: string[] = [];
   for (const a of answers) {
-    const ans = a.other_text?.trim() || a.selected_label?.trim() || "";
+    const ans = clarifyAnswerText(a);
     if (!ans) continue;
     const label = byId.get(a.question_id)?.question ?? a.question_id;
     lines.push(`- ${label} → ${ans}`);

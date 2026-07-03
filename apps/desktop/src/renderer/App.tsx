@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
-import type { AimProgressReadModel } from "@core/domain";
-import type { ClarifyAnswer, ClarifyOutput } from "@core/llm";
-import type { DecompositionOutput, Goal, Memory, Milestone } from "@core/types";
+import type { AimIntakeReport, AimProgressReadModel } from "@core/domain";
+import type { ClarifyAnswer, ClarifyOutput, ClarifyQuestion, ClarifySelectionMode } from "@core/llm";
+import type { ContextCategory, DecompositionOutput, Goal, Memory, Milestone } from "@core/types";
 import type {
   ClarifyIpcResult,
   GoalDetail,
@@ -24,8 +24,9 @@ import { ProviderForm } from "./ProviderForm";
 import { WebResearchForm } from "./WebResearchForm";
 import { C, inputStyle, primaryButton, secondaryButton } from "./styles";
 
-type AppMode = "cockpit" | "drafting" | "answering" | "reviewing" | "settings";
-type AnswerMap = Record<string, { label: string; other: string }>;
+type AppMode = "cockpit" | "contexting" | "drafting" | "answering" | "reviewing" | "settings";
+type ClarifyPhase = "intake" | "postDraft" | null;
+type AnswerMap = Record<string, { labels: string[]; other: string }>;
 
 const shell: CSSProperties = {
   width: "100%",
@@ -57,6 +58,144 @@ function createPlanningRunId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `renderer:${Date.now()}:${Math.random().toString(36).slice(2)}`;
 }
 
+function hasCjkText(value: string): boolean {
+  return /[\u3400-\u9fff]/.test(value);
+}
+
+function intakeQuestionKind(category: ContextCategory): ClarifyQuestion["kind"] {
+  if (category === "capability") return "capability";
+  if (category === "constraint") return "constraint";
+  if (category === "preference") return "scope";
+  return "assumption";
+}
+
+function intakeQuestionDimension(category: ContextCategory): ClarifyQuestion["source_dimension"] {
+  if (category === "eval_signal" || category === "procedure") return "verifiability";
+  if (category === "constraint") return "granularity";
+  return "context_fit";
+}
+
+function intakeQuestionSelectionMode(category: ContextCategory): ClarifySelectionMode {
+  return category === "preference" ? "single" : "multiple";
+}
+
+function intakeOptions(category: ContextCategory, zh: boolean): ClarifyQuestion["options"] {
+  if (zh) {
+    switch (category) {
+      case "eval_signal":
+        return [
+          { label: "自动证据", tradeoff: "后续进度可以尽量由 CI、文件或运行结果证明。" },
+          { label: "人工确认", tradeoff: "保留主观验收，但需要你最终确认。" },
+          { label: "可交付物", tradeoff: "用明确产物作为完成标准。" },
+        ];
+      case "constraint":
+        return [
+          { label: "平台/工具限制", tradeoff: "会影响技术路线和执行方式。" },
+          { label: "时间/预算限制", tradeoff: "会影响里程碑粒度和取舍。" },
+          { label: "隐私/质量限制", tradeoff: "会影响验收标准和可委派范围。" },
+        ];
+      case "procedure":
+        return [
+          { label: "已有工作流", tradeoff: "计划会复用现有步骤和命令。" },
+          { label: "已有材料", tradeoff: "需要先读材料再拆目标。" },
+          { label: "需要新流程", tradeoff: "计划会包含流程定义。" },
+        ];
+      case "capability":
+        return [
+          { label: "agent 可执行", tradeoff: "数字化工作优先交给 agent。" },
+          { label: "需要你决策", tradeoff: "关键选择会保留给人。" },
+          { label: "需要外部资源", tradeoff: "计划会先处理 access 或素材。" },
+        ];
+      case "project_fact":
+        return [
+          { label: "目标范围已明确", tradeoff: "可以更快拆分。" },
+          { label: "当前状态需要检查", tradeoff: "先收集现状再拆分。" },
+          { label: "交付形式待定", tradeoff: "需要先确定产物。" },
+        ];
+      case "preference":
+        return [
+          { label: "速度优先", tradeoff: "计划会偏向较小可交付版本。" },
+          { label: "质量优先", tradeoff: "计划会加入更多验证步骤。" },
+        ];
+    }
+  }
+
+  switch (category) {
+    case "eval_signal":
+      return [
+        { label: "Automated evidence", tradeoff: "Progress can be proven by CI, files, or run results." },
+        { label: "Manual approval", tradeoff: "Subjective acceptance stays with you." },
+        { label: "Deliverable artifact", tradeoff: "Completion is tied to a concrete artifact." },
+      ];
+    case "constraint":
+      return [
+        { label: "Platform/tool limits", tradeoff: "Changes the technical route and execution surface." },
+        { label: "Time/budget limits", tradeoff: "Changes milestone size and tradeoffs." },
+        { label: "Privacy/quality limits", tradeoff: "Changes acceptance rules and delegation." },
+      ];
+    case "procedure":
+      return [
+        { label: "Existing workflow", tradeoff: "The plan should reuse known steps and commands." },
+        { label: "Existing materials", tradeoff: "Aimcub should inspect source material before planning." },
+        { label: "New procedure needed", tradeoff: "The plan should include defining the workflow." },
+      ];
+    case "capability":
+      return [
+        { label: "Agent can execute", tradeoff: "Digital work should route to an agent first." },
+        { label: "You must decide", tradeoff: "Key decisions should stay human-owned." },
+        { label: "External resource needed", tradeoff: "Access, assets, or vendors become prerequisites." },
+      ];
+    case "project_fact":
+      return [
+        { label: "Scope is clear", tradeoff: "Aimcub can decompose faster." },
+        { label: "Current state needs inspection", tradeoff: "Context should be gathered before decomposition." },
+        { label: "Deliverable is undecided", tradeoff: "The plan should first pin down the artifact." },
+      ];
+    case "preference":
+      return [
+        { label: "Move fast", tradeoff: "The plan favors a smaller deliverable." },
+        { label: "Optimize quality", tradeoff: "The plan adds more verification." },
+      ];
+  }
+}
+
+function intakeToClarifyOutput(intake: AimIntakeReport, zh: boolean): ClarifyOutput {
+  return {
+    questions: intake.questions.map((question): ClarifyQuestion => ({
+      id: `intake_${question.id}`,
+      question: question.prompt,
+      why_high_impact: question.reason,
+      kind: intakeQuestionKind(question.category),
+      source_dimension: intakeQuestionDimension(question.category),
+      why_asked: [{
+        code: "aim_intake",
+        detail: question.reason,
+        category: question.category,
+        priority: question.priority,
+        ...(question.gapSource ? { gapSource: question.gapSource } : {}),
+        ...(question.nodeKey ? { nodeKey: question.nodeKey } : {}),
+        ...(question.nodeTitle ? { nodeTitle: question.nodeTitle } : {}),
+      }],
+      capture: question.capture,
+      allow_other: true,
+      selection_mode: intakeQuestionSelectionMode(question.category),
+      options: intakeOptions(question.category, zh),
+    })),
+    assumptions: [],
+  };
+}
+
+function shouldBlockForIntake(intake: AimIntakeReport): boolean {
+  return intake.loop.shouldContinue || intake.questions.some((question) => question.priority === "high" || question.priority === "medium");
+}
+
+function answerText(answer: ClarifyAnswer): string {
+  const selected = Array.isArray(answer.selected_labels) && answer.selected_labels.length > 0
+    ? answer.selected_labels.join("; ")
+    : answer.selected_label ?? "";
+  return [selected, answer.other_text ?? ""].filter((part) => part.trim().length > 0).join(selected ? "; " : "");
+}
+
 export function App() {
   return (
     <I18nProvider>
@@ -84,8 +223,12 @@ function AimOsApp() {
   const [planResult, setPlanResult] = useState<PlanResult | null>(null);
   const [planningDebugTraces, setPlanningDebugTraces] = useState<PlanningDebugTrace[]>([]);
   const [planningLiveEvents, setPlanningLiveEvents] = useState<PlanningLiveEvent[]>([]);
+  const [intakeClarify, setIntakeClarify] = useState<ClarifyOutput | null>(null);
+  const [intakeAnswers, setIntakeAnswers] = useState<AnswerMap>({});
+  const [clarifyPhase, setClarifyPhase] = useState<ClarifyPhase>(null);
   const [clarify, setClarify] = useState<ClarifyOutput | null>(null);
   const [answers, setAnswers] = useState<AnswerMap>({});
+  const [contextNote, setContextNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -113,6 +256,10 @@ function AimOsApp() {
     setPlanningLiveEvents([]);
   }
 
+  function hasCliPlanningRuntime(): boolean {
+    return localAgents.some((agent) => agent.available && agent.authStatus !== "missing");
+  }
+
   async function refreshAll() {
     const [nextGoals, nextProvider, nextWeb, nextAgents, nextCandidates] = await Promise.all([
       window.aimcub.listGoals().catch(() => []),
@@ -127,7 +274,7 @@ function AimOsApp() {
     setLocalAgents(nextAgents);
     setContextCandidates(nextCandidates);
     if (!selected && nextGoals[0]) void openGoal(nextGoals[0]);
-    if (!nextProvider?.configured) setShowSettings(true);
+    if (!nextProvider?.configured && !nextAgents.some((agent) => agent.available && agent.authStatus !== "missing")) setShowSettings(true);
   }
 
   async function openGoal(goal: Goal) {
@@ -139,8 +286,12 @@ function AimOsApp() {
     setPlanResult(null);
     setPlanningDebugTraces([]);
     clearPlanningRun();
+    setIntakeClarify(null);
+    setIntakeAnswers({});
+    setClarifyPhase(null);
     setClarify(null);
     setAnswers({});
+    setContextNote("");
     const [nextDetail, nextProgress] = await Promise.all([
       window.aimcub.getGoal(goal.id),
       window.aimcub.getAimProgress(goal.id),
@@ -158,29 +309,81 @@ function AimOsApp() {
     setPlanResult(null);
     setPlanningDebugTraces([]);
     clearPlanningRun();
+    setIntakeClarify(null);
+    setIntakeAnswers({});
+    setClarifyPhase(null);
     setClarify(null);
     setAnswers({});
+    setContextNote("");
     setSelected(null);
     setDetail(null);
     setProgress(null);
     setError(null);
   }
 
-  async function startDraft() {
+  function answersFor(output: ClarifyOutput | null, answerMap: AnswerMap): ClarifyAnswer[] {
+    const questions = output?.questions ?? [];
+    return questions.flatMap((question) => {
+      const answer = answerMap[question.id];
+      const labels = answer?.labels.map((label) => label.trim()).filter(Boolean) ?? [];
+      const selectedLabel = labels[0] ?? null;
+      const other = answer?.other.trim() || null;
+      if (labels.length === 0 && !other) return [];
+      return [{
+        question_id: question.id,
+        selected_label: selectedLabel,
+        selected_labels: labels,
+        other_text: other,
+      }];
+    });
+  }
+
+  function descriptionWithContext(): string | undefined {
+    const base = aimDescription.trim();
+    const contextLines: string[] = [];
+    const intakeQuestions = new Map((intakeClarify?.questions ?? []).map((question) => [question.id, question.question]));
+    for (const answer of answersFor(intakeClarify, intakeAnswers)) {
+      const text = answerText(answer);
+      if (!text) continue;
+      contextLines.push(`- ${intakeQuestions.get(answer.question_id) ?? answer.question_id}: ${text}`);
+    }
+    if (contextNote.trim()) contextLines.push(`- Additional context: ${contextNote.trim()}`);
+    const contextBlock = contextLines.length > 0
+      ? ["Context collected before decomposition:", ...contextLines].join("\n")
+      : "";
+    return [base, contextBlock].filter((part) => part.trim().length > 0).join("\n\n") || undefined;
+  }
+
+  async function startDraft(options: { skipIntakeGate?: boolean } = {}) {
     const title = aimTitle.trim();
     if (!title) return;
-    if (!provider?.configured) {
+    if (!provider?.configured && !hasCliPlanningRuntime()) {
       setShowSettings(true);
       setMode("settings");
       return;
     }
-    setBusy(t("os.busy.draft"));
     setError(null);
-    setMode("drafting");
-    setPlanningDebugTraces([]);
-    const runId = startPlanningRun();
     try {
-      const req = { title, description: aimDescription.trim() || undefined, clientRunId: runId };
+      if (!options.skipIntakeGate) {
+        setBusy(t("os.busy.context"));
+        setMode("contexting");
+        const intake = await window.aimcub.intake({ title, description: aimDescription.trim() || undefined });
+        setPlanResult({ ok: false, output: null, errors: [], intake });
+        if (shouldBlockForIntake(intake) && intake.questions.length > 0) {
+          const intakeOutput = intakeToClarifyOutput(intake, hasCjkText(`${title}\n${aimDescription}`));
+          setIntakeClarify(intakeOutput);
+          setClarify(intakeOutput);
+          setClarifyPhase("intake");
+          setBusy(null);
+          return;
+        }
+      }
+
+      setBusy(t("os.busy.draft"));
+      setMode("drafting");
+      setPlanningDebugTraces([]);
+      const runId = startPlanningRun();
+      const req = { title, description: descriptionWithContext(), clientRunId: runId };
       const nextDraft = await window.aimcub.draft(req);
       if (!nextDraft.ok || !nextDraft.output) throw new Error(nextDraft.errors.join("; ") || t("os.err.draft"));
       setDraft(nextDraft.output);
@@ -197,6 +400,8 @@ function AimOsApp() {
         setPlanningDebugTraces((current) => [...current, clarifyTrace]);
       }
       setClarify(nextClarify.output ?? { questions: [], assumptions: [] });
+      setClarifyPhase("postDraft");
+      setAnswers({});
       setMode("answering");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -207,15 +412,16 @@ function AimOsApp() {
   }
 
   const builtAnswers = useMemo<ClarifyAnswer[]>(() => {
-    const questions = clarify?.questions ?? [];
-    return questions.flatMap((question) => {
-      const answer = answers[question.id];
-      const selectedLabel = answer?.label.trim() || null;
-      const other = answer?.other.trim() || null;
-      if (!selectedLabel && !other) return [];
-      return [{ question_id: question.id, selected_label: selectedLabel, other_text: other }];
-    });
-  }, [answers, clarify]);
+    return answersFor(clarifyPhase === "postDraft" ? clarify : null, answers);
+  }, [answers, clarify, clarifyPhase]);
+
+  const builtIntakeAnswers = useMemo<ClarifyAnswer[]>(() => {
+    return answersFor(intakeClarify, intakeAnswers);
+  }, [intakeAnswers, intakeClarify]);
+
+  async function continueFromContext() {
+    await startDraft({ skipIntakeGate: true });
+  }
 
   async function refinePlan() {
     if (!draft) return;
@@ -225,7 +431,7 @@ function AimOsApp() {
     try {
       const refined = await window.aimcub.refine({
         title: aimTitle.trim(),
-        description: aimDescription.trim() || undefined,
+        description: descriptionWithContext(),
         draft,
         questions: clarify?.questions ?? [],
         answers: builtAnswers,
@@ -263,8 +469,11 @@ function AimOsApp() {
         review: planResult?.review ?? null,
         qualityRetry: planResult?.qualityRetry ?? undefined,
         debugTrace: mergePlanningDebugTraces(planningDebugTraces.length ? planningDebugTraces : [planResult?.debugTrace]),
-        questions: clarify?.questions ?? [],
-        answers: builtAnswers,
+        questions: [
+          ...(intakeClarify?.questions ?? []),
+          ...(clarifyPhase === "postDraft" ? clarify?.questions ?? [] : []),
+        ],
+        answers: [...builtIntakeAnswers, ...builtAnswers],
         assumptions: clarify?.assumptions ?? [],
       });
       setContextCandidates(saved.contextCandidates ?? []);
@@ -439,14 +648,23 @@ function AimOsApp() {
             />
           ) : null}
 
-          {clarify && (mode === "answering" || mode === "reviewing") ? (
+          {clarify && (mode === "contexting" || mode === "answering" || mode === "reviewing") ? (
             <ClarifyPanel
               clarify={clarify}
-              answers={answers}
+              phase={clarifyPhase}
+              answers={clarifyPhase === "intake" ? intakeAnswers : answers}
+              contextNote={contextNote}
               disabled={Boolean(busy)}
-              onAnswer={(id, value) => setAnswers((current) => ({ ...current, [id]: value }))}
-              onRefine={() => void refinePlan()}
-              onSkip={() => setMode("reviewing")}
+              onAnswer={(id, value) => {
+                if (clarifyPhase === "intake") {
+                  setIntakeAnswers((current) => ({ ...current, [id]: value }));
+                } else {
+                  setAnswers((current) => ({ ...current, [id]: value }));
+                }
+              }}
+              onContextNote={setContextNote}
+              onRefine={() => void (clarifyPhase === "intake" ? continueFromContext() : refinePlan())}
+              onSkip={clarifyPhase === "intake" ? undefined : () => setMode("reviewing")}
             />
           ) : null}
 
@@ -492,6 +710,11 @@ function AimOsApp() {
             planResult={planResult}
             debugTraces={planningDebugTraces}
             liveEvents={planningLiveEvents}
+            intakeClarify={intakeClarify}
+            intakeAnswers={builtIntakeAnswers}
+            clarify={clarifyPhase === "postDraft" ? clarify : null}
+            clarifyAnswers={builtAnswers}
+            contextNote={contextNote}
             plan={activePlan}
             detail={detail}
           />
@@ -532,7 +755,7 @@ function ComposerPanel(props: {
           disabled={props.disabled || !props.title.trim()}
           style={{ ...primaryButton(props.disabled || !props.title.trim()), marginTop: 0 }}
         >
-          {props.mode === "drafting" ? t("os.drafting") : t("os.startPlanning")}
+          {props.mode === "contexting" ? t("os.stepContext") : props.mode === "drafting" ? t("os.drafting") : t("os.startPlanning")}
         </button>
       </div>
       <input
@@ -554,42 +777,65 @@ function ComposerPanel(props: {
 
 function ClarifyPanel(props: {
   clarify: ClarifyOutput;
+  phase: ClarifyPhase;
   answers: AnswerMap;
+  contextNote: string;
   disabled: boolean;
-  onAnswer: (id: string, value: { label: string; other: string }) => void;
+  onAnswer: (id: string, value: { labels: string[]; other: string }) => void;
+  onContextNote: (value: string) => void;
   onRefine: () => void;
-  onSkip: () => void;
+  onSkip?: () => void;
 }) {
   const { t } = useI18n();
   const questions = props.clarify.questions;
+  const intake = props.phase === "intake";
+  const hasContextAnswer = !intake
+    || props.contextNote.trim().length > 0
+    || Object.values(props.answers).some((answer) => answer.other.trim() || answer.labels.length > 0);
+  const primaryDisabled = props.disabled || !hasContextAnswer;
   return (
     <section style={panelStyle()}>
       <div style={sectionHeaderStyle()}>
         <div>
           <div style={eyebrowStyle()}>{t("os.stepContext")}</div>
-          <h2 style={sectionTitleStyle()}>{questions.length ? t("os.clarifyHeading") : t("os.noQuestionsHeading")}</h2>
+          <h2 style={sectionTitleStyle()}>
+            {intake ? t("os.contextIntakeHeading") : questions.length ? t("os.clarifyHeading") : t("os.noQuestionsHeading")}
+          </h2>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={props.onSkip} style={{ ...secondaryButton(), marginTop: 0 }}>{t("os.useDraft")}</button>
-          <button onClick={props.onRefine} disabled={props.disabled} style={{ ...primaryButton(props.disabled), marginTop: 0 }}>
-            {t("os.refine")}
+          {props.onSkip ? <button onClick={props.onSkip} style={{ ...secondaryButton(), marginTop: 0 }}>{t("os.useDraft")}</button> : null}
+          <button onClick={props.onRefine} disabled={primaryDisabled} style={{ ...primaryButton(primaryDisabled), marginTop: 0 }}>
+            {intake ? t("os.generateFromContext") : t("os.refine")}
           </button>
         </div>
       </div>
+      {intake ? <p style={mutedTextStyle()}>{t("os.contextIntakeBody")}</p> : null}
       {questions.length === 0 ? <p style={mutedTextStyle()}>{t("os.noQuestionsBody")}</p> : null}
       <div style={{ display: "grid", gap: 12 }}>
         {questions.map((question) => {
-          const answer = props.answers[question.id] ?? { label: "", other: "" };
+          const answer = props.answers[question.id] ?? { labels: [], other: "" };
+          const multi = question.selection_mode === "multiple";
           return (
             <div key={question.id} style={questionStyle()}>
-              <div style={{ fontWeight: 750 }}>{question.question}</div>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline" }}>
+                <div style={{ fontWeight: 750 }}>{question.question}</div>
+                <span style={badgeStyle("#f6f7f7", C.muted)}>{t(multi ? "os.multiSelect" : "os.singleSelect")}</span>
+              </div>
               <div style={{ color: C.muted, fontSize: 13, marginTop: 4 }}>{question.why_high_impact}</div>
               <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
                 {question.options.map((option) => (
                   <button
                     key={option.label}
-                    onClick={() => props.onAnswer(question.id, { ...answer, label: option.label })}
-                    style={choiceStyle(answer.label === option.label)}
+                    onClick={() => {
+                      const selected = answer.labels.includes(option.label);
+                      const labels = multi
+                        ? selected
+                          ? answer.labels.filter((label) => label !== option.label)
+                          : [...answer.labels, option.label]
+                        : [option.label];
+                      props.onAnswer(question.id, { ...answer, labels });
+                    }}
+                    style={choiceStyle(answer.labels.includes(option.label))}
                   >
                     <strong>{option.label}</strong>
                     <span>{option.tradeoff}</span>
@@ -605,6 +851,19 @@ function ClarifyPanel(props: {
             </div>
           );
         })}
+        {intake ? (
+          <div style={questionStyle()}>
+            <div style={{ fontWeight: 750 }}>{t("os.contextConversation")}</div>
+            <div style={{ color: C.muted, fontSize: 13, marginTop: 4 }}>{t("os.contextConversationBody")}</div>
+            <textarea
+              value={props.contextNote}
+              onChange={(event) => props.onContextNote(event.target.value)}
+              placeholder={t("os.contextConversationPlaceholder")}
+              rows={4}
+              style={{ ...inputStyle(), marginTop: 10, resize: "vertical" }}
+            />
+          </div>
+        ) : null}
       </div>
     </section>
   );
@@ -781,7 +1040,14 @@ function RuntimePanel(props: {
       <div style={eyebrowStyle()}>{t("os.runtime")}</div>
       <h2 style={sectionTitleStyle()}>{t("os.runtimeHeading")}</h2>
       <div style={{ display: "grid", gap: 10, marginTop: 14 }}>
-        <Metric label={t("os.provider")} value={props.provider?.configured ? props.provider.provider ?? "configured" : t("os.missing")} />
+        <Metric
+          label={t("os.provider")}
+          value={props.provider?.configured
+            ? props.provider.provider ?? "configured"
+            : props.localAgents.some((agent) => agent.available && agent.authStatus !== "missing")
+              ? "local CLI"
+              : t("os.missing")}
+        />
         <Metric label={t("os.webResearch")} value={props.webResearch?.enabled ? "on" : "off"} />
         <Metric label={t("os.localAgents")} value={`${props.localAgents.filter((agent) => agent.available).length}/${props.localAgents.length}`} />
         <Metric label={t("os.pendingContext")} value={String(props.contextCount)} />
@@ -795,7 +1061,7 @@ function FlowRail(props: { mode: AppMode; hasDraft: boolean; hasPlan: boolean; s
   const { t } = useI18n();
   const steps = [
     { label: t("os.stepAim"), active: !props.hasDraft && !props.saved },
-    { label: t("os.stepContext"), active: props.mode === "answering" },
+    { label: t("os.stepContext"), active: props.mode === "contexting" || props.mode === "answering" },
     { label: t("os.stepPlan"), active: props.hasPlan && !props.saved },
     { label: t("os.stepExecute"), active: props.saved },
     { label: t("os.stepEval"), active: props.saved },

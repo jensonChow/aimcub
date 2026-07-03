@@ -36,6 +36,7 @@ import type {
 } from "../shared/ipc";
 
 const NO_PROVIDER = "No LLM provider configured — add a provider and API key in settings.";
+const MODEL_INPUT_PREVIEW_CHARS = 1_800;
 
 export type PlanningModelRunLiveEvent =
   | { type: "model.started"; run: PlanningLiveModelRun }
@@ -66,6 +67,13 @@ function emitModelRun(hooks: PlanningDebugHooks | undefined, event: PlanningMode
   }
 }
 
+function previewModelInput(value: string | undefined): string | undefined {
+  const cleaned = (value ?? "").replace(/\s+/g, " ").trim();
+  if (!cleaned) return undefined;
+  if (cleaned.length <= MODEL_INPUT_PREVIEW_CHARS) return cleaned;
+  return `${cleaned.slice(0, MODEL_INPUT_PREVIEW_CHARS - 1).trim()}…`;
+}
+
 function tracedGateway(gateway: LlmGateway, stage: PlanningRunStage, hooks?: PlanningDebugHooks): {
   gateway: LlmGateway;
   modelRuns: PlanningModelRunTrace[];
@@ -93,6 +101,8 @@ function tracedGateway(gateway: LlmGateway, stage: PlanningRunStage, hooks?: Pla
         startedAt,
         promptChars: req.prompt.length,
         systemChars: req.system?.length ?? 0,
+        promptPreview: previewModelInput(req.prompt),
+        systemPreview: previewModelInput(req.system),
         model: req.model ?? null,
       },
     });
@@ -109,6 +119,8 @@ function tracedGateway(gateway: LlmGateway, stage: PlanningRunStage, hooks?: Pla
         durationMs: Date.now() - startedAtMs,
         promptChars: req.prompt.length,
         systemChars: req.system?.length ?? 0,
+        promptPreview: previewModelInput(req.prompt),
+        systemPreview: previewModelInput(req.system),
         model: response.usage.model || req.model || null,
         usage: response.usage,
       };
@@ -127,6 +139,8 @@ function tracedGateway(gateway: LlmGateway, stage: PlanningRunStage, hooks?: Pla
         durationMs: Date.now() - startedAtMs,
         promptChars: req.prompt.length,
         systemChars: req.system?.length ?? 0,
+        promptPreview: previewModelInput(req.prompt),
+        systemPreview: previewModelInput(req.system),
         model: req.model ?? null,
         usage: null,
         error: err instanceof Error ? err.message : String(err),

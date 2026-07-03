@@ -292,9 +292,9 @@ export function aimLearningRowOrder(a: AimLearningReport["rows"][number], b: Aim
   return priorityRank[a.priority ?? "medium"] - priorityRank[b.priority ?? "medium"];
 }
 
-export function shortUiText(value: string): string {
+export function shortUiText(value: string, max = 140): string {
   const text = value.replace(/\s+/g, " ").trim();
-  return text.length > 140 ? `${text.slice(0, 137)}...` : text;
+  return text.length > max ? `${text.slice(0, Math.max(0, max - 3))}...` : text;
 }
 
 export function impactSignalLabel(signal: ClarifyAnswerImpactReport["rows"][number]["signals"][number], t: T): string {

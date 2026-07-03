@@ -109,6 +109,8 @@ export interface PlanningModelRunTrace {
   durationMs: number;
   promptChars: number;
   systemChars: number;
+  promptPreview?: string;
+  systemPreview?: string;
   model: string | null;
   usage: LlmUsage | null;
   error?: string;
@@ -134,6 +136,8 @@ export interface PlanningLiveModelRun {
   durationMs?: number;
   promptChars: number;
   systemChars: number;
+  promptPreview?: string;
+  systemPreview?: string;
   model: string | null;
   usage?: LlmUsage | null;
   error?: string;

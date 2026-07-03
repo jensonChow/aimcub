@@ -251,7 +251,12 @@ function contextIntakeSignals(input: {
   );
   const questionById = new Map(input.questions.map((question) => [question.id, question]));
   for (const answer of input.answers) {
-    const text = answer.other_text?.trim() || answer.selected_label?.trim();
+    const selected = Array.isArray(answer.selected_labels) && answer.selected_labels.length > 0
+      ? answer.selected_labels.map((label) => label.trim()).filter(Boolean).join("; ")
+      : "";
+    const text = selected
+      ? [selected, answer.other_text?.trim()].filter(Boolean).join("; ")
+      : answer.other_text?.trim() || answer.selected_label?.trim();
     if (!text) continue;
     const question = questionById.get(answer.question_id);
     signals.push({

@@ -17,6 +17,7 @@ export interface ContextCaptureQuestion {
 export interface ContextCaptureAnswer {
   question_id: string;
   selected_label?: string | null;
+  selected_labels?: string[] | null;
   other_text?: string | null;
 }
 
@@ -119,7 +120,12 @@ function normalizeText(value: string): string {
 }
 
 function answerText(answer: ContextCaptureAnswer | undefined): string | null {
-  const text = cleanText(answer?.other_text) || cleanText(answer?.selected_label);
+  if (!Array.isArray(answer?.selected_labels) || answer.selected_labels.length === 0) {
+    const legacy = cleanText(answer?.other_text) || cleanText(answer?.selected_label);
+    return legacy.length > 0 ? legacy : null;
+  }
+  const selected = answer.selected_labels.map((label) => cleanText(label)).filter(Boolean).join("; ");
+  const text = [selected, cleanText(answer?.other_text)].filter(Boolean).join(selected ? "; " : "");
   return text.length > 0 ? text : null;
 }
 

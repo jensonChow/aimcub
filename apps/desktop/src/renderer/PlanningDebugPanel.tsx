@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 
+import type { ClarifyAnswer, ClarifyOutput } from "@core/llm";
 import type { DecompositionOutput, Goal } from "@core/types";
 
 import type {
@@ -27,7 +28,7 @@ import {
 } from "./labels";
 import { C } from "./styles";
 
-type AppMode = "cockpit" | "drafting" | "answering" | "reviewing" | "settings";
+type AppMode = "cockpit" | "contexting" | "drafting" | "answering" | "reviewing" | "settings";
 type T = (key: StringKey, vars?: Record<string, string | number>) => string;
 
 export function mergePlanningDebugTraces(
@@ -59,6 +60,11 @@ export function PlanningDebugPanel(props: {
   planResult: PlanResult | null;
   debugTraces: PlanningDebugTrace[];
   liveEvents: PlanningLiveEvent[];
+  intakeClarify: ClarifyOutput | null;
+  intakeAnswers: ClarifyAnswer[];
+  clarify: ClarifyOutput | null;
+  clarifyAnswers: ClarifyAnswer[];
+  contextNote: string;
   plan: DecompositionOutput | null;
   detail: GoalDetail | null;
 }) {
@@ -78,7 +84,7 @@ export function PlanningDebugPanel(props: {
   const review = props.planResult?.review ?? (goal ? reviewOf(goal) : null);
   const planningContext = props.planResult?.planningContext ?? livePlanningContext ?? (goal ? planningContextOf(goal) : null);
   const planningTools = props.planResult?.planningTools ?? livePlanningTools ?? (goal ? planningToolsOf(goal) : null);
-  const running = Boolean(props.busy) && (props.mode === "drafting" || props.mode === "answering" || props.mode === "reviewing");
+  const running = Boolean(props.busy) && (props.mode === "contexting" || props.mode === "drafting" || props.mode === "answering" || props.mode === "reviewing");
 
   return (
     <section style={panelStyle()}>
@@ -101,6 +107,14 @@ export function PlanningDebugPanel(props: {
         intake={intake}
         planningContext={planningContext}
         planningTools={planningTools}
+        t={t}
+      />
+      <QuestionTraceSection
+        intakeClarify={props.intakeClarify}
+        intakeAnswers={props.intakeAnswers}
+        clarify={props.clarify}
+        clarifyAnswers={props.clarifyAnswers}
+        contextNote={props.contextNote}
         t={t}
       />
       <StructuredReasoningSection
@@ -131,7 +145,12 @@ function PendingSteps(props: { mode: AppMode; provider: ProviderStatus | null; t
   const rows = [
     { title: props.t("trace.intake"), body: props.t("trace.intakePending") },
     { title: props.t("trace.context"), body: props.t("trace.contextPending") },
-    { title: props.t("trace.draft"), body: props.t("trace.draftPending", { provider: providerName }) },
+    {
+      title: props.t("trace.draft"),
+      body: props.mode === "contexting"
+        ? props.t("trace.draftBlockedByContext")
+        : props.t("trace.draftPending", { provider: providerName }),
+    },
     {
       title: props.t("trace.clarify"),
       body: props.mode === "answering" || props.mode === "reviewing"
@@ -199,6 +218,18 @@ function ModelRunsSection(props: { trace: PlanningDebugTrace | null; liveEvents:
             </div>
           ) : null}
           {run.error ? <div style={{ ...mutedTextStyle(), color: C.danger }}>{shortUiText(run.error)}</div> : null}
+          {run.systemPreview ? (
+            <div style={previewBlockStyle()}>
+              <div style={previewLabelStyle()}>{props.t("debug.systemPreview")}</div>
+              <div>{shortUiText(run.systemPreview, 900)}</div>
+            </div>
+          ) : null}
+          {run.promptPreview ? (
+            <div style={previewBlockStyle()}>
+              <div style={previewLabelStyle()}>{props.t("debug.promptPreview")}</div>
+              <div>{shortUiText(run.promptPreview, 1200)}</div>
+            </div>
+          ) : null}
         </div>
       ))}
     </Section>
@@ -379,6 +410,100 @@ function ContextCollectionSection(props: {
   );
 }
 
+function QuestionTraceSection(props: {
+  intakeClarify: ClarifyOutput | null;
+  intakeAnswers: ClarifyAnswer[];
+  clarify: ClarifyOutput | null;
+  clarifyAnswers: ClarifyAnswer[];
+  contextNote: string;
+  t: T;
+}) {
+  const hasIntake = Boolean(props.intakeClarify?.questions.length || props.intakeAnswers.length || props.contextNote.trim());
+  const hasClarify = Boolean(props.clarify?.questions.length || props.clarifyAnswers.length);
+  if (!hasIntake && !hasClarify) return null;
+  return (
+    <Section title={props.t("debug.questionTrace")}>
+      {hasIntake ? (
+        <QuestionGroup
+          title={props.t("debug.contextIntakeQuestions")}
+          output={props.intakeClarify}
+          answers={props.intakeAnswers}
+          note={props.contextNote}
+          t={props.t}
+        />
+      ) : null}
+      {hasClarify ? (
+        <QuestionGroup
+          title={props.t("debug.clarifyQuestions")}
+          output={props.clarify}
+          answers={props.clarifyAnswers}
+          t={props.t}
+        />
+      ) : null}
+    </Section>
+  );
+}
+
+function QuestionGroup(props: {
+  title: string;
+  output: ClarifyOutput | null;
+  answers: ClarifyAnswer[];
+  note?: string;
+  t: T;
+}) {
+  const answerById = new Map(props.answers.map((answer) => [answer.question_id, answerText(answer)]));
+  return (
+    <div style={debugRowStyle()}>
+      <div style={rowHeaderStyle()}>
+        <strong>{props.title}</strong>
+        <span style={pillStyle(C.muted)}>
+          {props.t("debug.questionsAnswered", { answered: props.answers.length, total: props.output?.questions.length ?? 0 })}
+        </span>
+      </div>
+      {props.output?.questions.slice(0, 8).map((question) => {
+        const answer = answerById.get(question.id);
+        return (
+          <div key={question.id} style={compactBlockStyle()}>
+            <div style={rowHeaderStyle()}>
+              <div style={rowTitleStyle()}>{question.question}</div>
+              <span style={pillStyle(question.selection_mode === "multiple" ? C.accent : C.muted)}>
+                {props.t(question.selection_mode === "multiple" ? "os.multiSelect" : "os.singleSelect")}
+              </span>
+            </div>
+            <div style={mutedTextStyle()}>{shortUiText(question.why_high_impact)}</div>
+            {question.why_asked?.slice(0, 2).map((why, index) => (
+              <div key={`${question.id}-${why.code}-${index}`} style={metaLineStyle()}>
+                {why.code} · {shortUiText(why.detail)}
+              </div>
+            ))}
+            <div style={metaLineStyle()}>
+              {props.t("debug.options")} · {question.options.map((option) => option.label).join(" / ")}
+            </div>
+            {answer ? (
+              <div style={{ ...mutedTextStyle(), color: C.text }}>
+                {props.t("debug.userAnswer")} · {shortUiText(answer, 420)}
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
+      {props.note?.trim() ? (
+        <div style={compactBlockStyle()}>
+          <div style={rowTitleStyle()}>{props.t("debug.contextNote")}</div>
+          <div style={mutedTextStyle()}>{shortUiText(props.note, 420)}</div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function answerText(answer: ClarifyAnswer): string {
+  const selected = Array.isArray(answer.selected_labels) && answer.selected_labels.length > 0
+    ? answer.selected_labels.join("; ")
+    : answer.selected_label ?? "";
+  return [selected, answer.other_text ?? ""].filter((part) => part.trim().length > 0).join(selected ? "; " : "");
+}
+
 function StructuredReasoningSection(props: {
   goal: Goal | null;
   plan: DecompositionOutput | null;
@@ -549,6 +674,24 @@ function mutedTextStyle(): CSSProperties {
 
 function metaLineStyle(): CSSProperties {
   return { ...mutedTextStyle(), fontSize: 11 };
+}
+
+function previewBlockStyle(): CSSProperties {
+  return {
+    background: "#f6f7f7",
+    border: `1px solid ${C.border}`,
+    borderRadius: 6,
+    padding: 8,
+    marginTop: 8,
+    color: C.muted,
+    fontSize: 11,
+    lineHeight: 1.45,
+    overflowWrap: "anywhere",
+  };
+}
+
+function previewLabelStyle(): CSSProperties {
+  return { color: C.text, fontWeight: 800, marginBottom: 4 };
 }
 
 function compactBlockStyle(): CSSProperties {

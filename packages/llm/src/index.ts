@@ -275,6 +275,7 @@ export type {
   ClarifyAnswer,
   ClarifyAssumption,
   ClarifyQuestionKind,
+  ClarifySelectionMode,
   ClarifyQuestionWhy,
   ClarifyQuestionWhyCode,
   ClarifyQuestionSourceDimension,
