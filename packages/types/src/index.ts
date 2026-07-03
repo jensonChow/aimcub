@@ -75,6 +75,56 @@ export type SubscriptionTier = z.infer<typeof SubscriptionTier>;
 export const DecidedBy = z.enum(["rule_auto", "user_confirm", "agent_suggest"]);
 export type DecidedBy = z.infer<typeof DecidedBy>;
 
+export const ActorKind = z.enum(["human", "agent"]);
+export type ActorKind = z.infer<typeof ActorKind>;
+
+export const ActorStatus = z.enum(["active", "inactive", "revoked"]);
+export type ActorStatus = z.infer<typeof ActorStatus>;
+
+export const AgentRunMode = z.enum(["local_cli", "mcp", "remote"]);
+export type AgentRunMode = z.infer<typeof AgentRunMode>;
+
+export const SubAimRelationStatus = z.enum(["active", "completed", "blocked", "abandoned"]);
+export type SubAimRelationStatus = z.infer<typeof SubAimRelationStatus>;
+
+export const AssignmentStatus = z.enum(["proposed", "assigned", "running", "blocked", "completed", "cancelled"]);
+export type AssignmentStatus = z.infer<typeof AssignmentStatus>;
+
+export const AssignmentSource = z.enum(["routing", "user_override", "system"]);
+export type AssignmentSource = z.infer<typeof AssignmentSource>;
+
+export const RunKind = z.enum(["agent", "human"]);
+export type RunKind = z.infer<typeof RunKind>;
+
+export const RunStatus = z.enum(["queued", "running", "blocked", "completed", "failed", "cancelled"]);
+export type RunStatus = z.infer<typeof RunStatus>;
+
+export const RunEventType = z.enum([
+  "run.queued",
+  "run.started",
+  "run.log",
+  "tool.started",
+  "tool.finished",
+  "artifact.created",
+  "evidence.reported",
+  "run.completed",
+  "run.failed",
+  "run.cancelled",
+]);
+export type RunEventType = z.infer<typeof RunEventType>;
+
+export const RunArtifactKind = z.enum(["file", "url", "diff", "commit", "ci", "note", "screenshot", "other"]);
+export type RunArtifactKind = z.infer<typeof RunArtifactKind>;
+
+export const ContextIntakeSessionStatus = z.enum(["collecting", "needs_user", "blocked", "ready", "closed"]);
+export type ContextIntakeSessionStatus = z.infer<typeof ContextIntakeSessionStatus>;
+
+export const ToolTraceStatus = z.enum(["pending", "running", "succeeded", "failed", "blocked", "skipped"]);
+export type ToolTraceStatus = z.infer<typeof ToolTraceStatus>;
+
+export const EvaluatorRuntimeStatus = z.enum(["passed", "failed", "unsupported", "needs_human", "error"]);
+export type EvaluatorRuntimeStatus = z.infer<typeof EvaluatorRuntimeStatus>;
+
 // ──────────────────────────────────────────────────────────────────────────
 // AcceptanceRule — the unified evaluation DSL (forced to converge during review: the same concept across all three design docs)
 // Taken as the union: logic(any/all/weighted) + clauses[evaluator + auto_verifiable] + completion_mode
@@ -305,6 +355,191 @@ export const MilestoneCompletion = z.object({
 export type MilestoneCompletion = z.infer<typeof MilestoneCompletion>;
 
 // ──────────────────────────────────────────────────────────────────────────
+// Aim OS orchestration model
+// ──────────────────────────────────────────────────────────────────────────
+
+const ActorBase = {
+  id: z.string().uuid(),
+  owner_id: z.string().uuid(),
+  display_name: z.string().default(""),
+  capabilities: z.array(z.string()).default([]),
+  status: ActorStatus.default("active"),
+  created_at: z.string().optional(),
+};
+
+export const HumanActor = z.object({
+  ...ActorBase,
+  kind: z.literal("human"),
+  user_id: z.string().uuid().nullable().default(null),
+});
+export type HumanActor = z.infer<typeof HumanActor>;
+
+export const AgentProfile = z.object({
+  ...ActorBase,
+  kind: z.literal("agent"),
+  agent_kind: z.string().default("local_cli"),
+  run_mode: AgentRunMode.default("local_cli"),
+  model: z.string().nullable().default(null),
+  connection_ref: z.string().nullable().default(null),
+});
+export type AgentProfile = z.infer<typeof AgentProfile>;
+
+export const Actor = z.discriminatedUnion("kind", [HumanActor, AgentProfile]);
+export type Actor = z.infer<typeof Actor>;
+
+export const SubAimRelation = z.object({
+  id: z.string().uuid(),
+  owner_id: z.string().uuid(),
+  parent_goal_id: z.string().uuid(),
+  parent_milestone_id: z.string().uuid(),
+  child_goal_id: z.string().uuid(),
+  status: SubAimRelationStatus.default("active"),
+  reason: z.string().default(""),
+  created_at: z.string().optional(),
+  updated_at: z.string().optional(),
+});
+export type SubAimRelation = z.infer<typeof SubAimRelation>;
+
+export const Assignment = z.object({
+  id: z.string().uuid(),
+  owner_id: z.string().uuid(),
+  goal_id: z.string().uuid(),
+  milestone_id: z.string().uuid(),
+  actor_kind: ActorKind,
+  actor_id: z.string().uuid().nullable().default(null),
+  status: AssignmentStatus.default("assigned"),
+  source: AssignmentSource.default("routing"),
+  reason: z.string().default(""),
+  capability_tags: z.array(z.string()).default([]),
+  created_at: z.string().optional(),
+  updated_at: z.string().optional(),
+});
+export type Assignment = z.infer<typeof Assignment>;
+
+export const Run = z.object({
+  id: z.string().uuid(),
+  owner_id: z.string().uuid(),
+  goal_id: z.string().uuid(),
+  milestone_id: z.string().uuid(),
+  assignment_id: z.string().uuid().nullable().default(null),
+  actor_kind: ActorKind,
+  actor_id: z.string().uuid().nullable().default(null),
+  kind: RunKind,
+  status: RunStatus.default("queued"),
+  attempt: z.number().int().positive().default(1),
+  workspace_root: z.string().nullable().default(null),
+  sandbox: z.string().nullable().default(null),
+  network_enabled: z.boolean().default(false),
+  model: z.string().nullable().default(null),
+  reasoning: z.string().nullable().default(null),
+  summary: z.string().default(""),
+  error: z.string().nullable().default(null),
+  queued_at: z.string().optional(),
+  started_at: z.string().nullable().default(null),
+  finished_at: z.string().nullable().default(null),
+  created_at: z.string().optional(),
+});
+export type Run = z.infer<typeof Run>;
+
+export const RunEvent = z.object({
+  id: z.string().uuid(),
+  owner_id: z.string().uuid(),
+  run_id: z.string().uuid(),
+  type: RunEventType,
+  summary: z.string().default(""),
+  payload: z.record(z.unknown()).default({}),
+  created_at: z.string().optional(),
+});
+export type RunEvent = z.infer<typeof RunEvent>;
+
+export const RunArtifact = z.object({
+  id: z.string().uuid(),
+  owner_id: z.string().uuid(),
+  run_id: z.string().uuid(),
+  kind: RunArtifactKind,
+  uri: z.string().default(""),
+  path: z.string().nullable().default(null),
+  summary: z.string().default(""),
+  evidence_id: z.string().uuid().nullable().default(null),
+  created_at: z.string().optional(),
+});
+export type RunArtifact = z.infer<typeof RunArtifact>;
+
+export const ToolTrace = z.object({
+  id: z.string().uuid(),
+  owner_id: z.string().uuid(),
+  session_id: z.string().uuid().nullable().default(null),
+  tool_name: z.string(),
+  status: ToolTraceStatus,
+  summary: z.string().default(""),
+  sources: z.array(z.record(z.unknown())).default([]),
+  error: z.string().nullable().default(null),
+  started_at: z.string().nullable().default(null),
+  finished_at: z.string().nullable().default(null),
+  created_at: z.string().optional(),
+});
+export type ToolTrace = z.infer<typeof ToolTrace>;
+
+export const ContextIntakeSession = z.object({
+  id: z.string().uuid(),
+  owner_id: z.string().uuid(),
+  goal_id: z.string().uuid().nullable().default(null),
+  aim_title: z.string(),
+  aim_description: z.string().default(""),
+  status: ContextIntakeSessionStatus.default("collecting"),
+  readiness: z.string().default(""),
+  can_continue: z.boolean().default(false),
+  should_pause: z.boolean().default(false),
+  missing_questions: z.array(z.string()).default([]),
+  blocked_reasons: z.array(z.string()).default([]),
+  tool_trace_ids: z.array(z.string().uuid()).default([]),
+  started_at: z.string().optional(),
+  closed_at: z.string().nullable().default(null),
+  created_at: z.string().optional(),
+});
+export type ContextIntakeSession = z.infer<typeof ContextIntakeSession>;
+
+export const EvidenceAttribution = z.object({
+  id: z.string().uuid(),
+  owner_id: z.string().uuid(),
+  evidence_id: z.string().uuid(),
+  goal_id: z.string().uuid(),
+  milestone_id: z.string().uuid().nullable().default(null),
+  run_id: z.string().uuid().nullable().default(null),
+  assignment_id: z.string().uuid().nullable().default(null),
+  actor_kind: ActorKind.nullable().default(null),
+  actor_id: z.string().uuid().nullable().default(null),
+  trust_score: z.number().min(0).max(1).default(0),
+  reason: z.string().default(""),
+  created_at: z.string().optional(),
+});
+export type EvidenceAttribution = z.infer<typeof EvidenceAttribution>;
+
+export const EvaluatorRuntimeResult = z.object({
+  evaluator: Evaluator,
+  status: EvaluatorRuntimeStatus,
+  matched_evidence_ids: z.array(z.string().uuid()).default([]),
+  trust_score: z.number().min(0).max(1).default(0),
+  explanation: z.string().default(""),
+  failure_reason: z.string().nullable().default(null),
+  requires_human_confirmation: z.boolean().default(false),
+});
+export type EvaluatorRuntimeResult = z.infer<typeof EvaluatorRuntimeResult>;
+
+export const AimProgressMilestoneRead = z.object({
+  milestone: Milestone,
+  assignment: Assignment.nullable().default(null),
+  latest_run: Run.nullable().default(null),
+  child_relations: z.array(SubAimRelation).default([]),
+  evaluator_results: z.array(EvaluatorRuntimeResult).default([]),
+  evidence_count: z.number().int().nonnegative().default(0),
+  completed: z.boolean().default(false),
+  blocked: z.boolean().default(false),
+  next_action: z.string().default(""),
+});
+export type AimProgressMilestoneRead = z.infer<typeof AimProgressMilestoneRead>;
+
+// ──────────────────────────────────────────────────────────────────────────
 // Memory / Subscription / Job
 // ──────────────────────────────────────────────────────────────────────────
 
@@ -322,6 +557,21 @@ export const Memory = z.object({
   created_at: z.string().optional(),
 });
 export type Memory = z.infer<typeof Memory>;
+
+export const AimProgressReadModel = z.object({
+  goal: Goal,
+  milestones: z.array(AimProgressMilestoneRead),
+  actors: z.array(Actor).default([]),
+  assignments: z.array(Assignment).default([]),
+  runs: z.array(Run).default([]),
+  sub_aim_relations: z.array(SubAimRelation).default([]),
+  context_candidates: z.array(Memory).default([]),
+  completed_milestones: z.number().int().nonnegative().default(0),
+  total_milestones: z.number().int().nonnegative().default(0),
+  blocked_count: z.number().int().nonnegative().default(0),
+  next_action: z.string().default(""),
+});
+export type AimProgressReadModel = z.infer<typeof AimProgressReadModel>;
 
 export const Subscription = z.object({
   owner_id: z.string().uuid(),

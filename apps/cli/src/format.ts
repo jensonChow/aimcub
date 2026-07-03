@@ -636,6 +636,10 @@ export function formatImportSummary(summary: {
   memories: number;
   evidence: number;
   completions: number;
+  actors?: number;
+  subAimRelations?: number;
+  assignments?: number;
+  runs?: number;
 }): string {
   return [
     `imported: ${summary.goals} goals`,
@@ -643,6 +647,10 @@ export function formatImportSummary(summary: {
     `${summary.memories} memories`,
     `${summary.evidence} evidence`,
     `${summary.completions} completions`,
+    `${summary.actors ?? 0} actors`,
+    `${summary.subAimRelations ?? 0} sub-aim relations`,
+    `${summary.assignments ?? 0} assignments`,
+    `${summary.runs ?? 0} runs`,
   ].join(" · ");
 }
 

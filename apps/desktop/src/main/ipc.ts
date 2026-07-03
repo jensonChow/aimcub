@@ -116,6 +116,18 @@ async function runMilestoneAgent(req: RunMilestoneAgentRequest): Promise<RunMile
     return { ok: false, run: null, detail, error: "No authenticated local CLI agent is available." };
   }
 
+  const assignment = (await aimStore.listAssignments(detail.goal.id)).find((row) => row.milestone_id === milestone.id) ?? null;
+  const orchestrationRun = await aimStore.createRun({
+    goalId: detail.goal.id,
+    milestoneId: milestone.id,
+    assignmentId: assignment?.id ?? null,
+    actorKind: "agent",
+    status: "running",
+    sandbox: "read-only",
+    networkEnabled: false,
+    model: selected.models[0]?.id ?? "default",
+    summary: `Local agent ${selected.name} started: ${milestone.title}`,
+  });
   const run = await runLocalAgent({
     agentId: selected.id,
     prompt: milestoneAgentPrompt(detail.goal, milestone, req.prompt),
@@ -142,7 +154,18 @@ async function runMilestoneAgent(req: RunMilestoneAgentRequest): Promise<RunMile
       error: run.error,
     },
     trustScore: 0.6,
+    runId: orchestrationRun.id,
+    assignmentId: orchestrationRun.assignment_id,
   });
+  await aimStore.finishRun({
+    runId: orchestrationRun.id,
+    status: run.ok ? "completed" : "failed",
+    summary: run.ok
+      ? `Local agent ${selected.name} completed its run for: ${milestone.title}`
+      : `Local agent ${selected.name} failed its run for: ${milestone.title}`,
+    error: run.error,
+  });
+  await aimStore.sedimentContextFromGoal(detail.goal.id);
 
   return {
     ok: run.ok,
@@ -318,6 +341,8 @@ export function registerIpc(): void {
 
   ipcMain.handle(IPC.getGoal, (_e, id: string): Promise<GoalDetail | null> => goalDetail(id));
 
+  ipcMain.handle(IPC.getAimProgress, (_e, id: string) => aimStore.getAimProgress(id));
+
   ipcMain.handle(IPC.deleteGoal, (_e, id: string): Promise<void> => aimStore.deleteGoal(id));
 
   ipcMain.handle(IPC.listContextCandidates, () => aimStore.listMemoryCandidates());
@@ -394,6 +419,7 @@ export function registerIpc(): void {
       milestoneId: req.milestoneId,
       summary: req.summary,
     });
+    await aimStore.sedimentContextFromGoal(req.goalId);
     return goalDetail(req.goalId);
   });
 
@@ -450,6 +476,8 @@ export function registerIpc(): void {
     const saved = await aimStore.createGoal({
       title: req.title,
       description: req.description,
+      parentGoalId: req.parentGoalId,
+      parentMilestoneId: req.parentMilestoneId,
       plan: req.plan,
       metadata: {
         ...(req.quality !== undefined || req.qualityRetry || req.review

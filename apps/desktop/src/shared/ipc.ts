@@ -4,7 +4,7 @@
  * renderer bundle — only main/preload pull in the channel constants at runtime.
  */
 import type { DecompositionOutput, Goal, Memory, Milestone } from "@core/types";
-import type { AimIntakeReport, ContextHealthRow, ContextLineageLearningReport, ContextProfileReport, DecompositionLearningReport, DecompositionStrategyReport, PlanQualityReport, PlanReviewReport } from "@core/domain";
+import type { AimIntakeReport, AimProgressReadModel, ContextHealthRow, ContextLineageLearningReport, ContextProfileReport, DecompositionLearningReport, DecompositionStrategyReport, PlanQualityReport, PlanReviewReport } from "@core/domain";
 import type { LlmProvider } from "@core/llm/providers";
 import type {
   ClarifyOutput,
@@ -281,6 +281,7 @@ export interface AimcubApi {
   saveGoal(req: SaveRequest): Promise<SavedGoal>;
   listGoals(): Promise<Goal[]>;
   getGoal(id: string): Promise<GoalDetail | null>;
+  getAimProgress(id: string): Promise<AimProgressReadModel | null>;
   deleteGoal(id: string): Promise<void>;
   listContextCandidates(): Promise<Memory[]>;
   listContextHistory(): Promise<Memory[]>;
@@ -315,6 +316,7 @@ export const IPC = {
   saveGoal: "aimcub:saveGoal",
   listGoals: "aimcub:listGoals",
   getGoal: "aimcub:getGoal",
+  getAimProgress: "aimcub:getAimProgress",
   deleteGoal: "aimcub:deleteGoal",
   listContextCandidates: "aimcub:listContextCandidates",
   listContextHistory: "aimcub:listContextHistory",

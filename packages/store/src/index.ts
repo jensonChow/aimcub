@@ -18,12 +18,32 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "n
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { evaluate, inferContextCategory, isPromptLikeContextCandidate, planMerge, validatePlan } from "@core/domain";
+import {
+  attributeEvidence,
+  buildAimProgressReadModel,
+  decideContextIntakeSession,
+  deriveContextCandidatesFromWork,
+  evaluate,
+  inferContextCategory,
+  isPromptLikeContextCandidate,
+  planMerge,
+  routeMilestones,
+  validatePlan,
+} from "@core/domain";
 // DecompositionOutput is imported as a VALUE (the Zod schema) so the store can re-validate
 // the SHAPE of any plan it is asked to persist — the gatekeeper for untrusted input.
 import { AcceptanceRule, DecompositionOutput } from "@core/types";
 import type {
   ContextCategory,
+  Actor,
+  ActorKind,
+  AgentRunMode,
+  AimProgressReadModel,
+  Assignment,
+  AssignmentSource,
+  AssignmentStatus,
+  ContextIntakeSession,
+  EvidenceAttribution,
   Evidence,
   EvidenceKind,
   Goal,
@@ -34,6 +54,13 @@ import type {
   MilestoneCompletion,
   MilestoneStatus,
   PlanNode,
+  Run,
+  RunEvent,
+  RunEventType,
+  RunStatus,
+  SubAimRelation,
+  ToolTrace,
+  ToolTraceStatus,
 } from "@core/types";
 
 /** Fixed local owner for the single-user local app (matches the web demo owner). */
@@ -47,6 +74,14 @@ export interface LocalStore {
   memories: Memory[];
   evidence: Evidence[];
   completions: MilestoneCompletion[];
+  actors: Actor[];
+  subAimRelations: SubAimRelation[];
+  assignments: Assignment[];
+  runs: Run[];
+  runEvents: RunEvent[];
+  toolTraces: ToolTrace[];
+  evidenceAttributions: EvidenceAttribution[];
+  contextIntakeSessions: ContextIntakeSession[];
 }
 
 /** A memory to persist alongside a new goal (e.g. derived from clarifying answers). */
@@ -68,6 +103,8 @@ export interface CreateGoalInput {
   description?: string;
   domain?: GoalDomain;
   metadata?: Record<string, unknown>;
+  parentGoalId?: string;
+  parentMilestoneId?: string;
   /** The validated decomposition; milestones are materialized from it. */
   plan: DecompositionOutput;
   memories?: NewMemory[];
@@ -97,6 +134,8 @@ export interface AddEvidenceInput {
   summary?: string;
   payload?: Record<string, unknown>;
   trustScore?: number;
+  runId?: string | null;
+  assignmentId?: string | null;
 }
 
 export interface AddEvidenceResult {
@@ -153,6 +192,92 @@ export interface ImportStoreResult {
   memories: number;
   evidence: number;
   completions: number;
+  actors: number;
+  subAimRelations: number;
+  assignments: number;
+  runs: number;
+  runEvents: number;
+  toolTraces: number;
+  evidenceAttributions: number;
+  contextIntakeSessions: number;
+}
+
+export interface AddActorInput {
+  ownerId?: string;
+  kind: ActorKind;
+  displayName: string;
+  capabilities?: string[];
+  userId?: string | null;
+  agentKind?: string;
+  runMode?: AgentRunMode;
+  model?: string | null;
+  connectionRef?: string | null;
+}
+
+export interface AssignMilestoneInput {
+  ownerId?: string;
+  goalId: string;
+  milestoneId: string;
+  actorKind: ActorKind;
+  actorId?: string | null;
+  status?: AssignmentStatus;
+  source?: AssignmentSource;
+  reason?: string;
+  capabilityTags?: string[];
+}
+
+export interface CreateRunInput {
+  ownerId?: string;
+  goalId: string;
+  milestoneId: string;
+  assignmentId?: string | null;
+  actorKind: ActorKind;
+  actorId?: string | null;
+  status?: RunStatus;
+  workspaceRoot?: string | null;
+  sandbox?: string | null;
+  networkEnabled?: boolean;
+  model?: string | null;
+  reasoning?: string | null;
+  summary?: string;
+}
+
+export interface AppendRunEventInput {
+  ownerId?: string;
+  runId: string;
+  type: RunEventType;
+  summary?: string;
+  payload?: Record<string, unknown>;
+}
+
+export interface FinishRunInput {
+  runId: string;
+  status: Extract<RunStatus, "completed" | "failed" | "blocked" | "cancelled">;
+  summary?: string;
+  error?: string | null;
+}
+
+export interface RecordToolTraceInput {
+  ownerId?: string;
+  sessionId?: string | null;
+  toolName: string;
+  status: ToolTraceStatus;
+  summary?: string;
+  sources?: Array<Record<string, unknown>>;
+  error?: string | null;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+}
+
+export interface CreateContextIntakeSessionInput {
+  ownerId?: string;
+  goalId?: string | null;
+  aimTitle: string;
+  aimDescription?: string | null;
+  readiness?: string;
+  missingQuestions?: string[];
+  blockedReasons?: string[];
+  toolTraceIds?: string[];
 }
 
 /** The persistence surface. Async so a Supabase adapter can implement the same contract. */
@@ -178,6 +303,19 @@ export interface AimStore {
   rejectMemoryCandidate(id: string): Promise<Memory | null>;
   archiveMemory(id: string): Promise<Memory | null>;
   deprioritizeMemory(input: DeprioritizeMemoryInput): Promise<Memory | null>;
+  listActors(): Promise<Actor[]>;
+  addActor(input: AddActorInput): Promise<Actor>;
+  listAssignments(goalId?: string | null): Promise<Assignment[]>;
+  assignMilestone(input: AssignMilestoneInput): Promise<Assignment>;
+  listSubAimRelations(goalId?: string | null): Promise<SubAimRelation[]>;
+  listRuns(goalId?: string | null): Promise<Run[]>;
+  createRun(input: CreateRunInput): Promise<Run>;
+  appendRunEvent(input: AppendRunEventInput): Promise<RunEvent | null>;
+  finishRun(input: FinishRunInput): Promise<Run | null>;
+  recordToolTrace(input: RecordToolTraceInput): Promise<ToolTrace>;
+  createContextIntakeSession(input: CreateContextIntakeSessionInput): Promise<ContextIntakeSession>;
+  sedimentContextFromGoal(goalId: string): Promise<Memory[]>;
+  getAimProgress(goalId: string): Promise<AimProgressReadModel | null>;
   exportData(): Promise<LocalStore>;
   importData(snapshot: LocalStore, mode?: "merge" | "replace"): Promise<ImportStoreResult>;
 }
@@ -529,6 +667,12 @@ function insertCompletion(
   store.completions.push(completion);
   milestone.status = "completed";
   milestone.completed_at = now;
+  for (const assignment of store.assignments.filter((row) => row.milestone_id === milestone.id)) {
+    if (assignment.status !== "cancelled") {
+      assignment.status = "completed";
+      assignment.updated_at = now;
+    }
+  }
   return completion;
 }
 
@@ -574,7 +718,22 @@ function evaluateGoal(store: LocalStore, goalId: string, now: string): Milestone
 }
 
 function emptyStore(): LocalStore {
-  return { ownerId: DEFAULT_OWNER, goals: [], milestonesByGoal: {}, memories: [], evidence: [], completions: [] };
+  return {
+    ownerId: DEFAULT_OWNER,
+    goals: [],
+    milestonesByGoal: {},
+    memories: [],
+    evidence: [],
+    completions: [],
+    actors: [],
+    subAimRelations: [],
+    assignments: [],
+    runs: [],
+    runEvents: [],
+    toolTraces: [],
+    evidenceAttributions: [],
+    contextIntakeSessions: [],
+  };
 }
 
 function normalizeMemoryContent(content: string): string {
@@ -627,6 +786,14 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
         memories: (parsed.memories ?? []).map(normalizeMemoryRow),
         evidence: parsed.evidence ?? [],
         completions: parsed.completions ?? [],
+        actors: parsed.actors ?? [],
+        subAimRelations: parsed.subAimRelations ?? [],
+        assignments: parsed.assignments ?? [],
+        runs: parsed.runs ?? [],
+        runEvents: parsed.runEvents ?? [],
+        toolTraces: parsed.toolTraces ?? [],
+        evidenceAttributions: parsed.evidenceAttributions ?? [],
+        contextIntakeSessions: parsed.contextIntakeSessions ?? [],
       };
     } catch {
       return emptyStore();
@@ -670,6 +837,23 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
       };
 
       const milestones = materialize(input.plan, goalId, ownerId);
+      const routedAssignments: Assignment[] = routeMilestones({
+        milestones,
+        actors: store.actors,
+      }).map((assignment) => ({
+        id: randomUUID(),
+        owner_id: ownerId,
+        goal_id: assignment.goalId,
+        milestone_id: assignment.milestoneId,
+        actor_kind: assignment.actorKind,
+        actor_id: assignment.actorId,
+        status: assignment.status,
+        source: assignment.source,
+        reason: assignment.reason,
+        capability_tags: assignment.capabilityTags,
+        created_at: now,
+        updated_at: now,
+      }));
 
       const memories: Memory[] = (input.memories ?? [])
         .filter((m) => m.content.trim().length > 0)
@@ -690,6 +874,33 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
       store.goals.push(goal);
       store.milestonesByGoal[goalId] = milestones;
       store.memories.push(...memories);
+      store.assignments.push(...routedAssignments);
+
+      const metadataParentGoalId = typeof input.metadata?.parent_goal_id === "string" ? input.metadata.parent_goal_id : undefined;
+      const metadataParentMilestoneId = typeof input.metadata?.parent_milestone_id === "string" ? input.metadata.parent_milestone_id : undefined;
+      const parentGoalId = input.parentGoalId ?? metadataParentGoalId;
+      const parentMilestoneId = input.parentMilestoneId ?? metadataParentMilestoneId;
+      if (parentGoalId || parentMilestoneId) {
+        if (!parentGoalId || !parentMilestoneId) {
+          throw new Error("Both parentGoalId and parentMilestoneId are required for a child aim.");
+        }
+        const parentGoal = store.goals.find((g) => g.id === parentGoalId);
+        const parentMilestone = (store.milestonesByGoal[parentGoalId] ?? []).find((m) => m.id === parentMilestoneId);
+        if (!parentGoal || !parentMilestone) {
+          throw new Error("Parent aim or sub-aim not found.");
+        }
+        store.subAimRelations.push({
+          id: randomUUID(),
+          owner_id: ownerId,
+          parent_goal_id: parentGoalId,
+          parent_milestone_id: parentMilestoneId,
+          child_goal_id: goalId,
+          status: "active",
+          reason: "User manually decomposed this sub-aim into a child aim.",
+          created_at: now,
+          updated_at: now,
+        });
+      }
       save(store);
 
       return { goal, milestones };
@@ -710,6 +921,28 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
       if (input.metadata) goal.metadata = { ...goal.metadata, ...input.metadata };
 
       store.milestonesByGoal[goal.id] = milestones;
+      const assignmentNow = new Date().toISOString();
+      const existingAssignmentMilestoneIds = new Set(
+        store.assignments.filter((assignment) => assignment.goal_id === goal.id).map((assignment) => assignment.milestone_id),
+      );
+      const missingAssignments = routeMilestones({
+        milestones: milestones.filter((milestone) => !existingAssignmentMilestoneIds.has(milestone.id) && milestone.status !== "skipped"),
+        actors: store.actors,
+      }).map((assignment) => ({
+        id: randomUUID(),
+        owner_id: goal.owner_id,
+        goal_id: assignment.goalId,
+        milestone_id: assignment.milestoneId,
+        actor_kind: assignment.actorKind,
+        actor_id: assignment.actorId,
+        status: assignment.status,
+        source: assignment.source,
+        reason: assignment.reason,
+        capability_tags: assignment.capabilityTags,
+        created_at: assignmentNow,
+        updated_at: assignmentNow,
+      } satisfies Assignment));
+      store.assignments.push(...missingAssignments);
       save(store);
       return { goal, milestones };
     },
@@ -717,11 +950,21 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
     async deleteGoal(id: string): Promise<void> {
       const store = load();
       const milestoneIds = new Set((store.milestonesByGoal[id] ?? []).map((m) => m.id));
+      const runIds = new Set(store.runs.filter((run) => run.goal_id === id).map((run) => run.id));
+      const evidenceIds = new Set(store.evidence.filter((ev) => ev.goal_id === id).map((ev) => ev.id));
       store.goals = store.goals.filter((g) => g.id !== id);
       delete store.milestonesByGoal[id];
       store.memories = store.memories.filter((m) => m.goal_id !== id);
       store.evidence = store.evidence.filter((ev) => ev.goal_id !== id);
       store.completions = store.completions.filter((c) => !milestoneIds.has(c.milestone_id));
+      store.subAimRelations = store.subAimRelations.filter((relation) => relation.parent_goal_id !== id && relation.child_goal_id !== id);
+      store.assignments = store.assignments.filter((assignment) => assignment.goal_id !== id);
+      store.runs = store.runs.filter((run) => run.goal_id !== id);
+      store.runEvents = store.runEvents.filter((event) => !runIds.has(event.run_id));
+      store.evidenceAttributions = store.evidenceAttributions.filter(
+        (attribution) => attribution.goal_id !== id && !evidenceIds.has(attribution.evidence_id),
+      );
+      store.contextIntakeSessions = store.contextIntakeSessions.filter((session) => session.goal_id !== id);
       save(store);
     },
 
@@ -768,6 +1011,19 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
       };
 
       store.evidence.push(evidence);
+      const run = input.runId ? store.runs.find((row) => row.id === input.runId) ?? null : null;
+      const assignment = input.assignmentId
+        ? store.assignments.find((row) => row.id === input.assignmentId) ?? null
+        : run?.assignment_id
+          ? store.assignments.find((row) => row.id === run.assignment_id) ?? null
+          : input.milestoneId
+            ? store.assignments.find((row) => row.milestone_id === input.milestoneId) ?? null
+            : null;
+      store.evidenceAttributions.push({
+        id: randomUUID(),
+        ...attributeEvidence({ evidence, assignment, run }),
+        created_at: now,
+      });
       const completions = evaluateGoal(store, input.goalId, now);
       save(store);
       return { evidence, deduped: false, completions };
@@ -804,6 +1060,16 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
         created_at: now,
       };
       store.evidence.push(evidence);
+      const assignment = store.assignments.find((row) => row.milestone_id === milestone.id) ?? null;
+      store.evidenceAttributions.push({
+        id: randomUUID(),
+        ...attributeEvidence({
+          evidence,
+          assignment,
+          reason: "Human manual proof confirmed this sub-aim.",
+        }),
+        created_at: now,
+      });
       const completions = evaluateGoal(store, input.goalId, now);
       const completion = completions.find((c) => c.milestone_id === milestone.id) ?? null;
       save(store);
@@ -979,6 +1245,315 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
       return memory;
     },
 
+    async listActors(): Promise<Actor[]> {
+      return load().actors.slice().sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
+    },
+
+    async addActor(input: AddActorInput): Promise<Actor> {
+      const store = load();
+      const now = new Date().toISOString();
+      const ownerId = input.ownerId ?? store.ownerId;
+      const actor: Actor = input.kind === "human"
+        ? {
+            id: randomUUID(),
+            owner_id: ownerId,
+            kind: "human",
+            display_name: input.displayName,
+            capabilities: input.capabilities ?? [],
+            status: "active",
+            user_id: input.userId ?? null,
+            created_at: now,
+          }
+        : {
+            id: randomUUID(),
+            owner_id: ownerId,
+            kind: "agent",
+            display_name: input.displayName,
+            capabilities: input.capabilities ?? [],
+            status: "active",
+            agent_kind: input.agentKind ?? "local_cli",
+            run_mode: input.runMode ?? "local_cli",
+            model: input.model ?? null,
+            connection_ref: input.connectionRef ?? null,
+            created_at: now,
+          };
+      store.actors.push(actor);
+      save(store);
+      return actor;
+    },
+
+    async listAssignments(goalId: string | null = null): Promise<Assignment[]> {
+      const rows = load().assignments.filter((assignment) => goalId === null || assignment.goal_id === goalId);
+      return rows.slice().sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
+    },
+
+    async assignMilestone(input: AssignMilestoneInput): Promise<Assignment> {
+      const store = load();
+      const goal = store.goals.find((g) => g.id === input.goalId);
+      if (!goal) throw new Error(`Aim ${input.goalId} not found.`);
+      const milestone = (store.milestonesByGoal[input.goalId] ?? []).find((m) => m.id === input.milestoneId);
+      if (!milestone) throw new Error(`Milestone ${input.milestoneId} not found on aim ${input.goalId}.`);
+      if (input.actorId && !store.actors.some((actor) => actor.id === input.actorId && actor.kind === input.actorKind)) {
+        throw new Error(`Actor ${input.actorId} not found.`);
+      }
+      const now = new Date().toISOString();
+      const existing = store.assignments.find((assignment) => assignment.milestone_id === milestone.id);
+      if (existing) {
+        existing.actor_kind = input.actorKind;
+        existing.actor_id = input.actorId ?? null;
+        existing.status = input.status ?? "assigned";
+        existing.source = input.source ?? "user_override";
+        existing.reason = input.reason ?? "Assignment updated by the user.";
+        existing.capability_tags = input.capabilityTags ?? existing.capability_tags;
+        existing.updated_at = now;
+        save(store);
+        return existing;
+      }
+      const assignment: Assignment = {
+        id: randomUUID(),
+        owner_id: input.ownerId ?? goal.owner_id,
+        goal_id: goal.id,
+        milestone_id: milestone.id,
+        actor_kind: input.actorKind,
+        actor_id: input.actorId ?? null,
+        status: input.status ?? "assigned",
+        source: input.source ?? "user_override",
+        reason: input.reason ?? "Assignment created by the user.",
+        capability_tags: input.capabilityTags ?? [],
+        created_at: now,
+        updated_at: now,
+      };
+      store.assignments.push(assignment);
+      save(store);
+      return assignment;
+    },
+
+    async listSubAimRelations(goalId: string | null = null): Promise<SubAimRelation[]> {
+      const rows = load().subAimRelations.filter((relation) =>
+        goalId === null || relation.parent_goal_id === goalId || relation.child_goal_id === goalId,
+      );
+      return rows.slice().sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
+    },
+
+    async listRuns(goalId: string | null = null): Promise<Run[]> {
+      const rows = load().runs.filter((run) => goalId === null || run.goal_id === goalId);
+      return rows.slice().sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
+    },
+
+    async createRun(input: CreateRunInput): Promise<Run> {
+      const store = load();
+      const goal = store.goals.find((g) => g.id === input.goalId);
+      if (!goal) throw new Error(`Aim ${input.goalId} not found.`);
+      const milestone = (store.milestonesByGoal[input.goalId] ?? []).find((m) => m.id === input.milestoneId);
+      if (!milestone) throw new Error(`Milestone ${input.milestoneId} not found on aim ${input.goalId}.`);
+      const assignment = input.assignmentId
+        ? store.assignments.find((row) => row.id === input.assignmentId)
+        : store.assignments.find((row) => row.milestone_id === milestone.id);
+      const now = new Date().toISOString();
+      const attempt = store.runs.filter((run) => run.milestone_id === milestone.id).length + 1;
+      const status = input.status ?? "queued";
+      const run: Run = {
+        id: randomUUID(),
+        owner_id: input.ownerId ?? goal.owner_id,
+        goal_id: goal.id,
+        milestone_id: milestone.id,
+        assignment_id: assignment?.id ?? input.assignmentId ?? null,
+        actor_kind: input.actorKind,
+        actor_id: input.actorId ?? assignment?.actor_id ?? null,
+        kind: input.actorKind === "agent" ? "agent" : "human",
+        status,
+        attempt,
+        workspace_root: input.workspaceRoot ?? null,
+        sandbox: input.sandbox ?? null,
+        network_enabled: input.networkEnabled ?? false,
+        model: input.model ?? null,
+        reasoning: input.reasoning ?? null,
+        summary: input.summary ?? "",
+        error: null,
+        queued_at: now,
+        started_at: status === "running" ? now : null,
+        finished_at: null,
+        created_at: now,
+      };
+      store.runs.push(run);
+      if (assignment && assignment.status !== "cancelled") {
+        assignment.status = status === "queued" ? "assigned" : status === "running" ? "running" : assignment.status;
+        assignment.updated_at = now;
+      }
+      store.runEvents.push({
+        id: randomUUID(),
+        owner_id: run.owner_id,
+        run_id: run.id,
+        type: status === "running" ? "run.started" : "run.queued",
+        summary: input.summary ?? "",
+        payload: {},
+        created_at: now,
+      });
+      save(store);
+      return run;
+    },
+
+    async appendRunEvent(input: AppendRunEventInput): Promise<RunEvent | null> {
+      const store = load();
+      const run = store.runs.find((row) => row.id === input.runId);
+      if (!run) return null;
+      const event: RunEvent = {
+        id: randomUUID(),
+        owner_id: input.ownerId ?? run.owner_id,
+        run_id: run.id,
+        type: input.type,
+        summary: input.summary ?? "",
+        payload: input.payload ?? {},
+        created_at: new Date().toISOString(),
+      };
+      store.runEvents.push(event);
+      save(store);
+      return event;
+    },
+
+    async finishRun(input: FinishRunInput): Promise<Run | null> {
+      const store = load();
+      const run = store.runs.find((row) => row.id === input.runId);
+      if (!run) return null;
+      const now = new Date().toISOString();
+      run.status = input.status;
+      run.summary = input.summary ?? run.summary;
+      run.error = input.error ?? null;
+      run.finished_at = now;
+      if (!run.started_at) run.started_at = run.queued_at ?? now;
+      const assignment = run.assignment_id ? store.assignments.find((row) => row.id === run.assignment_id) : null;
+      if (assignment && assignment.status !== "completed" && assignment.status !== "cancelled") {
+        assignment.status = input.status === "completed" ? "assigned" : input.status === "failed" ? "blocked" : input.status;
+        assignment.updated_at = now;
+      }
+      store.runEvents.push({
+        id: randomUUID(),
+        owner_id: run.owner_id,
+        run_id: run.id,
+        type: input.status === "completed" ? "run.completed" : input.status === "cancelled" ? "run.cancelled" : "run.failed",
+        summary: input.summary ?? input.error ?? "",
+        payload: {},
+        created_at: now,
+      });
+      save(store);
+      return run;
+    },
+
+    async recordToolTrace(input: RecordToolTraceInput): Promise<ToolTrace> {
+      const store = load();
+      const now = new Date().toISOString();
+      const trace: ToolTrace = {
+        id: randomUUID(),
+        owner_id: input.ownerId ?? store.ownerId,
+        session_id: input.sessionId ?? null,
+        tool_name: input.toolName,
+        status: input.status,
+        summary: input.summary ?? "",
+        sources: input.sources ?? [],
+        error: input.error ?? null,
+        started_at: input.startedAt ?? null,
+        finished_at: input.finishedAt ?? (input.status === "succeeded" || input.status === "failed" || input.status === "blocked" ? now : null),
+        created_at: now,
+      };
+      store.toolTraces.push(trace);
+      save(store);
+      return trace;
+    },
+
+    async createContextIntakeSession(input: CreateContextIntakeSessionInput): Promise<ContextIntakeSession> {
+      const store = load();
+      const now = new Date().toISOString();
+      const traceIds = new Set(input.toolTraceIds ?? []);
+      const decision = decideContextIntakeSession({
+        aimTitle: input.aimTitle,
+        aimDescription: input.aimDescription,
+        goalId: input.goalId,
+        readiness: input.readiness,
+        missingQuestions: input.missingQuestions,
+        blockedReasons: input.blockedReasons,
+        toolTraces: store.toolTraces.filter((trace) => traceIds.has(trace.id)),
+      });
+      const session: ContextIntakeSession = {
+        id: randomUUID(),
+        owner_id: input.ownerId ?? store.ownerId,
+        ...decision,
+        started_at: now,
+        closed_at: decision.status === "ready" ? now : null,
+        created_at: now,
+      };
+      store.contextIntakeSessions.push(session);
+      save(store);
+      return session;
+    },
+
+    async sedimentContextFromGoal(goalId: string): Promise<Memory[]> {
+      const store = load();
+      const goal = store.goals.find((row) => row.id === goalId);
+      if (!goal) throw new Error(`Aim ${goalId} not found.`);
+      const milestones = store.milestonesByGoal[goalId] ?? [];
+      const candidates = deriveContextCandidatesFromWork({
+        goal,
+        milestones,
+        evidence: store.evidence.filter((row) => row.goal_id === goalId),
+        runs: store.runs.filter((row) => row.goal_id === goalId),
+        completions: store.completions.filter((completion) => milestones.some((milestone) => milestone.id === completion.milestone_id)),
+      });
+      const created: Memory[] = [];
+      for (const candidate of candidates) {
+        const content = normalizeMemoryContent(candidate.content);
+        if (!content) continue;
+        const scopedGoalId = candidate.scope === "aim" ? goalId : null;
+        const duplicate = findDuplicateMemory(store, content, scopedGoalId);
+        if (duplicate) {
+          created.push(duplicate);
+          continue;
+        }
+        const memory: Memory = {
+          id: randomUUID(),
+          owner_id: goal.owner_id,
+          goal_id: scopedGoalId,
+          kind: candidate.category === "procedure" ? "procedural" : "semantic",
+          category: candidate.category,
+          content,
+          confidence: candidate.confidence ?? 0.7,
+          source: "evidence_derived",
+          status: "pending",
+          superseded_by: null,
+          created_at: new Date().toISOString(),
+        };
+        store.memories.push(memory);
+        created.push(memory);
+      }
+      save(store);
+      return created;
+    },
+
+    async getAimProgress(goalId: string): Promise<AimProgressReadModel | null> {
+      const store = load();
+      const goal = store.goals.find((row) => row.id === goalId);
+      if (!goal) return null;
+      const milestones = store.milestonesByGoal[goalId] ?? [];
+      const milestoneIds = new Set(milestones.map((milestone) => milestone.id));
+      const contextCandidates = store.memories.filter((memory) =>
+        memory.status === "pending" && (memory.goal_id === null || memory.goal_id === goalId),
+      );
+      return buildAimProgressReadModel({
+        goal,
+        milestones,
+        actors: store.actors,
+        assignments: store.assignments.filter((assignment) => assignment.goal_id === goalId),
+        runs: store.runs.filter((run) => run.goal_id === goalId),
+        subAimRelations: store.subAimRelations.filter((relation) =>
+          relation.parent_goal_id === goalId || relation.child_goal_id === goalId,
+        ),
+        goals: store.goals,
+        milestonesByGoal: store.milestonesByGoal,
+        evidence: store.evidence.filter((row) => row.goal_id === goalId),
+        completions: store.completions.filter((completion) => milestoneIds.has(completion.milestone_id)),
+        contextCandidates,
+      });
+    },
+
     async exportData(): Promise<LocalStore> {
       return load();
     },
@@ -991,6 +1566,14 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
         memories: (snapshot.memories ?? []).map(normalizeMemoryRow),
         evidence: snapshot.evidence ?? [],
         completions: snapshot.completions ?? [],
+        actors: snapshot.actors ?? [],
+        subAimRelations: snapshot.subAimRelations ?? [],
+        assignments: snapshot.assignments ?? [],
+        runs: snapshot.runs ?? [],
+        runEvents: snapshot.runEvents ?? [],
+        toolTraces: snapshot.toolTraces ?? [],
+        evidenceAttributions: snapshot.evidenceAttributions ?? [],
+        contextIntakeSessions: snapshot.contextIntakeSessions ?? [],
       };
       if (mode === "replace") {
         save(incoming);
@@ -1000,6 +1583,14 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
           memories: incoming.memories.length,
           evidence: incoming.evidence.length,
           completions: incoming.completions.length,
+          actors: incoming.actors.length,
+          subAimRelations: incoming.subAimRelations.length,
+          assignments: incoming.assignments.length,
+          runs: incoming.runs.length,
+          runEvents: incoming.runEvents.length,
+          toolTraces: incoming.toolTraces.length,
+          evidenceAttributions: incoming.evidenceAttributions.length,
+          contextIntakeSessions: incoming.contextIntakeSessions.length,
         };
       }
 
@@ -1020,13 +1611,35 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
       const memories = mergeRows(store.memories, incoming.memories);
       const evidence = mergeRows(store.evidence, incoming.evidence);
       const completions = mergeRows(store.completions, incoming.completions);
+      const actors = mergeRows(store.actors, incoming.actors);
+      const subAimRelations = mergeRows(store.subAimRelations, incoming.subAimRelations);
+      const assignments = mergeRows(store.assignments, incoming.assignments);
+      const runs = mergeRows(store.runs, incoming.runs);
+      const runEvents = mergeRows(store.runEvents, incoming.runEvents);
+      const toolTraces = mergeRows(store.toolTraces, incoming.toolTraces);
+      const evidenceAttributions = mergeRows(store.evidenceAttributions, incoming.evidenceAttributions);
+      const contextIntakeSessions = mergeRows(store.contextIntakeSessions, incoming.contextIntakeSessions);
       let milestones = 0;
       for (const [goalId, nextRows] of Object.entries(incoming.milestonesByGoal)) {
         store.milestonesByGoal[goalId] ??= [];
         milestones += mergeRows(store.milestonesByGoal[goalId], nextRows);
       }
       save(store);
-      return { goals, milestones, memories, evidence, completions };
+      return {
+        goals,
+        milestones,
+        memories,
+        evidence,
+        completions,
+        actors,
+        subAimRelations,
+        assignments,
+        runs,
+        runEvents,
+        toolTraces,
+        evidenceAttributions,
+        contextIntakeSessions,
+      };
     },
   };
 }

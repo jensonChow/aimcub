@@ -103,6 +103,36 @@ const REPLAN = {
   edges: [{ from: "a", to: "b" }],
 } as unknown as DecompositionOutput;
 
+const MANUAL_PLAN = {
+  goal_summary: "Manual proof aim",
+  domain: "software",
+  rationale: "human proof",
+  nodes: [
+    {
+      key: "manual",
+      title: "Approve release",
+      description: "Human approval is required.",
+      est_effort: "s",
+      xp_reward: 10,
+      decomposition_contract: {
+        why: "The user owns approval.",
+        definition_of_done: "The user approves the release.",
+        required_evidence: ["Approval note."],
+        likely_owner: "human",
+        context_gaps: [],
+        eval_signal: "Done means the user confirms approval.",
+      },
+      acceptance_rule: {
+        logic: "all",
+        threshold: 1,
+        completion_mode: "manual",
+        clauses: [{ evaluator: "manual_confirm", auto_verifiable: false, match: {} }],
+      },
+    },
+  ],
+  edges: [],
+} as unknown as DecompositionOutput;
+
 function freshStore() {
   const dir = mkdtempSync(join(tmpdir(), "aimcub-store-"));
   return createJsonFileStore(dir);
@@ -514,6 +544,17 @@ describe("createJsonFileStore · memories/context", () => {
 });
 
 describe("createJsonFileStore · evidence and confirmations", () => {
+  it("creates durable routing assignments when an aim is saved", async () => {
+    const store = freshStore();
+    const { goal, milestones } = await store.createGoal({ title: "Build a CLI todo app", plan: PLAN });
+
+    const assignments = await store.listAssignments(goal.id);
+
+    expect(assignments).toHaveLength(milestones.length);
+    expect(assignments[0]!.actor_kind).toBe("agent");
+    expect(assignments[0]!.source).toBe("routing");
+  });
+
   it("appends trusted evidence and auto-completes matching milestones", async () => {
     const store = freshStore();
     const { goal, milestones } = await store.createGoal({ title: "Build a CLI todo app", plan: PLAN });
@@ -532,8 +573,50 @@ describe("createJsonFileStore · evidence and confirmations", () => {
     expect(result.deduped).toBe(false);
     expect(result.completions).toHaveLength(1);
     expect(result.completions[0]!.decided_by).toBe("rule_auto");
+    expect((await store.listAssignments(goal.id)).find((assignment) => assignment.milestone_id === milestones[0]!.id)?.status).toBe("completed");
     const got = await store.getGoal(goal.id);
     expect(got!.milestones[0]!.status).toBe("completed");
+  });
+
+  it("records agent run evidence attribution without letting low-trust self-reports complete", async () => {
+    const store = freshStore();
+    const { goal, milestones } = await store.createGoal({ title: "Build a CLI todo app", plan: PLAN });
+    const assignment = (await store.listAssignments(goal.id)).find((row) => row.milestone_id === milestones[0]!.id)!;
+    const run = await store.createRun({
+      goalId: goal.id,
+      milestoneId: milestones[0]!.id,
+      assignmentId: assignment.id,
+      actorKind: "agent",
+      status: "running",
+      sandbox: "read-only",
+      summary: "Codex started.",
+    });
+    await store.finishRun({ runId: run.id, status: "completed", summary: "Codex reported scaffold work." });
+
+    const result = await store.addEvidence({
+      goalId: goal.id,
+      milestoneId: milestones[0]!.id,
+      kind: "mcp_report",
+      sourceEventId: "agent-run-1",
+      summary: "Agent says the scaffold is done.",
+      payload: { ok: true },
+      trustScore: 0.6,
+      runId: run.id,
+      assignmentId: assignment.id,
+    });
+    const snapshot = await store.exportData();
+    const progress = await store.getAimProgress(goal.id);
+
+    expect(result.completions).toHaveLength(0);
+    expect(snapshot.evidenceAttributions[0]).toMatchObject({
+      evidence_id: result.evidence.id,
+      run_id: run.id,
+      assignment_id: assignment.id,
+      actor_kind: "agent",
+      trust_score: 0.6,
+    });
+    expect(progress?.milestones[0]?.completed).toBe(false);
+    expect(progress?.milestones[0]?.evidence_count).toBe(1);
   });
 
   it("dedupes evidence by emitter/source event", async () => {
@@ -567,6 +650,64 @@ describe("createJsonFileStore · evidence and confirmations", () => {
 
     const got = await store.getGoal(goal.id);
     expect(got!.milestones[1]!.status).toBe("completed");
+  });
+
+  it("human proof sedimentation creates pending durable context", async () => {
+    const store = freshStore();
+    const { goal, milestones } = await store.createGoal({ title: "Manual proof", plan: MANUAL_PLAN });
+
+    await store.confirmMilestone({
+      goalId: goal.id,
+      milestoneId: milestones[0]!.id,
+      summary: "Confirmed release approval.",
+    });
+    const candidates = await store.sedimentContextFromGoal(goal.id);
+
+    expect(candidates.some((candidate) => candidate.status === "pending" && candidate.category === "eval_signal")).toBe(true);
+    expect((await store.listMemories()).map((memory) => memory.id)).not.toContain(candidates[0]!.id);
+  });
+
+  it("manual sub-aim decomposition creates a relation that the cockpit can roll up", async () => {
+    const store = freshStore();
+    const { goal: parent, milestones: parentMilestones } = await store.createGoal({
+      title: "Parent aim",
+      plan: MANUAL_PLAN,
+    });
+    const { goal: child, milestones: childMilestones } = await store.createGoal({
+      title: "Child aim",
+      plan: MANUAL_PLAN,
+      parentGoalId: parent.id,
+      parentMilestoneId: parentMilestones[0]!.id,
+    });
+
+    await store.confirmMilestone({ goalId: child.id, milestoneId: childMilestones[0]!.id });
+    const relations = await store.listSubAimRelations(parent.id);
+    const progress = await store.getAimProgress(parent.id);
+
+    expect(relations).toHaveLength(1);
+    expect(relations[0]!.child_goal_id).toBe(child.id);
+    expect(progress?.milestones[0]?.child_relations[0]?.status).toBe("completed");
+    expect(progress?.milestones[0]?.next_action).toMatch(/child aim/i);
+  });
+
+  it("persists context intake sessions with explicit continue or pause state", async () => {
+    const store = freshStore();
+    const trace = await store.recordToolTrace({
+      toolName: "local.scan_workspace",
+      status: "blocked",
+      summary: "Workspace permission required.",
+      error: "Workspace permission required.",
+    });
+    const session = await store.createContextIntakeSession({
+      aimTitle: "Build CLI",
+      missingQuestions: ["What evidence proves done?"],
+      toolTraceIds: [trace.id],
+    });
+
+    expect(session.status).toBe("blocked");
+    expect(session.should_pause).toBe(true);
+    expect(session.can_continue).toBe(false);
+    expect(session.tool_trace_ids).toEqual([trace.id]);
   });
 });
 
