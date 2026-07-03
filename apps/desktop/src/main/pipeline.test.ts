@@ -14,7 +14,7 @@ import {
   type LlmUsage,
 } from "@core/llm";
 
-import { runClarify, runDraft, runRefine } from "./planner";
+import { runClarify, runDraft, runRefine, type PlanningModelRunLiveEvent } from "./planner";
 import { materialize } from "./materialize";
 
 /**
@@ -135,6 +135,36 @@ describe("desktop planner · with a gateway (real @core/llm pipeline)", () => {
     const milestones = materialize(d.output!, "goal-1", "owner-1");
     expect(milestones).toHaveLength(d.output!.nodes.length);
     expect(milestones[0]!.depends_on_id).toBeNull();
+  });
+
+  it("emits live model run hooks while drafting", async () => {
+    const events: PlanningModelRunLiveEvent[] = [];
+    const d = await runDraft(
+      mockGateway(),
+      aim.title,
+      aim.description,
+      [],
+      null,
+      null,
+      null,
+      null,
+      false,
+      { onModelRun: (event) => events.push(event) },
+    );
+
+    expect(d.ok).toBe(true);
+    expect(events.map((event) => event.type)).toEqual(["model.started", "model.completed"]);
+    expect(events[0]!.run).toMatchObject({
+      stage: "draft",
+      task: "decompose",
+      status: "running",
+      structured: true,
+    });
+    expect(events[1]!.run).toMatchObject({
+      id: events[0]!.run.id,
+      status: "ok",
+      usage: USAGE,
+    });
   });
 
   it("passes context lineage learning into the draft prompt", async () => {

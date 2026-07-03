@@ -2,7 +2,15 @@ import type { CSSProperties, ReactNode } from "react";
 
 import type { DecompositionOutput, Goal } from "@core/types";
 
-import type { GoalDetail, PlanResult, PlanningDebugTrace, PlanningToolIpcTrace, ProviderStatus } from "../shared/ipc";
+import type {
+  GoalDetail,
+  PlanResult,
+  PlanningDebugTrace,
+  PlanningLiveEvent,
+  PlanningLiveModelRun,
+  PlanningToolIpcTrace,
+  ProviderStatus,
+} from "../shared/ipc";
 import { useI18n, type StringKey } from "./i18n";
 import {
   aimIntakeOf,
@@ -50,6 +58,7 @@ export function PlanningDebugPanel(props: {
   provider: ProviderStatus | null;
   planResult: PlanResult | null;
   debugTraces: PlanningDebugTrace[];
+  liveEvents: PlanningLiveEvent[];
   plan: DecompositionOutput | null;
   detail: GoalDetail | null;
 }) {
@@ -60,12 +69,15 @@ export function PlanningDebugPanel(props: {
     : props.planResult?.debugTrace ?? null;
   const trace = liveTrace ?? (goal ? planningDebugTraceOf(goal) : null);
   const plan = props.plan ?? (goal ? planOf(goal) : null);
-  const intake = props.planResult?.intake ?? (goal ? aimIntakeOf(goal) : null);
+  const liveIntake = latestLiveValue(props.liveEvents, (event) => event.intake);
+  const livePlanningContext = latestLiveValue(props.liveEvents, (event) => event.planningContext);
+  const livePlanningTools = latestLiveValue(props.liveEvents, (event) => event.planningTools);
+  const intake = props.planResult?.intake ?? liveIntake ?? (goal ? aimIntakeOf(goal) : null);
   const quality = props.planResult?.quality ?? (goal ? planQualityOf(goal) : null);
   const qualityRetry = props.planResult?.qualityRetry ?? (goal ? planQualityRetryOf(goal) : null);
   const review = props.planResult?.review ?? (goal ? reviewOf(goal) : null);
-  const planningContext = props.planResult?.planningContext ?? (goal ? planningContextOf(goal) : null);
-  const planningTools = props.planResult?.planningTools ?? (goal ? planningToolsOf(goal) : null);
+  const planningContext = props.planResult?.planningContext ?? livePlanningContext ?? (goal ? planningContextOf(goal) : null);
+  const planningTools = props.planResult?.planningTools ?? livePlanningTools ?? (goal ? planningToolsOf(goal) : null);
   const running = Boolean(props.busy) && (props.mode === "drafting" || props.mode === "answering" || props.mode === "reviewing");
 
   return (
@@ -78,12 +90,13 @@ export function PlanningDebugPanel(props: {
         {running ? <span style={pillStyle(C.accent)}>{t("debug.pending")}</span> : null}
       </div>
 
-      {!trace && !planningContext && !planningTools && !plan ? (
+      {!trace && !planningContext && !planningTools && !plan && props.liveEvents.length === 0 ? (
         <p style={mutedTextStyle()}>{t("debug.noTrace")}</p>
       ) : null}
 
+      {running || props.liveEvents.length > 0 ? <LiveTimelineSection events={props.liveEvents} running={running} t={t} /> : null}
       {running ? <PendingSteps mode={props.mode} provider={props.provider} t={t} /> : null}
-      <ModelRunsSection trace={trace} t={t} />
+      <ModelRunsSection trace={trace} liveEvents={props.liveEvents} t={t} />
       <ContextCollectionSection
         intake={intake}
         planningContext={planningContext}
@@ -100,6 +113,17 @@ export function PlanningDebugPanel(props: {
       />
     </section>
   );
+}
+
+function latestLiveValue<T>(
+  events: readonly PlanningLiveEvent[],
+  pick: (event: PlanningLiveEvent) => T | null | undefined,
+): T | null {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const value = pick(events[index]!);
+    if (value !== null && value !== undefined) return value;
+  }
+  return null;
 }
 
 function PendingSteps(props: { mode: AppMode; provider: ProviderStatus | null; t: T }) {
@@ -130,8 +154,28 @@ function PendingSteps(props: { mode: AppMode; provider: ProviderStatus | null; t
   );
 }
 
-function ModelRunsSection(props: { trace: PlanningDebugTrace | null; t: T }) {
-  const runs = props.trace?.modelRuns ?? [];
+function LiveTimelineSection(props: { events: PlanningLiveEvent[]; running: boolean; t: T }) {
+  const events = props.events.slice(-12);
+  return (
+    <Section title={props.t("debug.liveTimeline")}>
+      {events.length === 0 ? (
+        <div style={mutedTextStyle()}>{props.t(props.running ? "debug.liveWaiting" : "debug.liveEmpty")}</div>
+      ) : null}
+      {events.map((event, index) => (
+        <div key={`${event.at}-${event.type}-${index}`} style={liveEventRowStyle()}>
+          <span style={dotStyle(liveEventColor(event))} />
+          <div style={{ minWidth: 0 }}>
+            <div style={rowTitleStyle()}>{liveEventTitle(event, props.t)}</div>
+            {liveEventMeta(event, props.t) ? <div style={metaLineStyle()}>{liveEventMeta(event, props.t)}</div> : null}
+          </div>
+        </div>
+      ))}
+    </Section>
+  );
+}
+
+function ModelRunsSection(props: { trace: PlanningDebugTrace | null; liveEvents: PlanningLiveEvent[]; t: T }) {
+  const runs = mergedModelRuns(props.trace, props.liveEvents);
   return (
     <Section title={props.t("debug.modelRuns")}>
       {runs.length === 0 ? <div style={mutedTextStyle()}>{props.t("debug.noModelRuns")}</div> : null}
@@ -139,12 +183,12 @@ function ModelRunsSection(props: { trace: PlanningDebugTrace | null; t: T }) {
         <div key={run.id} style={debugRowStyle()}>
           <div style={rowHeaderStyle()}>
             <strong style={{ minWidth: 0 }}>{run.stage} / {run.task}</strong>
-            <span style={pillStyle(run.status === "ok" ? "#1a7f4b" : C.danger)}>
-              {props.t(run.status === "ok" ? "debug.ok" : "debug.error")}
+            <span style={pillStyle(modelRunColor(run))}>
+              {props.t(run.status === "running" ? "debug.running" : run.status === "ok" ? "debug.ok" : "debug.error")}
             </span>
           </div>
           <div style={metaLineStyle()}>
-            {run.model ?? "model"} · {props.t("debug.duration", { ms: run.durationMs })}
+            {run.model ?? "model"} · {run.durationMs !== undefined ? props.t("debug.duration", { ms: run.durationMs }) : props.t("debug.running")}
           </div>
           <div style={metaLineStyle()}>
             {props.t("debug.promptSize", { prompt: run.promptChars, system: run.systemChars })}
@@ -159,6 +203,88 @@ function ModelRunsSection(props: { trace: PlanningDebugTrace | null; t: T }) {
       ))}
     </Section>
   );
+}
+
+function mergedModelRuns(
+  trace: PlanningDebugTrace | null,
+  events: readonly PlanningLiveEvent[],
+): PlanningLiveModelRun[] {
+  const byKey = new Map<string, PlanningLiveModelRun>();
+  for (const event of events) {
+    if (event.modelRun) byKey.set(`${event.modelRun.stage}:${event.modelRun.id}`, event.modelRun);
+  }
+  for (const run of trace?.modelRuns ?? []) {
+    byKey.set(`${run.stage}:${run.id}`, run);
+  }
+  return [...byKey.values()].sort((left, right) => Date.parse(left.startedAt) - Date.parse(right.startedAt));
+}
+
+function modelRunColor(run: PlanningLiveModelRun): string {
+  if (run.status === "running") return C.accent;
+  return run.status === "ok" ? "#1a7f4b" : C.danger;
+}
+
+function liveEventColor(event: PlanningLiveEvent): string {
+  if (event.type === "planning.failed" || event.type === "model.failed") return C.danger;
+  if (event.type.endsWith(".completed")) return "#1a7f4b";
+  return C.accent;
+}
+
+function liveEventTitle(event: PlanningLiveEvent, t: T): string {
+  switch (event.type) {
+    case "planning.started": return t("debug.event.planningStarted");
+    case "context.started": return t("debug.event.contextStarted");
+    case "context.completed": return t("debug.event.contextCompleted");
+    case "model.started": return t("debug.event.modelStarted");
+    case "model.completed": return t("debug.event.modelCompleted");
+    case "model.failed": return t("debug.event.modelFailed");
+    case "draft.completed": return t("debug.event.draftCompleted");
+    case "clarify.started": return t("debug.event.clarifyStarted");
+    case "clarify.completed": return t("debug.event.clarifyCompleted");
+    case "refine.started": return t("debug.event.refineStarted");
+    case "refine.completed": return t("debug.event.refineCompleted");
+    case "planning.failed": return t("debug.event.planningFailed");
+  }
+}
+
+function liveEventMeta(event: PlanningLiveEvent, t: T): string {
+  const parts: string[] = [];
+  const run = event.modelRun;
+  if (run) {
+    parts.push(`${run.stage}/${run.task}`);
+    if (run.model) parts.push(run.model);
+    parts.push(t("debug.promptSize", { prompt: run.promptChars, system: run.systemChars }));
+    if (run.durationMs !== undefined) parts.push(t("debug.duration", { ms: run.durationMs }));
+    if (run.usage) parts.push(t("debug.tokens", { input: run.usage.inputTokens, output: run.usage.outputTokens }));
+    if (run.error) parts.push(shortUiText(run.error));
+  }
+
+  const summary = event.summary;
+  if (summary?.selectedContext !== undefined && summary.ignoredContext !== undefined && summary.totalContext !== undefined) {
+    parts.push(t("debug.contextCounts", {
+      selected: summary.selectedContext,
+      ignored: summary.ignoredContext,
+      total: summary.totalContext,
+    }));
+  }
+  if (summary?.observationCount !== undefined && summary.failureCount !== undefined) {
+    parts.push(t("debug.toolRuns", {
+      observations: summary.observationCount,
+      failures: summary.failureCount,
+    }));
+  }
+  if (summary?.candidateCount !== undefined) parts.push(t("trace.tool.candidates", { n: summary.candidateCount }));
+  if (summary?.milestoneCount !== undefined) parts.push(t("debug.milestones", { n: summary.milestoneCount }));
+  if (summary?.questionCount !== undefined) parts.push(t("debug.questions", { n: summary.questionCount }));
+  if (summary?.qualityScore !== undefined) {
+    parts.push(t("debug.qualityScore", {
+      grade: summary.qualityGrade ?? "-",
+      score: summary.qualityScore,
+    }));
+  }
+  if (event.error) parts.push(shortUiText(event.error));
+
+  return parts.join(" · ");
 }
 
 function ContextCollectionSection(props: {
@@ -405,6 +531,10 @@ function pendingRowStyle(): CSSProperties {
   return { display: "grid", gridTemplateColumns: "10px minmax(0, 1fr)", gap: 8, alignItems: "start", marginBottom: 10 };
 }
 
+function liveEventRowStyle(): CSSProperties {
+  return { display: "grid", gridTemplateColumns: "10px minmax(0, 1fr)", gap: 8, alignItems: "start", minWidth: 0 };
+}
+
 function rowHeaderStyle(): CSSProperties {
   return { display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline", minWidth: 0 };
 }
@@ -438,6 +568,6 @@ function pillStyle(color: string): CSSProperties {
   };
 }
 
-function dotStyle(): CSSProperties {
-  return { width: 8, height: 8, borderRadius: 999, background: C.accent, marginTop: 6 };
+function dotStyle(color = C.accent): CSSProperties {
+  return { width: 8, height: 8, borderRadius: 999, background: color, marginTop: 6 };
 }

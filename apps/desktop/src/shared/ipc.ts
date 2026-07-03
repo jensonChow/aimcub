@@ -25,12 +25,14 @@ import type {
 export interface DraftRequest {
   title: string;
   description?: string;
+  clientRunId?: string;
 }
 
 export interface ClarifyRequest {
   title: string;
   description?: string;
   draft: DecompositionOutput;
+  clientRunId?: string;
 }
 
 export interface RefineRequest {
@@ -40,6 +42,7 @@ export interface RefineRequest {
   questions: ClarifyQuestion[];
   answers: ClarifyAnswer[];
   reviewPrompt?: string;
+  clientRunId?: string;
 }
 
 export interface SaveRequest {
@@ -118,6 +121,64 @@ export interface PlanningDebugTrace {
   finishedAt: string;
   durationMs: number;
   modelRuns: PlanningModelRunTrace[];
+}
+
+export interface PlanningLiveModelRun {
+  id: string;
+  stage: PlanningRunStage;
+  task: LlmTask;
+  status: "running" | "ok" | "error";
+  structured: boolean;
+  hasSchema: boolean;
+  startedAt: string;
+  durationMs?: number;
+  promptChars: number;
+  systemChars: number;
+  model: string | null;
+  usage?: LlmUsage | null;
+  error?: string;
+}
+
+export type PlanningLiveEventType =
+  | "planning.started"
+  | "context.started"
+  | "context.completed"
+  | "model.started"
+  | "model.completed"
+  | "model.failed"
+  | "draft.completed"
+  | "clarify.started"
+  | "clarify.completed"
+  | "refine.started"
+  | "refine.completed"
+  | "planning.failed";
+
+export interface PlanningLiveSummary {
+  selectedContext?: number;
+  ignoredContext?: number;
+  totalContext?: number;
+  observationCount?: number;
+  failureCount?: number;
+  candidateCount?: number;
+  milestoneCount?: number;
+  questionCount?: number;
+  qualityScore?: number;
+  qualityGrade?: string;
+  errorCount?: number;
+}
+
+export interface PlanningLiveEvent {
+  runId: string;
+  type: PlanningLiveEventType;
+  stage: PlanningDebugTraceStage;
+  at: string;
+  message?: string;
+  modelRun?: PlanningLiveModelRun;
+  planningContext?: PlanningContextSelectionReport | null;
+  planningTools?: PlanningToolIpcTrace | null;
+  intake?: AimIntakeReport | null;
+  summary?: PlanningLiveSummary;
+  error?: string;
 }
 
 export interface PlanningToolIpcTrace {
@@ -338,6 +399,7 @@ export interface AimcubApi {
   runLocalAgent(req: LocalAgentRunRequest): Promise<LocalAgentRunResult>;
   runMilestoneAgent(req: RunMilestoneAgentRequest): Promise<RunMilestoneAgentResult>;
   confirmMilestone(req: ConfirmMilestoneRequest): Promise<GoalDetail | null>;
+  onPlanningLiveEvent(handler: (event: PlanningLiveEvent) => void): () => void;
 }
 
 /** Channel names — kept in one place so main and preload can't drift. */
@@ -373,6 +435,7 @@ export const IPC = {
   runLocalAgent: "aimcub:runLocalAgent",
   runMilestoneAgent: "aimcub:runMilestoneAgent",
   confirmMilestone: "aimcub:confirmMilestone",
+  planningLiveEvent: "aimcub:planningLiveEvent",
 } as const;
 
 declare global {

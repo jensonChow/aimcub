@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
 import type { AimProgressReadModel } from "@core/domain";
 import type { ClarifyAnswer, ClarifyOutput } from "@core/llm";
@@ -8,6 +8,7 @@ import type {
   GoalDetail,
   LocalAgentDetection,
   PlanningDebugTrace,
+  PlanningLiveEvent,
   PlanResult,
   ProviderStatus,
   WebResearchStatus,
@@ -52,6 +53,10 @@ function planNodeForMilestone(plan: DecompositionOutput | null | undefined, mile
   return plan?.nodes.find((node) => node.key === key) ?? plan?.nodes.find((node) => node.title === milestone.title) ?? null;
 }
 
+function createPlanningRunId(): string {
+  return globalThis.crypto?.randomUUID?.() ?? `renderer:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+}
+
 export function App() {
   return (
     <I18nProvider>
@@ -78,15 +83,35 @@ function AimOsApp() {
   const [finalPlan, setFinalPlan] = useState<DecompositionOutput | null>(null);
   const [planResult, setPlanResult] = useState<PlanResult | null>(null);
   const [planningDebugTraces, setPlanningDebugTraces] = useState<PlanningDebugTrace[]>([]);
+  const [planningLiveEvents, setPlanningLiveEvents] = useState<PlanningLiveEvent[]>([]);
   const [clarify, setClarify] = useState<ClarifyOutput | null>(null);
   const [answers, setAnswers] = useState<AnswerMap>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const planningRunIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     void refreshAll();
   }, []);
+
+  useEffect(() => window.aimcub.onPlanningLiveEvent((event) => {
+    const activeRunId = planningRunIdRef.current;
+    if (!activeRunId || event.runId !== activeRunId) return;
+    setPlanningLiveEvents((current) => [...current, event].slice(-80));
+  }), []);
+
+  function startPlanningRun(): string {
+    const runId = createPlanningRunId();
+    planningRunIdRef.current = runId;
+    setPlanningLiveEvents([]);
+    return runId;
+  }
+
+  function clearPlanningRun() {
+    planningRunIdRef.current = null;
+    setPlanningLiveEvents([]);
+  }
 
   async function refreshAll() {
     const [nextGoals, nextProvider, nextWeb, nextAgents, nextCandidates] = await Promise.all([
@@ -113,6 +138,7 @@ function AimOsApp() {
     setFinalPlan(null);
     setPlanResult(null);
     setPlanningDebugTraces([]);
+    clearPlanningRun();
     setClarify(null);
     setAnswers({});
     const [nextDetail, nextProgress] = await Promise.all([
@@ -131,6 +157,7 @@ function AimOsApp() {
     setFinalPlan(null);
     setPlanResult(null);
     setPlanningDebugTraces([]);
+    clearPlanningRun();
     setClarify(null);
     setAnswers({});
     setSelected(null);
@@ -151,8 +178,9 @@ function AimOsApp() {
     setError(null);
     setMode("drafting");
     setPlanningDebugTraces([]);
+    const runId = startPlanningRun();
     try {
-      const req = { title, description: aimDescription.trim() || undefined };
+      const req = { title, description: aimDescription.trim() || undefined, clientRunId: runId };
       const nextDraft = await window.aimcub.draft(req);
       if (!nextDraft.ok || !nextDraft.output) throw new Error(nextDraft.errors.join("; ") || t("os.err.draft"));
       setDraft(nextDraft.output);
@@ -193,6 +221,7 @@ function AimOsApp() {
     if (!draft) return;
     setBusy(t("os.busy.refine"));
     setError(null);
+    const runId = startPlanningRun();
     try {
       const refined = await window.aimcub.refine({
         title: aimTitle.trim(),
@@ -200,6 +229,7 @@ function AimOsApp() {
         draft,
         questions: clarify?.questions ?? [],
         answers: builtAnswers,
+        clientRunId: runId,
       });
       if (!refined.ok || !refined.output) throw new Error(refined.errors.join("; ") || t("os.err.refine"));
       setFinalPlan(refined.output);
@@ -461,6 +491,7 @@ function AimOsApp() {
             provider={provider}
             planResult={planResult}
             debugTraces={planningDebugTraces}
+            liveEvents={planningLiveEvents}
             plan={activePlan}
             detail={detail}
           />

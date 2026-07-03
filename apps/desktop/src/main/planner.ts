@@ -30,11 +30,21 @@ import type {
   ClarifyIpcResult,
   PlanResult,
   PlanningDebugTrace,
+  PlanningLiveModelRun,
   PlanningModelRunTrace,
   PlanningRunStage,
 } from "../shared/ipc";
 
 const NO_PROVIDER = "No LLM provider configured — add a provider and API key in settings.";
+
+export type PlanningModelRunLiveEvent =
+  | { type: "model.started"; run: PlanningLiveModelRun }
+  | { type: "model.completed"; run: PlanningModelRunTrace }
+  | { type: "model.failed"; run: PlanningModelRunTrace };
+
+export interface PlanningDebugHooks {
+  onModelRun?: (event: PlanningModelRunLiveEvent) => void;
+}
 
 function createDebugTrace(stage: PlanningRunStage, startedAtMs: number, modelRuns: PlanningModelRunTrace[]): PlanningDebugTrace {
   const finishedAtMs = Date.now();
@@ -48,7 +58,15 @@ function createDebugTrace(stage: PlanningRunStage, startedAtMs: number, modelRun
   };
 }
 
-function tracedGateway(gateway: LlmGateway, stage: PlanningRunStage): {
+function emitModelRun(hooks: PlanningDebugHooks | undefined, event: PlanningModelRunLiveEvent): void {
+  try {
+    hooks?.onModelRun?.(event);
+  } catch {
+    // Debug event delivery must never change planning behavior.
+  }
+}
+
+function tracedGateway(gateway: LlmGateway, stage: PlanningRunStage, hooks?: PlanningDebugHooks): {
   gateway: LlmGateway;
   modelRuns: PlanningModelRunTrace[];
 } {
@@ -61,39 +79,60 @@ function tracedGateway(gateway: LlmGateway, stage: PlanningRunStage): {
     run: () => Promise<LlmResponse<T>>,
   ): Promise<LlmResponse<T>> {
     const startedAtMs = Date.now();
+    const id = `${stage}-${nextId++}`;
+    const startedAt = new Date(startedAtMs).toISOString();
+    emitModelRun(hooks, {
+      type: "model.started",
+      run: {
+        id,
+        stage,
+        task: req.task,
+        status: "running",
+        structured,
+        hasSchema: req.schema !== undefined,
+        startedAt,
+        promptChars: req.prompt.length,
+        systemChars: req.system?.length ?? 0,
+        model: req.model ?? null,
+      },
+    });
     try {
       const response = await run();
-      modelRuns.push({
-        id: `${stage}-${nextId++}`,
+      const trace: PlanningModelRunTrace = {
+        id,
         stage,
         task: req.task,
         status: "ok",
         structured,
         hasSchema: req.schema !== undefined,
-        startedAt: new Date(startedAtMs).toISOString(),
+        startedAt,
         durationMs: Date.now() - startedAtMs,
         promptChars: req.prompt.length,
         systemChars: req.system?.length ?? 0,
         model: response.usage.model || req.model || null,
         usage: response.usage,
-      });
+      };
+      modelRuns.push(trace);
+      emitModelRun(hooks, { type: "model.completed", run: trace });
       return response;
     } catch (err) {
-      modelRuns.push({
-        id: `${stage}-${nextId++}`,
+      const trace: PlanningModelRunTrace = {
+        id,
         stage,
         task: req.task,
         status: "error",
         structured,
         hasSchema: req.schema !== undefined,
-        startedAt: new Date(startedAtMs).toISOString(),
+        startedAt,
         durationMs: Date.now() - startedAtMs,
         promptChars: req.prompt.length,
         systemChars: req.system?.length ?? 0,
         model: req.model ?? null,
         usage: null,
         error: err instanceof Error ? err.message : String(err),
-      });
+      };
+      modelRuns.push(trace);
+      emitModelRun(hooks, { type: "model.failed", run: trace });
       throw err;
     }
   }
@@ -168,10 +207,11 @@ export async function runDraft(
   decompositionStrategy?: DecompositionStrategyReport | null,
   research?: ResearchBrief | null,
   researchRequired = false,
+  hooks?: PlanningDebugHooks,
 ): Promise<PlanResult> {
   const startedAtMs = Date.now();
   if (!gateway) return { ok: false, output: null, errors: [NO_PROVIDER], debugTrace: createDebugTrace("draft", startedAtMs, []) };
-  const traced = tracedGateway(gateway, "draft");
+  const traced = tracedGateway(gateway, "draft", hooks);
   const outputLanguage = inferAimOutputLanguage(title, description);
   const r = await decomposeWithQuality(traced.gateway, { title, description, memories, lineageLearning, decompositionLearning, decompositionStrategy, research, researchRequired, outputLanguage });
   const debugTrace = createDebugTrace("draft", startedAtMs, traced.modelRuns);
@@ -202,10 +242,11 @@ export async function runClarify(
   review?: Pick<PlanReviewReport, "quality" | "context"> | null,
   lineageLearning?: ContextLineageLearningReport | null,
   decompositionStrategy?: DecompositionStrategyReport | null,
+  hooks?: PlanningDebugHooks,
 ): Promise<ClarifyIpcResult> {
   const startedAtMs = Date.now();
   if (!gateway) return { ok: false, output: null, errors: [NO_PROVIDER], debugTrace: createDebugTrace("clarify", startedAtMs, []) };
-  const traced = tracedGateway(gateway, "clarify");
+  const traced = tracedGateway(gateway, "clarify", hooks);
   const outputLanguage = inferAimOutputLanguage(title, description);
   const r = await clarify(traced.gateway, { title, description, draft, memories, learning, captureLearning, lineageLearning, decompositionStrategy, outputLanguage, intake, review });
   const debugTrace = createDebugTrace("clarify", startedAtMs, traced.modelRuns);
@@ -227,10 +268,11 @@ export async function runRefine(
   decompositionStrategy?: DecompositionStrategyReport | null,
   research?: ResearchBrief | null,
   researchRequired = false,
+  hooks?: PlanningDebugHooks,
 ): Promise<PlanResult> {
   const startedAtMs = Date.now();
   if (!gateway) return { ok: false, output: null, errors: [NO_PROVIDER], debugTrace: createDebugTrace("refine", startedAtMs, []) };
-  const traced = tracedGateway(gateway, "refine");
+  const traced = tracedGateway(gateway, "refine", hooks);
   const outputLanguage = inferAimOutputLanguage(title, description);
   const reviewInstruction = reviewPrompt?.trim()
     ? `Plan review action to address before accepting:\n${reviewPrompt.trim()}`

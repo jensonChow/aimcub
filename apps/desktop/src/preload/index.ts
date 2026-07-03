@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 
 import { IPC, type AimcubApi } from "../shared/ipc";
 
@@ -34,6 +34,13 @@ const api: AimcubApi = {
   runLocalAgent: (req) => ipcRenderer.invoke(IPC.runLocalAgent, req),
   runMilestoneAgent: (req) => ipcRenderer.invoke(IPC.runMilestoneAgent, req),
   confirmMilestone: (req) => ipcRenderer.invoke(IPC.confirmMilestone, req),
+  onPlanningLiveEvent: (handler) => {
+    const listener = (_event: IpcRendererEvent, payload: unknown) => {
+      handler(payload as Parameters<typeof handler>[0]);
+    };
+    ipcRenderer.on(IPC.planningLiveEvent, listener);
+    return () => ipcRenderer.removeListener(IPC.planningLiveEvent, listener);
+  },
 };
 
 contextBridge.exposeInMainWorld("aimcub", api);
