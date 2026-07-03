@@ -203,6 +203,22 @@ describe("critiquePlan", () => {
     );
   });
 
+  it("honors an explicit research requirement even when the plan text is generic", () => {
+    const generic = structuredClone(GOOD_PLAN);
+
+    const report = critiquePlan({
+      plan: generic,
+      research: { required: true, sourceCount: 0, fetchedSourceCount: 0, searchResultCount: 0 },
+    });
+
+    expect(report.grade).toBe("warn");
+    expect(report.issues).toEqual([
+      expect.objectContaining({
+        code: "missing_research_evidence",
+      }),
+    ]);
+  });
+
   it("warns when first-party research coverage is too thin", () => {
     const report = critiquePlan({
       plan: travelResearchPlan(),

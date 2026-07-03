@@ -450,6 +450,21 @@ describe("decomposeWithQuality", () => {
     expect(gw.calls[1]!.prompt).toContain("commit_pattern message/path/min_files");
   });
 
+  it("uses explicit research requirements in the quality retry loop", async () => {
+    const gw = mockGatewayQueue([validPlan(), validPlan()]);
+
+    const result = await decomposeWithQuality(gw, {
+      ...INPUT,
+      researchRequired: true,
+    });
+
+    expect(result.retried).toBe(true);
+    expect(result.attempts).toBe(2);
+    expect(result.quality?.issues.map((issue) => issue.code)).toContain("missing_research_evidence");
+    expect(gw.calls[0]!.prompt).toContain("Research required: yes");
+    expect(gw.calls[1]!.prompt).toContain("first-party web research");
+  });
+
   it("does not retry a plan that already passes quality critique", async () => {
     const gw = mockGatewayQueue([validPlan()]);
     const result = await decomposeWithQuality(gw, INPUT);

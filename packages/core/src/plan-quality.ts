@@ -62,6 +62,7 @@ export interface PlanQualityContext {
 }
 
 export interface PlanQualityResearchEvidence {
+  required?: boolean;
   sourceCount?: number;
   fetchedSourceCount?: number;
   searchResultCount?: number;
@@ -403,6 +404,7 @@ function normalizedResearchEvidence(
   const research = explicit ?? researchFromContext(context);
   if (!research) return null;
   return {
+    required: research.required,
     sourceCount: research.sourceCount ?? research.sources?.length ?? 0,
     fetchedSourceCount: research.fetchedSourceCount ?? 0,
     searchResultCount: research.searchResultCount ?? 0,
@@ -416,9 +418,9 @@ function critiqueResearchCoverage(
   context: readonly PlanQualityContext[],
   research: PlanQualityResearchEvidence | null | undefined,
 ): PlanQualityIssue[] {
-  if (!planNeedsResearch(plan)) return [];
-
   const evidence = normalizedResearchEvidence(research, context);
+  if (!evidence?.required && !planNeedsResearch(plan)) return [];
+
   if (!evidence || (evidence.sourceCount ?? 0) === 0) {
     return [{
       code: "missing_research_evidence",

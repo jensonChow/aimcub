@@ -25,6 +25,7 @@ export interface DesktopPlanningContext extends PlanningContextForAim {
   toolFailures: PlanningToolFailure[];
   toolDistillation: ContextDistillOutput | null;
   research: ResearchBrief | null;
+  researchRequired: boolean;
 }
 
 function flagEnabled(value: string | undefined): boolean {
@@ -58,6 +59,10 @@ function aimLikelyNeedsWeb(req: DraftRequest): boolean {
   const text = [req.title, req.description].filter(Boolean).join(" ").toLowerCase();
   return /\b(latest|current|today|recent|research|search|web|online|compare|market|competitor|pricing|docs|api|regulation|law|travel|visa|flight|hotel)\b/i.test(text)
     || /最新|当前|现在|近期|调研|搜索|联网|网页|在线|对比|市场|竞品|价格|文档|api|法规|法律|旅行|旅游|签证|机票|航班|酒店/.test(text);
+}
+
+function aimRequiresWebResearch(req: DraftRequest): boolean {
+  return envFlag("AIMCUB_ENABLE_WEB_RESEARCH") === true || aimLikelyNeedsWeb(req);
 }
 
 function shouldAttemptWebResearch(req: DraftRequest): boolean {
@@ -103,6 +108,7 @@ export async function collectDesktopPlanningContext(req: DraftRequest): Promise<
   const currentAimId = (req as { id?: unknown }).id;
   const localRoot = localContextRoot();
   const attemptWeb = shouldAttemptWebResearch(req);
+  const researchRequired = aimRequiresWebResearch(req);
   const [sourceMemories, toolContext] = await Promise.all([
     aimStore.listMemories(),
     collectPlanningToolContext(
@@ -132,5 +138,6 @@ export async function collectDesktopPlanningContext(req: DraftRequest): Promise<
     toolFailures: toolContext.failures,
     toolDistillation: toolContext.distillation,
     research: toolContext.research,
+    researchRequired,
   };
 }

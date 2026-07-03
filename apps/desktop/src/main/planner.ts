@@ -21,7 +21,7 @@ import {
   type PlanningMemory,
   type ResearchBrief,
 } from "@core/llm";
-import { reviewPlan, type AimIntakeReport, type ContextCaptureLearningReport, type ContextLineageLearningReport, type DecompositionLearningReport, type DecompositionStrategyReport, type PlanReviewReport } from "@core/domain";
+import { reviewPlan, type AimIntakeReport, type ContextCaptureLearningReport, type ContextLineageLearningReport, type DecompositionLearningReport, type DecompositionStrategyReport, type PlanQualityResearchEvidence, type PlanReviewReport } from "@core/domain";
 import type { DecompositionOutput } from "@core/types";
 
 import type { ClarifyIpcResult, PlanResult } from "../shared/ipc";
@@ -43,6 +43,20 @@ function qualityRetry(result: DecomposeWithQualityResult): NonNullable<PlanResul
     attempts: result.attempts,
     firstQuality: result.firstQuality,
   };
+}
+
+export function researchEvidenceForReview(research: ResearchBrief | null | undefined, required: boolean): PlanQualityResearchEvidence | null {
+  if (research) {
+    return {
+      required,
+      sourceCount: research.sources.length,
+      fetchedSourceCount: research.fetchedSourceCount,
+      searchResultCount: research.searchResultCount,
+      sources: research.sources,
+      uncertainties: research.uncertainties,
+    };
+  }
+  return required ? { required: true, sourceCount: 0, fetchedSourceCount: 0, searchResultCount: 0 } : null;
 }
 
 function answerMemoriesForRefine(
@@ -70,17 +84,19 @@ export async function runDraft(
   decompositionLearning?: DecompositionLearningReport | null,
   decompositionStrategy?: DecompositionStrategyReport | null,
   research?: ResearchBrief | null,
+  researchRequired = false,
 ): Promise<PlanResult> {
   if (!gateway) return { ok: false, output: null, errors: [NO_PROVIDER] };
   const outputLanguage = inferAimOutputLanguage(title, description);
-  const r = await decomposeWithQuality(gateway, { title, description, memories, lineageLearning, decompositionLearning, decompositionStrategy, research, outputLanguage });
+  const r = await decomposeWithQuality(gateway, { title, description, memories, lineageLearning, decompositionLearning, decompositionStrategy, research, researchRequired, outputLanguage });
   if (r.output) {
+    const researchEvidence = researchEvidenceForReview(research, researchRequired);
     return {
       ok: true,
       output: r.output,
       errors: [],
       quality: r.quality,
-      review: reviewPlan({ plan: r.output, context: memories, quality: r.quality, research }),
+      review: reviewPlan({ plan: r.output, context: memories, quality: r.quality, research: researchEvidence }),
       qualityRetry: qualityRetry(r),
     };
   }
@@ -120,6 +136,7 @@ export async function runRefine(
   decompositionLearning?: DecompositionLearningReport | null,
   decompositionStrategy?: DecompositionStrategyReport | null,
   research?: ResearchBrief | null,
+  researchRequired = false,
 ): Promise<PlanResult> {
   if (!gateway) return { ok: false, output: null, errors: [NO_PROVIDER] };
   const outputLanguage = inferAimOutputLanguage(title, description);
@@ -130,14 +147,15 @@ export async function runRefine(
     .filter((part) => part.trim().length > 0)
     .join("\n\n");
   const refinedMemories = [...answerMemoriesForRefine(questions, answers), ...memories];
-  const r = await decomposeWithQuality(gateway, { title, description: refinedDescription, memories: refinedMemories, lineageLearning, decompositionLearning, decompositionStrategy, research, outputLanguage });
+  const r = await decomposeWithQuality(gateway, { title, description: refinedDescription, memories: refinedMemories, lineageLearning, decompositionLearning, decompositionStrategy, research, researchRequired, outputLanguage });
   if (r.output) {
+    const researchEvidence = researchEvidenceForReview(research, researchRequired);
     return {
       ok: true,
       output: r.output,
       errors: [],
       quality: r.quality,
-      review: reviewPlan({ plan: r.output, context: refinedMemories, quality: r.quality, research }),
+      review: reviewPlan({ plan: r.output, context: refinedMemories, quality: r.quality, research: researchEvidence }),
       qualityRetry: qualityRetry(r),
     };
   }

@@ -28,6 +28,7 @@ import {
   type PlanHandoffReport,
   type PlanQualityReport,
   type PlanQualityContext,
+  type PlanQualityResearchEvidence,
   type PlanReviewReport,
   type PlanValidation,
 } from "@core/domain";
@@ -55,6 +56,8 @@ export interface DecomposeInput {
   decompositionStrategy?: DecompositionStrategyReport | null;
   /** First-party web research evidence collected for this aim before decomposition. */
   research?: ResearchBrief | null;
+  /** True when the original aim requires current/external facts even if the model output hides those terms. */
+  researchRequired?: boolean;
   /** User-facing output language inferred from the aim text. Schema enum values stay unchanged. */
   outputLanguage?: AimOutputLanguage;
 }
@@ -268,9 +271,10 @@ function renderDecompositionStrategy(strategy: DecompositionStrategyReport | nul
   return lines.join("\n");
 }
 
-function renderResearchEvidence(research: ResearchBrief | null | undefined): string {
-  if (!research) return "(none collected)";
+function renderResearchEvidence(research: ResearchBrief | null | undefined, required: boolean | undefined): string {
+  if (!research) return required ? "Research required: yes. No first-party web evidence was collected." : "(none collected)";
   const lines = [
+    `Research required: ${required ? "yes" : "not explicitly"}`,
     `Research question: ${research.question}`,
     `Queries: ${research.queries.join(" | ")}`,
     `Coverage: ${research.sources.length} sources · ${research.fetchedSourceCount} fetched pages · ${research.searchResultCount} search results`,
@@ -312,7 +316,7 @@ function buildUserPrompt(input: DecomposeInput): string {
     renderPlanningContext(input.memories),
     "",
     "First-party web research evidence:",
-    renderResearchEvidence(input.research),
+    renderResearchEvidence(input.research, input.researchRequired),
     "",
     "Historical context lineage learning:",
     renderLineageLearning(input.lineageLearning),
@@ -392,6 +396,20 @@ function betterOrEqualQuality(next: PlanQualityReport, prev: PlanQualityReport):
   return next.score >= prev.score;
 }
 
+function researchEvidenceForQuality(input: DecomposeInput): PlanQualityResearchEvidence | null {
+  if (input.research) {
+    return {
+      required: input.researchRequired,
+      sourceCount: input.research.sources.length,
+      fetchedSourceCount: input.research.fetchedSourceCount,
+      searchResultCount: input.research.searchResultCount,
+      sources: input.research.sources,
+      uncertainties: input.research.uncertainties,
+    };
+  }
+  return input.researchRequired ? { required: true, sourceCount: 0, fetchedSourceCount: 0, searchResultCount: 0 } : null;
+}
+
 function qualityDimensionFeedback(report: PlanQualityReport): string[] {
   const dimensions = (report.dimensions ?? []).filter((dimension) =>
     dimension.grade !== "pass" || dimension.issueCount > 0,
@@ -458,12 +476,13 @@ export async function decomposeWithQuality(
     return { ...first, quality: null, retried: false, attempts: 1, firstQuality: null };
   }
 
-  const firstQuality = critiquePlan({ plan: first.output, context: input.memories, research: input.research });
+  const researchEvidence = researchEvidenceForQuality(input);
+  const firstQuality = critiquePlan({ plan: first.output, context: input.memories, research: researchEvidence });
   if (!shouldRetryForQuality(firstQuality)) {
     return { ...first, quality: firstQuality, retried: false, attempts: 1, firstQuality };
   }
 
-  const firstReview = reviewPlan({ plan: first.output, context: input.memories, quality: firstQuality, research: input.research });
+  const firstReview = reviewPlan({ plan: first.output, context: input.memories, quality: firstQuality, research: researchEvidence });
   const retry = await decompose(gateway, {
     ...input,
     description: qualityFeedbackDescription(input.description, firstQuality, firstReview),
@@ -472,7 +491,7 @@ export async function decomposeWithQuality(
     return { ...first, quality: firstQuality, retried: true, attempts: 2, firstQuality };
   }
 
-  const retryQuality = critiquePlan({ plan: retry.output, context: input.memories, research: input.research });
+  const retryQuality = critiquePlan({ plan: retry.output, context: input.memories, research: researchEvidence });
   if (!betterOrEqualQuality(retryQuality, firstQuality)) {
     return { ...first, quality: firstQuality, retried: true, attempts: 2, firstQuality };
   }

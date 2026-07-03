@@ -54,7 +54,7 @@ import {
   type WebResearchStatus,
   type WebResearchTestResult,
 } from "../shared/ipc";
-import { runClarify, runDraft, runRefine } from "./planner";
+import { researchEvidenceForReview, runClarify, runDraft, runRefine } from "./planner";
 import { aimStore } from "./store";
 import { buildGateway, getProviderStatus, setProviderConfig, testProviderConfig } from "./gateway";
 import { collectDesktopPlanningContext, type DesktopPlanningContext } from "./tools";
@@ -148,6 +148,7 @@ export function registerIpc(): void {
       decompositionLearningReport,
       decompositionStrategyReport,
       selectedContext.research,
+      selectedContext.researchRequired,
     );
     return {
       ...draft,
@@ -167,7 +168,11 @@ export function registerIpc(): void {
     const selectedContext = await planningContext(req);
     const [lineageLearning, decompositionLearningReport] = await Promise.all([contextLineageLearning(), decompositionLearning()]);
     const decompositionStrategyReport = await decompositionStrategy(req.title, req.description, decompositionLearningReport);
-    const draftReview = reviewPlan({ plan: req.draft, context: selectedContext.memories, research: selectedContext.research });
+    const draftReview = reviewPlan({
+      plan: req.draft,
+      context: selectedContext.memories,
+      research: researchEvidenceForReview(selectedContext.research, selectedContext.researchRequired),
+    });
     const intake = buildAimIntakeReport({
       title: req.title,
       description: req.description,
@@ -208,6 +213,7 @@ export function registerIpc(): void {
       decompositionLearningReport,
       decompositionStrategyReport,
       selectedContext.research,
+      selectedContext.researchRequired,
     );
     return {
       ...refined,
@@ -289,13 +295,14 @@ export function registerIpc(): void {
     const selectedContext = await planningContext({ title: req.title, description: req.description });
     const lineageLearning = await contextLineageLearning();
     const memories: NewMemory[] = clarifyAnswersToMemories(req.questions, req.answers);
+    const researchEvidence = researchEvidenceForReview(selectedContext.research, selectedContext.researchRequired);
     const answerImpact = req.answers.length > 0
       ? traceClarifyAnswerImpact({
           questions: req.questions,
           answers: req.answers,
           beforePlan: req.draft ?? null,
           afterPlan: req.plan,
-          beforeQuality: req.draft ? critiquePlan({ plan: req.draft, context: selectedContext.memories }) : null,
+          beforeQuality: req.draft ? critiquePlan({ plan: req.draft, context: selectedContext.memories, research: researchEvidence }) : null,
           afterQuality: req.quality ?? null,
       })
       : null;
