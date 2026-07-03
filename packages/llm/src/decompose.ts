@@ -37,6 +37,7 @@ import { decompositionJsonSchema } from "./decomposition-schema";
 import type { AimOutputLanguage } from "./language";
 import { PLANNING_CONTEXT_RULES, renderPlanningContext } from "./planning-context";
 import type { PlanningMemory } from "./planning-context";
+import type { ResearchBrief } from "./planning-tool-context";
 
 /** Input to {@link decompose}: the user's raw goal plus its domain. */
 export interface DecomposeInput {
@@ -52,6 +53,8 @@ export interface DecomposeInput {
   decompositionLearning?: DecompositionLearningReport | null;
   /** Current decomposition strategy derived from the aim and historical decomposition learning. */
   decompositionStrategy?: DecompositionStrategyReport | null;
+  /** First-party web research evidence collected for this aim before decomposition. */
+  research?: ResearchBrief | null;
   /** User-facing output language inferred from the aim text. Schema enum values stay unchanged. */
   outputLanguage?: AimOutputLanguage;
 }
@@ -179,6 +182,10 @@ const SYSTEM_PROMPT = [
   "  web research, prefer an agent-owned discovery/research milestone or a context gap that",
   "  names the needed tool. Do not ask the human to manually summarize web/local information",
   "  that an agent should collect.",
+  "- When first-party research evidence is provided, use it to make the decomposition deeper:",
+  "  include external constraints, current facts, source-backed risks, and unresolved",
+  "  uncertainties in milestone contracts or context gaps. Do not invent current facts that",
+  "  are not supported by the research brief.",
   "- For each milestone, write an `acceptance_rule` whose clauses use ONLY these evaluators:",
   "    * `commit_pattern` — matches commits by file path glob, message pattern, branch, or min file count.",
   "    * `ci_status` — matches a CI workflow conclusion (default conclusion: success).",
@@ -261,6 +268,22 @@ function renderDecompositionStrategy(strategy: DecompositionStrategyReport | nul
   return lines.join("\n");
 }
 
+function renderResearchEvidence(research: ResearchBrief | null | undefined): string {
+  if (!research) return "(none collected)";
+  const lines = [
+    `Research question: ${research.question}`,
+    `Queries: ${research.queries.join(" | ")}`,
+    `Coverage: ${research.sources.length} sources · ${research.fetchedSourceCount} fetched pages · ${research.searchResultCount} search results`,
+    "Findings:",
+    ...research.findings.slice(0, 8).map((finding) => `- ${finding}`),
+  ];
+  if (research.uncertainties.length > 0) {
+    lines.push("Uncertainties:");
+    lines.push(...research.uncertainties.map((uncertainty) => `- ${uncertainty}`));
+  }
+  return lines.join("\n");
+}
+
 function renderOutputLanguageInstruction(language: AimOutputLanguage | undefined): string {
   if (language === "simplified_chinese") {
     return [
@@ -287,6 +310,9 @@ function buildUserPrompt(input: DecomposeInput): string {
     "",
     "Known user context from previous aims:",
     renderPlanningContext(input.memories),
+    "",
+    "First-party web research evidence:",
+    renderResearchEvidence(input.research),
     "",
     "Historical context lineage learning:",
     renderLineageLearning(input.lineageLearning),

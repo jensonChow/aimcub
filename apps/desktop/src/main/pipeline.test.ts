@@ -200,6 +200,67 @@ describe("desktop planner · with a gateway (real @core/llm pipeline)", () => {
     expect(decomposeCall?.prompt).toContain("visible process traces");
   });
 
+  it("passes first-party web research evidence into the draft prompt", async () => {
+    const registry = createAimcubToolRegistry({
+      "memory.search": async () => ({
+        ok: true,
+        observation: {
+          summary: "Selected 0 planning memories.",
+          data: { memories: [] },
+          sources: [],
+        },
+      }),
+      "web.search": async () => ({
+        ok: true,
+        observation: {
+          summary: "Found 1 web result.",
+          data: {
+            results: [{
+              title: "Cambodia visa guidance",
+              url: "https://example.com/cambodia-visa",
+              snippet: "Current visa and travel basics.",
+            }],
+          },
+          sources: [{ kind: "web", url: "https://example.com/cambodia-visa" }],
+        },
+      }),
+      "web.fetch": async () => ({
+        ok: true,
+        observation: {
+          summary: "Fetched Cambodia visa guidance.",
+          data: {
+            finalUrl: "https://example.com/cambodia-visa",
+            status: 200,
+            title: "Cambodia visa guidance",
+            text: "Travelers should verify passport validity, visa requirements, local transport, and health guidance before departure.",
+            truncated: false,
+          },
+          sources: [{ kind: "web", url: "https://example.com/cambodia-visa" }],
+        },
+      }),
+    });
+    const collected = await collectPlanningToolContext(
+      registry,
+      { ...toolContext, permissions: ["memory.read", "network.search", "network.fetch"] },
+      {
+        title: "Plan a Cambodia trip",
+        includeWeb: true,
+        fetchWebResults: true,
+        webQueryLimit: 1,
+      },
+    );
+    const { gateway, calls } = recordingGateway();
+
+    const d = await runDraft(gateway, "Plan a Cambodia trip", "Make a practical travel plan.", collected.memories, null, null, null, collected.research);
+
+    expect(d.ok).toBe(true);
+    const decomposeCall = calls.find((call) => call.task === "decompose");
+    expect(decomposeCall?.prompt).toContain("First-party web research evidence");
+    expect(decomposeCall?.prompt).toContain("Cambodia visa guidance");
+    expect(decomposeCall?.prompt).toContain("https://example.com/cambodia-visa");
+    expect(decomposeCall?.prompt).toContain("passport validity");
+  });
+
   it("instructs draft output to follow a Chinese aim language", async () => {
     const { gateway, calls } = recordingGateway();
 

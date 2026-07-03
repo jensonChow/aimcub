@@ -51,6 +51,7 @@ describe("planning tool context collector", () => {
     const result = await collectPlanningToolContext(registry, context, {
       title: "Build Aimcub tool registry",
       includeWeb: true,
+      webQueryLimit: 1,
       memoryLimit: 10,
     });
 
@@ -58,6 +59,7 @@ describe("planning tool context collector", () => {
     expect(result.observations.map((observation) => observation.summary)).toEqual([
       "Selected 1 planning memory.",
       "Found 1 web result.",
+      "Built research brief from 1 queries, 1 sources, and 0 fetched pages.",
       "Distilled planning tool observations into compact context.",
     ]);
     expect(result.observationEvents.map((event) => event.toolName)).toEqual([
@@ -65,11 +67,13 @@ describe("planning tool context collector", () => {
       "web.search",
       "context.distill",
     ]);
-    expect(result.memories.map((memory) => memory.content)).toEqual([
+    expect(result.memories.map((memory) => memory.content)).toEqual(expect.arrayContaining([
       "User prefers TypeScript for Aimcub tools.",
       "Web search result: Aimcub research — A first-party planning tool runtime. — Source: https://example.com/aimcub",
-    ]);
-    expect(result.report.selected).toHaveLength(2);
+      expect.stringContaining("Research brief for aim: Build Aimcub tool registry"),
+    ]));
+    expect(result.research?.uncertainties).toContain("No source pages were fetched; findings rely on search snippets only.");
+    expect(result.report.selected).toHaveLength(3);
     expect(result.distillation?.summary).toContain("User prefers TypeScript");
     expect(result.distillation?.summary).toContain("Aimcub research");
     expect(result.distillation?.durableMemoryCandidates).toEqual([]);
@@ -105,7 +109,8 @@ describe("planning tool context collector", () => {
     expect(result.distillation?.missingQuestions.map((question) => question.id)).toContain("missing_eval_signal");
   });
 
-  it("fetches multiple top web search results when web fetch is enabled", async () => {
+  it("builds a research brief from multi-query search and fetched sources", async () => {
+    const searchedQueries: string[] = [];
     const fetchedUrls: string[] = [];
     const registry = createAimcubToolRegistry({
       "memory.search": async () => ({
@@ -116,24 +121,26 @@ describe("planning tool context collector", () => {
           sources: [],
         },
       }),
-      "web.search": async () => ({
-        ok: true,
-        observation: {
-          summary: "Found 3 web results.",
-          data: {
-            results: [
-              { title: "One", url: "https://example.com/one", snippet: "First source." },
-              { title: "Two", url: "https://example.com/two", snippet: "Second source." },
-              { title: "Three", url: "https://example.com/three", snippet: "Third source." },
+      "web.search": async (input) => {
+        searchedQueries.push(input.query);
+        const suffix = searchedQueries.length;
+        return {
+          ok: true,
+          observation: {
+            summary: "Found 2 web results.",
+            data: {
+              results: [
+                { title: `Official guide ${suffix}`, url: `https://example.com/source-${suffix}`, snippet: `Official source ${suffix}.` },
+                { title: "Duplicate overview", url: "https://example.com/shared", snippet: "Shared source." },
+              ],
+            },
+            sources: [
+              { kind: "web", url: `https://example.com/source-${suffix}` },
+              { kind: "web", url: "https://example.com/shared" },
             ],
           },
-          sources: [
-            { kind: "web", url: "https://example.com/one" },
-            { kind: "web", url: "https://example.com/two" },
-            { kind: "web", url: "https://example.com/three" },
-          ],
-        },
-      }),
+        };
+      },
       "web.fetch": async (input) => {
         fetchedUrls.push(input.url);
         return {
@@ -157,24 +164,37 @@ describe("planning tool context collector", () => {
       registry,
       { ...context, permissions: ["memory.read", "network.search", "network.fetch"] },
       {
-        title: "Research travel basics",
+        title: "Research Cambodia travel basics",
         includeWeb: true,
         fetchWebResults: true,
+        webQueryLimit: 2,
         webFetchLimit: 2,
       },
     );
 
     expect(result.failures).toEqual([]);
-    expect(fetchedUrls).toEqual(["https://example.com/one", "https://example.com/two"]);
+    expect(searchedQueries).toHaveLength(2);
+    expect(fetchedUrls).toEqual(["https://example.com/source-1", "https://example.com/shared"]);
     expect(result.observationEvents.map((event) => event.toolName)).toEqual([
       "memory.search",
+      "web.search",
       "web.search",
       "web.fetch",
       "web.fetch",
     ]);
+    expect(result.research).toMatchObject({
+      searchResultCount: 4,
+      fetchedSourceCount: 2,
+    });
+    expect(result.research?.queries).toEqual(searchedQueries);
+    expect(result.research?.findings.join("\n")).toContain("Detailed source text");
+    expect(result.observations.map((observation) => observation.summary)).toContain(
+      "Built research brief from 2 queries, 3 sources, and 2 fetched pages.",
+    );
     expect(result.memories.map((memory) => memory.source)).toEqual(expect.arrayContaining([
       "web.search",
       "web.fetch",
+      "web.research",
     ]));
   });
 

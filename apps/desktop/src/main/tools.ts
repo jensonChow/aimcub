@@ -13,6 +13,7 @@ import {
   type PlanningContextForAim,
   type PlanningToolFailure,
   type PlanningToolObservationEvent,
+  type ResearchBrief,
 } from "@core/llm";
 
 import type { DraftRequest } from "../shared/ipc";
@@ -23,6 +24,7 @@ export interface DesktopPlanningContext extends PlanningContextForAim {
   toolObservationEvents: PlanningToolObservationEvent[];
   toolFailures: PlanningToolFailure[];
   toolDistillation: ContextDistillOutput | null;
+  research: ResearchBrief | null;
 }
 
 function flagEnabled(value: string | undefined): boolean {
@@ -131,5 +133,6 @@ export async function collectDesktopPlanningContext(req: DraftRequest): Promise<
     toolObservationEvents: toolContext.observationEvents,
     toolFailures: toolContext.failures,
     toolDistillation: toolContext.distillation,
+    research: toolContext.research,
   };
 }

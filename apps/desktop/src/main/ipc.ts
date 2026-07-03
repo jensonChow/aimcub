@@ -143,6 +143,7 @@ export function registerIpc(): void {
       lineageLearning,
       decompositionLearningReport,
       decompositionStrategyReport,
+      selectedContext.research,
     );
     return {
       ...draft,
@@ -202,6 +203,7 @@ export function registerIpc(): void {
       lineageLearning,
       decompositionLearningReport,
       decompositionStrategyReport,
+      selectedContext.research,
     );
     return {
       ...refined,

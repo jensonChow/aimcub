@@ -19,6 +19,7 @@ import {
   type DecomposeWithQualityResult,
   type AimOutputLanguage,
   type PlanningMemory,
+  type ResearchBrief,
 } from "@core/llm";
 import { reviewPlan, type AimIntakeReport, type ContextCaptureLearningReport, type ContextLineageLearningReport, type DecompositionLearningReport, type DecompositionStrategyReport, type PlanReviewReport } from "@core/domain";
 import type { DecompositionOutput } from "@core/types";
@@ -68,10 +69,11 @@ export async function runDraft(
   lineageLearning?: ContextLineageLearningReport | null,
   decompositionLearning?: DecompositionLearningReport | null,
   decompositionStrategy?: DecompositionStrategyReport | null,
+  research?: ResearchBrief | null,
 ): Promise<PlanResult> {
   if (!gateway) return { ok: false, output: null, errors: [NO_PROVIDER] };
   const outputLanguage = inferAimOutputLanguage(title, description);
-  const r = await decomposeWithQuality(gateway, { title, description, memories, lineageLearning, decompositionLearning, decompositionStrategy, outputLanguage });
+  const r = await decomposeWithQuality(gateway, { title, description, memories, lineageLearning, decompositionLearning, decompositionStrategy, research, outputLanguage });
   if (r.output) {
     return {
       ok: true,
@@ -117,6 +119,7 @@ export async function runRefine(
   lineageLearning?: ContextLineageLearningReport | null,
   decompositionLearning?: DecompositionLearningReport | null,
   decompositionStrategy?: DecompositionStrategyReport | null,
+  research?: ResearchBrief | null,
 ): Promise<PlanResult> {
   if (!gateway) return { ok: false, output: null, errors: [NO_PROVIDER] };
   const outputLanguage = inferAimOutputLanguage(title, description);
@@ -127,7 +130,7 @@ export async function runRefine(
     .filter((part) => part.trim().length > 0)
     .join("\n\n");
   const refinedMemories = [...answerMemoriesForRefine(questions, answers), ...memories];
-  const r = await decomposeWithQuality(gateway, { title, description: refinedDescription, memories: refinedMemories, lineageLearning, decompositionLearning, decompositionStrategy, outputLanguage });
+  const r = await decomposeWithQuality(gateway, { title, description: refinedDescription, memories: refinedMemories, lineageLearning, decompositionLearning, decompositionStrategy, research, outputLanguage });
   if (r.output) {
     return {
       ok: true,

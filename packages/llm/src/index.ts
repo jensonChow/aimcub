@@ -230,6 +230,8 @@ export type {
   PlanningToolContextResult,
   PlanningToolFailure,
   PlanningToolObservationEvent,
+  ResearchBrief,
+  ResearchBriefSource,
 } from "./planning-tool-context";
 export {
   BraveWebSearchClient,
