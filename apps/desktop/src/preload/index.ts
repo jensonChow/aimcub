@@ -9,6 +9,7 @@ const api: AimcubApi = {
   refine: (req) => ipcRenderer.invoke(IPC.refine, req),
   saveGoal: (req) => ipcRenderer.invoke(IPC.saveGoal, req),
   listGoals: () => ipcRenderer.invoke(IPC.listGoals),
+  getGoal: (id) => ipcRenderer.invoke(IPC.getGoal, id),
   deleteGoal: (id) => ipcRenderer.invoke(IPC.deleteGoal, id),
   listContextCandidates: () => ipcRenderer.invoke(IPC.listContextCandidates),
   listContextHistory: () => ipcRenderer.invoke(IPC.listContextHistory),
@@ -30,6 +31,8 @@ const api: AimcubApi = {
   testWebResearchConfig: (config) => ipcRenderer.invoke(IPC.testWebResearchConfig, config),
   listLocalAgents: () => ipcRenderer.invoke(IPC.listLocalAgents),
   runLocalAgent: (req) => ipcRenderer.invoke(IPC.runLocalAgent, req),
+  runMilestoneAgent: (req) => ipcRenderer.invoke(IPC.runMilestoneAgent, req),
+  confirmMilestone: (req) => ipcRenderer.invoke(IPC.confirmMilestone, req),
 };
 
 contextBridge.exposeInMainWorld("aimcub", api);

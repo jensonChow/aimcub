@@ -43,6 +43,8 @@ export interface RefineRequest {
 export interface SaveRequest {
   title: string;
   description?: string;
+  parentGoalId?: string;
+  parentMilestoneId?: string;
   draft?: DecompositionOutput | null;
   plan: DecompositionOutput;
   quality?: PlanQualityReport | null;
@@ -97,6 +99,17 @@ export interface SavedGoal {
   milestones: Milestone[];
   contextCandidates?: Memory[];
   answerImpact?: ClarifyAnswerImpactReport | null;
+}
+
+export interface GoalDetail {
+  goal: Goal;
+  milestones: Milestone[];
+}
+
+export interface ConfirmMilestoneRequest {
+  goalId: string;
+  milestoneId: string;
+  summary?: string;
 }
 
 export interface AcceptContextCandidateRequest {
@@ -245,6 +258,20 @@ export interface LocalAgentRunResult {
   durationMs: number;
 }
 
+export interface RunMilestoneAgentRequest {
+  goalId: string;
+  milestoneId: string;
+  agentId?: LocalAgentId;
+  prompt?: string;
+}
+
+export interface RunMilestoneAgentResult {
+  ok: boolean;
+  run: LocalAgentRunResult | null;
+  detail: GoalDetail | null;
+  error: string | null;
+}
+
 /** The typed surface exposed on `window.aimcub` by the preload bridge. */
 export interface AimcubApi {
   intake(req: DraftRequest): Promise<AimIntakeReport>;
@@ -253,6 +280,7 @@ export interface AimcubApi {
   refine(req: RefineRequest): Promise<PlanResult>;
   saveGoal(req: SaveRequest): Promise<SavedGoal>;
   listGoals(): Promise<Goal[]>;
+  getGoal(id: string): Promise<GoalDetail | null>;
   deleteGoal(id: string): Promise<void>;
   listContextCandidates(): Promise<Memory[]>;
   listContextHistory(): Promise<Memory[]>;
@@ -274,6 +302,8 @@ export interface AimcubApi {
   testWebResearchConfig(config: WebResearchConfig): Promise<WebResearchTestResult>;
   listLocalAgents(): Promise<LocalAgentDetection[]>;
   runLocalAgent(req: LocalAgentRunRequest): Promise<LocalAgentRunResult>;
+  runMilestoneAgent(req: RunMilestoneAgentRequest): Promise<RunMilestoneAgentResult>;
+  confirmMilestone(req: ConfirmMilestoneRequest): Promise<GoalDetail | null>;
 }
 
 /** Channel names — kept in one place so main and preload can't drift. */
@@ -284,6 +314,7 @@ export const IPC = {
   refine: "aimcub:refine",
   saveGoal: "aimcub:saveGoal",
   listGoals: "aimcub:listGoals",
+  getGoal: "aimcub:getGoal",
   deleteGoal: "aimcub:deleteGoal",
   listContextCandidates: "aimcub:listContextCandidates",
   listContextHistory: "aimcub:listContextHistory",
@@ -305,6 +336,8 @@ export const IPC = {
   testWebResearchConfig: "aimcub:testWebResearchConfig",
   listLocalAgents: "aimcub:listLocalAgents",
   runLocalAgent: "aimcub:runLocalAgent",
+  runMilestoneAgent: "aimcub:runMilestoneAgent",
+  confirmMilestone: "aimcub:confirmMilestone",
 } as const;
 
 declare global {

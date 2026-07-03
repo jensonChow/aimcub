@@ -6,7 +6,7 @@
  */
 import { ipcMain } from "electron";
 
-import type { Goal } from "@core/types";
+import type { Goal, Milestone } from "@core/types";
 import type { NewMemory } from "@core/store";
 import {
   buildLocalHandoffManifest,
@@ -43,12 +43,16 @@ import {
   type AcceptContextCandidateRequest,
   type ClarifyRequest,
   type DeprioritizeContextMemoryRequest,
+  type ConfirmMilestoneRequest,
   type DraftRequest,
+  type GoalDetail,
   type ProviderConfig,
   type ProviderStatus,
   type ProviderTestResult,
   type LocalAgentRunRequest,
   type LocalAgentRunResult,
+  type RunMilestoneAgentRequest,
+  type RunMilestoneAgentResult,
   type RefineRequest,
   type SaveRequest,
   type SavedGoal,
@@ -68,6 +72,84 @@ async function planningContext(input: {
   description?: string;
 }): Promise<DesktopPlanningContext> {
   return collectDesktopPlanningContext(input);
+}
+
+async function goalDetail(goalId: string): Promise<GoalDetail | null> {
+  return aimStore.getGoal(goalId);
+}
+
+function milestonePlanKey(milestone: Milestone): string {
+  const key = milestone.metadata?.plan_key;
+  return typeof key === "string" ? key : milestone.id;
+}
+
+function milestoneAgentPrompt(goal: Goal, milestone: Milestone, extra?: string): string {
+  const contract = milestone.metadata?.decomposition_contract as Record<string, unknown> | undefined;
+  const done = typeof contract?.definition_of_done === "string" ? contract.definition_of_done : milestone.description;
+  const evidence = Array.isArray(contract?.required_evidence) ? contract.required_evidence.join(", ") : "";
+  const evalSignal = typeof contract?.eval_signal === "string" ? contract.eval_signal : "";
+  return [
+    `Aim: ${goal.title}`,
+    goal.description ? `Aim description: ${goal.description}` : "",
+    `Sub-aim: ${milestone.title}`,
+    milestone.description ? `Sub-aim description: ${milestone.description}` : "",
+    done ? `Definition of done: ${done}` : "",
+    evidence ? `Required evidence: ${evidence}` : "",
+    evalSignal ? `Eval signal: ${evalSignal}` : "",
+    extra?.trim() ? `User instruction: ${extra.trim()}` : "",
+    "",
+    "Work on this sub-aim as far as the local runtime permissions allow. Report what you did, what evidence exists, and what remains blocked. Do not claim completion unless the evidence is explicit.",
+  ].filter(Boolean).join("\n");
+}
+
+async function runMilestoneAgent(req: RunMilestoneAgentRequest): Promise<RunMilestoneAgentResult> {
+  const detail = await aimStore.getGoal(req.goalId);
+  if (!detail) return { ok: false, run: null, detail: null, error: "Aim not found." };
+  const milestone = detail.milestones.find((item) => item.id === req.milestoneId);
+  if (!milestone) return { ok: false, run: null, detail, error: "Sub-aim not found." };
+  const detections = await listLocalAgents();
+  const selected = req.agentId
+    ? detections.find((agent) => agent.id === req.agentId)
+    : detections.find((agent) => agent.id === "codex" && agent.available && agent.authStatus !== "missing")
+      ?? detections.find((agent) => agent.available && agent.authStatus !== "missing");
+  if (!selected || !selected.available || selected.authStatus === "missing") {
+    return { ok: false, run: null, detail, error: "No authenticated local CLI agent is available." };
+  }
+
+  const run = await runLocalAgent({
+    agentId: selected.id,
+    prompt: milestoneAgentPrompt(detail.goal, milestone, req.prompt),
+    model: selected.models[0]?.id ?? "default",
+    permission: { sandbox: "read-only", network: false },
+  });
+
+  await aimStore.addEvidence({
+    goalId: detail.goal.id,
+    milestoneId: milestone.id,
+    kind: "mcp_report",
+    emitterId: null,
+    sourceEventId: `local-agent:${selected.id}:${Date.now()}:${milestonePlanKey(milestone)}`,
+    summary: run.ok
+      ? `Local agent ${selected.name} worked on: ${milestone.title}`
+      : `Local agent ${selected.name} failed on: ${milestone.title}`,
+    payload: {
+      agent_id: selected.id,
+      command: run.command,
+      args: run.args,
+      ok: run.ok,
+      output: run.outputText,
+      events: run.events.map((event) => ({ type: event.type, summary: event.summary })),
+      error: run.error,
+    },
+    trustScore: 0.6,
+  });
+
+  return {
+    ok: run.ok,
+    run,
+    detail: await aimStore.getGoal(detail.goal.id),
+    error: run.error,
+  };
 }
 
 function planningToolTrace(context: DesktopPlanningContext) {
@@ -234,6 +316,8 @@ export function registerIpc(): void {
 
   ipcMain.handle(IPC.listGoals, (): Promise<Goal[]> => aimStore.listGoals());
 
+  ipcMain.handle(IPC.getGoal, (_e, id: string): Promise<GoalDetail | null> => goalDetail(id));
+
   ipcMain.handle(IPC.deleteGoal, (_e, id: string): Promise<void> => aimStore.deleteGoal(id));
 
   ipcMain.handle(IPC.listContextCandidates, () => aimStore.listMemoryCandidates());
@@ -299,6 +383,19 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.runLocalAgent, (_e, req: LocalAgentRunRequest): Promise<LocalAgentRunResult> =>
     runLocalAgent(req),
   );
+
+  ipcMain.handle(IPC.runMilestoneAgent, (_e, req: RunMilestoneAgentRequest): Promise<RunMilestoneAgentResult> =>
+    runMilestoneAgent(req),
+  );
+
+  ipcMain.handle(IPC.confirmMilestone, async (_e, req: ConfirmMilestoneRequest): Promise<GoalDetail | null> => {
+    await aimStore.confirmMilestone({
+      goalId: req.goalId,
+      milestoneId: req.milestoneId,
+      summary: req.summary,
+    });
+    return goalDetail(req.goalId);
+  });
 
   ipcMain.handle(IPC.saveGoal, async (_e, req: SaveRequest): Promise<SavedGoal> => {
     const selectedContext = await planningContext({ title: req.title, description: req.description });
@@ -370,6 +467,12 @@ export function registerIpc(): void {
         local_handoff_manifest: localHandoffManifest,
         planning_context: selectedContext.report,
         planning_tools: planningToolTrace(selectedContext),
+        ...(req.parentGoalId && req.parentMilestoneId
+          ? {
+              parent_goal_id: req.parentGoalId,
+              parent_milestone_id: req.parentMilestoneId,
+            }
+          : {}),
         ...(answerImpact ? { clarify_answer_impact: answerImpact } : {}),
         ...(captureFulfillment.total > 0 ? { context_capture_fulfillment: captureFulfillment } : {}),
       },

@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
-import type { DecompositionOutput, Goal, Memory } from "@core/types";
+import type { DecompositionOutput, Goal, Memory, Milestone } from "@core/types";
 import { reviewAimLearning, reviewContextLineage } from "@core/domain";
 import type { AimIntakeReport, AimLearningReport, ContextCaptureFulfillmentReport, ContextHealthRow, ContextLineageLearningReport, ContextLineageReport, ContextProfileReport, DecompositionLearningReport, DecompositionStrategyReport, PlanQualityDimensionReport } from "@core/domain";
 import type { ClarifyOutput, ClarifyAnswer, ClarifyAnswerImpactReport, ClarifyLearningReport, PlanningContextSelectionReport } from "@core/llm";
-import type { LocalAgentDetection, PlanResult, PlanningToolIpcTrace, ProviderStatus, WebResearchStatus } from "../shared/ipc";
+import type { GoalDetail, LocalAgentDetection, PlanResult, PlanningToolIpcTrace, ProviderStatus, WebResearchStatus } from "../shared/ipc";
 
 import { ContextInbox } from "./ContextInbox";
 import {
@@ -206,6 +206,8 @@ function AppInner() {
   const [contextLineageLearning, setContextLineageLearning] = useState<ContextLineageLearningReport | null>(null);
   const [contextDecompositionLearning, setContextDecompositionLearning] = useState<DecompositionLearningReport | null>(null);
   const [viewing, setViewing] = useState<Goal | null>(null);
+  const [viewingDetail, setViewingDetail] = useState<GoalDetail | null>(null);
+  const [subAimParent, setSubAimParent] = useState<{ goalId: string; milestoneId: string } | null>(null);
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("process");
   const [composerText, setComposerText] = useState("");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -448,11 +450,13 @@ function AppInner() {
     setSavedGoal(null);
     setSavedContextCandidateCount(0);
     setSavedContextCandidates([]);
+    setSubAimParent(null);
   }
 
   function goHome() {
     setError(null);
     setViewing(null);
+    setViewingDetail(null);
     setComposerText("");
     setInspectorTab("context");
     clearWizard();
@@ -470,6 +474,7 @@ function AppInner() {
   function startNew() {
     setError(null);
     setViewing(null);
+    setViewingDetail(null);
     setComposerText("");
     setInspectorTab("context");
     clearWizard();
@@ -479,6 +484,13 @@ function AppInner() {
   function openGoal(g: Goal) {
     setError(null);
     setViewing(g);
+    setViewingDetail({ goal: g, milestones: [] });
+    window.aimcub.getGoal(g.id).then((detail) => {
+      if (detail) {
+        setViewing(detail.goal);
+        setViewingDetail(detail);
+      }
+    }).catch(() => {});
     setInspectorTab(reviewOf(g) ? "quality" : "context");
     setStep("plan");
   }
@@ -500,6 +512,72 @@ function AppInner() {
       refreshContextLineageLearning();
       refreshContextDecompositionLearning();
     }
+  }
+
+  function refreshAfterMilestoneChange(detail: GoalDetail | null) {
+    if (detail) {
+      setViewing(detail.goal);
+      setViewingDetail(detail);
+    }
+    refreshGoals();
+    refreshContextDecompositionLearning();
+  }
+
+  async function runSubAimAgent(goal: Goal, milestone: Milestone) {
+    setError(null);
+    upsertPlanningTrace(traceEvent("sub-aim-agent", "running", t("trace.subAimAgent"), milestone.title));
+    try {
+      const result = await window.aimcub.runMilestoneAgent({
+        goalId: goal.id,
+        milestoneId: milestone.id,
+      });
+      refreshAfterMilestoneChange(result.detail);
+      upsertPlanningTrace(traceEvent(
+        "sub-aim-agent",
+        result.ok ? "done" : "warning",
+        t("trace.subAimAgent"),
+        result.ok ? t("trace.subAimAgentDone") : result.error ?? t("trace.subAimAgentFailed"),
+      ));
+      if (!result.ok && result.error) setError(result.error);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      updatePlanningTrace("sub-aim-agent", { status: "error", detail: message });
+      setError(message);
+    }
+  }
+
+  async function confirmSubAim(goal: Goal, milestone: Milestone) {
+    setError(null);
+    try {
+      const detail = await window.aimcub.confirmMilestone({
+        goalId: goal.id,
+        milestoneId: milestone.id,
+        summary: `Confirmed sub-aim: ${milestone.title}`,
+      });
+      refreshAfterMilestoneChange(detail);
+      upsertPlanningTrace(traceEvent("sub-aim-confirm", "done", t("trace.subAimConfirm"), milestone.title));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  function decomposeSubAim(goal: Goal, milestone: Milestone, node: DecompositionOutput["nodes"][number]) {
+    const contract = node.decomposition_contract;
+    clearWizard();
+    setViewing(null);
+    setViewingDetail(null);
+    setSubAimParent({ goalId: goal.id, milestoneId: milestone.id });
+    setTitle(node.title);
+    setDescription([
+      `Parent aim: ${goal.title}`,
+      milestone.description || node.description ? `Sub-aim context: ${milestone.description || node.description}` : "",
+      contract?.definition_of_done ? `Definition of done: ${contract.definition_of_done}` : "",
+      contract?.required_evidence?.length ? `Required evidence: ${contract.required_evidence.join("; ")}` : "",
+      contract?.eval_signal ? `Eval signal: ${contract.eval_signal}` : "",
+      "Break this sub-aim into smaller sub-aims with concrete eval rules.",
+    ].filter(Boolean).join("\n"));
+    setInspectorTab("context");
+    setStep("aim");
   }
 
   async function acceptContextCandidate(candidate: Memory, content: string, scope: "aim" | "global") {
@@ -747,6 +825,8 @@ function AppInner() {
       const res = await window.aimcub.saveGoal({
         title: title.trim(),
         description: description.trim() || undefined,
+        parentGoalId: subAimParent?.goalId,
+        parentMilestoneId: subAimParent?.milestoneId,
         draft,
         plan: finalPlan,
         quality: planQuality,
@@ -928,6 +1008,10 @@ function AppInner() {
                 {step === "plan" && viewing && (
                   <SavedGoalView
                     goal={viewing}
+                    milestones={viewingDetail?.goal.id === viewing.id ? viewingDetail.milestones : []}
+                    onRunAgent={(milestone) => runSubAimAgent(viewing, milestone)}
+                    onConfirm={(milestone) => confirmSubAim(viewing, milestone)}
+                    onDecompose={(milestone, node) => decomposeSubAim(viewing, milestone, node)}
                     onBack={goHome}
                     onDelete={() => removeGoal(viewing)}
                   />
@@ -1818,6 +1902,19 @@ function inlineDetailButtonStyle(): CSSProperties {
     cursor: "pointer",
     fontSize: 12,
     padding: "2px 0",
+  };
+}
+
+function subAimActionButtonStyle(): CSSProperties {
+  return {
+    border: `1px solid ${C.border}`,
+    background: "#fff",
+    color: C.text,
+    borderRadius: 7,
+    cursor: "pointer",
+    fontSize: 12,
+    fontWeight: 650,
+    padding: "6px 9px",
   };
 }
 
@@ -2840,22 +2937,62 @@ function QuestionsStep(props: {
   );
 }
 
+type MilestoneActionHandlers = {
+  onRunAgent?: (milestone: Milestone, node: DecompositionOutput["nodes"][number]) => void;
+  onConfirm?: (milestone: Milestone, node: DecompositionOutput["nodes"][number]) => void;
+  onDecompose?: (milestone: Milestone, node: DecompositionOutput["nodes"][number]) => void;
+};
+
+function milestoneByPlanKey(milestones: readonly Milestone[]): Map<string, Milestone> {
+  const out = new Map<string, Milestone>();
+  for (const milestone of milestones) {
+    const key = milestone.metadata?.plan_key;
+    if (typeof key === "string") out.set(key, milestone);
+  }
+  return out;
+}
+
+function milestoneStatusLabel(status: Milestone["status"], t: (key: StringKey, vars?: Record<string, string | number>) => string): string {
+  if (status === "completed") return t("subAim.status.completed");
+  if (status === "in_progress") return t("subAim.status.inProgress");
+  if (status === "blocked") return t("subAim.status.blocked");
+  if (status === "skipped") return t("subAim.status.skipped");
+  return t("subAim.status.pending");
+}
+
+function milestoneStatusColor(status: Milestone["status"]): string {
+  if (status === "completed") return "#1a7f4b";
+  if (status === "blocked") return C.danger;
+  if (status === "in_progress") return "#2b6f87";
+  if (status === "skipped") return C.muted;
+  return C.muted;
+}
+
 /** The milestone list — shared by the fresh-plan view and the saved-goal view. */
-function MilestoneCards(props: { plan: DecompositionOutput }) {
+function MilestoneCards(props: { plan: DecompositionOutput; milestones?: Milestone[] } & MilestoneActionHandlers) {
   const { t } = useI18n();
   const [openKey, setOpenKey] = useState<string | null>(null);
+  const byKey = useMemo(() => milestoneByPlanKey(props.milestones ?? []), [props.milestones]);
   return (
     <div style={milestoneListStyle()}>
       {props.plan.nodes.map((n, i) => {
         const contract = n.decomposition_contract;
         const open = openKey === n.key;
         const completionStandard = contract?.definition_of_done || n.description || n.title;
+        const milestone = byKey.get(n.key);
         return (
           <div key={n.key} style={milestoneRowStyle(open)}>
             <div style={{ display: "grid", gridTemplateColumns: "26px minmax(0, 1fr) auto", gap: 10, alignItems: "start" }}>
               <div style={milestoneIndexStyle()}>{i + 1}</div>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 650, overflow: "hidden", textOverflow: "ellipsis" }}>{n.title}</div>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <div style={{ fontWeight: 650, overflow: "hidden", textOverflow: "ellipsis" }}>{n.title}</div>
+                  {milestone && (
+                    <span style={{ color: milestoneStatusColor(milestone.status), fontSize: 12, fontWeight: 650 }}>
+                      {milestoneStatusLabel(milestone.status, t)}
+                    </span>
+                  )}
+                </div>
                 <div style={{ fontSize: 13, color: C.muted, marginTop: 5, lineHeight: 1.45 }}>
                   {shortUiText(completionStandard)}
                 </div>
@@ -2878,6 +3015,25 @@ function MilestoneCards(props: { plan: DecompositionOutput }) {
                     {t("plan.contractGap")} {contextCategoryLabel(gap.category, t)} · {shortUiText(gap.question)}
                   </div>
                 ))}
+              </div>
+            )}
+            {milestone && (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12, marginLeft: 36 }}>
+                {props.onRunAgent && milestone.status !== "completed" && (
+                  <button onClick={() => props.onRunAgent?.(milestone, n)} style={subAimActionButtonStyle()}>
+                    {t("subAim.runAgent")}
+                  </button>
+                )}
+                {props.onConfirm && milestone.status !== "completed" && (
+                  <button onClick={() => props.onConfirm?.(milestone, n)} style={subAimActionButtonStyle()}>
+                    {t("subAim.markDone")}
+                  </button>
+                )}
+                {props.onDecompose && milestone.status !== "completed" && (
+                  <button onClick={() => props.onDecompose?.(milestone, n)} style={subAimActionButtonStyle()}>
+                    {t("subAim.decompose")}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -2948,6 +3104,10 @@ function PlanView(props: {
 
 function SavedGoalView(props: {
   goal: Goal;
+  milestones: Milestone[];
+  onRunAgent: (milestone: Milestone) => void;
+  onConfirm: (milestone: Milestone) => void;
+  onDecompose: (milestone: Milestone, node: DecompositionOutput["nodes"][number]) => void;
   onBack: () => void;
   onDelete: () => void;
 }) {
@@ -2970,7 +3130,13 @@ function SavedGoalView(props: {
           <div style={threadSectionStyle()}>
             <WorkflowStrip active="save" completed={new Set<WorkflowStage>(["aim", "draft", "questions", "refine", "save"])} />
           </div>
-          <MilestoneCards plan={plan} />
+          <MilestoneCards
+            plan={plan}
+            milestones={props.milestones}
+            onRunAgent={(milestone) => props.onRunAgent(milestone)}
+            onConfirm={(milestone) => props.onConfirm(milestone)}
+            onDecompose={(milestone, node) => props.onDecompose(milestone, node)}
+          />
         </>
       ) : (
         <>

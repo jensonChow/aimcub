@@ -15,6 +15,7 @@ Last updated: 2026-07-03
 - Context collection is the v1b center of gravity. Aim decomposition should gather just enough user context to improve decomposition, acceptance rules, and future reuse without becoming a profile editor.
 - Context collection must distinguish durable/global context from aim-local context. Long-lived preferences, constraints, eval signals, and capability facts should become memory candidates; short-lived facts should stay scoped to the current aim.
 - Agent routing should be agent-forward: assign all digital, research, coding, summarization, and network-searchable work to agents by default. Humans should own only physical-world actions, authority/approval, secrets/access, taste calls, and final non-delegable decisions.
+- Product flow should stay centered on the simplest loop: user enters an aim -> Aim OS collects context -> Aim OS creates sub-aims with eval rules -> each sub-aim is either handed to an agent/user for execution and evaluation, or manually broken down into smaller sub-aims.
 
 ## Current Implementation State
 
@@ -51,6 +52,7 @@ Last updated: 2026-07-03
 - Desktop now has a first pass of the local CLI agent harness in `apps/desktop/src/main/local-agents.ts`, following the OpenDesign-style local adapter pattern: registry definitions for Codex and Claude, executable detection via explicit env overrides/PATH/common install paths, version/auth/model probes, command construction, stdin prompt delivery, and JSONL/stream-json event normalization into Aimcub events.
 - This local CLI harness is an Aimcub runtime layer, not MCP and not an LLM provider replacement. Aimcub should continue to own aim decomposition, context, permissions, evidence, and eval; local CLIs such as `codex exec --json` and `claude -p` are execution runtimes for delegated work.
 - Desktop settings now includes a minimal "Local CLI agents" panel that lists detected Codex/Claude CLIs and can run an explicit read-only smoke test. Keep this panel thin until the runtime is connected to milestone execution and evidence capture.
+- Saved Desktop aims now expose the first usable sub-aim loop: each saved sub-aim shows its persisted milestone status and can be handed to a local CLI agent, manually confirmed as done through the store's eval path, or used as the seed for a new child aim when the user wants to break it down further. Agent runs are recorded as evidence but do not auto-complete milestones; completion remains governed by eval/manual confirmation.
 
 ## Verification Notes
 
@@ -76,7 +78,7 @@ Last updated: 2026-07-03
 - Keep CLI work incremental: split help into layers, preserve scriptability, and add command-dispatch smoke tests before adding more verbs.
 - Before a public open-source release, choose the license, add `CONTRIBUTING.md` and `SECURITY.md`, audit secrets/env examples, and separate public local-first docs from hosted online-platform deployment notes.
 - Keep refining aim decomposition around context capture: ask fewer but higher-value questions, prefer eval signals, and show why a question changes the plan.
-- Next local-agent work: persist per-agent model/reasoning selection, add a run queue tied to milestones, capture file/tool events as append-only evidence, and add cancellation/resume only after the one-shot execution path is reliable.
+- Next local-agent work: persist per-agent model/reasoning selection, improve milestone-level agent prompts with workspace selection, add a real run queue tied to milestones, capture file/tool events as append-only evidence, and add cancellation/resume only after the one-shot execution path is reliable.
 
 ## Next Session Goal Prompt
 
