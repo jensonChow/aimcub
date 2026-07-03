@@ -57,6 +57,7 @@ Last updated: 2026-07-03
 - Aim OS orchestration now has a first durable local model in `@core/types`, `@core/domain`, and `@core/store`: actors, assignments, runs, run events, tool traces, context intake sessions, sub-aim relations, evidence attribution, evaluator runtime reports, and an `AimProgressReadModel`.
 - Local goal creation now materializes routing assignments from decomposition contracts. Agent execution through Desktop creates a `Run`, records low-trust evidence with attribution, finishes the run, and sediments pending context candidates. Manual child-aim decomposition is stored as a first-class sub-aim relation instead of only `metadata`.
 - The current Aim OS model is local-store first. Supabase schema parity is still future work; do not assume hosted Web has these orchestration tables until migrations and API adapters are added.
+- Desktop renderer has been reset from the old debug-heavy 3,500-line panel into a compact Aim OS cockpit MVP. The new first screen centers the actual flow: aim intake, context questions, sub-aim/eval preview, assignment/run/evidence/eval cockpit, context inbox, and runtime settings. It intentionally keeps rough MVP styling and reuses existing IPC instead of adding new product logic in the renderer.
 
 ## Verification Notes
 
@@ -83,7 +84,7 @@ Last updated: 2026-07-03
 - Before a public open-source release, choose the license, add `CONTRIBUTING.md` and `SECURITY.md`, audit secrets/env examples, and separate public local-first docs from hosted online-platform deployment notes.
 - Keep refining aim decomposition around context capture: ask fewer but higher-value questions, prefer eval signals, and show why a question changes the plan.
 - Next local-agent work: persist per-agent model/reasoning selection, improve milestone-level agent prompts with workspace selection, add a real run queue tied to milestones, capture file/tool events as append-only evidence, and add cancellation/resume only after the one-shot execution path is reliable.
-- Next Aim OS work: surface `getAimProgress` in the Desktop cockpit, add Supabase migrations/API parity for actors/assignments/runs/sub-aim relations/evidence attribution, and replace the current one-shot local agent runner with a queue that can stream run events and artifacts.
+- Next Aim OS work: deepen the new Desktop cockpit around `getAimProgress`, add Supabase migrations/API parity for actors/assignments/runs/sub-aim relations/evidence attribution, and replace the current one-shot local agent runner with a queue that can stream run events and artifacts.
 
 ## Next Session Goal Prompt
 
