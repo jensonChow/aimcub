@@ -13,7 +13,7 @@ import type {
 } from "@core/domain";
 import type { ClarifyAnswerImpactReport, ClarifyOutput, PlanningContextSelectionReport } from "@core/llm";
 import { getLlmProviderDefinition } from "@core/llm/providers";
-import type { PlanResult, PlanningToolIpcTrace, ProviderStatus } from "../shared/ipc";
+import type { PlanResult, PlanningDebugTrace, PlanningToolIpcTrace, ProviderStatus } from "../shared/ipc";
 
 import type { StringKey } from "./i18n";
 import { C } from "./styles";
@@ -399,6 +399,42 @@ export function planOf(g: Goal): DecompositionOutput | null {
 export function reviewOf(g: Goal): PlanResult["review"] | null {
   const review = g.metadata?.plan_review as PlanResult["review"] | undefined;
   return review && review.quality && review.context ? review : null;
+}
+
+export function planQualityOf(g: Goal): PlanResult["quality"] | null {
+  const quality = g.metadata?.plan_quality as PlanResult["quality"] | undefined;
+  return quality && typeof quality.score === "number" && typeof quality.grade === "string" ? quality : null;
+}
+
+export function planQualityRetryOf(g: Goal): PlanResult["qualityRetry"] | null {
+  const retry = g.metadata?.plan_quality_retry as {
+    retried?: unknown;
+    attempts?: unknown;
+    firstQuality?: PlanResult["quality"];
+    first_quality?: PlanResult["quality"];
+  } | undefined;
+  if (!retry || typeof retry.retried !== "boolean" || typeof retry.attempts !== "number") return null;
+  return {
+    retried: retry.retried,
+    attempts: retry.attempts,
+    firstQuality: retry.firstQuality ?? retry.first_quality ?? null,
+  };
+}
+
+export function planningDebugTraceOf(g: Goal): PlanningDebugTrace | null {
+  const trace = g.metadata?.planning_debug_trace as Partial<PlanningDebugTrace> | undefined;
+  if (!trace || trace.version !== 1 || !Array.isArray(trace.modelRuns)) return null;
+  if (trace.stage !== "planning" && trace.stage !== "draft" && trace.stage !== "clarify" && trace.stage !== "refine") {
+    return null;
+  }
+  return {
+    version: 1,
+    stage: trace.stage,
+    startedAt: typeof trace.startedAt === "string" ? trace.startedAt : "",
+    finishedAt: typeof trace.finishedAt === "string" ? trace.finishedAt : "",
+    durationMs: typeof trace.durationMs === "number" ? trace.durationMs : 0,
+    modelRuns: trace.modelRuns as PlanningDebugTrace["modelRuns"],
+  };
 }
 
 export function aimIntakeOf(g: Goal): AimIntakeReport | null {

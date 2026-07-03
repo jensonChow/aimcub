@@ -15,6 +15,8 @@ import type {
   ClarifyLearningReport,
   ContextDistillOutput,
   AimcubToolObservation,
+  LlmTask,
+  LlmUsage,
   PlanningToolObservationEvent,
   PlanningContextSelectionReport,
   PlanningToolFailure,
@@ -54,6 +56,7 @@ export interface SaveRequest {
     attempts: number;
     firstQuality: PlanQualityReport | null;
   };
+  debugTrace?: PlanningDebugTrace | null;
   questions: ClarifyQuestion[];
   answers: ClarifyAnswer[];
   assumptions?: ClarifyAssumption[];
@@ -76,6 +79,7 @@ export interface PlanResult {
     attempts: number;
     firstQuality: PlanQualityReport | null;
   };
+  debugTrace?: PlanningDebugTrace | null;
   planningContext?: PlanningContextSelectionReport | null;
   planningTools?: PlanningToolIpcTrace | null;
 }
@@ -84,7 +88,36 @@ export interface ClarifyIpcResult {
   ok: boolean;
   output: ClarifyOutput | null;
   errors: string[];
+  debugTrace?: PlanningDebugTrace | null;
   planningTools?: PlanningToolIpcTrace | null;
+}
+
+export type PlanningRunStage = "draft" | "clarify" | "refine";
+export type PlanningDebugTraceStage = PlanningRunStage | "planning";
+
+export interface PlanningModelRunTrace {
+  id: string;
+  stage: PlanningRunStage;
+  task: LlmTask;
+  status: "ok" | "error";
+  structured: boolean;
+  hasSchema: boolean;
+  startedAt: string;
+  durationMs: number;
+  promptChars: number;
+  systemChars: number;
+  model: string | null;
+  usage: LlmUsage | null;
+  error?: string;
+}
+
+export interface PlanningDebugTrace {
+  version: 1;
+  stage: PlanningDebugTraceStage;
+  startedAt: string;
+  finishedAt: string;
+  durationMs: number;
+  modelRuns: PlanningModelRunTrace[];
 }
 
 export interface PlanningToolIpcTrace {

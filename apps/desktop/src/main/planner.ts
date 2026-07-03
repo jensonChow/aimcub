@@ -18,15 +18,98 @@ import {
   type ClarifyQuestion,
   type DecomposeWithQualityResult,
   type AimOutputLanguage,
+  type LlmRequest,
+  type LlmResponse,
   type PlanningMemory,
   type ResearchBrief,
 } from "@core/llm";
 import { reviewPlan, type AimIntakeReport, type ContextCaptureLearningReport, type ContextLineageLearningReport, type DecompositionLearningReport, type DecompositionStrategyReport, type PlanQualityResearchEvidence, type PlanReviewReport } from "@core/domain";
 import type { DecompositionOutput } from "@core/types";
 
-import type { ClarifyIpcResult, PlanResult } from "../shared/ipc";
+import type {
+  ClarifyIpcResult,
+  PlanResult,
+  PlanningDebugTrace,
+  PlanningModelRunTrace,
+  PlanningRunStage,
+} from "../shared/ipc";
 
 const NO_PROVIDER = "No LLM provider configured — add a provider and API key in settings.";
+
+function createDebugTrace(stage: PlanningRunStage, startedAtMs: number, modelRuns: PlanningModelRunTrace[]): PlanningDebugTrace {
+  const finishedAtMs = Date.now();
+  return {
+    version: 1,
+    stage,
+    startedAt: new Date(startedAtMs).toISOString(),
+    finishedAt: new Date(finishedAtMs).toISOString(),
+    durationMs: finishedAtMs - startedAtMs,
+    modelRuns,
+  };
+}
+
+function tracedGateway(gateway: LlmGateway, stage: PlanningRunStage): {
+  gateway: LlmGateway;
+  modelRuns: PlanningModelRunTrace[];
+} {
+  const modelRuns: PlanningModelRunTrace[] = [];
+  let nextId = 1;
+
+  async function record<T>(
+    req: LlmRequest,
+    structured: boolean,
+    run: () => Promise<LlmResponse<T>>,
+  ): Promise<LlmResponse<T>> {
+    const startedAtMs = Date.now();
+    try {
+      const response = await run();
+      modelRuns.push({
+        id: `${stage}-${nextId++}`,
+        stage,
+        task: req.task,
+        status: "ok",
+        structured,
+        hasSchema: req.schema !== undefined,
+        startedAt: new Date(startedAtMs).toISOString(),
+        durationMs: Date.now() - startedAtMs,
+        promptChars: req.prompt.length,
+        systemChars: req.system?.length ?? 0,
+        model: response.usage.model || req.model || null,
+        usage: response.usage,
+      });
+      return response;
+    } catch (err) {
+      modelRuns.push({
+        id: `${stage}-${nextId++}`,
+        stage,
+        task: req.task,
+        status: "error",
+        structured,
+        hasSchema: req.schema !== undefined,
+        startedAt: new Date(startedAtMs).toISOString(),
+        durationMs: Date.now() - startedAtMs,
+        promptChars: req.prompt.length,
+        systemChars: req.system?.length ?? 0,
+        model: req.model ?? null,
+        usage: null,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      throw err;
+    }
+  }
+
+  return {
+    modelRuns,
+    gateway: {
+      complete(req) {
+        return record(req, false, () => gateway.complete(req));
+      },
+      completeStructured<T>(req: LlmRequest & { schema: unknown }) {
+        return record(req, true, () => gateway.completeStructured<T>(req));
+      },
+    },
+  };
+}
 
 function inferAimOutputLanguage(title: string, description?: string): AimOutputLanguage {
   const text = [title, description].filter(Boolean).join("\n");
@@ -86,9 +169,12 @@ export async function runDraft(
   research?: ResearchBrief | null,
   researchRequired = false,
 ): Promise<PlanResult> {
-  if (!gateway) return { ok: false, output: null, errors: [NO_PROVIDER] };
+  const startedAtMs = Date.now();
+  if (!gateway) return { ok: false, output: null, errors: [NO_PROVIDER], debugTrace: createDebugTrace("draft", startedAtMs, []) };
+  const traced = tracedGateway(gateway, "draft");
   const outputLanguage = inferAimOutputLanguage(title, description);
-  const r = await decomposeWithQuality(gateway, { title, description, memories, lineageLearning, decompositionLearning, decompositionStrategy, research, researchRequired, outputLanguage });
+  const r = await decomposeWithQuality(traced.gateway, { title, description, memories, lineageLearning, decompositionLearning, decompositionStrategy, research, researchRequired, outputLanguage });
+  const debugTrace = createDebugTrace("draft", startedAtMs, traced.modelRuns);
   if (r.output) {
     const researchEvidence = researchEvidenceForReview(research, researchRequired);
     return {
@@ -98,9 +184,10 @@ export async function runDraft(
       quality: r.quality,
       review: reviewPlan({ plan: r.output, context: memories, quality: r.quality, research: researchEvidence }),
       qualityRetry: qualityRetry(r),
+      debugTrace,
     };
   }
-  return { ok: false, output: null, errors: r.validation.errors };
+  return { ok: false, output: null, errors: r.validation.errors, debugTrace };
 }
 
 export async function runClarify(
@@ -116,11 +203,14 @@ export async function runClarify(
   lineageLearning?: ContextLineageLearningReport | null,
   decompositionStrategy?: DecompositionStrategyReport | null,
 ): Promise<ClarifyIpcResult> {
-  if (!gateway) return { ok: false, output: null, errors: [NO_PROVIDER] };
+  const startedAtMs = Date.now();
+  if (!gateway) return { ok: false, output: null, errors: [NO_PROVIDER], debugTrace: createDebugTrace("clarify", startedAtMs, []) };
+  const traced = tracedGateway(gateway, "clarify");
   const outputLanguage = inferAimOutputLanguage(title, description);
-  const r = await clarify(gateway, { title, description, draft, memories, learning, captureLearning, lineageLearning, decompositionStrategy, outputLanguage, intake, review });
-  if (r.output) return { ok: true, output: r.output, errors: [] };
-  return { ok: false, output: null, errors: r.validation.errors };
+  const r = await clarify(traced.gateway, { title, description, draft, memories, learning, captureLearning, lineageLearning, decompositionStrategy, outputLanguage, intake, review });
+  const debugTrace = createDebugTrace("clarify", startedAtMs, traced.modelRuns);
+  if (r.output) return { ok: true, output: r.output, errors: [], debugTrace };
+  return { ok: false, output: null, errors: r.validation.errors, debugTrace };
 }
 
 export async function runRefine(
@@ -138,7 +228,9 @@ export async function runRefine(
   research?: ResearchBrief | null,
   researchRequired = false,
 ): Promise<PlanResult> {
-  if (!gateway) return { ok: false, output: null, errors: [NO_PROVIDER] };
+  const startedAtMs = Date.now();
+  if (!gateway) return { ok: false, output: null, errors: [NO_PROVIDER], debugTrace: createDebugTrace("refine", startedAtMs, []) };
+  const traced = tracedGateway(gateway, "refine");
   const outputLanguage = inferAimOutputLanguage(title, description);
   const reviewInstruction = reviewPrompt?.trim()
     ? `Plan review action to address before accepting:\n${reviewPrompt.trim()}`
@@ -147,7 +239,8 @@ export async function runRefine(
     .filter((part) => part.trim().length > 0)
     .join("\n\n");
   const refinedMemories = [...answerMemoriesForRefine(questions, answers), ...memories];
-  const r = await decomposeWithQuality(gateway, { title, description: refinedDescription, memories: refinedMemories, lineageLearning, decompositionLearning, decompositionStrategy, research, researchRequired, outputLanguage });
+  const r = await decomposeWithQuality(traced.gateway, { title, description: refinedDescription, memories: refinedMemories, lineageLearning, decompositionLearning, decompositionStrategy, research, researchRequired, outputLanguage });
+  const debugTrace = createDebugTrace("refine", startedAtMs, traced.modelRuns);
   if (r.output) {
     const researchEvidence = researchEvidenceForReview(research, researchRequired);
     return {
@@ -157,7 +250,8 @@ export async function runRefine(
       quality: r.quality,
       review: reviewPlan({ plan: r.output, context: refinedMemories, quality: r.quality, research: researchEvidence }),
       qualityRetry: qualityRetry(r),
+      debugTrace,
     };
   }
-  return { ok: false, output: null, errors: r.validation.errors };
+  return { ok: false, output: null, errors: r.validation.errors, debugTrace };
 }

@@ -122,6 +122,16 @@ describe("desktop planner · with a gateway (real @core/llm pipeline)", () => {
     expect(d.quality?.grade).toBe("pass");
     expect(d.review?.quality.grade).toBe("pass");
     expect(d.qualityRetry?.attempts).toBe(1);
+    expect(d.debugTrace?.stage).toBe("draft");
+    expect(d.debugTrace?.modelRuns).toHaveLength(1);
+    expect(d.debugTrace?.modelRuns[0]).toMatchObject({
+      stage: "draft",
+      task: "decompose",
+      status: "ok",
+      structured: true,
+      model: "mock-model",
+      usage: USAGE,
+    });
     const milestones = materialize(d.output!, "goal-1", "owner-1");
     expect(milestones).toHaveLength(d.output!.nodes.length);
     expect(milestones[0]!.depends_on_id).toBeNull();
@@ -278,6 +288,12 @@ describe("desktop planner · with a gateway (real @core/llm pipeline)", () => {
     expect(c.ok).toBe(true);
     expect(c.output!.questions.length).toBeGreaterThan(0);
     expect(c.output!.questions.every((q) => q.options.length >= 2)).toBe(true);
+    expect(c.debugTrace?.modelRuns[0]).toMatchObject({
+      stage: "clarify",
+      task: "classify",
+      status: "ok",
+      structured: true,
+    });
   });
 
   it("instructs clarify output to follow a Chinese aim language", async () => {
@@ -504,5 +520,11 @@ describe("desktop planner · gateway failure is reported, never thrown", () => {
     expect(r.ok).toBe(false);
     expect(r.output).toBeNull();
     expect(r.errors.join(" ")).toMatch(/boom: 503/);
+    expect(r.debugTrace?.modelRuns[0]).toMatchObject({
+      stage: "draft",
+      task: "decompose",
+      status: "error",
+      error: "boom: 503",
+    });
   });
 });

@@ -4,8 +4,10 @@ import type { AimProgressReadModel } from "@core/domain";
 import type { ClarifyAnswer, ClarifyOutput } from "@core/llm";
 import type { DecompositionOutput, Goal, Memory, Milestone } from "@core/types";
 import type {
+  ClarifyIpcResult,
   GoalDetail,
   LocalAgentDetection,
+  PlanningDebugTrace,
   PlanResult,
   ProviderStatus,
   WebResearchStatus,
@@ -16,6 +18,7 @@ import { I18nProvider, useI18n } from "./i18n";
 import { LangToggle } from "./LangToggle";
 import { LocalAgentForm } from "./LocalAgentForm";
 import { Notice } from "./Notice";
+import { mergePlanningDebugTraces, PlanningDebugPanel } from "./PlanningDebugPanel";
 import { ProviderForm } from "./ProviderForm";
 import { WebResearchForm } from "./WebResearchForm";
 import { C, inputStyle, primaryButton, secondaryButton } from "./styles";
@@ -71,6 +74,7 @@ function AimOsApp() {
   const [draft, setDraft] = useState<DecompositionOutput | null>(null);
   const [finalPlan, setFinalPlan] = useState<DecompositionOutput | null>(null);
   const [planResult, setPlanResult] = useState<PlanResult | null>(null);
+  const [planningDebugTraces, setPlanningDebugTraces] = useState<PlanningDebugTrace[]>([]);
   const [clarify, setClarify] = useState<ClarifyOutput | null>(null);
   const [answers, setAnswers] = useState<AnswerMap>({});
   const [error, setError] = useState<string | null>(null);
@@ -102,6 +106,12 @@ function AimOsApp() {
     setSelected(goal);
     setMode("cockpit");
     setError(null);
+    setDraft(null);
+    setFinalPlan(null);
+    setPlanResult(null);
+    setPlanningDebugTraces([]);
+    setClarify(null);
+    setAnswers({});
     const [nextDetail, nextProgress] = await Promise.all([
       window.aimcub.getGoal(goal.id),
       window.aimcub.getAimProgress(goal.id),
@@ -117,6 +127,7 @@ function AimOsApp() {
     setDraft(null);
     setFinalPlan(null);
     setPlanResult(null);
+    setPlanningDebugTraces([]);
     setClarify(null);
     setAnswers({});
     setSelected(null);
@@ -136,6 +147,7 @@ function AimOsApp() {
     setBusy(t("os.busy.draft"));
     setError(null);
     setMode("drafting");
+    setPlanningDebugTraces([]);
     try {
       const req = { title, description: aimDescription.trim() || undefined };
       const nextDraft = await window.aimcub.draft(req);
@@ -143,11 +155,16 @@ function AimOsApp() {
       setDraft(nextDraft.output);
       setFinalPlan(nextDraft.output);
       setPlanResult(nextDraft);
-      const nextClarify = await window.aimcub.clarify({ ...req, draft: nextDraft.output }).catch((err: unknown) => ({
+      setPlanningDebugTraces(nextDraft.debugTrace ? [nextDraft.debugTrace] : []);
+      const nextClarify: ClarifyIpcResult = await window.aimcub.clarify({ ...req, draft: nextDraft.output }).catch((err: unknown) => ({
         ok: false,
         output: null,
         errors: [err instanceof Error ? err.message : String(err)],
       }));
+      const clarifyTrace = nextClarify.debugTrace;
+      if (clarifyTrace) {
+        setPlanningDebugTraces((current) => [...current, clarifyTrace]);
+      }
       setClarify(nextClarify.output ?? { questions: [], assumptions: [] });
       setMode("answering");
     } catch (err) {
@@ -184,6 +201,10 @@ function AimOsApp() {
       if (!refined.ok || !refined.output) throw new Error(refined.errors.join("; ") || t("os.err.refine"));
       setFinalPlan(refined.output);
       setPlanResult(refined);
+      const refineTrace = refined.debugTrace;
+      if (refineTrace) {
+        setPlanningDebugTraces((current) => [...current, refineTrace]);
+      }
       setMode("reviewing");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -208,6 +229,7 @@ function AimOsApp() {
         quality: planResult?.quality ?? null,
         review: planResult?.review ?? null,
         qualityRetry: planResult?.qualityRetry ?? undefined,
+        debugTrace: mergePlanningDebugTraces(planningDebugTraces.length ? planningDebugTraces : [planResult?.debugTrace]),
         questions: clarify?.questions ?? [],
         answers: builtAnswers,
         assumptions: clarify?.assumptions ?? [],
@@ -430,6 +452,15 @@ function AimOsApp() {
         </main>
 
         <aside style={rightRailStyle()}>
+          <PlanningDebugPanel
+            mode={mode}
+            busy={busy}
+            provider={provider}
+            planResult={planResult}
+            debugTraces={planningDebugTraces}
+            plan={activePlan}
+            detail={detail}
+          />
           <ContextInbox candidates={contextCandidates} onAccept={acceptContext} onReject={rejectContext} />
           <RuntimePanel
             provider={provider}

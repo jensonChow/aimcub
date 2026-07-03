@@ -495,6 +495,7 @@ export function registerIpc(): void {
         local_handoff_manifest: localHandoffManifest,
         planning_context: selectedContext.report,
         planning_tools: planningToolTrace(selectedContext),
+        ...(req.debugTrace ? { planning_debug_trace: req.debugTrace } : {}),
         ...(req.parentGoalId && req.parentMilestoneId
           ? {
               parent_goal_id: req.parentGoalId,
