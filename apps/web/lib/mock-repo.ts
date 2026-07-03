@@ -10,7 +10,7 @@
  * TODO(v1a-live): swap this for a supabase-js implementation of @core/api-client.AimcubRepo.
  */
 import type { CreateGoalInput } from "@core/api-client";
-import { validatePlan } from "@core/domain";
+import { reviewPlan, validatePlan } from "@core/domain";
 import type {
   DecompositionOutput,
   Goal,
@@ -18,6 +18,7 @@ import type {
   MilestoneStatus,
 } from "@core/types";
 import type { DataPort } from "./data-port";
+import { buildGoalDebugTrace } from "./debug-trace.server";
 import { localDecompose } from "./decompose";
 import { uuid } from "./ids";
 
@@ -145,6 +146,24 @@ export class MockGoalRepo implements DataPort {
     goal.status = "active";
     // Deterministic local decomposition. TODO(v1a-live): call @core/llm decomposition.
     const decomposition = localDecompose({ title: goal.title, description: goal.description, domain: goal.domain });
+    const review = reviewPlan({ plan: decomposition, context: [] });
+    goal.metadata = {
+      ...goal.metadata,
+      debug_trace: buildGoalDebugTrace({
+        aim: input,
+        mode: "mock",
+        plan: decomposition,
+        review,
+        model: {
+          primaryProvider: "local",
+          finalProvider: "local",
+          status: "local_only",
+          attempts: 1,
+          retried: false,
+          usage: [],
+        },
+      }),
+    };
     goal.plan_json = decomposition;
     const milestones = materialize(decomposition, goal.id, input.ownerId);
     this.goals.set(goal.id, goal);

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { validatePlan } from "@core/domain";
 import { localDecompose } from "./decompose";
+import { goalDebugTraceFromMetadata } from "./debug-trace";
 import { DEMO_OWNER_ID, MockGoalRepo } from "./mock-repo";
 
 describe("localDecompose", () => {
@@ -31,6 +32,9 @@ describe("MockGoalRepo", () => {
     });
     expect(goal.status).toBe("active");
     expect(goal.plan_json).not.toBeNull();
+    const trace = goalDebugTraceFromMetadata(goal.metadata);
+    expect(trace?.model.status).toBe("local_only");
+    expect(trace?.context.preModel.progress.pendingCount).toBeGreaterThan(0);
     expect(milestones.length).toBeGreaterThan(0);
     // First milestone has no prerequisite; the rest each depend on a real prior id.
     expect(milestones[0]!.depends_on_id).toBeNull();

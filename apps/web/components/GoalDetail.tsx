@@ -3,10 +3,12 @@
 import { colors, space } from "@ui/tokens";
 import type { Goal, Milestone } from "@core/types";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { goalDebugTraceFromMetadata } from "../lib/debug-trace";
 import { MockRealtime } from "../lib/mock-realtime";
 import { computeProgress, isGoalComplete } from "../lib/progress";
 import type { RealtimePort } from "../lib/realtime-port";
 import { SupabaseRealtime } from "../lib/supabase-realtime";
+import { GoalDebugPanel } from "./GoalDebugPanel";
 import { MilestoneCard } from "./MilestoneCard";
 import { ProgressBar } from "./ProgressBar";
 
@@ -56,6 +58,7 @@ export function GoalDetail({
 
   const progress = computeProgress(milestones);
   const complete = isGoalComplete(milestones);
+  const debugTrace = goalDebugTraceFromMetadata(goal.metadata);
 
   return (
     <section>
@@ -79,6 +82,8 @@ export function GoalDetail({
           <MilestoneCard key={m.id} milestone={m} index={i} justCompleted={m.id === recentlyLit} />
         ))}
       </ul>
+
+      <GoalDebugPanel trace={debugTrace} />
     </section>
   );
 }

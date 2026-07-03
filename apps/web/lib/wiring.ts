@@ -14,12 +14,19 @@ import { SupabaseDataPort } from "./live-port";
 import { MockGoalRepo } from "./mock-repo";
 import { createAdminSupabase, createServerSupabase } from "./supabase/server-clients";
 
-let mockSingleton: DataPort | null = null;
+type AimcubGlobal = typeof globalThis & {
+  __aimcubMockDataPort?: DataPort;
+};
+
+function getMockDataPort(): DataPort {
+  const globalState = globalThis as AimcubGlobal;
+  globalState.__aimcubMockDataPort ??= new MockGoalRepo();
+  return globalState.__aimcubMockDataPort;
+}
 
 export function getDataPort(): DataPort {
   if (hasLiveBackend()) {
     return new SupabaseDataPort(createServerSupabase(), createAdminSupabase());
   }
-  mockSingleton ??= new MockGoalRepo();
-  return mockSingleton;
+  return getMockDataPort();
 }

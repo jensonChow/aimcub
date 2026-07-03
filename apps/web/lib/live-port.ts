@@ -17,6 +17,8 @@ import { reviewPlan } from "@core/domain";
 import { AnthropicLlmGateway, decomposeWithQuality, planQualityMetadata, type UsageMeter } from "@core/llm";
 import type { DecompositionOutput, Goal, Milestone } from "@core/types";
 import type { DataPort } from "./data-port";
+import { buildGoalDebugTrace } from "./debug-trace.server";
+import type { GoalDebugUsageEvent } from "./debug-trace";
 import { localDecompose } from "./decompose";
 import { readEnv } from "./env";
 import { materialize } from "./mock-repo";
@@ -27,6 +29,22 @@ const LOG_METER: UsageMeter = {
     console.log(`[llm] owner=${ownerId} task=${task} model=${usage.model} in=${usage.inputTokens} out=${usage.outputTokens}`);
   },
 };
+
+function debugMeter(events: GoalDebugUsageEvent[]): UsageMeter {
+  return {
+    async record(ownerId, task, usage) {
+      events.push({
+        task,
+        model: usage.model,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        ...(usage.cacheReadTokens !== undefined ? { cacheReadTokens: usage.cacheReadTokens } : {}),
+        ...(usage.cacheWriteTokens !== undefined ? { cacheWriteTokens: usage.cacheWriteTokens } : {}),
+      });
+      await LOG_METER.record(ownerId, task, usage);
+    },
+  };
+}
 
 export class SupabaseDataPort implements DataPort {
   private readonly repo: SupabaseAimcubRepo;
@@ -64,16 +82,44 @@ export class SupabaseDataPort implements DataPort {
     metadata: Record<string, unknown> = {},
   ): Promise<{ output: DecompositionOutput; metadata?: Record<string, unknown> }> {
     const request = { title: input.title, description: input.description, domain: input.domain };
-    if (readEnv().anthropicApiKey) {
+    const hasAnthropicKey = Boolean(readEnv().anthropicApiKey);
+    const usage: GoalDebugUsageEvent[] = [];
+    let fallbackReason = hasAnthropicKey ? "" : "ANTHROPIC_API_KEY is not configured.";
+    let attemptedModelCalls = 0;
+
+    if (hasAnthropicKey) {
       try {
-        const gateway = new AnthropicLlmGateway({ meter: LOG_METER, ownerId: input.ownerId });
+        const gateway = new AnthropicLlmGateway({ meter: debugMeter(usage), ownerId: input.ownerId });
         const result = await decomposeWithQuality(gateway, request);
+        attemptedModelCalls = result.attempts;
         if (result.output) {
           const review = reviewPlan({ plan: result.output, context: [], quality: result.quality });
-          return { output: result.output, metadata: { ...metadata, ...planQualityMetadata(result, review) } };
+          return {
+            output: result.output,
+            metadata: {
+              ...metadata,
+              ...planQualityMetadata(result, review),
+              debug_trace: buildGoalDebugTrace({
+                aim: input,
+                mode: "live",
+                plan: result.output,
+                review,
+                model: {
+                  primaryProvider: "anthropic",
+                  finalProvider: "anthropic",
+                  status: "model_succeeded",
+                  attempts: result.attempts,
+                  retried: result.retried,
+                  usage,
+                },
+              }),
+            },
+          };
         }
+        fallbackReason = `Model output failed validation: ${result.validation.errors.join("; ")}`;
         console.error("[decompose] plan failed validation; using local fallback:", result.validation);
       } catch (err) {
+        fallbackReason = err instanceof Error ? err.message : String(err);
         console.error("[decompose] LLM call failed; using local fallback:", err);
       }
     }
@@ -84,6 +130,21 @@ export class SupabaseDataPort implements DataPort {
       metadata: {
         ...metadata,
         ...planQualityMetadata({ quality: review.quality, retried: false, attempts: 1, firstQuality: review.quality, output }, review),
+        debug_trace: buildGoalDebugTrace({
+          aim: input,
+          mode: "live",
+          plan: output,
+          review,
+          model: {
+            primaryProvider: hasAnthropicKey ? "anthropic" : "local",
+            finalProvider: "local",
+            status: hasAnthropicKey ? "local_fallback" : "local_only",
+            attempts: attemptedModelCalls || 1,
+            retried: false,
+            usage,
+            fallbackReason,
+          },
+        }),
       },
     };
   }
