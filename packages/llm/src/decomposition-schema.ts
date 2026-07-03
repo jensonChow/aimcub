@@ -17,8 +17,9 @@
  *    enforce the strict CONSTRAINTS.
  *  - NO recursion (the domain model is a flat `nodes[] + edges[]` graph by design).
  *
- * Evaluators surfaced to the model are limited to the v1 set (`commit_pattern`,
- * `ci_status`); reserved v3 evaluators and the `weighted` logic are not offered.
+ * Evaluators surfaced to the model are limited to the current runtime set
+ * (`commit_pattern`, `ci_status`, `manual_confirm`); reserved v3 artifact/URL/LLM
+ * evaluators and the `weighted` logic are not offered.
  */
 
 const nullableString = (description?: string) =>
@@ -47,10 +48,11 @@ const acceptanceClauseSchema = {
   properties: {
     evaluator: {
       type: "string",
-      enum: ["commit_pattern", "ci_status"],
+      enum: ["commit_pattern", "ci_status", "manual_confirm"],
       description:
         "commit_pattern matches commits (path_glob / min_files / message_pattern / branch); " +
-        "ci_status matches a CI run (workflow / conclusion). Set the other evaluator's fields to null.",
+        "ci_status matches a CI run (workflow / conclusion); manual_confirm matches explicit human proof. " +
+        "Set the other evaluator's fields to null.",
     },
     auto_verifiable: { type: ["boolean", "null"] },
     path_glob: nullableString("commit_pattern: glob over changed file paths."),

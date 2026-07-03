@@ -57,8 +57,8 @@ function localContextRoot(): string | undefined {
 
 function aimLikelyNeedsWeb(req: DraftRequest): boolean {
   const text = [req.title, req.description].filter(Boolean).join(" ").toLowerCase();
-  return /\b(latest|current|today|recent|research|search|web|online|compare|market|competitor|pricing|docs|api|regulation|law|travel|visa|flight|hotel)\b/i.test(text)
-    || /最新|当前|现在|近期|调研|搜索|联网|网页|在线|对比|市场|竞品|价格|文档|api|法规|法律|旅行|旅游|签证|机票|航班|酒店/.test(text);
+  return /\b(latest|current|today|recent|research|search|web|online|compare|market|competitor|pricing|docs|api|regulation|law|policy|guideline|app store|play store|apple developer|developer account|store review|distribution|travel|visa|flight|hotel|tarot|astrology|wellness|health|finance|education|coaching)\b/i.test(text)
+    || /最新|当前|现在|近期|调研|搜索|联网|网页|在线|对比|市场|竞品|价格|文档|api|法规|法律|政策|指南|应用商店|苹果开发者|开发者账号|上架|审核|分发|旅行|旅游|签证|机票|航班|酒店|塔罗|占星|疗愈|健康|财务|教育|学习|教练|咨询/.test(text);
 }
 
 function aimRequiresWebResearch(req: DraftRequest): boolean {

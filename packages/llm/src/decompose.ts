@@ -143,7 +143,7 @@ export function planQualityMetadata(
 /** System prompt: frozen instructions. Kept stable so it stays cache-friendly. */
 const SYSTEM_PROMPT = [
   "You are Aimcub's planning engine. You break a user's goal into a concrete, ordered set",
-  "of milestones that a software developer can verify automatically from their own activity.",
+  "of milestones that humans and agents can execute and verify from real evidence.",
   "",
   "Rules:",
   "- Produce between 1 and 15 milestones. Fewer, meaningful milestones beat many trivial ones.",
@@ -160,6 +160,22 @@ const SYSTEM_PROMPT = [
   "    * `likely_owner` as human|agent|either|mixed. Humans and agents are both routing options.",
   "    * `context_gaps` as missing context questions that would materially change this milestone.",
   "    * `eval_signal` as the personalized standard this milestone satisfies.",
+  "- Reality-modeling standard:",
+  "    * Do not reduce goals to a developer checklist. Before splitting, model the real",
+  "      situation around the goal: target user and use case, distribution channel, required",
+  "      accounts/access/permissions, legal or store-policy constraints, budget/time limits,",
+  "      source materials, domain expertise, owner authority, and final trust/eval standard.",
+  "    * For app/product goals, look beyond platform and feature lists. Consider app store",
+  "      accounts and review (for example Apple Developer or Google Play access),",
+  "      payment/subscription setup, privacy/data handling, content or domain source",
+  "      quality, target audience, onboarding, launch channel, support burden, and whether",
+  "      the user already has the real-world prerequisites.",
+  "    * For domain-specific products or advice-like experiences such as tarot, health,",
+  "      finance, education, coaching, travel, or legal workflows, surface the user's own",
+  "      domain experience, source material, acceptable tone/ethics, and research needs as",
+  "      context gaps or discovery milestones before implementation milestones.",
+  "    * If missing real-world context would materially change the plan, put it in",
+  "      `context_gaps` or create an explicit discovery/access milestone before execution.",
   "- Ownership routing standard:",
   "    * Default to `agent` for digital work an agent can perform with tools: code changes,",
   "      tests, repo/file inspection, documentation, data cleanup, web research, API/library",
@@ -192,7 +208,10 @@ const SYSTEM_PROMPT = [
   "- For each milestone, write an `acceptance_rule` whose clauses use ONLY these evaluators:",
   "    * `commit_pattern` — matches commits by file path glob, message pattern, branch, or min file count.",
   "    * `ci_status` — matches a CI workflow conclusion (default conclusion: success).",
+  "    * `manual_confirm` — explicit human confirmation for real-world prerequisites,",
+  "      account/access grants, personal judgment, physical-world actions, or final approval.",
   "  Prefer `commit_pattern` for 'work was done' milestones and `ci_status` for 'it passes' milestones.",
+  "  Prefer `manual_confirm` only when no first-party digital evidence can honestly prove the milestone.",
   "- `acceptance_rule.completion_mode` is ONLY `auto`, `manual`, or `auto_then_confirm`.",
   "  Never put `mixed` there; `mixed` is valid only for `decomposition_contract.likely_owner`.",
   "- Only set a `ci_status` clause's `workflow` when the goal explicitly names a CI workflow;",
@@ -532,7 +551,9 @@ function stripNulls(value: unknown): unknown {
 function nestClause(clause: Record<string, unknown>): Record<string, unknown> {
   if (clause.match && typeof clause.match === "object") return clause;
   const matchKeys: readonly string[] =
-    clause.evaluator === "ci_status" ? CI_MATCH_KEYS : COMMIT_MATCH_KEYS;
+    clause.evaluator === "ci_status" ? CI_MATCH_KEYS :
+      clause.evaluator === "manual_confirm" ? [] :
+        COMMIT_MATCH_KEYS;
   const match: Record<string, unknown> = {};
   const rest: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(clause)) {

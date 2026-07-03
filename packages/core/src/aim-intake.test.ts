@@ -168,6 +168,44 @@ describe("reviewAimIntake", () => {
     expect(report.loop.durableMemoryTargets).toEqual(expect.arrayContaining(["constraint", "preference", "capability"]));
   });
 
+  it("asks real-world product and domain context before decomposing a consumer app", () => {
+    const report = reviewAimIntake({
+      title: "Develop a tarot app",
+      memories: [],
+      selectedContext: [],
+    });
+
+    expect(report.readiness).toBe("needs_targeted_context");
+    expect(report.questions).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        category: "constraint",
+        priority: "high",
+        reason: "account_access_distribution_prerequisite",
+        prompt: expect.stringContaining("Apple Developer account"),
+      }),
+      expect.objectContaining({
+        category: "capability",
+        priority: "high",
+        reason: "domain_expertise_and_source_material_missing",
+        prompt: expect.stringContaining("tarot experience"),
+      }),
+      expect.objectContaining({
+        category: "project_fact",
+        reason: "consumer_product_context_missing",
+        prompt: expect.stringContaining("first real user"),
+      }),
+    ]));
+    expect(report.acquisition.find((row) => row.channel === "web_research")).toMatchObject({
+      priority: "high",
+      reason: expect.stringContaining("current or external facts"),
+      suggestedTools: ["web.search", "web.fetch", "memory.write_candidate"],
+    });
+    expect(report.loop.shouldContinue).toBe(true);
+    expect(report.nextActions).toEqual(expect.arrayContaining([
+      expect.stringContaining("high-priority intake question"),
+    ]));
+  });
+
   it("uses draft review gaps and quality actions to mark a plan as needing refinement", () => {
     const plan = {
       goal_summary: "Ship Aimcub CLI context.",

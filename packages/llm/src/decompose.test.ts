@@ -161,9 +161,13 @@ describe("decompose · happy path", () => {
     expect(call.schema).toBeDefined();
     expect(call.system).toContain("Aimcub");
     expect(call.system).toContain("decomposition_contract");
+    expect(call.system).toContain("Do not reduce goals to a developer checklist");
+    expect(call.system).toContain("Apple Developer");
+    expect(call.system).toContain("domain experience");
     expect(call.system).toContain("Default to `agent` for digital work");
     expect(call.system).toContain("Agent-owned milestones must be handoff-ready");
     expect(call.system).toContain("Use `human` only for work that must happen in the physical world");
+    expect(call.system).toContain("manual_confirm");
     expect(call.system).toContain("split it into");
     expect(call.system).toContain("likely_owner` must agree with `required_evidence`");
     expect(call.system).toContain("Never put `mixed` there");
@@ -385,6 +389,47 @@ describe("decompose · happy path", () => {
 
     expect(result.validation.ok).toBe(true);
     expect(result.output?.nodes[0]?.acceptance_rule.completion_mode).toBe("auto_then_confirm");
+  });
+
+  it("normalizes flat manual confirmation clauses for real-world prerequisites", async () => {
+    const plan = validPlan();
+    plan.nodes[0]!.decomposition_contract!.likely_owner = "human";
+    plan.nodes[0]!.decomposition_contract!.required_evidence = ["User confirms the Apple Developer account is available."];
+    const manualRule = {
+      logic: "all",
+      threshold: 1,
+      completion_mode: "manual",
+      clauses: [
+        {
+          evaluator: "manual_confirm",
+          auto_verifiable: null,
+          path_glob: null,
+          min_files: null,
+          message_pattern: null,
+          branch: null,
+          workflow: null,
+          conclusion: null,
+        },
+      ],
+    } as unknown as typeof plan.nodes[0]["acceptance_rule"];
+    plan.nodes[0]!.acceptance_rule = manualRule;
+
+    const result = await decompose(mockGateway(plan), {
+      title: "Develop a tarot app",
+      description: "Ship an iOS tarot app after confirming distribution access.",
+    });
+
+    expect(result.validation.ok).toBe(true);
+    expect(result.output?.nodes[0]?.acceptance_rule).toMatchObject({
+      completion_mode: "manual",
+      clauses: [
+        {
+          evaluator: "manual_confirm",
+          auto_verifiable: false,
+          match: {},
+        },
+      ],
+    });
   });
 });
 

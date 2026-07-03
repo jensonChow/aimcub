@@ -201,17 +201,17 @@ function contextCategory(row: { content: string; category?: string | null; kind?
 function categoryPrompt(category: ContextCategory): string {
   switch (category) {
     case "eval_signal":
-      return "Ask what would make this aim count as genuinely complete, and what evidence would prove it without relying on manual judgment alone.";
+      return "Ask what would make this aim count as genuinely complete in the real world, and what evidence, proof, or final human confirmation would show it worked.";
     case "constraint":
-      return "Ask for non-negotiable scope boundaries such as tools, platform limits, privacy, budget, deadlines, or quality bars.";
+      return "Ask for non-negotiable real-world constraints such as required accounts, permissions, platform/store rules, privacy, budget, deadlines, legal/policy limits, or quality bars.";
     case "procedure":
-      return "Ask whether there is an existing workflow, checklist, command, artifact, or review path this aim should follow.";
+      return "Ask whether there is an existing workflow, checklist, command, artifact, source material, review path, or approval process this aim should follow.";
     case "capability":
-      return "Ask who or which agent is best suited for each kind of work, only if routing would change the plan.";
+      return "Ask what human expertise, domain experience, access, authority, or agent capability is available, only if routing would change the plan.";
     case "preference":
-      return "Ask for stable preferences that should shape scope, interaction style, or default tradeoffs.";
+      return "Ask for stable preferences that should shape audience, scope, interaction style, tone, or default tradeoffs.";
     case "project_fact":
-      return "Ask for the desired outcome, target surface, and known environment facts before decomposing.";
+      return "Ask for the target user/scenario, desired outcome, distribution surface, current state, and known environment facts before decomposing.";
   }
 }
 
@@ -332,8 +332,29 @@ function hasPersonalDatabaseSignal(text: string): boolean {
 }
 
 function hasWebResearchSignal(text: string): boolean {
-  return /\b(latest|current|recent|today|market|competitor|pricing|docs|api|regulation|law|travel|visa|flight|hotel|research|search|compare|benchmark)\b/.test(text) ||
-    /最新|当前|最近|市场|竞品|价格|文档|资料|法规|法律|旅行|旅游|签证|航班|酒店|调研|搜索|比较|对比/.test(text);
+  return /\b(latest|current|recent|today|market|competitor|pricing|docs|api|regulation|law|policy|guideline|app store|play store|apple developer|developer account|store review|distribution|travel|visa|flight|hotel|research|search|compare|benchmark|tarot|astrology|wellness|health|finance|education|coaching)\b/.test(text) ||
+    /最新|当前|最近|市场|竞品|价格|文档|资料|法规|法律|政策|指南|应用商店|苹果开发者|开发者账号|上架|审核|分发|旅行|旅游|签证|航班|酒店|调研|搜索|比较|对比|塔罗|占星|疗愈|健康|财务|教育|学习|教练|咨询/.test(text);
+}
+
+function hasConsumerAppSignal(text: string): boolean {
+  return /\b(app|application|mobile|ios|iphone|ipad|android|consumer|customer|user|users|launch|publish|store|subscription|payment|onboarding)\b/.test(text) ||
+    /app|应用|小程序|移动端|手机|苹果|安卓|用户|消费者|上线|发布|上架|订阅|付费|支付|注册|塔罗/.test(text);
+}
+
+function hasAccountOrDistributionSignal(text: string): boolean {
+  return hasConsumerAppSignal(text) ||
+    /\b(account|developer account|apple developer|app store|play store|publish|distribution|payment|stripe|login|oauth|permission|credential|secret)\b/.test(text) ||
+    /账号|账户|开发者账号|苹果开发者|应用商店|上架|发布|支付|权限|凭证|密钥|审核/.test(text);
+}
+
+function hasDomainExpertiseSignal(text: string): boolean {
+  return /\b(tarot|astrology|wellness|health|medical|legal|finance|education|learning|coaching|therapy|fitness|travel|recipe|language|content|creator|community|game|music|spiritual|advice)\b/.test(text) ||
+    /塔罗|占星|玄学|疗愈|健康|医疗|法律|财务|金融|教育|学习|教练|咨询|治疗|健身|旅行|旅游|食谱|语言|内容|创作|社区|游戏|音乐|经验|专业/.test(text);
+}
+
+function hasTrustOrAdvisorySignal(text: string): boolean {
+  return /\b(tarot|astrology|wellness|health|medical|legal|finance|coaching|therapy|advice|recommendation|prediction|diagnosis|privacy|personal data)\b/.test(text) ||
+    /塔罗|占星|疗愈|健康|医疗|法律|财务|金融|教练|咨询|建议|推荐|预测|诊断|隐私|个人数据/.test(text);
 }
 
 function addAcquisition(
@@ -762,6 +783,61 @@ function aimTextQuestions(input: ReviewAimIntakeInput): Omit<AimIntakeQuestion, 
   }];
 }
 
+function realWorldContextQuestions(input: ReviewAimIntakeInput): Omit<AimIntakeQuestion, "id">[] {
+  const text = searchableText(input);
+  const questions: Omit<AimIntakeQuestion, "id">[] = [];
+
+  if (hasConsumerAppSignal(text)) {
+    questions.push({
+      category: "project_fact",
+      priority: "medium",
+      source: "aim_text",
+      reason: "consumer_product_context_missing",
+      prompt: "Who is the first real user, what situation are they in, and where will this product/app actually be distributed or used?",
+      roiScore: 42,
+      roiSignals: ["medium_priority", "missing_context"],
+    });
+  }
+
+  if (hasAccountOrDistributionSignal(text)) {
+    questions.push({
+      category: "constraint",
+      priority: "high",
+      source: "aim_text",
+      reason: "account_access_distribution_prerequisite",
+      prompt: "Which required accounts, permissions, store/distribution paths, payments, credentials, or approvals already exist? For an iOS app, include whether the user has an Apple Developer account.",
+      roiScore: 58,
+      roiSignals: ["high_priority", "constraint", "missing_context"],
+    });
+  }
+
+  if (hasDomainExpertiseSignal(text)) {
+    questions.push({
+      category: "capability",
+      priority: "high",
+      source: "aim_text",
+      reason: "domain_expertise_and_source_material_missing",
+      prompt: "What domain experience, taste, source material, or external expert should shape this aim? For a tarot app, include the user's tarot experience, deck/interpretation style, and what should not be invented by the agent.",
+      roiScore: 54,
+      roiSignals: ["high_priority", "capability", "missing_context"],
+    });
+  }
+
+  if (hasTrustOrAdvisorySignal(text)) {
+    questions.push({
+      category: "eval_signal",
+      priority: "medium",
+      source: "aim_text",
+      reason: "trust_safety_quality_standard_missing",
+      prompt: "What quality, trust, safety, privacy, or ethical standard must the result satisfy before it can be considered acceptable in the real world?",
+      roiScore: 38,
+      roiSignals: ["medium_priority", "eval_signal", "missing_context"],
+    });
+  }
+
+  return questions;
+}
+
 function profileQuestions(input: {
   profile: ContextProfileReport;
   selectedCategories: Set<ContextCategory>;
@@ -851,6 +927,7 @@ export function reviewAimIntake(input: ReviewAimIntakeInput): AimIntakeReport {
 
   for (const question of [
     ...aimTextQuestions(input),
+    ...realWorldContextQuestions(input),
     ...profileQuestions({ profile, selectedCategories }),
     ...draftReviewQuestions(input.draftReview),
   ]) {

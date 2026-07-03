@@ -90,6 +90,7 @@ function intakeOptions(category: ContextCategory, zh: boolean): ClarifyQuestion[
         ];
       case "constraint":
         return [
+          { label: "账号/权限前置", tradeoff: "会先处理开发者账号、授权、凭证或审批。" },
           { label: "平台/工具限制", tradeoff: "会影响技术路线和执行方式。" },
           { label: "时间/预算限制", tradeoff: "会影响里程碑粒度和取舍。" },
           { label: "隐私/质量限制", tradeoff: "会影响验收标准和可委派范围。" },
@@ -103,11 +104,13 @@ function intakeOptions(category: ContextCategory, zh: boolean): ClarifyQuestion[
       case "capability":
         return [
           { label: "agent 可执行", tradeoff: "数字化工作优先交给 agent。" },
+          { label: "我有领域经验", tradeoff: "计划会复用你的经验、品味和判断。" },
           { label: "需要你决策", tradeoff: "关键选择会保留给人。" },
-          { label: "需要外部资源", tradeoff: "计划会先处理 access 或素材。" },
+          { label: "需要外部专家/素材", tradeoff: "计划会先处理专业输入、access 或素材。" },
         ];
       case "project_fact":
         return [
+          { label: "用户/场景明确", tradeoff: "可以围绕真实使用场景拆分。" },
           { label: "目标范围已明确", tradeoff: "可以更快拆分。" },
           { label: "当前状态需要检查", tradeoff: "先收集现状再拆分。" },
           { label: "交付形式待定", tradeoff: "需要先确定产物。" },
@@ -129,6 +132,7 @@ function intakeOptions(category: ContextCategory, zh: boolean): ClarifyQuestion[
       ];
     case "constraint":
       return [
+        { label: "Account/access prerequisites", tradeoff: "Developer accounts, credentials, approvals, or permissions become prerequisites." },
         { label: "Platform/tool limits", tradeoff: "Changes the technical route and execution surface." },
         { label: "Time/budget limits", tradeoff: "Changes milestone size and tradeoffs." },
         { label: "Privacy/quality limits", tradeoff: "Changes acceptance rules and delegation." },
@@ -142,11 +146,13 @@ function intakeOptions(category: ContextCategory, zh: boolean): ClarifyQuestion[
     case "capability":
       return [
         { label: "Agent can execute", tradeoff: "Digital work should route to an agent first." },
+        { label: "I have domain expertise", tradeoff: "The plan should reuse your experience, taste, and judgment." },
         { label: "You must decide", tradeoff: "Key decisions should stay human-owned." },
-        { label: "External resource needed", tradeoff: "Access, assets, or vendors become prerequisites." },
+        { label: "External expert/material needed", tradeoff: "Expert input, access, assets, or vendors become prerequisites." },
       ];
     case "project_fact":
       return [
+        { label: "User/scenario is clear", tradeoff: "The plan can decompose around the real usage situation." },
         { label: "Scope is clear", tradeoff: "Aimcub can decompose faster." },
         { label: "Current state needs inspection", tradeoff: "Context should be gathered before decomposition." },
         { label: "Deliverable is undecided", tradeoff: "The plan should first pin down the artifact." },
