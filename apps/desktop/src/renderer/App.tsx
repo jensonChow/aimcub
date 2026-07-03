@@ -61,7 +61,7 @@ type Step = "home" | "aim" | "drafting" | "clarifying" | "questions" | "refining
 type InspectorTab = "process" | "context" | "quality" | "activity";
 type IconName = "chat" | "panelClose" | "panelOpen" | "plus" | "send";
 
-type AnswerMap = Record<string, { label: string | null; other: string }>;
+type AnswerMap = Record<string, { labels: string[]; other: string }>;
 type PlanningTraceStatus = "pending" | "running" | "done" | "warning" | "error";
 type BusyStep = Extract<Step, "drafting" | "clarifying" | "refining">;
 type ElectronDragStyle = CSSProperties & { WebkitAppRegion?: "drag" | "no-drag" };
@@ -118,6 +118,23 @@ function traceTime(): string {
 
 function isBusyStep(step: Step | null): step is BusyStep {
   return step === "drafting" || step === "clarifying" || step === "refining";
+}
+
+function clarifyQuestionSelectionMode(question: ClarifyOutput["questions"][number]): "single" | "multiple" {
+  if (question.selection_mode === "single" || question.selection_mode === "multiple") return question.selection_mode;
+  const text = [
+    question.question,
+    ...question.options.flatMap((option) => [option.label, option.tradeoff]),
+  ].join(" ").toLowerCase();
+  if (/\b(choose all|all that apply|several|multiple)\b/i.test(text)) return "multiple";
+  if (/\b(which|what)\b.{0,80}\b(constraints|tools|platforms|sources|materials|requirements|capabilities|channels|systems)\b/i.test(text)) {
+    return "multiple";
+  }
+  if (/\b(constraints|tools|platforms|sources|materials|requirements|capabilities)\b.{0,80}\b(apply|required|must|available|usable|unacceptable)\b/i.test(text)) {
+    return "multiple";
+  }
+  if (/哪些|哪几|多选|约束|工具|平台|来源|材料|能力|要求/.test(text)) return "multiple";
+  return "single";
 }
 
 function useSpinnerVerb(step: Step | null): { tick: number; item: SpinnerVerb } | null {
@@ -278,7 +295,8 @@ function AppInner() {
       .map((q) => {
         const a = answers[q.id];
         const other = a?.other.trim() ? a.other.trim() : null;
-        return { question_id: q.id, selected_label: a?.label ?? null, other_text: other };
+        const selected = a?.labels.length ? a.labels.join("; ") : null;
+        return { question_id: q.id, selected_label: selected, other_text: other };
       })
       .filter((a) => a.selected_label || a.other_text);
   }, [clarifyOut, answers]);
@@ -874,7 +892,7 @@ function AppInner() {
                   <QuestionsStep
                     clarify={clarifyOut}
                     answers={answers}
-                    onAnswer={(id, patch) => setAnswers((m) => ({ ...m, [id]: { label: null, other: "", ...m[id], ...patch } }))}
+                    onAnswer={(id, patch) => setAnswers((m) => ({ ...m, [id]: { labels: [], other: "", ...m[id], ...patch } }))}
                     onRefine={() => refine(false)}
                     onUseDraft={() => refine(true)}
                   />
@@ -2689,7 +2707,7 @@ function DecompositionStrategyPanel(props: { report: DecompositionStrategyReport
 function QuestionsStep(props: {
   clarify: ClarifyOutput;
   answers: AnswerMap;
-  onAnswer: (id: string, patch: Partial<{ label: string | null; other: string }>) => void;
+  onAnswer: (id: string, patch: Partial<{ labels: string[]; other: string }>) => void;
   onRefine: () => void;
   onUseDraft: () => void;
 }) {
@@ -2710,22 +2728,36 @@ function QuestionsStep(props: {
         <div style={clarifyListStyle()}>
           {clarify.questions.map((q, i) => {
             const sourceLabel = q.source_dimension ? dimensionLabel(q.source_dimension, t) : null;
+            const selectionMode = clarifyQuestionSelectionMode(q);
+            const selectedLabels = answers[q.id]?.labels ?? [];
             return (
               <div key={q.id} style={clarifyQuestionRowStyle()}>
                 <div style={clarifyQuestionHeaderStyle()}>
                   <span style={clarifyQuestionNumberStyle()}>{i + 1}</span>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ color: C.text, fontSize: 15, fontWeight: 600, lineHeight: 1.45 }}>{q.question}</div>
-                    {sourceLabel && <div style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>{sourceLabel}</div>}
+                    <div style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>
+                      {[sourceLabel, t(selectionMode === "multiple" ? "q.multiple" : "q.single")].filter(Boolean).join(" · ")}
+                    </div>
                   </div>
                 </div>
                 <div style={clarifyChoicesStyle()}>
                   {q.options.map((opt) => {
-                    const selected = answers[q.id]?.label === opt.label;
+                    const selected = selectedLabels.includes(opt.label);
                     return (
                       <button
                         key={opt.label}
-                        onClick={() => props.onAnswer(q.id, { label: selected ? null : opt.label })}
+                        onClick={() => {
+                          if (selectionMode === "multiple") {
+                            props.onAnswer(q.id, {
+                              labels: selected
+                                ? selectedLabels.filter((label) => label !== opt.label)
+                                : [...selectedLabels, opt.label],
+                            });
+                            return;
+                          }
+                          props.onAnswer(q.id, { labels: selected ? [] : [opt.label] });
+                        }}
                         style={clarifyChoiceButtonStyle(selected)}
                       >
                         <span style={{ fontWeight: 600 }}>{opt.label}</span>

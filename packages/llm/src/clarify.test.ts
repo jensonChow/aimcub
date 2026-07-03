@@ -165,6 +165,8 @@ describe("clarify · happy path", () => {
     expect(result.output).not.toBeNull();
     expect(result.output?.questions.map((q) => q.id)).toEqual(["scope", "lang", "aim_target_context", "durable_eval_signal"]);
     expect(result.output?.questions[0]?.source_dimension).toBe("granularity");
+    expect(result.output?.questions[0]?.selection_mode).toBe("single");
+    expect(result.output?.questions[1]?.selection_mode).toBe("single");
     expect(result.output?.questions[0]?.capture).toMatchObject({
       category: "constraint",
       scope: "global",
@@ -187,6 +189,43 @@ describe("clarify · happy path", () => {
     expect(result.usage).toEqual(FIXED_USAGE);
   });
 
+  it("marks constraint-set questions as multi-select while keeping mutually exclusive choices single-select", async () => {
+    const result = await clarify(mockGateway({
+      questions: [
+        {
+          id: "constraints",
+          question: "Which constraints, tools, platforms, or data requirements apply?",
+          why_high_impact: "Changes scope, routing, and evidence choices.",
+          kind: "constraint",
+          source_dimension: "context_fit",
+          allow_other: true,
+          options: [
+            { label: "Must support iOS and Android", tradeoff: "Adds cross-platform work." },
+            { label: "Must work offline", tradeoff: "Requires local-first storage." },
+          ],
+        },
+        {
+          id: "polish",
+          question: "How polished should the first version be?",
+          why_high_impact: "Changes milestone count and acceptance strictness.",
+          kind: "scope",
+          source_dimension: "granularity",
+          allow_other: true,
+          selection_mode: "single",
+          options: [
+            { label: "Prototype", tradeoff: "Fastest path." },
+            { label: "Production-ready", tradeoff: "More quality gates." },
+          ],
+        },
+      ],
+      assumptions: [],
+    }), INPUT);
+
+    expect(result.validation.ok).toBe(true);
+    expect(result.output?.questions.find((q) => q.id === "constraints")?.selection_mode).toBe("multiple");
+    expect(result.output?.questions.find((q) => q.id === "polish")?.selection_mode).toBe("single");
+  });
+
   it("routes the request as a `classify` task and supplies the JSON schema + draft", async () => {
     const gw = mockGateway(validQuestions());
     await clarify(gw, INPUT);
@@ -196,8 +235,10 @@ describe("clarify · happy path", () => {
     expect(call.task).toBe("classify");
     expect(call.schema).toBeDefined();
     expect(JSON.stringify(call.schema)).toContain("source_dimension");
+    expect(JSON.stringify(call.schema)).toContain("selection_mode");
     expect(call.system).toContain("CLARIFYING");
     expect(call.system).toContain("source_dimension");
+    expect(call.system).toContain("selection_mode");
     expect(call.prompt).toContain(INPUT.title);
     expect(call.prompt).toContain("Scaffold the CLI"); // draft is grounded in
     expect(call.prompt).toContain("contract: owner=agent");

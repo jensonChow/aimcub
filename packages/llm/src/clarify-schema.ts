@@ -23,6 +23,7 @@ const nullableEnum = (values: readonly string[], description?: string) => ({
 
 const questionKindEnum = ["scope", "involvement", "assumption", "constraint", "capability"] as const;
 const sourceDimensionEnum = ["verifiability", "granularity", "distinctness", "context_fit"] as const;
+const selectionModeEnum = ["single", "multiple"] as const;
 
 /** One option the user can pick — a hypothesis the planner proposes, with its trade-off. */
 const optionSchema = {
@@ -51,9 +52,13 @@ const questionSchema = {
       "The plan-quality dimension this question most improves, or null when it is general discovery.",
     ),
     allow_other: { type: ["boolean", "null"], description: "Free-text is always allowed; set true." },
+    selection_mode: nullableEnum(
+      selectionModeEnum,
+      "Use single for mutually exclusive choices; use multiple when several options can be true at the same time.",
+    ),
     options: { type: "array", description: ">= 2 hypothesis options with trade-offs.", items: optionSchema },
   },
-  required: ["id", "question", "why_high_impact", "kind", "source_dimension", "allow_other", "options"],
+  required: ["id", "question", "why_high_impact", "kind", "source_dimension", "allow_other", "selection_mode", "options"],
 } as const;
 
 /** A low-impact unknown we DEFAULTED rather than asked about (default-and-disclose). */

@@ -105,6 +105,79 @@ describe("planning tool context collector", () => {
     expect(result.distillation?.missingQuestions.map((question) => question.id)).toContain("missing_eval_signal");
   });
 
+  it("fetches multiple top web search results when web fetch is enabled", async () => {
+    const fetchedUrls: string[] = [];
+    const registry = createAimcubToolRegistry({
+      "memory.search": async () => ({
+        ok: true,
+        observation: {
+          summary: "Selected 0 planning memories.",
+          data: { memories: [] },
+          sources: [],
+        },
+      }),
+      "web.search": async () => ({
+        ok: true,
+        observation: {
+          summary: "Found 3 web results.",
+          data: {
+            results: [
+              { title: "One", url: "https://example.com/one", snippet: "First source." },
+              { title: "Two", url: "https://example.com/two", snippet: "Second source." },
+              { title: "Three", url: "https://example.com/three", snippet: "Third source." },
+            ],
+          },
+          sources: [
+            { kind: "web", url: "https://example.com/one" },
+            { kind: "web", url: "https://example.com/two" },
+            { kind: "web", url: "https://example.com/three" },
+          ],
+        },
+      }),
+      "web.fetch": async (input) => {
+        fetchedUrls.push(input.url);
+        return {
+          ok: true,
+          observation: {
+            summary: `Fetched ${input.url}.`,
+            data: {
+              finalUrl: input.url,
+              status: 200,
+              title: input.url,
+              text: `Detailed source text for ${input.url}.`,
+              truncated: false,
+            },
+            sources: [{ kind: "web", url: input.url }],
+          },
+        };
+      },
+    });
+
+    const result = await collectPlanningToolContext(
+      registry,
+      { ...context, permissions: ["memory.read", "network.search", "network.fetch"] },
+      {
+        title: "Research travel basics",
+        includeWeb: true,
+        fetchWebResults: true,
+        webFetchLimit: 2,
+      },
+    );
+
+    expect(result.failures).toEqual([]);
+    expect(fetchedUrls).toEqual(["https://example.com/one", "https://example.com/two"]);
+    expect(result.observationEvents.map((event) => event.toolName)).toEqual([
+      "memory.search",
+      "web.search",
+      "web.fetch",
+      "web.fetch",
+    ]);
+    expect(result.memories.map((memory) => memory.source)).toEqual(expect.arrayContaining([
+      "web.search",
+      "web.fetch",
+    ]));
+  });
+
   it("turns distilled missing context into structured user requests when enabled", async () => {
     const registry = createAimcubToolRegistry({
       "memory.search": async () => ({

@@ -49,6 +49,7 @@ const HARD_MAX_QUESTIONS = 7;
 export type ClarifyQuestionKind = "scope" | "involvement" | "assumption" | "constraint" | "capability";
 export type ClarifyQuestionSourceDimension = PlanQualityDimension;
 export type ClarifyQuestionWhyCode = "review_gap" | "quality_dimension" | "historical_learning" | "aim_intake" | "context_lineage" | "decomposition_strategy";
+export type ClarifySelectionMode = "single" | "multiple";
 
 /** One hypothesis option the user can pick, with the trade-off it implies. */
 export interface ClarifyOption {
@@ -71,6 +72,8 @@ export interface ClarifyQuestion {
   capture?: ContextCaptureContract;
   /** Always true in v1 — a free-text "something else" is always available. */
   allow_other: boolean;
+  /** Whether options are mutually exclusive or several can apply. */
+  selection_mode?: ClarifySelectionMode;
   options: ClarifyOption[];
 }
 
@@ -232,6 +235,7 @@ const QUESTION_SOURCE_DIMENSIONS: readonly ClarifyQuestionSourceDimension[] = [
   "distinctness",
   "context_fit",
 ];
+const CLARIFY_SELECTION_MODES: readonly ClarifySelectionMode[] = ["single", "multiple"];
 
 const QUESTION_CONTEXT_CATEGORIES: Record<ClarifyQuestionKind, readonly ContextCategory[]> = {
   scope: ["preference", "constraint", "eval_signal", "project_fact"],
@@ -308,6 +312,9 @@ const CLARIFY_SYSTEM_PROMPT = [
   PLANNING_CONTEXT_RULES,
   "- Each question carries >= 2 `options`. Every option is a concrete hypothesis (a",
   "  candidate answer), never a blank, and states its `tradeoff` (the consequence).",
+  "- Set `selection_mode` to `single` only when the options are mutually exclusive.",
+  "  Set it to `multiple` when several options can be true together, such as constraints,",
+  "  tools, platforms, evidence sources, source materials, or capabilities.",
   "- Keep question text short and user-facing. Avoid internal scorecard, contract, ROI,",
   "  lineage, or schema jargon in `question`, option `label`, and option `tradeoff`.",
   "- Option labels should be short natural phrases; put nuance in one concise tradeoff.",
@@ -1060,6 +1067,30 @@ function isQuestionSourceDimension(v: unknown): v is ClarifyQuestionSourceDimens
   return typeof v === "string" && (QUESTION_SOURCE_DIMENSIONS as readonly string[]).includes(v);
 }
 
+function isClarifySelectionMode(v: unknown): v is ClarifySelectionMode {
+  return typeof v === "string" && (CLARIFY_SELECTION_MODES as readonly string[]).includes(v);
+}
+
+function inferSelectionMode(
+  question: string,
+  _kind: ClarifyQuestionKind,
+  options: readonly ClarifyOption[],
+): ClarifySelectionMode {
+  const text = [
+    question,
+    ...options.flatMap((option) => [option.label, option.tradeoff]),
+  ].join(" ").toLowerCase();
+  if (/\b(choose all|all that apply|several|multiple)\b/i.test(text)) return "multiple";
+  if (/\b(which|what)\b.{0,80}\b(constraints|tools|platforms|sources|materials|requirements|capabilities|channels|systems)\b/i.test(text)) {
+    return "multiple";
+  }
+  if (/\b(constraints|tools|platforms|sources|materials|requirements|capabilities)\b.{0,80}\b(apply|required|must|available|usable|unacceptable)\b/i.test(text)) {
+    return "multiple";
+  }
+  if (/哪些|哪几|多选|约束|工具|平台|来源|材料|能力|要求/.test(text)) return "multiple";
+  return "single";
+}
+
 function answerContextCategory(
   question: Pick<ClarifyQuestion, "kind" | "source_dimension"> | undefined,
 ): ContextCategory {
@@ -1163,6 +1194,13 @@ function normalizeClarify(raw: unknown): ClarifyOutput | null {
       kind: isQuestionKind(r.kind) ? r.kind : "assumption",
       ...(isQuestionSourceDimension(r.source_dimension) ? { source_dimension: r.source_dimension } : {}),
       allow_other: typeof r.allow_other === "boolean" ? r.allow_other : true,
+      selection_mode: isClarifySelectionMode(r.selection_mode)
+        ? r.selection_mode
+        : inferSelectionMode(
+          typeof r.question === "string" ? r.question : "",
+          isQuestionKind(r.kind) ? r.kind : "assumption",
+          options,
+        ),
       options,
     };
   });

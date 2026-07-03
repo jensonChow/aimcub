@@ -25,6 +25,7 @@ export interface PlanningToolContextInput {
   includeWeb?: boolean;
   fetchWebResults?: boolean;
   webSearchLimit?: number;
+  webFetchLimit?: number;
   includeLocal?: boolean;
   workspaceRoot?: string;
   localScanMaxDepth?: number;
@@ -53,6 +54,7 @@ export interface PlanningToolContextResult {
 
 const DEFAULT_CONTEXT_LIMIT = 12;
 const DEFAULT_WEB_SEARCH_LIMIT = 3;
+const DEFAULT_WEB_FETCH_LIMIT = 3;
 const DEFAULT_LOCAL_MANIFEST_READ_LIMIT = 3;
 const DEFAULT_LOCAL_MANIFEST_READ_LINES = 80;
 const DEFAULT_LOCAL_MANIFEST_READ_BYTES = 16_000;
@@ -301,20 +303,25 @@ export async function collectPlanningToolContext(
     );
     if (webSearchObservation) {
       planningMemories.push(...collectWebSearchData(webSearchObservation));
-      const firstUrl = (webSearchObservation.data as WebSearchOutput).results[0]?.url;
-      if (input.fetchWebResults && firstUrl) {
-        const webFetchObservation = addResult(
-          "web.fetch",
-          await registry.execute("web.fetch", {
-            url: firstUrl,
-            maxBytes: 80_000,
-            extractMode: "text",
-          }, context),
-          observations,
-          observationEvents,
-          failures,
-        );
-        if (webFetchObservation) planningMemories.push(...collectWebFetchData(webFetchObservation));
+      const fetchUrls = (webSearchObservation.data as WebSearchOutput).results
+        .map((result) => result.url)
+        .filter((url): url is string => Boolean(url))
+        .slice(0, input.webFetchLimit ?? DEFAULT_WEB_FETCH_LIMIT);
+      if (input.fetchWebResults) {
+        for (const url of fetchUrls) {
+          const webFetchObservation = addResult(
+            "web.fetch",
+            await registry.execute("web.fetch", {
+              url,
+              maxBytes: 80_000,
+              extractMode: "text",
+            }, context),
+            observations,
+            observationEvents,
+            failures,
+          );
+          if (webFetchObservation) planningMemories.push(...collectWebFetchData(webFetchObservation));
+        }
       }
     }
   }
