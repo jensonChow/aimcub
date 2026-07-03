@@ -478,7 +478,9 @@ function AppInner() {
       refreshContextLineageLearning();
       refreshContextDecompositionLearning();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const message = e instanceof Error ? e.message : String(e);
+      updatePlanningTrace("save", { status: "error", detail: message });
+      setError(message);
     }
   }
 
@@ -550,7 +552,8 @@ function AppInner() {
     setError(null);
     setInspectorTab("process");
     setPlanningTrace([
-      traceEvent("context", "running", t("trace.context"), t("trace.contextPending")),
+      traceEvent("intake", "running", t("trace.intake"), t("trace.intakePending")),
+      traceEvent("context", "pending", t("trace.context"), t("trace.contextPending")),
       traceEvent("draft", "pending", t("trace.draft"), t("trace.draftPending", { provider: providerText })),
       traceEvent("quality", "pending", t("trace.quality"), t("trace.qualityPending")),
       traceEvent("clarify", "pending", t("trace.clarify"), t("trace.clarifyPending")),
@@ -566,6 +569,13 @@ function AppInner() {
       setPlanningContext(d.planningContext ?? null);
       setPlanningTools(d.planningTools ?? null);
       appendPlanningToolTrace("draft", d.planningTools);
+      updatePlanningTrace("intake", {
+        status: "done",
+        detail: t("trace.intakeDone", {
+          score: d.intake?.score ?? "-",
+          questions: d.intake?.questions.length ?? 0,
+        }),
+      });
       updatePlanningTrace("context", {
         status: "done",
         detail: describeContextTrace(d.planningContext, d.intake ?? null),
@@ -697,6 +707,7 @@ function AppInner() {
   async function save() {
     if (!finalPlan) return;
     setError(null);
+    upsertPlanningTrace(traceEvent("save", "running", t("trace.save"), t("trace.savePending")));
     try {
       const res = await window.aimcub.saveGoal({
         title: title.trim(),
@@ -714,6 +725,10 @@ function AppInner() {
       setSavedGoal(res.goal);
       setSavedContextCandidateCount(res.contextCandidates?.length ?? 0);
       setSavedContextCandidates(res.contextCandidates ?? []);
+      updatePlanningTrace("save", {
+        status: "done",
+        detail: t("trace.saveDone", { n: res.contextCandidates?.length ?? 0 }),
+      });
       setInspectorTab("activity");
       refreshGoals();
       refreshContextCandidates();
@@ -830,8 +845,24 @@ function AppInner() {
           <main style={contentSurfaceStyle(compactShell)}>
             <section style={agentWorkspaceStyle()}>
               <div style={conversationStreamStyle()}>
-                {(step === "home" || step === "aim") && (
-                  <ChatStart />
+                {step === "home" && (
+                  <HomeDashboard
+                    goals={goals}
+                    onNew={startNew}
+                    onOpen={openGoal}
+                  />
+                )}
+
+                {step === "aim" && (
+                  <NewAimPanel
+                    title={title}
+                    description={description}
+                    configured={configured}
+                    aimIntake={aimIntake}
+                    onTitle={setTitle}
+                    onDescription={setDescription}
+                    onDraft={() => runDraft({ title: title.trim(), description: description.trim() || undefined })}
+                  />
                 )}
 
                 {(step === "drafting" || step === "clarifying" || step === "refining") && (
@@ -919,14 +950,152 @@ function AppInner() {
   );
 }
 
-function ChatStart() {
+type WorkflowStage = "aim" | "draft" | "questions" | "refine" | "save";
+
+function HomeDashboard(props: {
+  goals: Goal[];
+  onNew: () => void;
+  onOpen: (goal: Goal) => void;
+}) {
   const { t } = useI18n();
+  const recent = props.goals.slice(0, 6);
   return (
-    <div style={chatStartStyle()}>
-      <div style={{ color: C.accent, fontSize: 13, fontWeight: 700, marginBottom: 14 }}>Aimcub</div>
-      <h1 style={{ margin: 0, fontSize: 34, lineHeight: 1.1, letterSpacing: 0, fontWeight: 740 }}>
-        {t("chat.greeting")}
-      </h1>
+    <section style={mvpPanelStyle()}>
+      <div style={mvpHeroRowStyle()}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ color: C.accent, fontSize: 12, fontWeight: 700, marginBottom: 10 }}>Aimcub</div>
+          <h1 style={mvpTitleStyle()}>{t("mvp.homeTitle")}</h1>
+          <p style={mvpBodyStyle()}>{t("mvp.homeBody")}</p>
+        </div>
+        <button onClick={props.onNew} style={{ ...primaryButton(false), marginTop: 0, whiteSpace: "nowrap" }}>
+          {t("home.new")}
+        </button>
+      </div>
+
+      <WorkflowStrip active="aim" completed={new Set()} />
+
+      <div style={recentListShellStyle()}>
+        <div style={recentListHeaderStyle()}>
+          <span>{t("mvp.recentTitle")}</span>
+          <span style={{ color: C.muted, fontSize: 12 }}>
+            {t(props.goals.length === 1 ? "home.aim_one" : "home.aim_other", { n: props.goals.length })}
+          </span>
+        </div>
+        {recent.length > 0 ? (
+          <div style={{ display: "grid", gap: 6 }}>
+            {recent.map((goal) => {
+              const plan = planOf(goal);
+              return (
+                <button key={goal.id} onClick={() => props.onOpen(goal)} style={recentGoalRowStyle()}>
+                  <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{goal.title}</span>
+                  <span style={{ color: C.muted, fontSize: 12, whiteSpace: "nowrap" }}>
+                    {t((plan?.nodes.length ?? 0) === 1 ? "common.milestone_one" : "common.milestone_other", { n: plan?.nodes.length ?? 0 })}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div style={{ color: C.muted, fontSize: 13, padding: "8px 0" }}>{t("mvp.noRecent")}</div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function NewAimPanel(props: {
+  title: string;
+  description: string;
+  configured: boolean;
+  aimIntake: AimIntakeReport | null;
+  onTitle: (value: string) => void;
+  onDescription: (value: string) => void;
+  onDraft: () => void;
+}) {
+  const { t } = useI18n();
+  const canDraft = props.title.trim().length > 0;
+  return (
+    <section style={mvpPanelStyle()}>
+      <div style={{ marginBottom: 18 }}>
+        <div style={{ color: C.accent, fontSize: 12, fontWeight: 700, marginBottom: 10 }}>{t("mvp.formTitle")}</div>
+        <h1 style={mvpTitleStyle()}>{t("chat.greeting")}</h1>
+        <p style={mvpBodyStyle()}>{t("mvp.formBody")}</p>
+      </div>
+
+      <WorkflowStrip active="aim" completed={props.title.trim() ? new Set<WorkflowStage>(["aim"]) : new Set()} />
+
+      <div style={newAimFormStyle()}>
+        <label style={aimFieldLabelStyle()} htmlFor="aim-title">{t("aim.titleLabel")}</label>
+        <textarea
+          id="aim-title"
+          value={props.title}
+          onChange={(event) => props.onTitle(event.target.value)}
+          placeholder={t("aim.titlePlaceholder")}
+          rows={3}
+          style={aimTitleInputStyle()}
+        />
+
+        <label style={aimFieldLabelStyle()} htmlFor="aim-description">{t("aim.descLabel")}</label>
+        <textarea
+          id="aim-description"
+          value={props.description}
+          onChange={(event) => props.onDescription(event.target.value)}
+          placeholder={t("aim.descPlaceholder")}
+          rows={4}
+          style={aimDescriptionInputStyle()}
+        />
+
+        {props.aimIntake && (
+          <div style={intakeMiniStyle()}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline" }}>
+              <span style={{ color: C.text, fontSize: 13, fontWeight: 650 }}>{t("mvp.intakeReady")}</span>
+              <span style={{ color: C.muted, fontSize: 12 }}>{props.aimIntake.score}/100</span>
+            </div>
+            <div style={{ color: C.muted, fontSize: 12, lineHeight: 1.45, marginTop: 5 }}>
+              {intakeReadinessLabel(props.aimIntake.readiness, t)} · {t("mvp.intakeRows", { n: props.aimIntake.coverage.selectedTotal })}
+            </div>
+            {props.aimIntake.questions[0] && (
+              <div style={{ color: C.muted, fontSize: 12, lineHeight: 1.45, marginTop: 5 }}>
+                {shortUiText(props.aimIntake.questions[0].prompt)}
+              </div>
+            )}
+          </div>
+        )}
+
+        {!props.configured && <Notice tone="info">{t("aim.needProvider")}</Notice>}
+
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 4 }}>
+          <button onClick={props.onDraft} disabled={!canDraft} style={{ ...primaryButton(!canDraft), marginTop: 0 }}>
+            {t("aim.draft")}
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function WorkflowStrip(props: { active: WorkflowStage; completed: ReadonlySet<WorkflowStage> }) {
+  const { t } = useI18n();
+  const stages: WorkflowStage[] = ["aim", "draft", "questions", "refine", "save"];
+  const labels = {
+    aim: "mvp.flow.aim",
+    draft: "mvp.flow.draft",
+    questions: "mvp.flow.questions",
+    refine: "mvp.flow.refine",
+    save: "mvp.flow.save",
+  } as const satisfies Record<WorkflowStage, StringKey>;
+  return (
+    <div style={workflowShellStyle()} aria-label={t("mvp.workflow")}>
+      {stages.map((stage, index) => {
+        const active = props.active === stage;
+        const done = props.completed.has(stage);
+        return (
+          <div key={stage} style={workflowItemStyle(active, done)}>
+            <span style={workflowDotStyle(active, done)}>{done ? "OK" : index + 1}</span>
+            <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t(labels[stage])}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -1241,16 +1410,178 @@ function conversationStreamStyle(): CSSProperties {
   };
 }
 
-function chatStartStyle(): CSSProperties {
+function mvpPanelStyle(): CSSProperties {
   return {
-    minHeight: "100%",
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "center",
     maxWidth: 760,
     margin: "0 auto",
-    paddingBottom: 72,
+    padding: "36px 0 88px",
     boxSizing: "border-box",
+  };
+}
+
+function mvpHeroRowStyle(): CSSProperties {
+  return {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) auto",
+    gap: 18,
+    alignItems: "start",
+    marginBottom: 22,
+  };
+}
+
+function mvpTitleStyle(): CSSProperties {
+  return {
+    margin: 0,
+    color: C.text,
+    fontSize: 30,
+    lineHeight: 1.14,
+    letterSpacing: 0,
+    fontWeight: 720,
+  };
+}
+
+function mvpBodyStyle(): CSSProperties {
+  return {
+    margin: "10px 0 0",
+    color: C.muted,
+    fontSize: 14,
+    lineHeight: 1.55,
+  };
+}
+
+function workflowShellStyle(): CSSProperties {
+  return {
+    display: "grid",
+    gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+    gap: 6,
+    margin: "18px 0",
+  };
+}
+
+function workflowItemStyle(active: boolean, done: boolean): CSSProperties {
+  return {
+    minWidth: 0,
+    display: "flex",
+    alignItems: "center",
+    gap: 7,
+    border: `1px solid ${active ? "#b7d7df" : C.border}`,
+    background: active ? C.accentBg : done ? "#f6f8fa" : C.surface,
+    color: active ? C.accent : done ? C.text : C.muted,
+    borderRadius: 8,
+    padding: "8px 9px",
+    fontSize: 12,
+    fontWeight: active || done ? 700 : 560,
+    overflow: "hidden",
+  };
+}
+
+function workflowDotStyle(active: boolean, done: boolean): CSSProperties {
+  return {
+    width: 20,
+    height: 20,
+    flex: "0 0 20px",
+    display: "inline-grid",
+    placeItems: "center",
+    borderRadius: 999,
+    background: active ? C.accent : done ? C.text : "#eceff1",
+    color: active || done ? "#fff" : C.muted,
+    fontSize: done ? 8 : 11,
+    fontWeight: 800,
+    fontVariantNumeric: "tabular-nums",
+  };
+}
+
+function recentListShellStyle(): CSSProperties {
+  return {
+    borderTop: `1px solid ${C.border}`,
+    paddingTop: 16,
+    marginTop: 22,
+  };
+}
+
+function recentListHeaderStyle(): CSSProperties {
+  return {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+    gap: 12,
+    color: C.text,
+    fontSize: 13,
+    fontWeight: 700,
+    marginBottom: 10,
+  };
+}
+
+function recentGoalRowStyle(): CSSProperties {
+  return {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) auto",
+    alignItems: "baseline",
+    gap: 12,
+    width: "100%",
+    border: "none",
+    borderRadius: 8,
+    background: "transparent",
+    color: C.text,
+    cursor: "pointer",
+    fontFamily: "inherit",
+    fontSize: 14,
+    fontWeight: 620,
+    padding: "9px 0",
+    textAlign: "left",
+  };
+}
+
+function newAimFormStyle(): CSSProperties {
+  return {
+    display: "grid",
+    gap: 10,
+    borderTop: `1px solid ${C.border}`,
+    paddingTop: 16,
+  };
+}
+
+function aimFieldLabelStyle(): CSSProperties {
+  return {
+    color: C.muted,
+    fontSize: 12,
+    fontWeight: 700,
+    marginTop: 4,
+  };
+}
+
+function aimTitleInputStyle(): CSSProperties {
+  return {
+    width: "100%",
+    minHeight: 88,
+    resize: "vertical",
+    border: `1px solid ${C.border}`,
+    borderRadius: 10,
+    background: C.surface,
+    color: C.text,
+    fontFamily: "inherit",
+    fontSize: 17,
+    lineHeight: 1.45,
+    outline: "none",
+    padding: "12px 13px",
+    boxSizing: "border-box",
+  };
+}
+
+function aimDescriptionInputStyle(): CSSProperties {
+  return {
+    ...aimTitleInputStyle(),
+    minHeight: 104,
+    fontSize: 14,
+  };
+}
+
+function intakeMiniStyle(): CSSProperties {
+  return {
+    border: `1px solid ${C.border}`,
+    borderRadius: 10,
+    background: "#f7fbfb",
+    padding: "11px 12px",
   };
 }
 
@@ -1939,6 +2270,14 @@ function BusyPlanState(props: { step: Step; title: string; description: string }
     : props.step === "clarifying"
       ? t("status.clarifying")
       : t("status.refining");
+  const active: WorkflowStage = props.step === "refining" ? "refine" : props.step === "clarifying" ? "questions" : "draft";
+  const completed = new Set<WorkflowStage>(
+    props.step === "drafting"
+      ? ["aim"]
+      : props.step === "clarifying"
+        ? ["aim", "draft"]
+        : ["aim", "draft", "questions"],
+  );
   return (
     <section style={threadSectionStyle()}>
       <div style={userTurnStyle()}>
@@ -1949,6 +2288,7 @@ function BusyPlanState(props: { step: Step; title: string; description: string }
           <span>Aimcub</span>
           <span>{message}</span>
         </div>
+        <WorkflowStrip active={active} completed={completed} />
         <SpinnerVerbLine step={props.step} />
         {props.description ? <div style={{ color: C.muted, fontSize: 14, lineHeight: 1.55, marginTop: 10 }}>{props.description}</div> : null}
       </div>
@@ -2359,6 +2699,7 @@ function QuestionsStep(props: {
           <span>Aimcub</span>
           <span>{t("trace.clarify")}</span>
         </div>
+        <WorkflowStrip active="questions" completed={new Set<WorkflowStage>(["aim", "draft"])} />
         <div style={{ color: C.muted, fontSize: 14, lineHeight: 1.55, marginTop: 8 }}>{t("q.intro")}</div>
 
         {clarify.questions.length === 0 && <div style={clarifyEmptyStyle()}>{t("q.none")}</div>}
@@ -2510,6 +2851,12 @@ function PlanView(props: {
         milestoneCount={n}
         nextAction={nextNode?.title ?? t("shell.noNextAction")}
       />
+      <div style={threadSectionStyle()}>
+        <WorkflowStrip
+          active="save"
+          completed={new Set<WorkflowStage>(savedAt ? ["aim", "draft", "questions", "refine", "save"] : ["aim", "draft", "questions", "refine"])}
+        />
+      </div>
       <MilestoneCards plan={plan} />
 
       <div style={planActionRowStyle()}>
@@ -2558,6 +2905,9 @@ function SavedGoalView(props: {
             milestoneCount={n}
             nextAction={nextNode?.title ?? t("shell.noNextAction")}
           />
+          <div style={threadSectionStyle()}>
+            <WorkflowStrip active="save" completed={new Set<WorkflowStage>(["aim", "draft", "questions", "refine", "save"])} />
+          </div>
           <MilestoneCards plan={plan} />
         </>
       ) : (
@@ -2569,6 +2919,9 @@ function SavedGoalView(props: {
             milestoneCount={0}
             nextAction={t("shell.noNextAction")}
           />
+          <div style={threadSectionStyle()}>
+            <WorkflowStrip active="save" completed={new Set<WorkflowStage>(["aim", "save"])} />
+          </div>
           <Notice tone="info">{t("saved.noPlan")}</Notice>
         </>
       )}
