@@ -458,12 +458,12 @@ export async function decomposeWithQuality(
     return { ...first, quality: null, retried: false, attempts: 1, firstQuality: null };
   }
 
-  const firstQuality = critiquePlan({ plan: first.output, context: input.memories });
+  const firstQuality = critiquePlan({ plan: first.output, context: input.memories, research: input.research });
   if (!shouldRetryForQuality(firstQuality)) {
     return { ...first, quality: firstQuality, retried: false, attempts: 1, firstQuality };
   }
 
-  const firstReview = reviewPlan({ plan: first.output, context: input.memories, quality: firstQuality });
+  const firstReview = reviewPlan({ plan: first.output, context: input.memories, quality: firstQuality, research: input.research });
   const retry = await decompose(gateway, {
     ...input,
     description: qualityFeedbackDescription(input.description, firstQuality, firstReview),
@@ -472,7 +472,7 @@ export async function decomposeWithQuality(
     return { ...first, quality: firstQuality, retried: true, attempts: 2, firstQuality };
   }
 
-  const retryQuality = critiquePlan({ plan: retry.output, context: input.memories });
+  const retryQuality = critiquePlan({ plan: retry.output, context: input.memories, research: input.research });
   if (!betterOrEqualQuality(retryQuality, firstQuality)) {
     return { ...first, quality: firstQuality, retried: true, attempts: 2, firstQuality };
   }

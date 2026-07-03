@@ -167,7 +167,7 @@ export function registerIpc(): void {
     const selectedContext = await planningContext(req);
     const [lineageLearning, decompositionLearningReport] = await Promise.all([contextLineageLearning(), decompositionLearning()]);
     const decompositionStrategyReport = await decompositionStrategy(req.title, req.description, decompositionLearningReport);
-    const draftReview = reviewPlan({ plan: req.draft, context: selectedContext.memories });
+    const draftReview = reviewPlan({ plan: req.draft, context: selectedContext.memories, research: selectedContext.research });
     const intake = buildAimIntakeReport({
       title: req.title,
       description: req.description,

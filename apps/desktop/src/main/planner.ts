@@ -80,7 +80,7 @@ export async function runDraft(
       output: r.output,
       errors: [],
       quality: r.quality,
-      review: reviewPlan({ plan: r.output, context: memories, quality: r.quality }),
+      review: reviewPlan({ plan: r.output, context: memories, quality: r.quality, research }),
       qualityRetry: qualityRetry(r),
     };
   }
@@ -137,7 +137,7 @@ export async function runRefine(
       output: r.output,
       errors: [],
       quality: r.quality,
-      review: reviewPlan({ plan: r.output, context: refinedMemories, quality: r.quality }),
+      review: reviewPlan({ plan: r.output, context: refinedMemories, quality: r.quality, research }),
       qualityRetry: qualityRetry(r),
     };
   }

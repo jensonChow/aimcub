@@ -91,6 +91,8 @@ const QUALITY_ISSUES = new Set<PlanQualityIssueCode>([
   "missing_contract_eval_signal",
   "missing_context_application",
   "missing_eval_acceptance_signal",
+  "missing_research_evidence",
+  "insufficient_research_coverage",
   "manual_only_verification",
   "orphan_verification_milestone",
   "duplicate_acceptance_rule",
@@ -122,6 +124,8 @@ function qualityDimensionForIssue(code: PlanQualityIssueCode): PlanQualityDimens
   switch (code) {
     case "missing_decomposition_contract":
     case "missing_context_application":
+    case "missing_research_evidence":
+    case "insufficient_research_coverage":
       return "context_fit";
     case "missing_contract_evidence":
     case "missing_contract_eval_signal":
@@ -145,6 +149,8 @@ function qualityDimensionForIssue(code: PlanQualityIssueCode): PlanQualityDimens
 function recommendationForIssue(code: PlanQualityIssueCode): DecompositionLearningRecommendation {
   switch (code) {
     case "missing_context_application":
+    case "missing_research_evidence":
+    case "insufficient_research_coverage":
       return "ask_context_earlier";
     case "missing_eval_acceptance_signal":
     case "manual_only_verification":

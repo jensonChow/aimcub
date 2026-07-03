@@ -16,6 +16,8 @@ export type PlanQualityIssueCode =
   | "missing_contract_eval_signal"
   | "missing_context_application"
   | "missing_eval_acceptance_signal"
+  | "missing_research_evidence"
+  | "insufficient_research_coverage"
   | "manual_only_verification"
   | "orphan_verification_milestone"
   | "duplicate_acceptance_rule"
@@ -59,9 +61,18 @@ export interface PlanQualityContext {
   confidence?: number;
 }
 
+export interface PlanQualityResearchEvidence {
+  sourceCount?: number;
+  fetchedSourceCount?: number;
+  searchResultCount?: number;
+  sources?: readonly unknown[];
+  uncertainties?: readonly string[];
+}
+
 export interface CritiquePlanInput {
   plan: DecompositionOutput;
   context?: readonly PlanQualityContext[];
+  research?: PlanQualityResearchEvidence | null;
 }
 
 export interface PlanContextUse {
@@ -354,6 +365,88 @@ function critiqueEvalAcceptanceApplication(plan: DecompositionOutput, context: r
   return issues;
 }
 
+const RESEARCH_REQUIRED_PATTERN =
+  /\b(latest|current|recent|today|research|search|web|online|compare|comparison|market|competitor|pricing|price|docs|documentation|regulation|legal|law|policy|travel|visa|flight|hotel|country|city|vendor|official)\b|最新|当前|现在|近期|调研|搜索|联网|网页|在线|对比|比较|市场|竞品|价格|文档|官方|法规|法律|政策|旅行|旅游|签证|机票|航班|酒店|国家|城市/;
+
+function parseResearchCount(content: string, label: string): number | null {
+  const match = new RegExp(`${label}:\\s*(\\d+)`, "i").exec(content);
+  if (!match) return null;
+  const value = Number(match[1]);
+  return Number.isFinite(value) ? value : null;
+}
+
+function researchFromContext(context: readonly PlanQualityContext[]): PlanQualityResearchEvidence | null {
+  for (const row of context) {
+    const content = row.content;
+    if (!/Research brief for aim:/i.test(content)) continue;
+    const sourceCount = parseResearchCount(content, "Sources");
+    const fetchedMatch = /(\d+)\s+fetched pages/i.exec(content);
+    const searchMatch = /(\d+)\s+search results/i.exec(content);
+    return {
+      sourceCount: sourceCount ?? undefined,
+      fetchedSourceCount: fetchedMatch ? Number(fetchedMatch[1]) : undefined,
+      searchResultCount: searchMatch ? Number(searchMatch[1]) : undefined,
+      uncertainties: /Uncertainties:/i.test(content) ? ["Research brief reported uncertainties."] : [],
+    };
+  }
+  return null;
+}
+
+function planNeedsResearch(plan: DecompositionOutput): boolean {
+  return RESEARCH_REQUIRED_PATTERN.test(planText(plan));
+}
+
+function normalizedResearchEvidence(
+  explicit: PlanQualityResearchEvidence | null | undefined,
+  context: readonly PlanQualityContext[],
+): PlanQualityResearchEvidence | null {
+  const research = explicit ?? researchFromContext(context);
+  if (!research) return null;
+  return {
+    sourceCount: research.sourceCount ?? research.sources?.length ?? 0,
+    fetchedSourceCount: research.fetchedSourceCount ?? 0,
+    searchResultCount: research.searchResultCount ?? 0,
+    sources: research.sources,
+    uncertainties: research.uncertainties ?? [],
+  };
+}
+
+function critiqueResearchCoverage(
+  plan: DecompositionOutput,
+  context: readonly PlanQualityContext[],
+  research: PlanQualityResearchEvidence | null | undefined,
+): PlanQualityIssue[] {
+  if (!planNeedsResearch(plan)) return [];
+
+  const evidence = normalizedResearchEvidence(research, context);
+  if (!evidence || (evidence.sourceCount ?? 0) === 0) {
+    return [{
+      code: "missing_research_evidence",
+      severity: "warning",
+      contextCategory: "project_fact",
+      message: "Plan appears to depend on current or external facts, but no first-party web research evidence was provided.",
+    }];
+  }
+
+  const sourceCount = evidence.sourceCount ?? 0;
+  const fetchedSourceCount = evidence.fetchedSourceCount ?? 0;
+  const uncertainties = evidence.uncertainties ?? [];
+  if (sourceCount < 3 || fetchedSourceCount < 1 || uncertainties.length > 0) {
+    const reasons: string[] = [];
+    if (sourceCount < 3) reasons.push(`only ${sourceCount} source${sourceCount === 1 ? "" : "s"}`);
+    if (fetchedSourceCount < 1) reasons.push("no fetched source pages");
+    if (uncertainties.length > 0) reasons.push(`${uncertainties.length} research uncertainty${uncertainties.length === 1 ? "" : "ies"}`);
+    return [{
+      code: "insufficient_research_coverage",
+      severity: "warning",
+      contextCategory: "project_fact",
+      message: `Plan uses web-sensitive facts, but research coverage is thin: ${reasons.join(", ")}.`,
+    }];
+  }
+
+  return [];
+}
+
 function critiqueDependencyShape(plan: DecompositionOutput): PlanQualityIssue[] {
   if (plan.nodes.length >= 4 && plan.edges.length === 0) {
     return [
@@ -574,6 +667,8 @@ const ISSUE_DIMENSION: Record<PlanQualityIssueCode, PlanQualityDimension> = {
   missing_decomposition_contract: "context_fit",
   missing_dependency_shape: "distinctness",
   missing_eval_acceptance_signal: "context_fit",
+  missing_research_evidence: "context_fit",
+  insufficient_research_coverage: "context_fit",
   orphan_verification_milestone: "verifiability",
   oversized_milestone: "granularity",
   unsupported_auto_evaluator: "verifiability",
@@ -607,6 +702,7 @@ export function critiquePlan(input: CritiquePlanInput): PlanQualityReport {
     ...input.plan.nodes.flatMap(critiqueNodeVerification),
     ...critiqueContextApplication(input.plan, input.context ?? []),
     ...critiqueEvalAcceptanceApplication(input.plan, input.context ?? []),
+    ...critiqueResearchCoverage(input.plan, input.context ?? [], input.research),
     ...critiqueDependencyShape(input.plan),
     ...critiqueVerificationDependencies(input.plan),
     ...critiqueDuplicateAcceptanceRules(input.plan),
@@ -657,11 +753,17 @@ const DISTINCTNESS_CONTEXT_ISSUES: PlanQualityIssueCode[] = [
   "missing_dependency_shape",
 ];
 
+const RESEARCH_CONTEXT_ISSUES: PlanQualityIssueCode[] = [
+  "missing_research_evidence",
+  "insufficient_research_coverage",
+];
+
 function hasAnyIssue(issueCodes: Set<PlanQualityIssueCode>, codes: readonly PlanQualityIssueCode[]): boolean {
   return codes.some((code) => issueCodes.has(code));
 }
 
 function contextGapPriority(issueCodes: Set<PlanQualityIssueCode>, category: ContextCategory): PlanContextGapPriority {
+  if (category === "project_fact" && hasAnyIssue(issueCodes, RESEARCH_CONTEXT_ISSUES)) return "high";
   if (category === "eval_signal") {
     return hasAnyIssue(issueCodes, VERIFIABILITY_CONTEXT_ISSUES) ||
       hasAnyIssue(issueCodes, GRANULARITY_CONTEXT_ISSUES) ||
@@ -714,6 +816,13 @@ function procedureGapPrompt(issueCodes: Set<PlanQualityIssueCode>): string {
   return prompts.length > 0
     ? prompts.join(" ")
     : "Ask whether there is an existing workflow, checklist, or verification command that this aim should follow.";
+}
+
+function researchGapPrompt(issueCodes: Set<PlanQualityIssueCode>): string {
+  if (issueCodes.has("missing_research_evidence")) {
+    return "Run first-party web research before finalizing this plan: search multiple current sources, fetch the most relevant pages, and use cited facts to refine constraints, risks, and milestone order.";
+  }
+  return "Broaden first-party web research before finalizing this plan: use at least 3 relevant sources and fetch at least 1 source page so the plan is not based on snippets alone.";
 }
 
 function contractGapPriority(category: ContextCategory): PlanContextGapPriority {
@@ -875,6 +984,16 @@ function contextGaps(
       issueCodes: [...issueCodes],
     });
   }
+  if (hasAnyIssue(issueCodes, RESEARCH_CONTEXT_ISSUES)) {
+    addContextGap(gaps, seen, {
+      category: "project_fact",
+      priority: contextGapPriority(issueCodes, "project_fact"),
+      reason: "insufficient_research_evidence",
+      prompt: researchGapPrompt(issueCodes),
+      source: "missing_context",
+      issueCodes: [...issueCodes].filter((code) => RESEARCH_CONTEXT_ISSUES.includes(code)),
+    });
+  }
   if (plan.nodes.length >= 2 && !present.has("capability")) {
     addContextGap(gaps, seen, {
       category: "capability",
@@ -913,6 +1032,9 @@ function reviewGuidance(
   }
   if (gaps.some((gap) => gap.category === "eval_signal")) {
     guidance.push("Missing personalized eval context; capture what the user considers genuinely complete.");
+  }
+  if (quality.issues.some((issue) => RESEARCH_CONTEXT_ISSUES.includes(issue.code))) {
+    guidance.push("Web-sensitive decomposition needs stronger first-party research evidence before the plan should be trusted.");
   }
   return guidance;
 }
@@ -962,6 +1084,18 @@ function qualityIssueRefineInstruction(issue: PlanQualityIssue, index: number): 
     return [
       `${index}. ${issue.message}`,
       "   Make each milestone's acceptance_rule distinguishable with different path_glob, message_pattern, workflow, branch, or min_files filters; move shared verification into a dependent verification milestone when it is truly shared.",
+    ].join("\n");
+  }
+  if (issue.code === "missing_research_evidence") {
+    return [
+      `${index}. ${issue.message}`,
+      "   Collect first-party web research before finalizing the plan, or add an agent-owned research milestone that gathers current sources before downstream planning decisions.",
+    ].join("\n");
+  }
+  if (issue.code === "insufficient_research_coverage") {
+    return [
+      `${index}. ${issue.message}`,
+      "   Broaden search/fetch coverage, then revise milestones with source-backed constraints, risks, and unresolved uncertainties instead of relying on snippets or assumptions.",
     ].join("\n");
   }
   return `${index}. ${issue.message}`;

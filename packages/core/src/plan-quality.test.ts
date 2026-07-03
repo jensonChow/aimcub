@@ -61,6 +61,26 @@ const GOOD_PLAN = {
   edges: [{ from: "core", to: "test" }],
 } as unknown as DecompositionOutput;
 
+function travelResearchPlan(): DecompositionOutput {
+  const plan = structuredClone(GOOD_PLAN);
+  plan.goal_summary = "Plan a current Cambodia travel itinerary.";
+  plan.rationale = "The route depends on current visa, safety, transport, hotel, and pricing facts.";
+  plan.nodes[0]!.title = "Research Cambodia travel basics";
+  plan.nodes[0]!.description = "Gather current official visa, safety, transport, and budget information for Cambodia.";
+  plan.nodes[0]!.decomposition_contract!.why = "Current external travel facts determine what the itinerary can safely include.";
+  plan.nodes[0]!.decomposition_contract!.definition_of_done = "The plan cites current sources for Cambodia travel constraints and risks.";
+  plan.nodes[0]!.decomposition_contract!.required_evidence = ["A research brief with current Cambodia travel sources."];
+  plan.nodes[0]!.decomposition_contract!.eval_signal = "The milestone is done when current external facts are sourced before itinerary planning.";
+  plan.nodes[0]!.acceptance_rule.clauses = [
+    {
+      evaluator: "commit_pattern",
+      auto_verifiable: true,
+      match: { path_glob: "research/**", min_files: 1, message_pattern: "cambodia travel research" },
+    },
+  ];
+  return plan;
+}
+
 describe("critiquePlan", () => {
   it("passes a context-aware, evidence-verifiable plan", () => {
     const report = critiquePlan({
@@ -166,6 +186,56 @@ describe("critiquePlan", () => {
     });
 
     expect(report.issues.map((issue) => issue.code)).not.toContain("missing_eval_acceptance_signal");
+  });
+
+  it("warns when web-sensitive plans lack first-party research evidence", () => {
+    const report = critiquePlan({ plan: travelResearchPlan() });
+
+    expect(report.grade).toBe("warn");
+    expect(report.issues).toEqual([
+      expect.objectContaining({
+        code: "missing_research_evidence",
+        contextCategory: "project_fact",
+      }),
+    ]);
+    expect(report.dimensions?.find((row) => row.dimension === "context_fit")?.issueCodes).toContain(
+      "missing_research_evidence",
+    );
+  });
+
+  it("warns when first-party research coverage is too thin", () => {
+    const report = critiquePlan({
+      plan: travelResearchPlan(),
+      research: {
+        sourceCount: 2,
+        fetchedSourceCount: 0,
+        searchResultCount: 4,
+        uncertainties: ["No source pages were fetched; findings rely on search snippets only."],
+      },
+    });
+
+    expect(report.grade).toBe("warn");
+    expect(report.issues).toEqual([
+      expect.objectContaining({
+        code: "insufficient_research_coverage",
+        message: expect.stringContaining("research coverage is thin"),
+      }),
+    ]);
+  });
+
+  it("accepts web-sensitive plans when research coverage is sufficient", () => {
+    const report = critiquePlan({
+      plan: travelResearchPlan(),
+      research: {
+        sourceCount: 4,
+        fetchedSourceCount: 2,
+        searchResultCount: 8,
+        uncertainties: [],
+      },
+    });
+
+    expect(report.issues.map((issue) => issue.code)).not.toContain("missing_research_evidence");
+    expect(report.issues.map((issue) => issue.code)).not.toContain("insufficient_research_coverage");
   });
 
   it("warns on manual-only milestones and broad commit message patterns", () => {
@@ -443,6 +513,24 @@ describe("reviewPlan", () => {
     expect(constraintGap!.prompt).toContain("scope boundaries");
     expect(procedureGap).toMatchObject({ priority: "medium" });
     expect(procedureGap!.prompt).toContain("shared verification");
+  });
+
+  it("surfaces research coverage gaps before accepting web-sensitive plans", () => {
+    const report = reviewPlan({ plan: travelResearchPlan(), context: [] });
+    const researchGap = report.context.gaps.find((gap) => gap.category === "project_fact");
+
+    expect(researchGap).toMatchObject({
+      priority: "high",
+      reason: "insufficient_research_evidence",
+      issueCodes: ["missing_research_evidence"],
+    });
+    expect(researchGap!.prompt).toContain("Run first-party web research");
+    expect(report.actions[0]).toMatchObject({
+      code: "review_quality_warnings",
+      issueCodes: ["missing_research_evidence"],
+    });
+    expect(report.actions[0]!.refinePrompt).toContain("Collect first-party web research");
+    expect(report.guidance.join(" ")).toContain("Web-sensitive decomposition needs stronger first-party research evidence");
   });
 
   it("promotes error-level quality issues into a high-priority action", () => {
