@@ -27,7 +27,10 @@ type AppMode = "cockpit" | "drafting" | "answering" | "reviewing" | "settings";
 type AnswerMap = Record<string, { label: string; other: string }>;
 
 const shell: CSSProperties = {
+  width: "100%",
+  height: "100vh",
   minHeight: "100vh",
+  overflow: "hidden",
   background: "#f6f7f7",
   color: C.text,
   fontFamily:
@@ -806,7 +809,9 @@ function layoutStyle(): CSSProperties {
     display: "grid",
     gridTemplateColumns: "280px minmax(0, 1fr) 320px",
     gap: 16,
-    minHeight: "100vh",
+    width: "100%",
+    height: "100%",
+    minHeight: 0,
     padding: 16,
     boxSizing: "border-box",
   };
@@ -818,9 +823,8 @@ function sidebarStyle(): CSSProperties {
     border: `1px solid ${C.border}`,
     borderRadius: 8,
     padding: 16,
-    position: "sticky",
-    top: 16,
-    height: "calc(100vh - 32px)",
+    height: "100%",
+    minHeight: 0,
     boxSizing: "border-box",
     overflow: "auto",
   };
@@ -829,9 +833,12 @@ function sidebarStyle(): CSSProperties {
 function mainStyle(): CSSProperties {
   return {
     minWidth: 0,
+    minHeight: 0,
     display: "grid",
     alignContent: "start",
     gap: 14,
+    overflowY: "auto",
+    paddingRight: 2,
   };
 }
 
@@ -840,9 +847,8 @@ function rightRailStyle(): CSSProperties {
     display: "grid",
     alignContent: "start",
     gap: 14,
-    position: "sticky",
-    top: 16,
-    height: "calc(100vh - 32px)",
+    height: "100%",
+    minHeight: 0,
     overflow: "auto",
   };
 }

@@ -11,8 +11,10 @@ let mainWindow: BrowserWindow | null = null;
 
 function createWindow(): void {
   const win = new BrowserWindow({
-    width: 1000,
-    height: 760,
+    width: 1280,
+    height: 820,
+    minWidth: 1100,
+    minHeight: 720,
     show: false,
     title: "Aimcub",
     backgroundColor: "#fafafa",
