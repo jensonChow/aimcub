@@ -5,6 +5,10 @@ import { registerIpc } from "./ipc";
 import { loadProviderConfig } from "./gateway";
 import { loadWebResearchConfig } from "./web-research-settings";
 
+app.setName("Aimcub");
+
+let mainWindow: BrowserWindow | null = null;
+
 function createWindow(): void {
   const win = new BrowserWindow({
     width: 1000,
@@ -20,6 +24,10 @@ function createWindow(): void {
     },
   });
 
+  mainWindow = win;
+  win.on("closed", () => {
+    if (mainWindow === win) mainWindow = null;
+  });
   win.on("ready-to-show", () => win.show());
 
   // In dev, electron-vite serves the renderer over HTTP; in prod, load the built file.
@@ -31,7 +39,21 @@ function createWindow(): void {
   }
 }
 
+const singleInstanceLock = app.requestSingleInstanceLock();
+
+if (!singleInstanceLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    if (!mainWindow) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  });
+}
+
 app.whenReady().then(() => {
+  if (!singleInstanceLock) return;
   // Load the persisted provider config into memory, then wire IPC.
   loadProviderConfig();
   loadWebResearchConfig();
