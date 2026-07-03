@@ -47,6 +47,8 @@ import {
   type ProviderConfig,
   type ProviderStatus,
   type ProviderTestResult,
+  type LocalAgentRunRequest,
+  type LocalAgentRunResult,
   type RefineRequest,
   type SaveRequest,
   type SavedGoal,
@@ -59,6 +61,7 @@ import { aimStore } from "./store";
 import { buildGateway, getProviderStatus, setProviderConfig, testProviderConfig } from "./gateway";
 import { collectDesktopPlanningContext, type DesktopPlanningContext } from "./tools";
 import { getWebResearchStatus, setWebResearchConfig, testWebResearchConfig } from "./web-research-settings";
+import { listLocalAgents, runLocalAgent } from "./local-agents";
 
 async function planningContext(input: {
   title: string;
@@ -289,6 +292,12 @@ export function registerIpc(): void {
 
   ipcMain.handle(IPC.testWebResearchConfig, async (_e, config: WebResearchConfig): Promise<WebResearchTestResult> =>
     testWebResearchConfig(config),
+  );
+
+  ipcMain.handle(IPC.listLocalAgents, () => listLocalAgents());
+
+  ipcMain.handle(IPC.runLocalAgent, (_e, req: LocalAgentRunRequest): Promise<LocalAgentRunResult> =>
+    runLocalAgent(req),
   );
 
   ipcMain.handle(IPC.saveGoal, async (_e, req: SaveRequest): Promise<SavedGoal> => {

@@ -4,7 +4,7 @@ import type { DecompositionOutput, Goal, Memory } from "@core/types";
 import { reviewAimLearning, reviewContextLineage } from "@core/domain";
 import type { AimIntakeReport, AimLearningReport, ContextCaptureFulfillmentReport, ContextHealthRow, ContextLineageLearningReport, ContextLineageReport, ContextProfileReport, DecompositionLearningReport, DecompositionStrategyReport, PlanQualityDimensionReport } from "@core/domain";
 import type { ClarifyOutput, ClarifyAnswer, ClarifyAnswerImpactReport, ClarifyLearningReport, PlanningContextSelectionReport } from "@core/llm";
-import type { PlanResult, PlanningToolIpcTrace, ProviderStatus, WebResearchStatus } from "../shared/ipc";
+import type { LocalAgentDetection, PlanResult, PlanningToolIpcTrace, ProviderStatus, WebResearchStatus } from "../shared/ipc";
 
 import { ContextInbox } from "./ContextInbox";
 import {
@@ -16,6 +16,7 @@ import {
 } from "./HomeView";
 import { I18nProvider, useI18n, type StringKey } from "./i18n";
 import { LangToggle } from "./LangToggle";
+import { LocalAgentForm } from "./LocalAgentForm";
 import { Notice } from "./Notice";
 import { ProviderForm } from "./ProviderForm";
 import { WebResearchForm } from "./WebResearchForm";
@@ -194,6 +195,7 @@ function AppInner() {
   const [savedContextCandidates, setSavedContextCandidates] = useState<Memory[]>([]);
   const [provider, setProvider] = useState<ProviderStatus | null>(null);
   const [webResearch, setWebResearch] = useState<WebResearchStatus | null>(null);
+  const [localAgents, setLocalAgents] = useState<LocalAgentDetection[] | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [contextCandidates, setContextCandidates] = useState<Memory[]>([]);
@@ -221,6 +223,7 @@ function AppInner() {
       .getWebResearchConfig()
       .then(setWebResearch)
       .catch(() => {});
+    refreshLocalAgents();
     refreshGoals();
     refreshContextCandidates();
     refreshContextHistory();
@@ -291,6 +294,14 @@ function AppInner() {
 
   function refreshContextDecompositionLearning() {
     window.aimcub.listContextDecompositionLearning().then(setContextDecompositionLearning).catch(() => {});
+  }
+
+  async function refreshLocalAgents() {
+    try {
+      setLocalAgents(await window.aimcub.listLocalAgents());
+    } catch {
+      setLocalAgents([]);
+    }
   }
 
   const configured = provider?.configured ?? false;
@@ -862,6 +873,11 @@ function AppInner() {
               <WebResearchForm
                 status={webResearch}
                 onSaved={setWebResearch}
+              />
+              <div style={{ height: 10 }} />
+              <LocalAgentForm
+                agents={localAgents}
+                onRefresh={refreshLocalAgents}
               />
             </div>
           )}

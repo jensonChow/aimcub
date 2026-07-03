@@ -176,6 +176,75 @@ export interface WebResearchTestResult {
   latencyMs: number;
 }
 
+export type LocalAgentId = "codex" | "claude";
+
+export type LocalAgentSandboxMode = "read-only" | "workspace-write" | "danger-full-access";
+
+export interface LocalAgentModelOption {
+  id: string;
+  label: string;
+}
+
+export interface LocalAgentDetection {
+  id: LocalAgentId;
+  name: string;
+  runMode: "local_cli";
+  available: boolean;
+  path: string | null;
+  version: string | null;
+  authStatus: "ok" | "missing" | "unknown";
+  authMessage: string | null;
+  models: LocalAgentModelOption[];
+  modelsSource: "live" | "fallback";
+  reasoningOptions: LocalAgentModelOption[];
+  diagnostics: string[];
+}
+
+export interface LocalAgentRunRequest {
+  agentId: LocalAgentId;
+  prompt: string;
+  cwd?: string;
+  model?: string;
+  reasoning?: string;
+  extraAllowedDirs?: string[];
+  timeoutMs?: number;
+  permission?: {
+    sandbox?: LocalAgentSandboxMode;
+    network?: boolean;
+  };
+}
+
+export interface LocalAgentEvent {
+  type:
+    | "agent.run.started"
+    | "agent.message.delta"
+    | "agent.tool.started"
+    | "agent.tool.finished"
+    | "agent.usage.reported"
+    | "agent.run.completed"
+    | "agent.run.failed"
+    | "agent.stderr"
+    | "agent.raw";
+  summary: string;
+  sessionId?: string;
+  toolId?: string;
+  toolName?: string;
+  usage?: Record<string, number>;
+  raw?: unknown;
+}
+
+export interface LocalAgentRunResult {
+  ok: boolean;
+  agentId: LocalAgentId;
+  command: string;
+  args: string[];
+  events: LocalAgentEvent[];
+  outputText: string;
+  exitCode: number | null;
+  error: string | null;
+  durationMs: number;
+}
+
 /** The typed surface exposed on `window.aimcub` by the preload bridge. */
 export interface AimcubApi {
   intake(req: DraftRequest): Promise<AimIntakeReport>;
@@ -203,6 +272,8 @@ export interface AimcubApi {
   getWebResearchConfig(): Promise<WebResearchStatus>;
   setWebResearchConfig(config: WebResearchConfig): Promise<WebResearchStatus>;
   testWebResearchConfig(config: WebResearchConfig): Promise<WebResearchTestResult>;
+  listLocalAgents(): Promise<LocalAgentDetection[]>;
+  runLocalAgent(req: LocalAgentRunRequest): Promise<LocalAgentRunResult>;
 }
 
 /** Channel names — kept in one place so main and preload can't drift. */
@@ -232,6 +303,8 @@ export const IPC = {
   getWebResearchConfig: "aimcub:getWebResearchConfig",
   setWebResearchConfig: "aimcub:setWebResearchConfig",
   testWebResearchConfig: "aimcub:testWebResearchConfig",
+  listLocalAgents: "aimcub:listLocalAgents",
+  runLocalAgent: "aimcub:runLocalAgent",
 } as const;
 
 declare global {

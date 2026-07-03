@@ -28,6 +28,8 @@ const api: AimcubApi = {
   getWebResearchConfig: () => ipcRenderer.invoke(IPC.getWebResearchConfig),
   setWebResearchConfig: (config) => ipcRenderer.invoke(IPC.setWebResearchConfig, config),
   testWebResearchConfig: (config) => ipcRenderer.invoke(IPC.testWebResearchConfig, config),
+  listLocalAgents: () => ipcRenderer.invoke(IPC.listLocalAgents),
+  runLocalAgent: (req) => ipcRenderer.invoke(IPC.runLocalAgent, req),
 };
 
 contextBridge.exposeInMainWorld("aimcub", api);

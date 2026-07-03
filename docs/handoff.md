@@ -1,6 +1,6 @@
 # Aimcub Handoff
 
-Last updated: 2026-07-02
+Last updated: 2026-07-03
 
 ## Product Memory
 
@@ -48,6 +48,9 @@ Last updated: 2026-07-02
 - Recent DeepSeek fixes disabled unsupported structured-output assumptions for custom/OpenAI-compatible paths and added request-shaping for DeepSeek-style JSON responses. If providers fail, surface the model/provider error quickly instead of leaving Desktop stuck on "starting initial plan".
 - Clarify/decompose has been strengthened but is still not enough. It now asks more baseline context questions and routes more digital work to agents, but it is still mostly prompt-only. The next missing layer is a first-party planning tool substrate that lets the model inspect local context, search/read files, use memory, and optionally research the web before decomposing an aim.
 - The first unified built-in tool contract substrate now lives in `packages/llm/src/tool-contract.ts` and is exported from `@core/llm`. It defines contracts, permissions, structured observations, normalized errors, handler types, and a registry for `local.*`, `memory.*`, `web.*`, and `context.*` planning tools. Runtime handlers and Desktop permission UI are still next.
+- Desktop now has a first pass of the local CLI agent harness in `apps/desktop/src/main/local-agents.ts`, following the OpenDesign-style local adapter pattern: registry definitions for Codex and Claude, executable detection via explicit env overrides/PATH/common install paths, version/auth/model probes, command construction, stdin prompt delivery, and JSONL/stream-json event normalization into Aimcub events.
+- This local CLI harness is an Aimcub runtime layer, not MCP and not an LLM provider replacement. Aimcub should continue to own aim decomposition, context, permissions, evidence, and eval; local CLIs such as `codex exec --json` and `claude -p` are execution runtimes for delegated work.
+- Desktop settings now includes a minimal "Local CLI agents" panel that lists detected Codex/Claude CLIs and can run an explicit read-only smoke test. Keep this panel thin until the runtime is connected to milestone execution and evidence capture.
 
 ## Verification Notes
 
@@ -73,6 +76,7 @@ Last updated: 2026-07-02
 - Keep CLI work incremental: split help into layers, preserve scriptability, and add command-dispatch smoke tests before adding more verbs.
 - Before a public open-source release, choose the license, add `CONTRIBUTING.md` and `SECURITY.md`, audit secrets/env examples, and separate public local-first docs from hosted online-platform deployment notes.
 - Keep refining aim decomposition around context capture: ask fewer but higher-value questions, prefer eval signals, and show why a question changes the plan.
+- Next local-agent work: persist per-agent model/reasoning selection, add a run queue tied to milestones, capture file/tool events as append-only evidence, and add cancellation/resume only after the one-shot execution path is reliable.
 
 ## Next Session Goal Prompt
 
