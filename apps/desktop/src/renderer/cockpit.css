@@ -988,6 +988,299 @@ select:focus-visible {
   text-align: right;
 }
 
+.od-stage-panel {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+}
+
+.od-stage-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.od-stage-kicker {
+  color: var(--od-accent);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.od-stage-panel-head h2 {
+  margin: 4px 0 0;
+  color: var(--od-fg);
+  font-size: 20px;
+  line-height: 1.35;
+}
+
+.od-stage-panel-head p {
+  max-width: 680px;
+  margin: 6px 0 0;
+  color: var(--od-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.od-stage-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.od-stage-metric {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-sm);
+  background: var(--od-surface-warm);
+  padding: 10px 12px;
+}
+
+.od-stage-metric span {
+  overflow: hidden;
+  color: var(--od-muted);
+  font-size: 12px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.od-stage-metric strong {
+  color: var(--od-fg);
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.od-work-list {
+  display: grid;
+  gap: 10px;
+}
+
+.od-work-card {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-sm);
+  background: var(--od-bg);
+  padding: 14px;
+}
+
+.od-work-card.is-complete {
+  border-color: color-mix(in oklab, var(--od-success), var(--od-bg) 72%);
+  background: color-mix(in oklab, var(--od-success), var(--od-bg) 96%);
+}
+
+.od-work-card-main {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.od-work-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.od-work-title {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.od-work-title strong {
+  min-width: 0;
+  color: var(--od-fg);
+  font-size: 14px;
+  line-height: 1.35;
+  font-weight: 750;
+}
+
+.od-work-card-main > p {
+  max-width: 760px;
+  margin: 0;
+  color: var(--od-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.od-work-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.od-work-detail-grid > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-sm);
+  background: var(--od-surface-warm);
+  padding: 9px 10px;
+}
+
+.od-work-detail-grid span,
+.od-work-detail-grid small {
+  overflow: hidden;
+  color: var(--od-muted);
+  font-size: 12px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.od-work-detail-grid strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--od-fg);
+  font-size: 13px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.od-work-note,
+.od-next-work {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  color: var(--od-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.od-work-note strong,
+.od-next-work span {
+  color: var(--od-fg);
+  font-weight: 750;
+}
+
+.od-next-work strong {
+  color: var(--od-muted);
+  font-weight: 500;
+}
+
+.od-work-actions {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.od-work-actions .od-aim-secondary {
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+
+.od-aim-secondary:disabled {
+  color: var(--od-meta);
+  background: var(--od-surface);
+  cursor: default;
+}
+
+.od-pill.danger {
+  border-color: color-mix(in oklab, var(--od-danger), var(--od-bg) 76%);
+  background: color-mix(in oklab, var(--od-danger), var(--od-bg) 92%);
+  color: var(--od-danger);
+}
+
+.od-evaluator-list {
+  display: grid;
+  gap: 8px;
+}
+
+.od-evaluator-row {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-sm);
+  background: var(--od-surface-warm);
+  padding: 10px;
+}
+
+.od-evaluator-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.od-evaluator-head strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--od-fg);
+  font-size: 13px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.od-evaluator-row p,
+.od-evaluator-row small {
+  margin: 0;
+  color: var(--od-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.od-empty-inline {
+  border: 1px dashed var(--od-border);
+  border-radius: var(--od-radius-sm);
+  color: var(--od-muted);
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.od-eval-context {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid var(--od-border-soft);
+  padding-top: 14px;
+}
+
+.od-eval-context-list {
+  display: grid;
+  gap: 8px;
+}
+
+.od-eval-candidate {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-sm);
+  background: var(--od-surface-warm);
+  padding: 10px 12px;
+}
+
+.od-eval-candidate strong {
+  color: var(--od-fg);
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 650;
+}
+
+.od-eval-candidate span {
+  overflow: hidden;
+  color: var(--od-muted);
+  font-size: 12px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .od-inspector {
   min-width: 0;
   min-height: 0;
@@ -1349,7 +1642,10 @@ select:focus-visible {
   .od-context-source-status,
   .od-context-next-action,
   .od-context-online-row,
-  .od-context-setting-row {
+  .od-context-setting-row,
+  .od-stage-metrics,
+  .od-work-card,
+  .od-work-detail-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -1364,6 +1660,18 @@ select:focus-visible {
 
   .od-context-control-head > .od-pill {
     width: max-content;
+  }
+
+  .od-stage-panel-head {
+    display: grid;
+  }
+
+  .od-work-actions {
+    justify-content: stretch;
+  }
+
+  .od-work-actions .od-aim-secondary {
+    width: 100%;
   }
 
   .od-workspace {
