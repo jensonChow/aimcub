@@ -2,9 +2,17 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 
 import type { AimIntakeReport, AimProgressReadModel } from "@core/domain";
 import type { ClarifyAnswer, ClarifyOutput, ClarifyQuestion, ClarifySelectionMode } from "@core/llm";
-import type { ContextCategory, DecompositionOutput, Goal, Milestone } from "@core/types";
+import type {
+  ContextCategory,
+  DecompositionOutput,
+  Evidence,
+  Goal,
+  ManualEvidenceRequiredItem,
+  Milestone,
+} from "@core/types";
 import type {
   ClarifyIpcResult,
+  ConfirmMilestoneRequest,
   ContextSourceStatus,
   GoalDetail,
   LocalAgentDetection,
@@ -29,11 +37,86 @@ type ClarifyPhase = "intake" | "postDraft" | null;
 type AnswerMap = Record<string, { labels: string[]; other: string }>;
 type ProgressMilestoneRow = AimProgressReadModel["milestones"][number];
 type EvalState = "passed" | "failed" | "needs_human" | "unsupported" | "error" | "pending";
+type EvidenceSubmissionDraft = {
+  proofNote: string;
+  url: string;
+  filePaths: string[];
+  requiredEvidence: ManualEvidenceRequiredItem[];
+};
 
 function shortText(value: string | undefined | null, max = 120): string {
   const cleaned = (value ?? "").replace(/\s+/g, " ").trim();
   if (cleaned.length <= max) return cleaned;
   return `${cleaned.slice(0, max - 1).trim()}…`;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
+}
+
+function requiredEvidenceForMilestone(milestone: Milestone): string[] {
+  const contract = asRecord(milestone.metadata?.decomposition_contract);
+  return stringArray(contract?.required_evidence);
+}
+
+function emptyEvidenceDraft(milestone: Milestone): EvidenceSubmissionDraft {
+  return {
+    proofNote: "",
+    url: "",
+    filePaths: [],
+    requiredEvidence: requiredEvidenceForMilestone(milestone).map((text) => ({ text, satisfied: false })),
+  };
+}
+
+function proofUrlsFromDraft(url: string): string[] {
+  return url.split(/[\n,]+/).map((item) => item.trim()).filter(Boolean);
+}
+
+function evidenceDraftIsSubmittable(draft: EvidenceSubmissionDraft): boolean {
+  const hasProof = draft.proofNote.trim().length > 0 || proofUrlsFromDraft(draft.url).length > 0 || draft.filePaths.length > 0;
+  const requiredOk = draft.requiredEvidence.length === 0 || draft.requiredEvidence.some((item) => item.satisfied);
+  return hasProof && requiredOk;
+}
+
+function evidenceSubmissionPayload(
+  draft: EvidenceSubmissionDraft,
+): Omit<ConfirmMilestoneRequest, "goalId" | "milestoneId"> {
+  return {
+    proofNote: draft.proofNote.trim(),
+    urls: proofUrlsFromDraft(draft.url),
+    filePaths: draft.filePaths,
+    requiredEvidence: draft.requiredEvidence,
+  };
+}
+
+function manualPayloadField(evidence: Evidence, key: string): unknown {
+  return asRecord(evidence.payload)?.[key];
+}
+
+function evidenceReferenceMeta(evidence: Evidence): string {
+  const urls = stringArray(manualPayloadField(evidence, "urls"));
+  const files = stringArray(manualPayloadField(evidence, "file_paths"));
+  const required = Array.isArray(manualPayloadField(evidence, "required_evidence"))
+    ? (manualPayloadField(evidence, "required_evidence") as unknown[])
+      .map(asRecord)
+      .filter((item): item is Record<string, unknown> => Boolean(item))
+    : [];
+  const checked = required.filter((item) => item.satisfied === true).length;
+  return [
+    evidence.kind,
+    urls.length ? `${urls.length} URL${urls.length === 1 ? "" : "s"}` : "",
+    files.length ? `${files.length} file${files.length === 1 ? "" : "s"}` : "",
+    required.length ? `${checked}/${required.length} required` : "",
+  ].filter(Boolean).join(" · ");
+}
+
+function evidenceDisplaySummary(evidence: Evidence): string {
+  const proofNote = manualPayloadField(evidence, "proof_note");
+  return typeof proofNote === "string" && proofNote.trim() ? proofNote : evidence.summary;
 }
 
 function pct(done: number, total: number): number {
@@ -208,6 +291,7 @@ function progressRows(detail: GoalDetail, progress: AimProgressReadModel | null)
     latest_run: null,
     child_relations: [],
     evaluator_results: [],
+    evidence: [],
     evidence_count: 0,
     completed: milestone.status === "completed",
     blocked: milestone.status === "blocked",
@@ -552,7 +636,7 @@ function AimOsApp() {
     }
   }
 
-  async function confirmMilestone(milestone: Milestone) {
+  async function confirmMilestone(milestone: Milestone, submission: Omit<ConfirmMilestoneRequest, "goalId" | "milestoneId">) {
     if (!selected) return;
     setBusy(t("os.busy.confirm"));
     setError(null);
@@ -560,7 +644,7 @@ function AimOsApp() {
       const nextDetail = await window.aimcub.confirmMilestone({
         goalId: selected.id,
         milestoneId: milestone.id,
-        summary: `Confirmed sub-aim: ${milestone.title}`,
+        ...submission,
       });
       const nextProgress = await window.aimcub.getAimProgress(selected.id);
       setDetail(nextDetail);
@@ -679,7 +763,11 @@ function AimOsApp() {
       progress={progress}
       disabled={Boolean(busy)}
       onRunAgent={(milestone) => void runAgent(milestone)}
-      onConfirm={(milestone) => void confirmMilestone(milestone)}
+      onConfirm={confirmMilestone}
+      onPickFiles={async () => {
+        const result = await window.aimcub.pickLocalContextFiles();
+        return result.canceled ? [] : result.paths;
+      }}
       onBreakDown={breakDown}
     />
   ) : null;
@@ -1173,7 +1261,8 @@ function ExecutePanel(props: {
   progress: AimProgressReadModel | null;
   disabled: boolean;
   onRunAgent: (milestone: Milestone) => void;
-  onConfirm: (milestone: Milestone) => void;
+  onConfirm: (milestone: Milestone, submission: Omit<ConfirmMilestoneRequest, "goalId" | "milestoneId">) => Promise<void>;
+  onPickFiles: () => Promise<string[]>;
   onBreakDown: (milestone: Milestone) => void;
 }) {
   const { t } = useI18n();
@@ -1181,6 +1270,51 @@ function ExecutePanel(props: {
   const openRows = rows.filter((row) => !row.completed);
   const agentAssignments = rows.filter((row) => row.assignment?.actor_kind === "agent").length;
   const humanAssignments = rows.filter((row) => row.assignment?.actor_kind === "human").length;
+  const [activeProofId, setActiveProofId] = useState<string | null>(null);
+  const [proofDrafts, setProofDrafts] = useState<Record<string, EvidenceSubmissionDraft>>({});
+  const [pickingFilesFor, setPickingFilesFor] = useState<string | null>(null);
+
+  function proofDraftFor(milestone: Milestone): EvidenceSubmissionDraft {
+    return proofDrafts[milestone.id] ?? emptyEvidenceDraft(milestone);
+  }
+
+  function updateProofDraft(milestone: Milestone, updater: (draft: EvidenceSubmissionDraft) => EvidenceSubmissionDraft): void {
+    setProofDrafts((current) => ({
+      ...current,
+      [milestone.id]: updater(current[milestone.id] ?? emptyEvidenceDraft(milestone)),
+    }));
+  }
+
+  function openProof(milestone: Milestone): void {
+    setActiveProofId(milestone.id);
+    setProofDrafts((current) => current[milestone.id] ? current : { ...current, [milestone.id]: emptyEvidenceDraft(milestone) });
+  }
+
+  async function pickProofFiles(milestone: Milestone): Promise<void> {
+    setPickingFilesFor(milestone.id);
+    try {
+      const paths = await props.onPickFiles();
+      if (paths.length === 0) return;
+      updateProofDraft(milestone, (draft) => ({
+        ...draft,
+        filePaths: [...new Set([...draft.filePaths, ...paths.map((path) => path.trim()).filter(Boolean)])],
+      }));
+    } finally {
+      setPickingFilesFor(null);
+    }
+  }
+
+  async function submitProof(milestone: Milestone): Promise<void> {
+    const draft = proofDraftFor(milestone);
+    if (!evidenceDraftIsSubmittable(draft)) return;
+    await props.onConfirm(milestone, evidenceSubmissionPayload(draft));
+    setActiveProofId(null);
+    setProofDrafts((current) => {
+      const next = { ...current };
+      delete next[milestone.id];
+      return next;
+    });
+  }
 
   function actorLabel(row: ProgressMilestoneRow): string {
     if (!row.assignment) return t("os.unassigned");
@@ -1274,7 +1408,7 @@ function ExecutePanel(props: {
                 className="od-aim-secondary"
                 type="button"
                 disabled={props.disabled || row.completed}
-                onClick={() => props.onConfirm(row.milestone)}
+                onClick={() => openProof(row.milestone)}
               >
                 {t("os.confirmProof")}
               </button>
@@ -1287,10 +1421,168 @@ function ExecutePanel(props: {
                 {t("os.breakDown")}
               </button>
             </div>
+
+            {activeProofId === row.milestone.id ? (
+              <EvidenceSubmissionForm
+                milestone={row.milestone}
+                draft={proofDraftFor(row.milestone)}
+                disabled={props.disabled}
+                pickingFiles={pickingFilesFor === row.milestone.id}
+                onChange={(next) => updateProofDraft(row.milestone, () => next)}
+                onPickFiles={() => void pickProofFiles(row.milestone)}
+                onCancel={() => setActiveProofId(null)}
+                onSubmit={() => void submitProof(row.milestone)}
+              />
+            ) : null}
           </article>
         ))}
       </div>
     </section>
+  );
+}
+
+export function EvidenceSubmissionForm(props: {
+  milestone: Milestone;
+  draft: EvidenceSubmissionDraft;
+  disabled: boolean;
+  pickingFiles: boolean;
+  onChange: (draft: EvidenceSubmissionDraft) => void;
+  onPickFiles: () => void;
+  onCancel: () => void;
+  onSubmit: () => void;
+}) {
+  const { t } = useI18n();
+  const hasProof = props.draft.proofNote.trim().length > 0
+    || proofUrlsFromDraft(props.draft.url).length > 0
+    || props.draft.filePaths.length > 0;
+  const requiredOk = props.draft.requiredEvidence.length === 0
+    || props.draft.requiredEvidence.some((item) => item.satisfied);
+  const canSubmit = hasProof && requiredOk;
+
+  function setRequiredEvidence(text: string, satisfied: boolean): void {
+    props.onChange({
+      ...props.draft,
+      requiredEvidence: props.draft.requiredEvidence.map((item) =>
+        item.text === text ? { ...item, satisfied } : item,
+      ),
+    });
+  }
+
+  function removeFile(path: string): void {
+    props.onChange({
+      ...props.draft,
+      filePaths: props.draft.filePaths.filter((item) => item !== path),
+    });
+  }
+
+  return (
+    <form
+      className="od-proof-form"
+      onSubmit={(event) => {
+        event.preventDefault();
+        props.onSubmit();
+      }}
+    >
+      <div className="od-proof-head">
+        <div>
+          <strong>{t("os.proofHeading")}</strong>
+          <span>{t("os.proofBody")}</span>
+        </div>
+        <span className="od-pill">{shortText(props.milestone.title, 48)}</span>
+      </div>
+
+      <label className="od-proof-field">
+        <span>{t("os.proofNote")}</span>
+        <textarea
+          value={props.draft.proofNote}
+          disabled={props.disabled}
+          rows={3}
+          placeholder={t("os.proofNotePlaceholder")}
+          onChange={(event) => props.onChange({ ...props.draft, proofNote: event.currentTarget.value })}
+        />
+      </label>
+
+      <label className="od-proof-field">
+        <span>{t("os.proofUrl")}</span>
+        <textarea
+          value={props.draft.url}
+          disabled={props.disabled}
+          rows={2}
+          placeholder={t("os.proofUrlPlaceholder")}
+          onChange={(event) => props.onChange({ ...props.draft, url: event.currentTarget.value })}
+        />
+      </label>
+
+      <div className="od-proof-field">
+        <span>{t("os.proofFiles")}</span>
+        <div className="od-proof-file-actions">
+          <button
+            className="od-aim-secondary"
+            type="button"
+            disabled={props.disabled || props.pickingFiles}
+            onClick={props.onPickFiles}
+          >
+            {props.pickingFiles ? t("os.proofPickingFiles") : t("os.proofAddFiles")}
+          </button>
+          <small>{t("os.proofFilesHint")}</small>
+        </div>
+        {props.draft.filePaths.length === 0 ? (
+          <div className="od-empty-inline">{t("os.proofNoFiles")}</div>
+        ) : (
+          <div className="od-proof-file-list">
+            {props.draft.filePaths.map((path) => (
+              <div key={path} className="od-proof-file-row">
+                <span>{path}</span>
+                <button
+                  type="button"
+                  disabled={props.disabled}
+                  aria-label={`${t("os.proofRemoveFile")}: ${path}`}
+                  onClick={() => removeFile(path)}
+                >
+                  {t("os.proofRemoveFile")}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <fieldset className="od-proof-required">
+        <legend>{t("os.proofRequiredEvidence")}</legend>
+        {props.draft.requiredEvidence.length === 0 ? (
+          <div className="od-empty-inline">{t("os.proofNoRequiredEvidence")}</div>
+        ) : (
+          <div className="od-proof-required-list">
+            {props.draft.requiredEvidence.map((item) => (
+              <label key={item.text} className="od-proof-check-row">
+                <input
+                  type="checkbox"
+                  checked={item.satisfied}
+                  disabled={props.disabled}
+                  onChange={(event) => setRequiredEvidence(item.text, event.currentTarget.checked)}
+                />
+                <span>{item.text}</span>
+              </label>
+            ))}
+          </div>
+        )}
+      </fieldset>
+
+      {!canSubmit ? (
+        <div className="od-proof-validation">
+          {!hasProof ? t("os.proofNeedsDetail") : t("os.proofNeedsRequired")}
+        </div>
+      ) : null}
+
+      <div className="od-proof-actions">
+        <button className="od-aim-secondary" type="button" disabled={props.disabled} onClick={props.onCancel}>
+          {t("common.cancel")}
+        </button>
+        <button className="od-aim-primary" type="submit" disabled={props.disabled || !canSubmit}>
+          {t("os.submitProof")}
+        </button>
+      </div>
+    </form>
   );
 }
 
@@ -1383,6 +1675,21 @@ function EvalPanel(props: {
                         {t("os.evalMatchedCount", { n: result.matched_evidence_ids.length })}
                         {result.requires_human_confirmation ? ` · ${t("os.evalHumanConfirmation")}` : ""}
                       </small>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="od-evidence-list">
+                  <div className="od-evidence-list-head">
+                    <strong>{t("os.evalEvidenceItems")}</strong>
+                    <span>{t("os.evidenceCount", { n: row.evidence.length })}</span>
+                  </div>
+                  {row.evidence.length === 0 ? (
+                    <div className="od-empty-inline">{t("os.evalNoEvidenceItems")}</div>
+                  ) : row.evidence.slice().reverse().slice(0, 4).map((evidence) => (
+                    <div key={evidence.id} className="od-evidence-row">
+                      <strong>{shortText(evidenceDisplaySummary(evidence), 180)}</strong>
+                      <span>{evidenceReferenceMeta(evidence)}</span>
                     </div>
                   ))}
                 </div>

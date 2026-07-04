@@ -150,6 +150,7 @@ Reference links:
 - Pointer targets should be at least 24 by 24 CSS px, with practical Aimcub targets usually 32 to 44 px.
 - Do not interrupt the user with modal dialogs for recoverable actions. Prefer inline banners, undo, or a review surface.
 - Planning question surfaces must distinguish blocking pre-draft context from optional post-draft refinements. Pre-draft intake should make the blocked next step explicit; post-draft clarification should keep accepting the draft available without implying the user is stuck.
+- Manual proof confirmation must open an evidence submission surface before recording confirmation. The surface should collect proof note, URL, local file references when available, and required-evidence checklist mapping; Eval should show the submitted evidence details.
 - Destructive actions need undo when possible. If undo is not possible, require explicit confirmation with action-specific button labels.
 - Loading states should preserve layout dimensions. Avoid spinners that replace large content areas without a stable skeleton, label, or status.
 - Motion should be fast, direct, and functional. Keep transitions around 120 to 180 ms. Avoid decorative animation loops.

@@ -336,6 +336,7 @@ export function buildAimProgressReadModel(input: BuildAimProgressInput): AimProg
       latest_run: latestRun,
       child_relations: childRelations,
       evaluator_results: evaluation.evaluatorResults,
+      evidence: milestoneEvidence,
       evidence_count: milestoneEvidence.length,
       completed,
       blocked,
