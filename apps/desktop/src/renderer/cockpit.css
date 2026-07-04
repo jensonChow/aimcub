@@ -1183,6 +1183,177 @@ select:focus-visible {
   font-size: 13px;
 }
 
+.od-plan-editor .od-aim-primary {
+  margin-top: 0;
+}
+
+.od-plan-list {
+  display: grid;
+  gap: 10px;
+}
+
+.od-plan-card {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 12px;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-sm);
+  background: var(--od-bg);
+  padding: 14px;
+}
+
+.od-plan-card-index {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--od-accent), var(--od-bg) 92%);
+  color: var(--od-accent);
+  font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.od-plan-card-main,
+.od-plan-edit-grid,
+.od-plan-field {
+  min-width: 0;
+  display: grid;
+}
+
+.od-plan-card-main {
+  gap: 12px;
+}
+
+.od-plan-card-head {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.od-plan-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.od-plan-actions button,
+.od-plan-field-head button {
+  min-height: 32px;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-pill);
+  background: var(--od-surface-warm);
+  color: var(--od-fg);
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.od-plan-actions button:hover:not(:disabled),
+.od-plan-field-head button:hover {
+  border-color: var(--od-border);
+  background: var(--od-surface);
+}
+
+.od-plan-actions button:disabled {
+  color: var(--od-meta);
+  cursor: default;
+  opacity: 0.6;
+}
+
+.od-plan-edit-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.od-plan-field {
+  gap: 6px;
+}
+
+.od-plan-field-wide {
+  grid-column: 1 / -1;
+}
+
+.od-plan-field span,
+.od-plan-field-head span {
+  color: var(--od-muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.od-plan-field input,
+.od-plan-field textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-sm);
+  background: var(--od-surface-warm);
+  color: var(--od-fg);
+  padding: 10px 11px;
+  font-size: 13px;
+  line-height: 1.45;
+  outline: 0;
+}
+
+.od-plan-field input:focus,
+.od-plan-field textarea:focus {
+  border-color: color-mix(in oklab, var(--od-accent), var(--od-bg) 48%);
+  background: var(--od-bg);
+}
+
+.od-plan-field textarea {
+  resize: vertical;
+}
+
+.od-plan-field-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.od-plan-rule-input {
+  font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.od-plan-error,
+.od-plan-validation {
+  color: var(--od-danger);
+}
+
+.od-plan-error {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.od-plan-validation {
+  display: grid;
+  gap: 4px;
+  border: 1px solid color-mix(in oklab, var(--od-danger), var(--od-bg) 76%);
+  border-radius: var(--od-radius-sm);
+  background: color-mix(in oklab, var(--od-danger), var(--od-bg) 94%);
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.od-plan-validation strong {
+  color: var(--od-danger);
+}
+
+.od-plan-validation span {
+  overflow-wrap: anywhere;
+}
+
 .od-aim-secondary:disabled {
   color: var(--od-meta);
   background: var(--od-surface);
@@ -1645,7 +1816,10 @@ select:focus-visible {
   .od-context-setting-row,
   .od-stage-metrics,
   .od-work-card,
-  .od-work-detail-grid {
+  .od-work-detail-grid,
+  .od-plan-card,
+  .od-plan-card-head,
+  .od-plan-edit-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -1672,6 +1846,14 @@ select:focus-visible {
 
   .od-work-actions .od-aim-secondary {
     width: 100%;
+  }
+
+  .od-plan-actions {
+    justify-content: stretch;
+  }
+
+  .od-plan-actions button {
+    flex: 1 1 120px;
   }
 
   .od-workspace {

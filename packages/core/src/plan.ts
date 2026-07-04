@@ -3,11 +3,30 @@
  * - validatePlan: semantic validation of the LLM output (what the grammar cannot enforce: acyclic / unique ids / count limit).
  * - planMerge: the core invariant of re-plan — completed nodes are frozen forever, never overwritten or lost.
  */
-import { type DecompositionOutput, type MilestoneStatus, type PlanEdge } from "@core/types";
+import {
+  DecompositionOutput,
+  type AcceptanceRule,
+  type DecompositionContract,
+  type MilestoneStatus,
+  type PlanEdge,
+  type PlanNode,
+} from "@core/types";
 
 export interface PlanValidation {
   ok: boolean;
   errors: string[];
+}
+
+export interface PlanNodePatch {
+  title?: string;
+  description?: string;
+  acceptance_rule?: AcceptanceRule;
+  decomposition_contract?: DecompositionContract | null;
+}
+
+export interface SplitPlanNodeInput {
+  first?: PlanNodePatch;
+  second?: Partial<Pick<PlanNode, "key" | "title" | "description" | "est_effort" | "xp_reward" | "acceptance_rule" | "decomposition_contract">>;
 }
 
 /** edge {from, to} semantics: `from` must be completed before `to` can begin (directed edge from→to). Detects directed cycles. */
@@ -60,6 +79,199 @@ export function validatePlan(output: DecompositionOutput): PlanValidation {
   }
 
   return { ok: errors.length === 0, errors };
+}
+
+export function validateExecutablePlan(input: unknown): PlanValidation {
+  const parsed = DecompositionOutput.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      errors: parsed.error.issues.map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`),
+    };
+  }
+  return validatePlan(parsed.data);
+}
+
+function cloneAcceptanceRule(rule: AcceptanceRule): AcceptanceRule {
+  return {
+    ...rule,
+    clauses: rule.clauses.map((clause) => ({
+      ...clause,
+      match: { ...clause.match },
+    })) as AcceptanceRule["clauses"],
+  };
+}
+
+function cloneContract(contract: DecompositionContract | null | undefined): DecompositionContract | null {
+  if (!contract) return null;
+  return {
+    ...contract,
+    required_evidence: [...contract.required_evidence],
+    context_gaps: contract.context_gaps.map((gap) => ({ ...gap })),
+  };
+}
+
+function compactUnique(values: string[]): string[] {
+  const result: string[] = [];
+  const seen = new Set<string>();
+  for (const value of values) {
+    const trimmed = value.trim();
+    if (!trimmed) continue;
+    const normalized = trimmed.toLowerCase().replace(/\s+/g, " ");
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    result.push(trimmed);
+  }
+  return result;
+}
+
+function mergeText(left: string | undefined, right: string | undefined): string {
+  return compactUnique([left ?? "", right ?? ""]).join("\n\n");
+}
+
+function mergeCompletionMode(left: AcceptanceRule["completion_mode"], right: AcceptanceRule["completion_mode"]): AcceptanceRule["completion_mode"] {
+  if (left === right) return left;
+  if (left === "auto_then_confirm" || right === "auto_then_confirm") return "auto_then_confirm";
+  return left === "auto" || right === "auto" ? "auto_then_confirm" : "manual";
+}
+
+function mergeAcceptanceRules(left: AcceptanceRule, right: AcceptanceRule): AcceptanceRule {
+  return {
+    logic: "all",
+    threshold: 1,
+    completion_mode: mergeCompletionMode(left.completion_mode, right.completion_mode),
+    clauses: [
+      ...cloneAcceptanceRule(left).clauses,
+      ...cloneAcceptanceRule(right).clauses,
+    ],
+  };
+}
+
+function mergeContracts(left: DecompositionContract | null, right: DecompositionContract | null): DecompositionContract | null {
+  if (!left && !right) return null;
+  if (!left) return cloneContract(right);
+  if (!right) return cloneContract(left);
+
+  const gaps = [...left.context_gaps, ...right.context_gaps];
+  const seenGaps = new Set<string>();
+  return {
+    why: mergeText(left.why, right.why) || "Merged sub-aim contract.",
+    definition_of_done: mergeText(left.definition_of_done, right.definition_of_done) || "The merged sub-aim is complete.",
+    required_evidence: compactUnique([...left.required_evidence, ...right.required_evidence]),
+    likely_owner: left.likely_owner === right.likely_owner ? left.likely_owner : "mixed",
+    context_gaps: gaps.filter((gap) => {
+      const id = `${gap.category}\n${gap.question.trim().toLowerCase()}`;
+      if (seenGaps.has(id)) return false;
+      seenGaps.add(id);
+      return true;
+    }).map((gap) => ({ ...gap })),
+    eval_signal: mergeText(left.eval_signal, right.eval_signal) || "Evidence satisfies the merged acceptance rule.",
+  };
+}
+
+function applyNodePatch(node: PlanNode, patch: PlanNodePatch): PlanNode {
+  return {
+    ...node,
+    ...(patch.title !== undefined ? { title: patch.title } : {}),
+    ...(patch.description !== undefined ? { description: patch.description } : {}),
+    ...(patch.acceptance_rule !== undefined ? { acceptance_rule: cloneAcceptanceRule(patch.acceptance_rule) } : {}),
+    ...(patch.decomposition_contract !== undefined ? { decomposition_contract: cloneContract(patch.decomposition_contract) } : {}),
+  };
+}
+
+function linearEdgesFor(nodes: readonly PlanNode[]): PlanEdge[] {
+  const edges: PlanEdge[] = [];
+  for (let i = 1; i < nodes.length; i += 1) {
+    edges.push({ from: nodes[i - 1]!.key, to: nodes[i]!.key });
+  }
+  return edges;
+}
+
+function withLinearOrder(plan: DecompositionOutput, nodes: PlanNode[]): DecompositionOutput {
+  return { ...plan, nodes, edges: linearEdgesFor(nodes) };
+}
+
+function uniquePlanKey(existing: ReadonlySet<string>, preferred: string): string {
+  const root = preferred
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "sub-aim";
+  let candidate = root;
+  let suffix = 2;
+  while (existing.has(candidate)) {
+    candidate = `${root}-${suffix}`;
+    suffix += 1;
+  }
+  return candidate;
+}
+
+export function updatePlanNode(plan: DecompositionOutput, key: string, patch: PlanNodePatch): DecompositionOutput {
+  return {
+    ...plan,
+    nodes: plan.nodes.map((node) => (node.key === key ? applyNodePatch(node, patch) : node)),
+  };
+}
+
+export function mergePlanNodes(plan: DecompositionOutput, targetKey: string, sourceKey: string): DecompositionOutput {
+  if (targetKey === sourceKey) return plan;
+  const target = plan.nodes.find((node) => node.key === targetKey);
+  const source = plan.nodes.find((node) => node.key === sourceKey);
+  if (!target || !source) return plan;
+
+  const mergedTitle = target.title.trim().toLowerCase() === source.title.trim().toLowerCase()
+    ? target.title
+    : `${target.title} + ${source.title}`;
+  const merged: PlanNode = {
+    ...target,
+    title: mergedTitle,
+    description: mergeText(target.description, source.description),
+    xp_reward: Math.max(1, target.xp_reward + source.xp_reward),
+    acceptance_rule: mergeAcceptanceRules(target.acceptance_rule, source.acceptance_rule),
+    decomposition_contract: mergeContracts(target.decomposition_contract, source.decomposition_contract),
+  };
+  const nodes = plan.nodes.flatMap((node) => {
+    if (node.key === targetKey) return [merged];
+    if (node.key === sourceKey) return [];
+    return [node];
+  });
+  return withLinearOrder(plan, nodes);
+}
+
+export function splitPlanNode(plan: DecompositionOutput, key: string, input: SplitPlanNodeInput = {}): DecompositionOutput {
+  const index = plan.nodes.findIndex((node) => node.key === key);
+  const node = plan.nodes[index];
+  if (!node || plan.nodes.length >= 15) return plan;
+
+  const existing = new Set(plan.nodes.map((item) => item.key));
+  const secondKey = uniquePlanKey(existing, input.second?.key ?? `${node.key}-split`);
+  const first = applyNodePatch(node, input.first ?? {});
+  const second: PlanNode = {
+    ...node,
+    key: secondKey,
+    title: input.second?.title ?? `Follow up: ${node.title}`,
+    description: input.second?.description ?? "",
+    est_effort: input.second?.est_effort ?? node.est_effort,
+    xp_reward: input.second?.xp_reward ?? node.xp_reward,
+    acceptance_rule: input.second?.acceptance_rule ? cloneAcceptanceRule(input.second.acceptance_rule) : cloneAcceptanceRule(node.acceptance_rule),
+    decomposition_contract: input.second && "decomposition_contract" in input.second
+      ? cloneContract(input.second.decomposition_contract ?? null)
+      : cloneContract(node.decomposition_contract),
+  };
+
+  const nodes = [...plan.nodes.slice(0, index), first, second, ...plan.nodes.slice(index + 1)];
+  return withLinearOrder(plan, nodes);
+}
+
+export function movePlanNode(plan: DecompositionOutput, key: string, toIndex: number): DecompositionOutput {
+  const fromIndex = plan.nodes.findIndex((node) => node.key === key);
+  const node = plan.nodes[fromIndex];
+  if (!node) return plan;
+  const nextNodes = plan.nodes.slice();
+  nextNodes.splice(fromIndex, 1);
+  const clamped = Math.max(0, Math.min(toIndex, nextNodes.length));
+  nextNodes.splice(clamped, 0, node);
+  return withLinearOrder(plan, nextNodes);
 }
 
 // ── re-plan merge ──────────────────────────────────────────────────────────

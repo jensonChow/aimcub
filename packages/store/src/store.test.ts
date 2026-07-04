@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { movePlanNode, splitPlanNode, updatePlanNode } from "@core/domain";
 import type { DecompositionOutput } from "@core/types";
 
 import {
@@ -312,6 +313,46 @@ describe("createJsonFileStore · round-trip", () => {
     const { goal } = await store.createGoal({ title: "x", plan: PLAN, memories: [{ content: "  " }] });
     expect(goal.id).toBeTruthy();
     expect(await store.listMemories(goal.id)).toEqual([]);
+  });
+
+  it("saves an edited pre-save plan payload into plan JSON and milestones", async () => {
+    const store = freshStore();
+    const manualRule: DecompositionOutput["nodes"][number]["acceptance_rule"] = {
+      logic: "all",
+      threshold: 1,
+      completion_mode: "manual",
+      clauses: [{ evaluator: "manual_confirm", auto_verifiable: false, match: {} }],
+    };
+    const editedTitlePlan = updatePlanNode(PLAN, "m1", {
+      title: "Scope edited release",
+      description: "Capture the exact edited release scope.",
+      acceptance_rule: manualRule,
+    });
+    const splitPlan = splitPlanNode(editedTitlePlan, "m2", {
+      first: { title: "Implement edited release" },
+      second: {
+        title: "Verify edited release",
+        description: "Confirm the saved payload drives the final milestone.",
+      },
+    });
+    const edited = movePlanNode(splitPlan, "m2-split", 1);
+
+    const { goal, milestones } = await store.createGoal({
+      title: "Edited plan aim",
+      plan: edited,
+    });
+
+    expect(goal.plan_json).toEqual(edited);
+    expect(milestones.map((milestone) => milestone.title)).toEqual([
+      "Scope edited release",
+      "Verify edited release",
+      "Implement edited release",
+    ]);
+    expect(milestones[0]!.description).toBe("Capture the exact edited release scope.");
+    expect(milestones[0]!.acceptance_rule).toEqual(manualRule);
+    expect(milestones[1]!.depends_on_id).toBe(milestones[0]!.id);
+    expect(milestones[2]!.depends_on_id).toBe(milestones[1]!.id);
+    expect(milestones[1]!.metadata.plan_key).toBe("m2-split");
   });
 });
 

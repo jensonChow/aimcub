@@ -1,31 +1,26 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-04
-Branch: `main`
+Branch: `codex/plan-editing-tools`
 
 ## Current Session
 
-- Previously merged `codex/avoid-duplicate-aim-intake`, `codex/clarify-journey-steps`, `codex/simplify-context-sources`, and `codex/runtime-helper-settings` into `main`.
-- Merged `codex/separate-execute-eval-stages` into `main`.
-- Resolved merge conflicts in `apps/desktop/src/renderer/cockpit.css`, `docs/memory/design-system.md`, and this handoff.
-- Kept all Desktop journey improvements: Context shows the captured aim instead of a second aim composer, pre-draft intake is blocking context, post-draft clarify is optional refinement, context source setup has one summary plus one editable control surface, Settings is framed as Aim helpers, and Execute/Eval are distinct stages.
-- Kept the pnpm config cleanup from the Execute/Eval branch: React overrides moved from `package.json#pnpm` to `pnpm-workspace.yaml`, with native build approvals and noninteractive module-purge config.
+- Added pure plan editing helpers in `@core/domain`: executable-plan validation, sub-aim text/rule edits, merge, split, and reorder with linear dependency rewriting.
+- Added Desktop pre-save editing in the Plan/Contracts stage: title/body fields, done/evidence/eval contract fields, schema-validated acceptance rule editing, move up/down, merge up/down, and split.
+- Kept save flow on the existing `DecompositionOutput` path. Edited drafts update `finalPlan`, save is blocked on invalid plans, and the store still materializes through the same validation gate.
+- Added focused tests for edit/merge/split/reorder transformations and for creating a saved goal from an edited pre-save payload.
+- Updated `docs/memory/design-system.md` with the durable requirement that generated plans are directly editable before save.
 
 ## Current State
 
-- Normal new aim flow reads: describe aim -> enter context collection -> answer or attach context -> generate plan.
-- Context stage shows a compact captured-aim summary plus context sources/questions. It does not ask users to re-enter the same aim except for explicit child-aim breakdown or unsaved-aim editing paths.
-- Pre-draft intake is framed as blocking context before planning.
-- Post-draft clarification is framed as optional draft refinement; users can accept the draft without answering optional refinement questions.
-- Desktop context collection remains local-store first through `context-sources.json`; no planning/runtime behavior was changed by the context source UI simplification.
-- The context source panel presents active sources, attention state, and a single next action before the editable form, without repeated cards/tables/toggles for the same setting.
-- Desktop Settings starts with helper readiness and next setup action, then shows the existing configuration forms in this order: Planning model, Local CLI agents, Web research, Context sources.
-- Execute focuses on assignment ownership, latest run state, next work, run-agent action, human proof confirmation, and child breakdown.
-- Eval focuses on evidence totals, rule mode, matched evidence IDs, evaluator status, trust/explanation, human-review flags, and pending context candidates from progress.
+- Normal new aim flow remains: describe aim -> collect context -> generate plan -> optionally refine -> edit/save plan.
+- Unsaved generated plans can now be edited directly before saving. Saved aims remain read-only in the Plan/Contracts view.
+- Structural edits rewrite plan edges into the current visible order so milestones remain executable as a linear chain.
+- Acceptance-rule edits use the same `AcceptanceRule` schema as the rest of the app; invalid rule drafts show inline errors and disable Save.
 
 ## Verification
 
-Passed after merging `codex/separate-execute-eval-stages`:
+Passed:
 
 ```bash
 PATH=/Users/jenson/.local/node/bin:$PATH pnpm build
@@ -34,18 +29,17 @@ PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck
 PATH=/Users/jenson/.local/node/bin:$PATH pnpm lint
 PATH=/Users/jenson/.local/node/bin:$PATH pnpm core:purity
 git diff --check
-git diff --cached --check
 ```
 
 Notes:
+- `pnpm install` was needed because this worktree initially had no `node_modules`; the first sandboxed install hit DNS restrictions, then a network-escalated install succeeded.
 - Turbo emitted non-fatal `IO error: Operation not permitted` warnings while all required tasks exited successfully.
-- The Execute/Eval branch reported desktop and narrow visual checks before merge; this merge session verified build, tests, typecheck, lint, purity, and whitespace.
+- `pnpm test` included the expected MCP stderr hygiene test output and still exited successfully.
 
-Commit/push status: this handoff is part of the merge commit that brings `codex/separate-execute-eval-stages` into `main`.
+Commit/push status: committed and pushed on `codex/plan-editing-tools`.
 
 ## Next Session Prompt
 
 ```text
-Continue from main after the Desktop journey cleanup merges. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md. Then load only the module memory relevant to the task.
-Keep new aim title/description owned by the Aim stage. Context should collect answers, attachments, and sources without asking users to re-enter the same aim, except for explicit child-aim breakdown or unsaved-aim editing paths. Keep pre-draft intake framed as blocking context before planning and post-draft clarify framed as optional draft refinement. Keep context source setup product-first: one clear summary, one edit surface, and no repeated controls for the same source setting. Keep Settings framed as Aim helper setup rather than a runtime control panel. Keep Execute focused on next-work ownership/actions and Eval focused on evidence/rule review.
+Continue from `codex/plan-editing-tools` after the generated-plan editing tools. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md. Keep plan editing as a pre-save Plan/Contracts workflow: direct sub-aim text edits, acceptance/eval rule edits, merge, split, reorder, inline validation, and save through the validated DecompositionOutput path.
 ```
