@@ -334,6 +334,53 @@ export const STRINGS = {
   },
   "settings.overall.next.aim": { en: "Open an aim and enter context collection.", zh: "打开 Aim 并进入上下文收集。" },
 
+  "firstRun.eyebrow": { en: "Helper needed", zh: "需要助手" },
+  "firstRun.heading": { en: "Connect the right helper for this aim", zh: "为这个 Aim 连接合适助手" },
+  "firstRun.body": {
+    en: "Aimcub captured \"{aim}\". Before it can collect context and draft sub-aims, connect a planning runtime.",
+    zh: "Aimcub 已记录「{aim}」。在收集 Context 和生成子目标前，需要连接规划运行时。",
+  },
+  "firstRun.requiredLabel": { en: "Required now", zh: "现在需要" },
+  "firstRun.requiredValue": { en: "Planning runtime", zh: "规划运行时" },
+  "firstRun.capabilityLabel": { en: "Aim capability", zh: "Aim 能力" },
+  "firstRun.bestHelperLabel": { en: "Best helper", zh: "优先助手" },
+  "firstRun.openSettings": { en: "Open Aim helpers", zh: "打开 Aim 助手" },
+  "firstRun.keepEditing": { en: "Keep editing aim", zh: "继续编辑 Aim" },
+  "firstRun.settingsEyebrow": { en: "For this aim", zh: "针对这个 Aim" },
+  "firstRun.settingsBlocked": {
+    en: "Connect the helper below, then return to the aim to collect context and draft sub-aims.",
+    zh: "在下方连接助手，然后回到 Aim 收集 Context 并生成子目标。",
+  },
+  "firstRun.settingsReady": {
+    en: "A planning helper is ready. Return to the aim and enter context collection.",
+    zh: "规划助手已就绪。回到 Aim 并进入 Context 收集。",
+  },
+  "firstRun.returnToAim": { en: "Return to aim", zh: "返回 Aim" },
+  "firstRun.capability.code": { en: "Code-capable execution", zh: "可执行代码工作" },
+  "firstRun.capability.research": { en: "Current-fact research", zh: "当前事实研究" },
+  "firstRun.capability.context": { en: "Source context reading", zh: "来源上下文读取" },
+  "firstRun.capability.planning": { en: "Planning and decomposition", zh: "规划与拆分" },
+  "firstRun.helper.localAgent": { en: "Authenticated local CLI agent", zh: "已认证本地 CLI agent" },
+  "firstRun.helper.providerWithWeb": { en: "Planning model plus web research", zh: "规划模型加 Web 研究" },
+  "firstRun.helper.provider": { en: "Planning model provider", zh: "规划模型提供方" },
+  "firstRun.helper.either": { en: "Planning model or local CLI agent", zh: "规划模型或本地 CLI agent" },
+  "firstRun.reason.code": {
+    en: "This aim sounds like software or workspace work. A local CLI agent is the best helper once work is assigned; a planning model can also draft the initial sub-aims.",
+    zh: "这个 Aim 像软件或工作区任务。分派工作后，本地 CLI agent 最合适；规划模型也可以先生成子目标。",
+  },
+  "firstRun.reason.research": {
+    en: "This aim depends on current or source-backed facts. Start with a planning model, then enable web research when current sources matter.",
+    zh: "这个 Aim 依赖当前事实或来源支撑。先连接规划模型；如果需要当前来源，再启用 Web 研究。",
+  },
+  "firstRun.reason.context": {
+    en: "This aim mentions files, notes, or source material. Connect a planning model, then attach context sources so the plan is grounded in the material.",
+    zh: "这个 Aim 提到文件、笔记或来源材料。先连接规划模型，再添加上下文来源，让计划基于真实材料。",
+  },
+  "firstRun.reason.planning": {
+    en: "This aim first needs decomposition and eval rules. Either a planning model provider or an authenticated local CLI agent can provide that planning runtime.",
+    zh: "这个 Aim 首先需要拆分和评估规则。规划模型提供方或已认证本地 CLI agent 都可以提供规划运行时。",
+  },
+
   "home.aim_one": { en: "{n} aim", zh: "{n} 个目标" },
   "home.aim_other": { en: "{n} aims", zh: "{n} 个目标" },
   "home.none": { en: "No aims yet.", zh: "还没有目标。" },

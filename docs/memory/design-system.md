@@ -60,6 +60,7 @@ Reference links:
 - Execute and Eval are distinct stages. Execute answers "Who/what should do the next work?" with assignments, agent run, human proof, and child-breakdown actions. Eval answers "What evidence exists, did it satisfy the rule, and what needs review?" with evidence counts/details, evaluator status, trust/explanation, and pending context candidates when present.
 - Existing aims open to Aim overview first. Do not jump users into Run details or show an empty composer on the Context stage.
 - Settings are an aim-helper setup surface, not a flat runtime control panel. Frame provider setup, local CLI agent detection, web research, and context sources as helpers needed to complete aims; keep their configuration clear and thin unless setup is the user's current task.
+- First-run with no provider or local CLI agent must stay aim-first. Capture the aim before helper setup, then explain the required helper capability from that aim and link to contextual Aim helpers settings.
 
 ## Layout Rules
 
