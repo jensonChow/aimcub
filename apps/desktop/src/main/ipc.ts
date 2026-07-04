@@ -49,6 +49,9 @@ import {
   type ProviderConfig,
   type ProviderStatus,
   type ProviderTestResult,
+  type ContextSourceConfig,
+  type ContextSourceStatus,
+  type LocalContextPickResult,
   type LocalAgentRunRequest,
   type LocalAgentRunResult,
   type PlanningDebugTraceStage,
@@ -67,6 +70,12 @@ import { researchEvidenceForReview, runClarify, runDraft, runIntakeQuestions, ru
 import { aimStore } from "./store";
 import { buildGateway, getProviderStatus, setProviderConfig, testProviderConfig } from "./gateway";
 import { collectDesktopPlanningContext, type DesktopPlanningContext } from "./tools";
+import {
+  getContextSourceConfig,
+  pickLocalContextFiles,
+  pickLocalContextFolder,
+  setContextSourceConfig,
+} from "./context-source-settings";
 import { getWebResearchStatus, setWebResearchConfig, testWebResearchConfig } from "./web-research-settings";
 import { listLocalAgents, runLocalAgent } from "./local-agents";
 
@@ -622,6 +631,16 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.testWebResearchConfig, async (_e, config: WebResearchConfig): Promise<WebResearchTestResult> =>
     testWebResearchConfig(config),
   );
+
+  ipcMain.handle(IPC.getContextSourceConfig, async (): Promise<ContextSourceStatus> => getContextSourceConfig());
+
+  ipcMain.handle(IPC.setContextSourceConfig, async (_e, config: ContextSourceConfig): Promise<ContextSourceStatus> =>
+    setContextSourceConfig(config),
+  );
+
+  ipcMain.handle(IPC.pickLocalContextFolder, async (): Promise<LocalContextPickResult> => pickLocalContextFolder());
+
+  ipcMain.handle(IPC.pickLocalContextFiles, async (): Promise<LocalContextPickResult> => pickLocalContextFiles());
 
   ipcMain.handle(IPC.listLocalAgents, () => listLocalAgents());
 

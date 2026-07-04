@@ -9,6 +9,8 @@ import type {
   ContextAskUserOutput,
   ContextDistillInput,
   ContextDistillOutput,
+  ContextLinkedSourcesInput,
+  ContextLinkedSourcesOutput,
   LocalEditInput,
   LocalEditOutput,
   LocalGlobInput,
@@ -43,6 +45,7 @@ export interface AimcubToolInputByName {
   "memory.write_candidate": MemoryWriteCandidateInput;
   "web.search": WebSearchInput;
   "web.fetch": WebFetchInput;
+  "context.linked_sources": ContextLinkedSourcesInput;
   "context.distill": ContextDistillInput;
   "context.ask_user": ContextAskUserInput;
 }
@@ -58,6 +61,7 @@ export interface AimcubToolOutputByName {
   "memory.write_candidate": MemoryWriteCandidateOutput;
   "web.search": WebSearchOutput;
   "web.fetch": WebFetchOutput;
+  "context.linked_sources": ContextLinkedSourcesOutput;
   "context.distill": ContextDistillOutput;
   "context.ask_user": ContextAskUserOutput;
 }

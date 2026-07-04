@@ -32,6 +32,11 @@ function uniqueChoices(value: unknown): string[] | undefined {
   return choices.length > 0 ? choices : undefined;
 }
 
+function selectionMode(value: unknown, choices: readonly string[] | undefined): "single" | "multiple" {
+  if (value === "single" || value === "multiple") return value;
+  return choices && choices.length <= 2 ? "single" : "multiple";
+}
+
 function normalizeQuestions(
   questions: unknown,
   maxQuestions: number,
@@ -51,6 +56,7 @@ function normalizeQuestions(
       question,
       ...(category ? { category } : {}),
       ...(choices ? { choices } : {}),
+      selectionMode: selectionMode(row.selectionMode, choices),
       captureScope: captureScope(row.captureScope),
     });
   }

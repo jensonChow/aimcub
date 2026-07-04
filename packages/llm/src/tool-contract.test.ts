@@ -22,6 +22,7 @@ const EXPECTED_TOOL_NAMES: readonly AimcubToolName[] = [
   "memory.write_candidate",
   "web.search",
   "web.fetch",
+  "context.linked_sources",
   "context.distill",
   "context.ask_user",
 ];
@@ -65,6 +66,15 @@ describe("built-in tool contracts", () => {
     expect(getBuiltInToolContract("local.write").permission.requiresUserApproval).toBe(true);
     expect(getBuiltInToolContract("local.edit").permission.requiresUserApproval).toBe(true);
     expect(getBuiltInToolContract("local.read").permission.requiresUserApproval).toBe(false);
+  });
+
+  it("tracks linked context sources without treating connectors as already fetched content", () => {
+    const linked = getBuiltInToolContract("context.linked_sources");
+
+    expect(linked.availability).toBe("always");
+    expect(linked.permission.kind).toBe("context.source");
+    expect(linked.permission.requiresUserApproval).toBe(false);
+    expect(linked.sourceMetadata).toEqual(["connector"]);
   });
 
   it("recognizes built-in names without exposing MCP as the substrate", () => {

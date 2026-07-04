@@ -5,6 +5,7 @@ import type { ClarifyAnswer, ClarifyOutput, ClarifyQuestion, ClarifySelectionMod
 import type { ContextCategory, DecompositionOutput, Goal, Memory, Milestone } from "@core/types";
 import type {
   ClarifyIpcResult,
+  ContextSourceStatus,
   GoalDetail,
   LocalAgentDetection,
   PlanningDebugTrace,
@@ -15,6 +16,7 @@ import type {
 } from "../shared/ipc";
 
 import { ContextInbox } from "./ContextInbox";
+import { ContextSourcesPanel } from "./ContextSourcesPanel";
 import { I18nProvider, useI18n } from "./i18n";
 import { LangToggle } from "./LangToggle";
 import { LocalAgentForm } from "./LocalAgentForm";
@@ -220,6 +222,7 @@ function AimOsApp() {
   const [contextCandidates, setContextCandidates] = useState<Memory[]>([]);
   const [provider, setProvider] = useState<ProviderStatus | null>(null);
   const [webResearch, setWebResearch] = useState<WebResearchStatus | null>(null);
+  const [contextSources, setContextSources] = useState<ContextSourceStatus | null>(null);
   const [localAgents, setLocalAgents] = useState<LocalAgentDetection[]>([]);
   const [aimTitle, setAimTitle] = useState("");
   const [aimDescription, setAimDescription] = useState("");
@@ -267,16 +270,18 @@ function AimOsApp() {
   }
 
   async function refreshAll() {
-    const [nextGoals, nextProvider, nextWeb, nextAgents, nextCandidates] = await Promise.all([
+    const [nextGoals, nextProvider, nextWeb, nextSources, nextAgents, nextCandidates] = await Promise.all([
       window.aimcub.listGoals().catch(() => []),
       window.aimcub.getProviderConfig().catch(() => null),
       window.aimcub.getWebResearchConfig().catch(() => null),
+      window.aimcub.getContextSourceConfig().catch(() => null),
       window.aimcub.listLocalAgents().catch(() => []),
       window.aimcub.listContextCandidates().catch(() => []),
     ]);
     setGoals(nextGoals);
     setProvider(nextProvider);
     setWebResearch(nextWeb);
+    setContextSources(nextSources);
     setLocalAgents(nextAgents);
     setContextCandidates(nextCandidates);
     if (!selected && nextGoals[0]) void openGoal(nextGoals[0]);
@@ -642,16 +647,19 @@ function AimOsApp() {
           <FlowRail mode={mode} hasDraft={Boolean(draft)} hasPlan={Boolean(finalPlan)} saved={Boolean(selected)} />
 
           {!selected || draft ? (
-            <ComposerPanel
-              title={aimTitle}
-              description={aimDescription}
-              parent={parent}
-              mode={mode}
-              disabled={Boolean(busy)}
-              onTitle={setAimTitle}
-              onDescription={setAimDescription}
-              onDraft={() => void startDraft()}
-            />
+            <>
+              <ComposerPanel
+                title={aimTitle}
+                description={aimDescription}
+                parent={parent}
+                mode={mode}
+                disabled={Boolean(busy)}
+                onTitle={setAimTitle}
+                onDescription={setAimDescription}
+                onDraft={() => void startDraft()}
+              />
+              <ContextSourcesPanel status={contextSources} disabled={Boolean(busy)} onSaved={setContextSources} />
+            </>
           ) : null}
 
           {clarify && (mode === "contexting" || mode === "answering" || mode === "reviewing") ? (
@@ -660,6 +668,8 @@ function AimOsApp() {
               phase={clarifyPhase}
               answers={clarifyPhase === "intake" ? intakeAnswers : answers}
               contextNote={contextNote}
+              conversationEnabled={clarifyPhase !== "intake" || contextSources?.userSession.enabled !== false}
+              questionnaireEnabled={clarifyPhase !== "intake" || contextSources?.questionnaire.enabled !== false}
               disabled={Boolean(busy)}
               onAnswer={(id, value) => {
                 if (clarifyPhase === "intake") {
@@ -700,9 +710,11 @@ function AimOsApp() {
             <SettingsPanel
               provider={provider}
               webResearch={webResearch}
+              contextSources={contextSources}
               localAgents={localAgents}
               onProvider={setProvider}
               onWeb={setWebResearch}
+              onContextSources={setContextSources}
               onRefreshAgents={async () => setLocalAgents(await window.aimcub.listLocalAgents())}
             />
           ) : null}
@@ -728,6 +740,7 @@ function AimOsApp() {
           <RuntimePanel
             provider={provider}
             webResearch={webResearch}
+            contextSources={contextSources}
             localAgents={localAgents}
             progress={progress}
             contextCount={contextCandidates.length}
@@ -786,6 +799,8 @@ function ClarifyPanel(props: {
   phase: ClarifyPhase;
   answers: AnswerMap;
   contextNote: string;
+  conversationEnabled: boolean;
+  questionnaireEnabled: boolean;
   disabled: boolean;
   onAnswer: (id: string, value: { labels: string[]; other: string }) => void;
   onContextNote: (value: string) => void;
@@ -793,10 +808,10 @@ function ClarifyPanel(props: {
   onSkip?: () => void;
 }) {
   const { t } = useI18n();
-  const questions = props.clarify.questions;
   const intake = props.phase === "intake";
+  const questions = intake && !props.questionnaireEnabled ? [] : props.clarify.questions;
   const hasContextAnswer = !intake
-    || props.contextNote.trim().length > 0
+    || (props.conversationEnabled && props.contextNote.trim().length > 0)
     || Object.values(props.answers).some((answer) => answer.other.trim() || answer.labels.length > 0);
   const primaryDisabled = props.disabled || !hasContextAnswer;
   return (
@@ -857,7 +872,7 @@ function ClarifyPanel(props: {
             </div>
           );
         })}
-        {intake ? (
+        {intake && props.conversationEnabled ? (
           <div style={questionStyle()}>
             <div style={{ fontWeight: 750 }}>{t("os.contextConversation")}</div>
             <div style={{ color: C.muted, fontSize: 13, marginTop: 4 }}>{t("os.contextConversationBody")}</div>
@@ -1010,9 +1025,11 @@ function ExecutionPanel(props: {
 function SettingsPanel(props: {
   provider: ProviderStatus | null;
   webResearch: WebResearchStatus | null;
+  contextSources: ContextSourceStatus | null;
   localAgents: LocalAgentDetection[];
   onProvider: (status: ProviderStatus) => void;
   onWeb: (status: WebResearchStatus) => void;
+  onContextSources: (status: ContextSourceStatus) => void;
   onRefreshAgents: () => Promise<void>;
 }) {
   const { t } = useI18n();
@@ -1028,6 +1045,8 @@ function SettingsPanel(props: {
       <div style={{ height: 12 }} />
       <WebResearchForm status={props.webResearch} onSaved={props.onWeb} />
       <div style={{ height: 12 }} />
+      <ContextSourcesPanel status={props.contextSources} compact onSaved={props.onContextSources} />
+      <div style={{ height: 12 }} />
       <LocalAgentForm agents={props.localAgents} onRefresh={props.onRefreshAgents} />
     </section>
   );
@@ -1036,6 +1055,7 @@ function SettingsPanel(props: {
 function RuntimePanel(props: {
   provider: ProviderStatus | null;
   webResearch: WebResearchStatus | null;
+  contextSources: ContextSourceStatus | null;
   localAgents: LocalAgentDetection[];
   progress: AimProgressReadModel | null;
   contextCount: number;
@@ -1055,6 +1075,11 @@ function RuntimePanel(props: {
               : t("os.missing")}
         />
         <Metric label={t("os.webResearch")} value={props.webResearch?.enabled ? "on" : "off"} />
+        <Metric
+          label={t("context.sources.local")}
+          value={String((props.contextSources?.local.resolvedWorkspaceRoot ? 1 : 0) + (props.contextSources?.local.resolvedFilePaths.length ?? 0))}
+        />
+        <Metric label={t("context.sources.online")} value={String(props.contextSources?.online.enabledCount ?? 0)} />
         <Metric label={t("os.localAgents")} value={`${props.localAgents.filter((agent) => agent.available).length}/${props.localAgents.length}`} />
         <Metric label={t("os.pendingContext")} value={String(props.contextCount)} />
         <Metric label={t("os.blocked")} value={String(props.progress?.blocked_count ?? 0)} />

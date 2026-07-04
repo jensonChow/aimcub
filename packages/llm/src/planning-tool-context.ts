@@ -3,6 +3,7 @@ import type {
   AimcubToolHandlerContext,
   AimcubToolName,
   AimcubToolObservation,
+  ContextLinkedSourcesOutput,
   ContextDistillOutput,
   LocalReadOutput,
   LocalScanWorkspaceOutput,
@@ -30,6 +31,8 @@ export interface PlanningToolContextInput {
   includeLocal?: boolean;
   workspaceRoot?: string;
   localScanMaxDepth?: number;
+  localFilePaths?: string[];
+  linkedSources?: ContextLinkedSourcesOutput["sources"];
   writeDistilledMemoryCandidates?: boolean;
   askMissingQuestions?: boolean;
 }
@@ -396,6 +399,39 @@ function collectLocalReadData(observation: AimcubToolObservation<unknown>): Plan
   return [localReadOutputToPlanningMemory(data as LocalReadOutput)];
 }
 
+function linkedSourcesOutputToPlanningMemory(output: ContextLinkedSourcesOutput): PlanningMemory {
+  const rows = output.sources
+    .filter((source) => source.enabled)
+    .slice(0, 12)
+    .map((source) => {
+      const location = source.path ?? source.uri ?? "";
+      const status = source.status === "available" ? "available" : `requires ${source.status.replace("_", " ")}`;
+      return `${source.kind}: ${source.label}${location ? ` (${location})` : ""} — ${status}`;
+    });
+  return {
+    id: `context.linked_sources:${output.sources.length}:${output.availableCount}:${output.blockedCount}`,
+    content: [
+      `Linked context sources: ${output.availableCount} available, ${output.blockedCount} requiring connector/access.`,
+      ...rows,
+      ...output.planningHints.map((hint) => `Hint: ${hint}`),
+    ].join("\n"),
+    kind: "semantic",
+    category: "project_fact",
+    source: "context.linked_sources",
+    confidence: output.availableCount > 0 ? 0.72 : 0.56,
+    goalId: null,
+    goal_id: null,
+  };
+}
+
+function collectLinkedSourceData(observation: AimcubToolObservation<unknown>): PlanningMemory[] {
+  const data = observation.data as Partial<ContextLinkedSourcesOutput> | undefined;
+  if (!data || !Array.isArray(data.sources) || typeof data.availableCount !== "number" || typeof data.blockedCount !== "number") {
+    return [];
+  }
+  return [linkedSourcesOutputToPlanningMemory(data as ContextLinkedSourcesOutput)];
+}
+
 function manifestPathsFromScan(observation: AimcubToolObservation<LocalScanWorkspaceOutput>): string[] {
   const seen = new Set<string>();
   const paths: string[] = [];
@@ -435,6 +471,17 @@ export async function collectPlanningToolContext(
   const planningMemories: PlanningMemory[] = [];
   let research: ResearchBrief | null = null;
   const query = queryForAim(input);
+
+  if (registry.has("context.linked_sources") && input.linkedSources && input.linkedSources.length > 0) {
+    const linkedSourceObservation = addResult(
+      "context.linked_sources",
+      await registry.execute("context.linked_sources", { sources: input.linkedSources }, context),
+      observations,
+      observationEvents,
+      failures,
+    );
+    if (linkedSourceObservation) planningMemories.push(...collectLinkedSourceData(linkedSourceObservation));
+  }
 
   const memoryObservation = addResult(
     "memory.search",
@@ -481,6 +528,26 @@ export async function collectPlanningToolContext(
           if (localReadObservation) planningMemories.push(...collectLocalReadData(localReadObservation));
         }
       }
+    }
+  }
+
+  if (input.includeLocal && registry.has("local.read")) {
+    const seenLocalFiles = new Set<string>();
+    for (const localFilePath of input.localFilePaths ?? []) {
+      if (seenLocalFiles.has(localFilePath)) continue;
+      seenLocalFiles.add(localFilePath);
+      const localReadObservation = addResult(
+        "local.read",
+        await registry.execute("local.read", {
+          path: localFilePath,
+          maxLines: DEFAULT_LOCAL_MANIFEST_READ_LINES * 2,
+          maxBytes: DEFAULT_LOCAL_MANIFEST_READ_BYTES * 2,
+        }, context),
+        observations,
+        observationEvents,
+        failures,
+      );
+      if (localReadObservation) planningMemories.push(...collectLocalReadData(localReadObservation));
     }
   }
 

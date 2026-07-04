@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { createContextAskUserHandler } from "./context-ask-user";
 import { createContextDistillHandler } from "./context-distill";
+import { createContextLinkedSourcesHandler } from "./context-linked-sources";
 import { collectPlanningToolContext } from "./planning-tool-context";
 import { createAimcubToolRegistry } from "./tool-registry";
 import type { AimcubToolHandlerContext } from "./tool-contract";
@@ -236,6 +237,85 @@ describe("planning tool context collector", () => {
         ],
       },
     });
+  });
+
+  it("records linked context sources and reads explicitly attached local files", async () => {
+    const registry = createAimcubToolRegistry({
+      "context.linked_sources": createContextLinkedSourcesHandler(),
+      "memory.search": async () => ({
+        ok: true,
+        observation: {
+          summary: "Selected 0 planning memories.",
+          data: { memories: [] },
+          sources: [],
+        },
+      }),
+      "local.read": async (input) => ({
+        ok: true,
+        observation: {
+          summary: `Read attached file ${input.path}.`,
+          data: {
+            path: input.path,
+            lines: [
+              { line: 1, text: "# Tarot app notes" },
+              { line: 2, text: "User has beginner tarot knowledge and needs App Store distribution." },
+            ],
+            truncated: false,
+            byteLength: 96,
+          },
+          sources: [{ kind: "file", path: input.path }],
+        },
+      }),
+      "context.distill": createContextDistillHandler(),
+    });
+
+    const result = await collectPlanningToolContext(
+      registry,
+      {
+        ...context,
+        workspaceRoot: "/workspace/app",
+        permissions: ["context.source", "memory.read", "filesystem.read", "context.distill"],
+      },
+      {
+        title: "Develop a tarot app",
+        includeLocal: true,
+        localFilePaths: ["/workspace/app/docs/tarot.md"],
+        linkedSources: [
+          {
+            id: "workspace",
+            kind: "local_folder",
+            label: "Workspace",
+            enabled: true,
+            status: "available",
+            path: "/workspace/app",
+          },
+          {
+            id: "notion",
+            kind: "notion",
+            label: "Product wiki",
+            enabled: true,
+            status: "needs_connector",
+            uri: "notion://workspace/product",
+          },
+        ],
+      },
+    );
+
+    expect(result.failures).toEqual([]);
+    expect(result.observationEvents.map((event) => event.toolName)).toEqual([
+      "context.linked_sources",
+      "memory.search",
+      "local.read",
+      "context.distill",
+    ]);
+    expect(result.memories.map((memory) => memory.source)).toEqual(expect.arrayContaining([
+      "context.linked_sources",
+      "local.read",
+    ]));
+    expect(result.memories.find((memory) => memory.source === "context.linked_sources")?.content).toContain("Product wiki");
+    expect(result.memories.find((memory) => memory.source === "local.read")?.content).toContain("beginner tarot knowledge");
+    expect(result.distillation?.summary).toContain("linked sources");
+    expect(result.distillation?.missingQuestions.map((question) => question.id)).toContain("missing_connector_access");
   });
 
   it("collects local workspace scans into planning context", async () => {

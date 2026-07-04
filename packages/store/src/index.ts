@@ -375,8 +375,84 @@ export interface WebResearchSettings {
   fetchPages: boolean;
 }
 
+export type ContextOnlineSourceProvider =
+  | "notion"
+  | "obsidian"
+  | "google-drive"
+  | "supabase"
+  | "database"
+  | "url"
+  | "other";
+
+export interface ContextOnlineSourceSettings {
+  id: string;
+  provider: ContextOnlineSourceProvider;
+  label: string;
+  reference: string;
+  enabled: boolean;
+}
+
+export interface ContextSourceSettings {
+  version: 1;
+  local: {
+    enabled: boolean;
+    workspaceRoot?: string;
+    filePaths: string[];
+  };
+  online: {
+    enabled: boolean;
+    sources: ContextOnlineSourceSettings[];
+  };
+  research: {
+    webEnabled: boolean;
+    deepResearch: boolean;
+  };
+  userSession: {
+    enabled: boolean;
+  };
+  questionnaire: {
+    enabled: boolean;
+  };
+}
+
+const CONTEXT_ONLINE_SOURCE_PROVIDERS: readonly ContextOnlineSourceProvider[] = [
+  "notion",
+  "obsidian",
+  "google-drive",
+  "supabase",
+  "database",
+  "url",
+  "other",
+];
+
+export const DEFAULT_CONTEXT_SOURCE_SETTINGS: ContextSourceSettings = {
+  version: 1,
+  local: {
+    enabled: false,
+    filePaths: [],
+  },
+  online: {
+    enabled: false,
+    sources: [],
+  },
+  research: {
+    webEnabled: true,
+    deepResearch: true,
+  },
+  userSession: {
+    enabled: true,
+  },
+  questionnaire: {
+    enabled: true,
+  },
+};
+
 function isProviderSettingsProvider(value: unknown): value is ProviderSettingsProvider {
   return typeof value === "string" && PROVIDER_SETTINGS_PROVIDERS.includes(value as ProviderSettingsProvider);
+}
+
+function isContextOnlineSourceProvider(value: unknown): value is ContextOnlineSourceProvider {
+  return typeof value === "string" && CONTEXT_ONLINE_SOURCE_PROVIDERS.includes(value as ContextOnlineSourceProvider);
 }
 
 /** Path to the provider settings file (sibling to the aim store). */
@@ -387,6 +463,11 @@ export function settingsPath(dataDir: string = defaultDataDir()): string {
 /** Path to first-party web research provider settings. */
 export function webResearchSettingsPath(dataDir: string = defaultDataDir()): string {
   return join(dataDir, "web-settings.json");
+}
+
+/** Path to context source settings. */
+export function contextSourceSettingsPath(dataDir: string = defaultDataDir()): string {
+  return join(dataDir, "context-sources.json");
 }
 
 /**
@@ -457,6 +538,116 @@ export function saveWebResearchSettings(config: WebResearchSettings, dataDir: st
   } catch {
     /* best-effort (e.g. Windows) */
   }
+}
+
+function cleanOptionalPath(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function uniqueCleanPaths(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of value) {
+    const path = cleanOptionalPath(item);
+    if (!path || seen.has(path)) continue;
+    seen.add(path);
+    out.push(path);
+  }
+  return out;
+}
+
+function normalizeOnlineSources(value: unknown): ContextOnlineSourceSettings[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const sources: ContextOnlineSourceSettings[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+    const row = item as Record<string, unknown>;
+    const provider = isContextOnlineSourceProvider(row.provider) ? row.provider : "other";
+    const label = typeof row.label === "string" && row.label.trim() ? row.label.trim() : provider;
+    const reference = typeof row.reference === "string" ? row.reference.trim() : "";
+    if (!reference) continue;
+    const key = `${provider}\u0000${reference.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    sources.push({
+      id: typeof row.id === "string" && row.id.trim() ? row.id.trim() : randomUUID(),
+      provider,
+      label,
+      reference,
+      enabled: typeof row.enabled === "boolean" ? row.enabled : true,
+    });
+  }
+  return sources;
+}
+
+export function normalizeContextSourceSettings(input: unknown): ContextSourceSettings {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return { ...DEFAULT_CONTEXT_SOURCE_SETTINGS, local: { ...DEFAULT_CONTEXT_SOURCE_SETTINGS.local }, online: { ...DEFAULT_CONTEXT_SOURCE_SETTINGS.online } };
+  }
+  const row = input as Record<string, unknown>;
+  const local = row.local && typeof row.local === "object" && !Array.isArray(row.local)
+    ? row.local as Record<string, unknown>
+    : {};
+  const online = row.online && typeof row.online === "object" && !Array.isArray(row.online)
+    ? row.online as Record<string, unknown>
+    : {};
+  const research = row.research && typeof row.research === "object" && !Array.isArray(row.research)
+    ? row.research as Record<string, unknown>
+    : {};
+  const userSession = row.userSession && typeof row.userSession === "object" && !Array.isArray(row.userSession)
+    ? row.userSession as Record<string, unknown>
+    : {};
+  const questionnaire = row.questionnaire && typeof row.questionnaire === "object" && !Array.isArray(row.questionnaire)
+    ? row.questionnaire as Record<string, unknown>
+    : {};
+
+  return {
+    version: 1,
+    local: {
+      enabled: typeof local.enabled === "boolean" ? local.enabled : Boolean(cleanOptionalPath(local.workspaceRoot) || uniqueCleanPaths(local.filePaths).length > 0),
+      workspaceRoot: cleanOptionalPath(local.workspaceRoot),
+      filePaths: uniqueCleanPaths(local.filePaths),
+    },
+    online: {
+      enabled: typeof online.enabled === "boolean" ? online.enabled : normalizeOnlineSources(online.sources).length > 0,
+      sources: normalizeOnlineSources(online.sources),
+    },
+    research: {
+      webEnabled: typeof research.webEnabled === "boolean" ? research.webEnabled : DEFAULT_CONTEXT_SOURCE_SETTINGS.research.webEnabled,
+      deepResearch: typeof research.deepResearch === "boolean" ? research.deepResearch : DEFAULT_CONTEXT_SOURCE_SETTINGS.research.deepResearch,
+    },
+    userSession: {
+      enabled: typeof userSession.enabled === "boolean" ? userSession.enabled : DEFAULT_CONTEXT_SOURCE_SETTINGS.userSession.enabled,
+    },
+    questionnaire: {
+      enabled: typeof questionnaire.enabled === "boolean" ? questionnaire.enabled : DEFAULT_CONTEXT_SOURCE_SETTINGS.questionnaire.enabled,
+    },
+  };
+}
+
+export function loadContextSourceSettings(dataDir: string = defaultDataDir()): ContextSourceSettings {
+  try {
+    const p = contextSourceSettingsPath(dataDir);
+    if (!existsSync(p)) return normalizeContextSourceSettings(null);
+    return normalizeContextSourceSettings(JSON.parse(readFileSync(p, "utf8")) as unknown);
+  } catch {
+    return normalizeContextSourceSettings(null);
+  }
+}
+
+export function saveContextSourceSettings(config: ContextSourceSettings, dataDir: string = defaultDataDir()): ContextSourceSettings {
+  const normalized = normalizeContextSourceSettings(config);
+  mkdirSync(dataDir, { recursive: true });
+  const p = contextSourceSettingsPath(dataDir);
+  writeFileSync(p, JSON.stringify(normalized, null, 2), { encoding: "utf8", mode: 0o600 });
+  try {
+    chmodSync(p, 0o600);
+  } catch {
+    /* best-effort (e.g. Windows) */
+  }
+  return normalized;
 }
 
 /**

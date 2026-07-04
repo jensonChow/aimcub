@@ -8,16 +8,20 @@ import type { DecompositionOutput } from "@core/types";
 
 import {
   createJsonFileStore,
+  contextSourceSettingsPath,
   materialize,
   mergeMilestones,
   defaultDataDir,
+  loadContextSourceSettings,
   loadSettings,
   loadWebResearchSettings,
+  saveContextSourceSettings,
   saveSettings,
   saveWebResearchSettings,
   settingsPath,
   webResearchSettingsPath,
   type ProviderSettings,
+  type ContextSourceSettings,
   type WebResearchSettings,
 } from "./index";
 
@@ -808,5 +812,64 @@ describe("web research settings (web-settings.json)", () => {
     const dir = freshDir();
     writeFileSync(webResearchSettingsPath(dir), JSON.stringify({ provider: "unknown", apiKey: "k" }), "utf8");
     expect(loadWebResearchSettings(dir)).toBeNull();
+  });
+});
+
+describe("context source settings (context-sources.json)", () => {
+  const freshDir = (): string => mkdtempSync(join(tmpdir(), "aimcub-context-sources-"));
+
+  it("returns defaults when no context source settings are on file", () => {
+    expect(loadContextSourceSettings(freshDir())).toMatchObject({
+      version: 1,
+      local: { enabled: false, filePaths: [] },
+      online: { enabled: false, sources: [] },
+      research: { webEnabled: true, deepResearch: true },
+      userSession: { enabled: true },
+      questionnaire: { enabled: true },
+    });
+  });
+
+  it("round-trips local files, online sources, research, session, and questionnaire controls", () => {
+    const dir = freshDir();
+    const cfg: ContextSourceSettings = {
+      version: 1,
+      local: {
+        enabled: true,
+        workspaceRoot: "/workspace/aimcub",
+        filePaths: ["/workspace/aimcub/docs/prd.md", "/workspace/aimcub/docs/prd.md"],
+      },
+      online: {
+        enabled: true,
+        sources: [{
+          id: "notion-1",
+          provider: "notion",
+          label: "Product wiki",
+          reference: "notion://workspace/product",
+          enabled: true,
+        }],
+      },
+      research: { webEnabled: true, deepResearch: false },
+      userSession: { enabled: true },
+      questionnaire: { enabled: false },
+    };
+
+    const saved = saveContextSourceSettings(cfg, dir);
+
+    expect(saved.local.filePaths).toEqual(["/workspace/aimcub/docs/prd.md"]);
+    expect(loadContextSourceSettings(dir)).toEqual(saved);
+  });
+
+  it("writes context-sources.json with owner-only (0600) perms because paths can be sensitive", () => {
+    const dir = freshDir();
+    saveContextSourceSettings({
+      version: 1,
+      local: { enabled: true, workspaceRoot: "/workspace/private", filePaths: [] },
+      online: { enabled: false, sources: [] },
+      research: { webEnabled: true, deepResearch: true },
+      userSession: { enabled: true },
+      questionnaire: { enabled: true },
+    }, dir);
+    const mode = statSync(contextSourceSettingsPath(dir)).mode & 0o777;
+    expect(mode).toBe(0o600);
   });
 });

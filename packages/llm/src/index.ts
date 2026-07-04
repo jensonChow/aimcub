@@ -173,6 +173,10 @@ export type {
   ContextAskUserOutput,
   ContextDistillInput,
   ContextDistillOutput,
+  ContextLinkedSource,
+  ContextLinkedSourceKind,
+  ContextLinkedSourcesInput,
+  ContextLinkedSourcesOutput,
   LocalEditInput,
   LocalEditOutput,
   LocalGlobInput,
@@ -222,6 +226,9 @@ export type {
 export {
   createContextDistillHandler,
 } from "./context-distill";
+export {
+  createContextLinkedSourcesHandler,
+} from "./context-linked-sources";
 export {
   collectPlanningToolContext,
 } from "./planning-tool-context";

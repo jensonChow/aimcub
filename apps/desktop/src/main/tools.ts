@@ -3,9 +3,11 @@ import {
   createAimcubToolRegistry,
   createContextAskUserHandler,
   createContextDistillHandler,
+  createContextLinkedSourcesHandler,
   createLocalReadOnlyToolHandlers,
   createMemorySearchHandler,
   createMemoryWriteCandidateHandler,
+  type ContextLinkedSource,
   type AimcubToolHandlerContext,
   type AimcubToolObservation,
   type ContextDistillOutput,
@@ -14,9 +16,11 @@ import {
   type PlanningToolObservationEvent,
   type ResearchBrief,
 } from "@core/llm";
+import path from "node:path";
 
 import type { DraftRequest } from "../shared/ipc";
 import { aimStore, LOCAL_OWNER } from "./store";
+import { resolveContextSourceConfig } from "./context-source-settings";
 import { createDesktopWebResearchRuntime, resolveWebResearchConfig, webResearchDisabledBySettings } from "./web-research-settings";
 
 export interface DesktopPlanningContext extends PlanningContextForAim {
@@ -43,7 +47,7 @@ function webResearchEnabled(): boolean {
 }
 
 function fetchWebResultsEnabled(): boolean {
-  return resolveWebResearchConfig().fetchPages;
+  return resolveWebResearchConfig().fetchPages && resolveContextSourceConfig().research.deepResearch;
 }
 
 function writeContextCandidatesEnabled(): boolean {
@@ -51,8 +55,90 @@ function writeContextCandidatesEnabled(): boolean {
 }
 
 function localContextRoot(): string | undefined {
-  const root = process.env.AIMCUB_LOCAL_CONTEXT_ROOT ?? process.env.AIMCUB_WORKSPACE_ROOT;
-  return root?.trim() ? root.trim() : undefined;
+  const context = resolveContextSourceConfig();
+  const root = context.local.resolvedWorkspaceRoot ?? commonAncestor(context.local.resolvedFilePaths);
+  return context.local.enabled && root?.trim() ? root.trim() : undefined;
+}
+
+function localContextFiles(): string[] {
+  const context = resolveContextSourceConfig();
+  return context.local.enabled ? context.local.resolvedFilePaths : [];
+}
+
+function commonAncestor(paths: readonly string[]): string | undefined {
+  const dirs = paths
+    .filter((item) => item.trim().length > 0)
+    .map((item) => path.resolve(path.dirname(item)));
+  if (dirs.length === 0) return undefined;
+  const [first, ...rest] = dirs.map((dir) => dir.split(path.sep).filter(Boolean));
+  if (!first) return undefined;
+  const parts: string[] = [];
+  for (let index = 0; index < first.length; index += 1) {
+    const part = first[index]!;
+    if (rest.every((segments) => segments[index] === part)) {
+      parts.push(part);
+      continue;
+    }
+    break;
+  }
+  const prefix = path.isAbsolute(dirs[0]!) ? path.sep : "";
+  return parts.length > 0 ? path.join(prefix, ...parts) : path.parse(dirs[0]!).root;
+}
+
+function onlineSourceKind(provider: string): ContextLinkedSource["kind"] {
+  switch (provider) {
+    case "notion":
+    case "obsidian":
+    case "database":
+    case "url":
+      return provider;
+    case "google-drive":
+      return "online_folder";
+    case "supabase":
+      return "database";
+    default:
+      return "other";
+  }
+}
+
+function linkedContextSources(): ContextLinkedSource[] {
+  const context = resolveContextSourceConfig();
+  const sources: ContextLinkedSource[] = [];
+  const root = localContextRoot();
+  if (context.local.enabled && root) {
+    sources.push({
+      id: "local_workspace",
+      kind: "local_folder",
+      label: "Local workspace",
+      enabled: true,
+      status: "available",
+      path: root,
+    });
+  }
+  for (const filePath of localContextFiles()) {
+    sources.push({
+      id: `local_file:${filePath}`,
+      kind: "local_file",
+      label: path.basename(filePath),
+      enabled: true,
+      status: "available",
+      path: filePath,
+    });
+  }
+  if (context.online.enabled) {
+    for (const source of context.online.sources) {
+      sources.push({
+        id: source.id,
+        kind: onlineSourceKind(source.provider),
+        label: source.label,
+        enabled: source.enabled,
+        status: source.provider === "url" ? "available" : "needs_connector",
+        uri: source.reference,
+        note: source.provider,
+      });
+    }
+  }
+  return sources;
 }
 
 function aimLikelyNeedsWeb(req: DraftRequest): boolean {
@@ -62,13 +148,16 @@ function aimLikelyNeedsWeb(req: DraftRequest): boolean {
 }
 
 function aimRequiresWebResearch(req: DraftRequest): boolean {
-  return envFlag("AIMCUB_ENABLE_WEB_RESEARCH") === true || aimLikelyNeedsWeb(req);
+  const context = resolveContextSourceConfig();
+  return envFlag("AIMCUB_ENABLE_WEB_RESEARCH") === true || (context.research.webEnabled && (context.research.deepResearch || aimLikelyNeedsWeb(req)));
 }
 
 function shouldAttemptWebResearch(req: DraftRequest): boolean {
   const resolved = resolveWebResearchConfig();
+  const context = resolveContextSourceConfig();
   const explicit = envFlag("AIMCUB_ENABLE_WEB_RESEARCH");
   if (explicit === false) return false;
+  if (!context.research.webEnabled && explicit !== true) return false;
   if (explicit !== true && webResearchDisabledBySettings()) return false;
   return explicit === true || Boolean(resolved.apiKey) || aimLikelyNeedsWeb(req);
 }
@@ -80,6 +169,7 @@ export function createDesktopFirstPartyToolRegistry() {
     ...(localRoot ? createLocalReadOnlyToolHandlers({ workspaceRoot: localRoot }) : {}),
     "memory.search": createMemorySearchHandler(aimStore),
     "memory.write_candidate": createMemoryWriteCandidateHandler(aimStore),
+    "context.linked_sources": createContextLinkedSourcesHandler(),
     "context.ask_user": createContextAskUserHandler(),
     "context.distill": createContextDistillHandler(),
     "web.search": webRuntime.search,
@@ -95,6 +185,7 @@ export function desktopToolContext(networkEnabled = webResearchEnabled()): Aimcu
     now: () => new Date(),
     permissions: [
       "memory.read",
+      "context.source",
       "user.ask",
       "context.distill",
       ...(localRoot ? ["filesystem.read" as const, "filesystem.search" as const] : []),
@@ -107,6 +198,9 @@ export function desktopToolContext(networkEnabled = webResearchEnabled()): Aimcu
 export async function collectDesktopPlanningContext(req: DraftRequest): Promise<DesktopPlanningContext> {
   const currentAimId = (req as { id?: unknown }).id;
   const localRoot = localContextRoot();
+  const localFiles = localContextFiles();
+  const linkedSources = linkedContextSources();
+  const contextConfig = resolveContextSourceConfig();
   const attemptWeb = shouldAttemptWebResearch(req);
   const researchRequired = aimRequiresWebResearch(req);
   const [sourceMemories, toolContext] = await Promise.all([
@@ -120,9 +214,12 @@ export async function collectDesktopPlanningContext(req: DraftRequest): Promise<
         currentAimId: typeof currentAimId === "string" ? currentAimId : undefined,
         includeWeb: attemptWeb,
         fetchWebResults: attemptWeb && fetchWebResultsEnabled(),
-        webFetchLimit: 3,
+        webQueryLimit: contextConfig.research.deepResearch ? 4 : 2,
+        webFetchLimit: contextConfig.research.deepResearch ? 5 : 2,
         includeLocal: Boolean(localRoot),
         workspaceRoot: localRoot,
+        localFilePaths: localFiles,
+        linkedSources,
         askMissingQuestions: true,
         writeDistilledMemoryCandidates: writeContextCandidatesEnabled(),
       },

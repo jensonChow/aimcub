@@ -454,7 +454,7 @@ describe("reviewPlan", () => {
       contextCategories: ["eval_signal", "constraint", "procedure", "capability"],
     });
     expect(report.actions.find((action) => action.code === "capture_initial_context")!.refinePrompt).toContain(
-      "what would make this aim count as genuinely complete",
+      "What would make this aim count as genuinely complete",
     );
     expect(report.guidance.join(" ")).toMatch(/No active context/);
   });

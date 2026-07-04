@@ -6,6 +6,7 @@
 import type { DecompositionOutput, Goal, Memory, Milestone } from "@core/types";
 import type { AimIntakeReport, AimProgressReadModel, ContextHealthRow, ContextLineageLearningReport, ContextProfileReport, DecompositionLearningReport, DecompositionStrategyReport, PlanQualityReport, PlanReviewReport } from "@core/domain";
 import type { LlmProvider } from "@core/llm/providers";
+import type { ContextSourceSettings } from "@core/store";
 import type {
   ClarifyOutput,
   ClarifyQuestion,
@@ -288,6 +289,26 @@ export interface WebResearchTestResult {
   latencyMs: number;
 }
 
+export type ContextSourceConfig = ContextSourceSettings;
+
+export interface ContextSourceStatus extends ContextSourceSettings {
+  local: ContextSourceSettings["local"] & {
+    configured: boolean;
+    source: "settings" | "env" | null;
+    resolvedWorkspaceRoot: string | null;
+    resolvedFilePaths: string[];
+  };
+  online: ContextSourceSettings["online"] & {
+    configuredCount: number;
+    enabledCount: number;
+  };
+}
+
+export interface LocalContextPickResult {
+  canceled: boolean;
+  paths: string[];
+}
+
 export type LocalAgentId = "codex" | "claude";
 
 export type LocalAgentSandboxMode = "read-only" | "workspace-write" | "danger-full-access";
@@ -400,6 +421,10 @@ export interface AimcubApi {
   getWebResearchConfig(): Promise<WebResearchStatus>;
   setWebResearchConfig(config: WebResearchConfig): Promise<WebResearchStatus>;
   testWebResearchConfig(config: WebResearchConfig): Promise<WebResearchTestResult>;
+  getContextSourceConfig(): Promise<ContextSourceStatus>;
+  setContextSourceConfig(config: ContextSourceConfig): Promise<ContextSourceStatus>;
+  pickLocalContextFolder(): Promise<LocalContextPickResult>;
+  pickLocalContextFiles(): Promise<LocalContextPickResult>;
   listLocalAgents(): Promise<LocalAgentDetection[]>;
   runLocalAgent(req: LocalAgentRunRequest): Promise<LocalAgentRunResult>;
   runMilestoneAgent(req: RunMilestoneAgentRequest): Promise<RunMilestoneAgentResult>;
@@ -436,6 +461,10 @@ export const IPC = {
   getWebResearchConfig: "aimcub:getWebResearchConfig",
   setWebResearchConfig: "aimcub:setWebResearchConfig",
   testWebResearchConfig: "aimcub:testWebResearchConfig",
+  getContextSourceConfig: "aimcub:getContextSourceConfig",
+  setContextSourceConfig: "aimcub:setContextSourceConfig",
+  pickLocalContextFolder: "aimcub:pickLocalContextFolder",
+  pickLocalContextFiles: "aimcub:pickLocalContextFiles",
   listLocalAgents: "aimcub:listLocalAgents",
   runLocalAgent: "aimcub:runLocalAgent",
   runMilestoneAgent: "aimcub:runMilestoneAgent",

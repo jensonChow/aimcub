@@ -5,6 +5,7 @@ import type {
   AimcubToolSource,
   ContextDistillInput,
   ContextDistillOutput,
+  ContextLinkedSourcesOutput,
   LocalScanWorkspaceOutput,
   MemorySearchOutput,
   WebFetchOutput,
@@ -41,6 +42,14 @@ function isLocalScanWorkspaceOutput(value: unknown): value is LocalScanWorkspace
     Array.isArray(value.likelyProjectTypes);
 }
 
+function isContextLinkedSourcesOutput(value: unknown): value is ContextLinkedSourcesOutput {
+  return isRecord(value) &&
+    Array.isArray(value.sources) &&
+    typeof value.availableCount === "number" &&
+    typeof value.blockedCount === "number" &&
+    Array.isArray(value.planningHints);
+}
+
 function uniqueSources(observations: readonly AimcubToolObservation<unknown>[]): AimcubToolSource[] {
   const seen = new Set<string>();
   const sources: AimcubToolSource[] = [];
@@ -74,6 +83,13 @@ function summarizeObservation(observation: AimcubToolObservation<unknown>): stri
     const projectTypes = data.likelyProjectTypes.length > 0 ? data.likelyProjectTypes.join(", ") : "unknown project type";
     return [`workspace: ${data.root} — ${data.fileCount} files, ${data.directoryCount} directories, ${projectTypes}`];
   }
+  if (isContextLinkedSourcesOutput(data)) {
+    const sources = data.sources
+      .filter((source) => source.enabled)
+      .slice(0, 6)
+      .map((source) => `${source.kind}: ${source.label} (${source.status})`);
+    return [`linked sources: ${data.availableCount} available, ${data.blockedCount} blocked${sources.length ? ` — ${sources.join("; ")}` : ""}`];
+  }
   return observation.summary ? [observation.summary] : [];
 }
 
@@ -87,7 +103,18 @@ function missingQuestions(input: ContextDistillInput): ContextDistillOutput["mis
     isMemorySearchOutput(observation.data) &&
     observation.data.memories.some((memory) => memory.category === "eval_signal"),
   );
+  const linkedSources = observations.flatMap((observation) =>
+    isContextLinkedSourcesOutput(observation.data) ? observation.data.sources : [],
+  );
+  const hasBlockedConnector = linkedSources.some((source) => source.enabled && source.status !== "available");
   const questions: ContextDistillOutput["missingQuestions"] = [];
+  if (hasBlockedConnector) {
+    questions.push({
+      id: "missing_connector_access",
+      category: "project_fact",
+      question: "Which linked online source should be exported, summarized, or connected before planning relies on it?",
+    });
+  }
   if (!hasMemory || memoryCount === 0) {
     questions.push({
       id: "missing_planning_context",

@@ -35,7 +35,35 @@ describe("createContextAskUserHandler", () => {
             question: "What evidence proves this is complete?",
             category: "eval_signal",
             choices: ["Tests pass", "User confirms"],
+            selectionMode: "single",
             captureScope: "global",
+          }],
+        },
+      },
+    });
+  });
+
+  it("keeps explicit multi-select mode for richer context choices", async () => {
+    const handler = createContextAskUserHandler();
+
+    const result = await handler({
+      questions: [
+        {
+          id: "sources",
+          question: "Which sources should Aimcub inspect?",
+          choices: ["Local files", "Web research", "Notion"],
+          selectionMode: "multiple",
+        },
+      ],
+    }, context);
+
+    expect(result).toMatchObject({
+      ok: true,
+      observation: {
+        data: {
+          questions: [{
+            id: "sources",
+            selectionMode: "multiple",
           }],
         },
       },

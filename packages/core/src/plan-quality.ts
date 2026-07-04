@@ -787,37 +787,37 @@ function contextGapPriority(issueCodes: Set<PlanQualityIssueCode>, category: Con
 function evalSignalGapPrompt(issueCodes: Set<PlanQualityIssueCode>): string {
   const prompts: string[] = [];
   if (hasAnyIssue(issueCodes, GRANULARITY_CONTEXT_ISSUES)) {
-    prompts.push("Ask which outcomes should count as separate milestones, where each outcome stops, and what evidence would prove each outcome complete.");
+    prompts.push("Which outcomes should count as separate milestones, where does each outcome stop, and what evidence would prove each outcome complete?");
   }
   if (hasAnyIssue(issueCodes, DISTINCTNESS_CONTEXT_ISSUES)) {
-    prompts.push("Ask what evidence should uniquely prove each milestone so one event cannot complete unrelated work.");
+    prompts.push("What evidence should uniquely prove each milestone so one event cannot complete unrelated work?");
   }
   if (hasAnyIssue(issueCodes, VERIFIABILITY_CONTEXT_ISSUES) || issueCodes.has("missing_eval_acceptance_signal")) {
-    prompts.push("Ask what would make this aim count as genuinely complete, and what evidence would prove it without relying on manual judgment alone.");
+    prompts.push("What would make this aim count as genuinely complete, and what evidence would prove it without relying on manual judgment alone?");
   }
   return prompts.length > 0
     ? prompts.join(" ")
-    : "Ask what would make this aim count as genuinely complete, and what evidence would prove it.";
+    : "What would make this aim count as genuinely complete, and what evidence would prove it?";
 }
 
 function constraintGapPrompt(issueCodes: Set<PlanQualityIssueCode>): string {
   if (hasAnyIssue(issueCodes, GRANULARITY_CONTEXT_ISSUES)) {
-    return "Ask for non-negotiable scope boundaries that decide which deliverables must be split, deferred, or kept together.";
+    return "Which non-negotiable scope boundaries decide which deliverables must be split, deferred, or kept together?";
   }
-  return "Ask for non-negotiable constraints such as tools, platform boundaries, privacy, budget, deadlines, or quality bars.";
+  return "Which non-negotiable constraints apply, such as tools, platform boundaries, privacy, budget, deadlines, or quality bars?";
 }
 
 function procedureGapPrompt(issueCodes: Set<PlanQualityIssueCode>): string {
   const prompts: string[] = [];
   if (hasAnyIssue(issueCodes, VERIFIABILITY_CONTEXT_ISSUES)) {
-    prompts.push("Ask for existing commands, CI workflows, files, review artifacts, or evidence sources that prove progress.");
+    prompts.push("Which existing commands, CI workflows, files, review artifacts, or evidence sources prove progress?");
   }
   if (hasAnyIssue(issueCodes, DISTINCTNESS_CONTEXT_ISSUES)) {
-    prompts.push("Ask whether shared verification should be its own dependent milestone instead of completing multiple milestones at once.");
+    prompts.push("Should shared verification be its own dependent milestone instead of completing multiple milestones at once?");
   }
   return prompts.length > 0
     ? prompts.join(" ")
-    : "Ask whether there is an existing workflow, checklist, or verification command that this aim should follow.";
+    : "Which existing workflow, checklist, or verification command should this aim follow?";
 }
 
 function researchGapPrompt(issueCodes: Set<PlanQualityIssueCode>): string {
@@ -1001,7 +1001,7 @@ function contextGaps(
       category: "capability",
       priority: contextGapPriority(issueCodes, "capability"),
       reason: "missing_routing_context",
-      prompt: "Ask who or which agent is best suited for each kind of work, only if routing is ambiguous.",
+      prompt: "Who or which agent is best suited for each kind of work, if routing is ambiguous?",
       source: "missing_context",
       issueCodes: [...issueCodes],
     });

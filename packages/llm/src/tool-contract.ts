@@ -17,6 +17,7 @@ export type AimcubToolName =
   | "memory.write_candidate"
   | "web.search"
   | "web.fetch"
+  | "context.linked_sources"
   | "context.distill"
   | "context.ask_user";
 
@@ -29,6 +30,7 @@ export type AimcubToolPermissionKind =
   | "memory.write_candidate"
   | "network.search"
   | "network.fetch"
+  | "context.source"
   | "context.distill"
   | "user.ask";
 
@@ -96,7 +98,7 @@ export interface AimcubToolContract<Name extends AimcubToolName = AimcubToolName
   sourceMetadata: readonly AimcubToolSourceKind[];
 }
 
-export type AimcubToolSourceKind = "file" | "workspace" | "memory" | "web" | "user" | "tool";
+export type AimcubToolSourceKind = "file" | "workspace" | "memory" | "web" | "connector" | "user" | "tool";
 
 export interface AimcubToolSource {
   kind: AimcubToolSourceKind;
@@ -298,12 +300,48 @@ export interface ContextDistillOutput {
   durableMemoryCandidates: Array<{ content: string; category: string; scope: "global" | "current_aim" }>;
 }
 
+export type ContextLinkedSourceKind =
+  | "local_folder"
+  | "local_file"
+  | "online_folder"
+  | "database"
+  | "notion"
+  | "obsidian"
+  | "url"
+  | "other";
+
+export interface ContextLinkedSource {
+  id: string;
+  kind: ContextLinkedSourceKind;
+  label: string;
+  enabled: boolean;
+  status: "available" | "needs_connector" | "unavailable";
+  path?: string;
+  uri?: string;
+  note?: string;
+}
+
+export interface ContextLinkedSourcesInput {
+  sources: ContextLinkedSource[];
+}
+
+export interface ContextLinkedSourcesOutput {
+  sources: ContextLinkedSource[];
+  availableCount: number;
+  blockedCount: number;
+  localFileCount: number;
+  localFolderCount: number;
+  onlineCount: number;
+  planningHints: string[];
+}
+
 export interface ContextAskUserInput {
   questions: Array<{
     id: string;
     question: string;
     category?: string;
     choices?: string[];
+    selectionMode?: "single" | "multiple";
     captureScope?: "global" | "current_aim" | "none";
   }>;
 }
@@ -339,7 +377,7 @@ const sourceSchema: AimcubToolJsonSchema = {
   required: ["kind"],
   additionalProperties: false,
   properties: {
-    kind: { type: "string", enum: ["file", "workspace", "memory", "web", "user", "tool"] },
+    kind: { type: "string", enum: ["file", "workspace", "memory", "web", "connector", "user", "tool"] },
     title: { type: "string" },
     uri: { type: "string" },
     path: { type: "string" },
@@ -367,6 +405,7 @@ const fileSource = ["file"] as const;
 const workspaceSource = ["workspace", "file"] as const;
 const memorySource = ["memory"] as const;
 const webSource = ["web"] as const;
+const connectorSource = ["connector"] as const;
 const userSource = ["user"] as const;
 const toolSource = ["tool", "file", "workspace", "memory", "web", "user"] as const;
 
@@ -765,6 +804,71 @@ export const BUILT_IN_TOOL_CONTRACTS = [
     }),
   }),
   contract({
+    name: "context.linked_sources",
+    description: "Inventory user-linked local, online, and connector-backed context sources before planning.",
+    availability: "always",
+    permission: permission("context.source", "low", "Read configured context source references without fetching private connector content."),
+    errors: ["invalid_input", "permission_denied"],
+    sourceMetadata: connectorSource,
+    inputSchema: {
+      type: "object",
+      required: ["sources"],
+      additionalProperties: false,
+      properties: {
+        sources: {
+          type: "array",
+          maxItems: 50,
+          items: {
+            type: "object",
+            required: ["id", "kind", "label", "enabled", "status"],
+            additionalProperties: false,
+            properties: {
+              id: { type: "string" },
+              kind: {
+                type: "string",
+                enum: ["local_folder", "local_file", "online_folder", "database", "notion", "obsidian", "url", "other"],
+              },
+              label: { type: "string" },
+              enabled: { type: "boolean" },
+              status: { type: "string", enum: ["available", "needs_connector", "unavailable"] },
+              path: { type: "string" },
+              uri: { type: "string" },
+              note: { type: "string" },
+            },
+          },
+        },
+      },
+    },
+    outputSchema: observationSchema({
+      type: "object",
+      required: ["sources", "availableCount", "blockedCount", "localFileCount", "localFolderCount", "onlineCount", "planningHints"],
+      additionalProperties: false,
+      properties: {
+        sources: {
+          type: "array",
+          items: {
+            type: "object",
+            required: ["id", "kind", "label", "enabled", "status"],
+            additionalProperties: true,
+            properties: {
+              id: { type: "string" },
+              kind: { type: "string" },
+              label: { type: "string" },
+              enabled: { type: "boolean" },
+              status: { type: "string" },
+            },
+          },
+        },
+        availableCount: { type: "integer", minimum: 0 },
+        blockedCount: { type: "integer", minimum: 0 },
+        localFileCount: { type: "integer", minimum: 0 },
+        localFolderCount: { type: "integer", minimum: 0 },
+        onlineCount: { type: "integer", minimum: 0 },
+        planningHints: { type: "array", items: { type: "string" } },
+      },
+    }),
+  }),
+  contract({
     name: "context.distill",
     description: "Compact tool observations into planning context, durable memory candidates, and remaining questions.",
     availability: "always",
@@ -839,6 +943,7 @@ export const BUILT_IN_TOOL_CONTRACTS = [
               question: { type: "string" },
               category: { type: "string" },
               choices: { type: "array", items: { type: "string" } },
+              selectionMode: { type: "string", enum: ["single", "multiple"], default: "multiple" },
               captureScope: { type: "string", enum: ["global", "current_aim", "none"], default: "current_aim" },
             },
           },

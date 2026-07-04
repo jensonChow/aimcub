@@ -2,6 +2,7 @@ import { app, BrowserWindow } from "electron";
 import { join } from "node:path";
 
 import { registerIpc } from "./ipc";
+import { loadContextSourceConfig } from "./context-source-settings";
 import { loadProviderConfig } from "./gateway";
 import { loadWebResearchConfig } from "./web-research-settings";
 
@@ -59,6 +60,7 @@ app.whenReady().then(() => {
   // Load the persisted provider config into memory, then wire IPC.
   loadProviderConfig();
   loadWebResearchConfig();
+  loadContextSourceConfig();
   registerIpc();
   createWindow();
   app.on("activate", () => {
