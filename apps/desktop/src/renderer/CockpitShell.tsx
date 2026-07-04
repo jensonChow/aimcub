@@ -306,7 +306,9 @@ export function CockpitShell({
             <h2>{t("shell.inspector")}</h2>
             <span>{activeStage}</span>
           </div>
-          {inspector}
+          <div className="od-inspector-body">
+            {inspector}
+          </div>
         </aside>
       </div>
     </div>

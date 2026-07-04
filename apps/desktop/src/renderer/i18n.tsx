@@ -171,6 +171,16 @@ export const STRINGS = {
   "cockpit.settings.meta": { en: "AI / agents / cost", zh: "AI / agent / 成本" },
   "cockpit.resizeSidebar": { en: "Resize left sidebar", zh: "调整左侧边栏宽度" },
   "cockpit.workflow": { en: "Aim OS workflow", zh: "Aim OS 流程" },
+  "cockpit.contractsLockedTitle": { en: "Context gate is still locked", zh: "Context gate 仍未解锁" },
+  "cockpit.contractsLockedBody": {
+    en: "Aimcub will not show concrete sub-aims until context sources, scope, and blocking questions are clear enough to avoid fake certainty.",
+    zh: "在上下文来源、范围和阻塞问题足够清楚前，Aimcub 不展示具体子目标，避免把假设伪装成确定计划。",
+  },
+  "cockpit.runLockedTitle": { en: "Run is waiting for a saved plan", zh: "执行区正在等待已保存计划" },
+  "cockpit.runLockedBody": {
+    en: "Create or open an aim with sub-aim contracts first. Then this stage shows assignments, agent runs, evidence, and eval results.",
+    zh: "请先创建或打开带子目标契约的 Aim。之后这里会展示分派、agent 运行、证据和评估结果。",
+  },
 
   "home.aim_one": { en: "{n} aim", zh: "{n} 个目标" },
   "home.aim_other": { en: "{n} aims", zh: "{n} 个目标" },

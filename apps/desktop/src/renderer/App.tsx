@@ -237,7 +237,6 @@ function AimOsApp() {
   const [contextNote, setContextNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const [showSettings, setShowSettings] = useState(false);
   const [stageOverride, setStageOverride] = useState<CockpitStage | null>(null);
   const planningRunIdRef = useRef<string | null>(null);
 
@@ -283,7 +282,10 @@ function AimOsApp() {
     setLocalAgents(nextAgents);
     setContextCandidates(nextCandidates);
     if (!selected && nextGoals[0]) void openGoal(nextGoals[0]);
-    if (!nextProvider?.configured && !nextAgents.some((agent) => agent.available && agent.authStatus !== "missing")) setShowSettings(true);
+    if (!nextProvider?.configured && !nextAgents.some((agent) => agent.available && agent.authStatus !== "missing")) {
+      setMode("settings");
+      setStageOverride("settings");
+    }
   }
 
   async function openGoal(goal: Goal) {
@@ -369,8 +371,8 @@ function AimOsApp() {
     const title = aimTitle.trim();
     if (!title) return;
     if (!provider?.configured && !hasCliPlanningRuntime()) {
-      setShowSettings(true);
       setMode("settings");
+      setStageOverride("settings");
       return;
     }
     setError(null);
@@ -589,11 +591,9 @@ function AimOsApp() {
   function openCockpitStage(stage: CockpitStage) {
     setStageOverride(stage);
     if (stage === "settings") {
-      setShowSettings(true);
       setMode("settings");
       return;
     }
-    setShowSettings(false);
     if (stage === "context") {
       setMode("contexting");
       return;
@@ -608,6 +608,132 @@ function AimOsApp() {
     }
     setMode("cockpit");
   }
+
+  const heroPanel = (
+    <section style={heroPanelStyle()}>
+      <div>
+        <div style={eyebrowStyle()}>{t("os.flow")}</div>
+        <h1 style={{ margin: "6px 0 8px", fontSize: 30, letterSpacing: 0 }}>
+          {selected ? selected.title : parent ? t("os.breakdownTitle") : t("os.heroTitle")}
+        </h1>
+        <p style={{ margin: 0, color: C.muted, maxWidth: 680, lineHeight: 1.55 }}>
+          {selected ? shortText(selected.description || progress?.next_action || t("os.heroBody"), 220) : t("os.heroBody")}
+        </p>
+      </div>
+      <ProgressDonut done={completed} total={total} />
+    </section>
+  );
+
+  const composerPanel = (
+    <ComposerPanel
+      title={aimTitle}
+      description={aimDescription}
+      parent={parent}
+      mode={mode}
+      disabled={Boolean(busy)}
+      onTitle={setAimTitle}
+      onDescription={setAimDescription}
+      onDraft={() => void startDraft()}
+    />
+  );
+
+  const clarifyPanel = clarify && (mode === "contexting" || mode === "answering" || mode === "reviewing") ? (
+    <ClarifyPanel
+      clarify={clarify}
+      phase={clarifyPhase}
+      answers={clarifyPhase === "intake" ? intakeAnswers : answers}
+      contextNote={contextNote}
+      conversationEnabled={clarifyPhase !== "intake" || contextSources?.userSession.enabled !== false}
+      questionnaireEnabled={clarifyPhase !== "intake" || contextSources?.questionnaire.enabled !== false}
+      disabled={Boolean(busy)}
+      onAnswer={(id, value) => {
+        if (clarifyPhase === "intake") {
+          setIntakeAnswers((current) => ({ ...current, [id]: value }));
+        } else {
+          setAnswers((current) => ({ ...current, [id]: value }));
+        }
+      }}
+      onContextNote={setContextNote}
+      onRefine={() => void (clarifyPhase === "intake" ? continueFromContext() : refinePlan())}
+      onSkip={clarifyPhase === "intake" ? undefined : () => setMode("reviewing")}
+    />
+  ) : null;
+
+  const planPanel = activePlan ? (
+    <PlanPanel
+      plan={activePlan}
+      quality={planResult?.quality ?? null}
+      review={planResult?.review ?? null}
+      saved={Boolean(selected)}
+      disabled={Boolean(busy)}
+      onSave={() => void savePlan()}
+    />
+  ) : null;
+
+  const executionPanel = selected && detail ? (
+    <ExecutionPanel
+      detail={detail}
+      progress={progress}
+      disabled={Boolean(busy)}
+      onRunAgent={(milestone) => void runAgent(milestone)}
+      onConfirm={(milestone) => void confirmMilestone(milestone)}
+      onBreakDown={breakDown}
+    />
+  ) : null;
+
+  const settingsPanel = (
+    <SettingsPanel
+      provider={provider}
+      webResearch={webResearch}
+      contextSources={contextSources}
+      localAgents={localAgents}
+      onProvider={setProvider}
+      onWeb={setWebResearch}
+      onContextSources={setContextSources}
+      onRefreshAgents={async () => setLocalAgents(await window.aimcub.listLocalAgents())}
+    />
+  );
+
+  const mainStageContent = (() => {
+    if (activeStage === "settings") return settingsPanel;
+    if (activeStage === "context") {
+      return (
+        <>
+          {!selected || draft || mode === "contexting" ? composerPanel : null}
+          <ContextSourcesPanel status={contextSources} disabled={Boolean(busy)} onSaved={setContextSources} />
+          {clarifyPanel}
+        </>
+      );
+    }
+    if (activeStage === "contracts") {
+      return planPanel ?? (
+        <LockedStagePanel
+          eyebrow={t("os.stepPlan")}
+          title={t("cockpit.contractsLockedTitle")}
+          body={t("cockpit.contractsLockedBody")}
+          action={t("cockpit.next.context")}
+          onAction={() => openCockpitStage("context")}
+        />
+      );
+    }
+    if (activeStage === "run" || activeStage === "eval") {
+      return executionPanel ?? planPanel ?? (
+        <LockedStagePanel
+          eyebrow={activeStage === "eval" ? t("os.stepEval") : t("os.stepExecute")}
+          title={t("cockpit.runLockedTitle")}
+          body={t("cockpit.runLockedBody")}
+          action={t("os.stepAim")}
+          onAction={() => openCockpitStage("aim")}
+        />
+      );
+    }
+    return (
+      <>
+        {heroPanel}
+        {!selected || draft || parent ? composerPanel : null}
+      </>
+    );
+  })();
 
   return (
     <CockpitShell
@@ -626,7 +752,6 @@ function AimOsApp() {
       error={error}
       onNewAim={() => {
         resetComposer();
-        setShowSettings(false);
         setMode("cockpit");
         setStageOverride("aim");
       }}
@@ -636,94 +761,7 @@ function AimOsApp() {
         <>
           {error ? <Notice tone="error">{error}</Notice> : null}
           {busy ? <Notice tone="info">{busy}</Notice> : null}
-
-          <section style={heroPanelStyle()}>
-            <div>
-              <div style={eyebrowStyle()}>{t("os.flow")}</div>
-              <h1 style={{ margin: "6px 0 8px", fontSize: 30, letterSpacing: 0 }}>
-                {selected ? selected.title : parent ? t("os.breakdownTitle") : t("os.heroTitle")}
-              </h1>
-              <p style={{ margin: 0, color: C.muted, maxWidth: 680, lineHeight: 1.55 }}>
-                {selected ? shortText(selected.description || progress?.next_action || t("os.heroBody"), 220) : t("os.heroBody")}
-              </p>
-            </div>
-            <ProgressDonut done={completed} total={total} />
-          </section>
-
-          <FlowRail mode={mode} hasDraft={Boolean(draft)} hasPlan={Boolean(finalPlan)} saved={Boolean(selected)} />
-
-          {!selected || draft || mode === "contexting" ? (
-            <>
-              <ComposerPanel
-                title={aimTitle}
-                description={aimDescription}
-                parent={parent}
-                mode={mode}
-                disabled={Boolean(busy)}
-                onTitle={setAimTitle}
-                onDescription={setAimDescription}
-                onDraft={() => void startDraft()}
-              />
-              <ContextSourcesPanel status={contextSources} disabled={Boolean(busy)} onSaved={setContextSources} />
-            </>
-          ) : null}
-
-          {clarify && (mode === "contexting" || mode === "answering" || mode === "reviewing") ? (
-            <ClarifyPanel
-              clarify={clarify}
-              phase={clarifyPhase}
-              answers={clarifyPhase === "intake" ? intakeAnswers : answers}
-              contextNote={contextNote}
-              conversationEnabled={clarifyPhase !== "intake" || contextSources?.userSession.enabled !== false}
-              questionnaireEnabled={clarifyPhase !== "intake" || contextSources?.questionnaire.enabled !== false}
-              disabled={Boolean(busy)}
-              onAnswer={(id, value) => {
-                if (clarifyPhase === "intake") {
-                  setIntakeAnswers((current) => ({ ...current, [id]: value }));
-                } else {
-                  setAnswers((current) => ({ ...current, [id]: value }));
-                }
-              }}
-              onContextNote={setContextNote}
-              onRefine={() => void (clarifyPhase === "intake" ? continueFromContext() : refinePlan())}
-              onSkip={clarifyPhase === "intake" ? undefined : () => setMode("reviewing")}
-            />
-          ) : null}
-
-          {activePlan ? (
-            <PlanPanel
-              plan={activePlan}
-              quality={planResult?.quality ?? null}
-              review={planResult?.review ?? null}
-              saved={Boolean(selected)}
-              disabled={Boolean(busy)}
-              onSave={() => void savePlan()}
-            />
-          ) : null}
-
-          {selected && detail ? (
-            <ExecutionPanel
-              detail={detail}
-              progress={progress}
-              disabled={Boolean(busy)}
-              onRunAgent={(milestone) => void runAgent(milestone)}
-              onConfirm={(milestone) => void confirmMilestone(milestone)}
-              onBreakDown={breakDown}
-            />
-          ) : null}
-
-          {showSettings || mode === "settings" ? (
-            <SettingsPanel
-              provider={provider}
-              webResearch={webResearch}
-              contextSources={contextSources}
-              localAgents={localAgents}
-              onProvider={setProvider}
-              onWeb={setWebResearch}
-              onContextSources={setContextSources}
-              onRefreshAgents={async () => setLocalAgents(await window.aimcub.listLocalAgents())}
-            />
-          ) : null}
+          {mainStageContent}
         </>
       )}
       inspector={(
@@ -755,6 +793,29 @@ function AimOsApp() {
         </>
       )}
     />
+  );
+}
+
+function LockedStagePanel(props: {
+  eyebrow: string;
+  title: string;
+  body: string;
+  action: string;
+  onAction: () => void;
+}) {
+  return (
+    <section style={panelStyle()}>
+      <div style={sectionHeaderStyle()}>
+        <div>
+          <div style={eyebrowStyle()}>{props.eyebrow}</div>
+          <h2 style={sectionTitleStyle()}>{props.title}</h2>
+        </div>
+        <button type="button" onClick={props.onAction} style={{ ...primaryButton(false), marginTop: 0 }}>
+          {props.action}
+        </button>
+      </div>
+      <p style={mutedTextStyle()}>{props.body}</p>
+    </section>
   );
 }
 
@@ -1095,27 +1156,6 @@ function RuntimePanel(props: {
   );
 }
 
-function FlowRail(props: { mode: AppMode; hasDraft: boolean; hasPlan: boolean; saved: boolean }) {
-  const { t } = useI18n();
-  const steps = [
-    { label: t("os.stepAim"), active: !props.hasDraft && !props.saved },
-    { label: t("os.stepContext"), active: props.mode === "contexting" || props.mode === "answering" },
-    { label: t("os.stepPlan"), active: props.hasPlan && !props.saved },
-    { label: t("os.stepExecute"), active: props.saved },
-    { label: t("os.stepEval"), active: props.saved },
-  ];
-  return (
-    <section style={flowRailStyle()}>
-      {steps.map((step, index) => (
-        <div key={step.label} style={flowStepStyle(step.active)}>
-          <div style={flowNumberStyle(step.active)}>{index + 1}</div>
-          <span>{step.label}</span>
-        </div>
-      ))}
-    </section>
-  );
-}
-
 function ProgressDonut({ done, total }: { done: number; total: number }) {
   const value = pct(done, total);
   return (
@@ -1194,44 +1234,6 @@ function eyebrowStyle(): CSSProperties {
 
 function mutedTextStyle(): CSSProperties {
   return { color: C.muted, fontSize: 13, lineHeight: 1.45, margin: "4px 0 0" };
-}
-
-function flowRailStyle(): CSSProperties {
-  return {
-    display: "grid",
-    gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
-    gap: 8,
-  };
-}
-
-function flowStepStyle(active: boolean): CSSProperties {
-  return {
-    background: active ? C.accentBg : "#fff",
-    border: `1px solid ${active ? C.accent : C.border}`,
-    borderRadius: 8,
-    padding: 10,
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    color: active ? C.accent : C.muted,
-    fontSize: 13,
-    fontWeight: 700,
-    minWidth: 0,
-  };
-}
-
-function flowNumberStyle(active: boolean): CSSProperties {
-  return {
-    width: 20,
-    height: 20,
-    borderRadius: 999,
-    display: "grid",
-    placeItems: "center",
-    background: active ? C.accent : "#eef0f2",
-    color: active ? "#fff" : C.muted,
-    fontSize: 11,
-    flex: "0 0 auto",
-  };
 }
 
 function questionStyle(): CSSProperties {
