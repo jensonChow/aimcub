@@ -147,6 +147,7 @@ Reference links:
 - Keyboard focus must remain visible. Current focus token is a 4 px accent-tinted ring; keep or improve it, do not remove it.
 - Pointer targets should be at least 24 by 24 CSS px, with practical Aimcub targets usually 32 to 44 px.
 - Do not interrupt the user with modal dialogs for recoverable actions. Prefer inline banners, undo, or a review surface.
+- Planning question surfaces must distinguish blocking pre-draft context from optional post-draft refinements. Pre-draft intake should make the blocked next step explicit; post-draft clarification should keep accepting the draft available without implying the user is stuck.
 - Destructive actions need undo when possible. If undo is not possible, require explicit confirmation with action-specific button labels.
 - Loading states should preserve layout dimensions. Avoid spinners that replace large content areas without a stable skeleton, label, or status.
 - Motion should be fast, direct, and functional. Keep transitions around 120 to 180 ms. Avoid decorative animation loops.

@@ -1,25 +1,25 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-04
-Branch: `codex/avoid-duplicate-aim-intake`
+Branch: `main`
 
 ## Current Session
 
-- Updated the Desktop new/open aim journey so the Aim step owns new aim title and description input.
-- Changed the Context stage to show a compact captured-aim summary plus context sources/questions instead of a second title/description composer.
-- Added a locked Context empty state for users who navigate there before describing an aim.
-- Preserved the explicit child aim breakdown path, which can still use the composer when breaking down a parent milestone.
-- Recorded the new Desktop flow invariant in `docs/memory/design-system.md`.
+- Merged `codex/avoid-duplicate-aim-intake` into `main`.
+- Merged `codex/clarify-journey-steps` into `main`.
+- Resolved merge conflicts in `apps/desktop/src/renderer/i18n.tsx` and this handoff.
+- Kept both journey improvements: Context stage shows the captured aim instead of a second aim composer, and pre-draft versus post-draft questions now have distinct user-facing purposes.
 
 ## Current State
 
-- Normal new aim flow reads: describe aim -> enter context collection -> answer/attach context -> generate plan.
-- Existing saved aims still open to Aim overview first. Their Context stage shows context collection controls and the saved aim summary, not an empty composer.
-- Unsaved new aims can return to the Aim stage through "Edit aim" when title/description needs adjustment.
+- Normal new aim flow reads: describe aim -> enter context collection -> answer or attach context -> generate plan.
+- Context stage shows a compact captured-aim summary plus context sources/questions. It does not ask users to re-enter the same aim except for explicit child-aim breakdown or unsaved-aim editing paths.
+- Pre-draft intake is framed as blocking context before planning.
+- Post-draft clarification is framed as optional draft refinement; users can accept the draft without answering optional refinement questions.
 
 ## Verification
 
-Passed for this session:
+Passed after merge conflict resolution:
 
 ```bash
 PATH=/Users/jenson/.local/node/bin:$PATH pnpm build
@@ -32,14 +32,14 @@ git diff --check
 
 Notes:
 
-- `node_modules` was absent at the start of verification. `pnpm install` was required; the sandboxed install hit DNS restrictions and then succeeded with approved network access.
+- `node_modules` was absent in this worktree, so `pnpm install` was required before verification. The sandboxed install hit DNS restrictions and the approved network install succeeded.
 - Turbo emitted non-fatal `IO error: Operation not permitted` warnings while all required tasks exited successfully.
 
-Commit/push status: this handoff is part of the session commit; use `git log -1` for the final hash after commit.
+Commit/push status: pending merge commit and push to `origin/main`.
 
 ## Next Session Prompt
 
 ```text
-Continue from the Desktop-first Aim OS workspace. Start by reading AGENTS.md, docs/handoff.md, docs/memory/README.md, then load the module memory relevant to the task.
-Keep new aim title/description owned by the Aim stage. Context should collect answers, attachments, and sources without asking users to re-enter the same aim, except for explicit child-aim breakdown or unsaved-aim editing paths.
+Continue from main after the Desktop journey cleanup merges. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md. Then load only the module memory relevant to the task.
+Keep new aim title/description owned by the Aim stage. Context should collect answers, attachments, and sources without asking users to re-enter the same aim, except for explicit child-aim breakdown or unsaved-aim editing paths. Keep pre-draft intake framed as blocking context before planning and post-draft clarify framed as optional draft refinement.
 ```
