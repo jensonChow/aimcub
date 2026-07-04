@@ -2,8 +2,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import type { Milestone } from "@core/types";
+import type { ContextSourceStatus, ProviderStatus, WebResearchStatus } from "../shared/ipc";
 
-import { EvidenceSubmissionForm } from "./App";
+import { EvidenceSubmissionForm, SettingsPanel } from "./App";
 import { I18nProvider } from "./i18n";
 
 const OWNER = "00000000-0000-4000-8000-000000000001";
@@ -40,6 +41,52 @@ const milestone: Milestone = {
 };
 
 const noop = () => {};
+const asyncNoop = async () => {};
+
+const providerStatus: ProviderStatus = {
+  configured: false,
+  provider: null,
+  model: null,
+  baseURL: null,
+  hasApiKey: false,
+};
+
+const webResearchStatus: WebResearchStatus = {
+  configured: false,
+  provider: "brave",
+  enabled: false,
+  fetchPages: true,
+  hasApiKey: false,
+  keySource: null,
+};
+
+const contextSourceStatus: ContextSourceStatus = {
+  version: 1,
+  local: {
+    enabled: false,
+    filePaths: [],
+    configured: false,
+    source: null,
+    resolvedWorkspaceRoot: null,
+    resolvedFilePaths: [],
+  },
+  online: {
+    enabled: false,
+    sources: [],
+    configuredCount: 0,
+    enabledCount: 0,
+  },
+  research: {
+    webEnabled: true,
+    deepResearch: true,
+  },
+  userSession: {
+    enabled: true,
+  },
+  questionnaire: {
+    enabled: true,
+  },
+};
 
 describe("EvidenceSubmissionForm", () => {
   it("renders proof note, URL, file, and required evidence controls", () => {
@@ -69,5 +116,37 @@ describe("EvidenceSubmissionForm", () => {
     expect(html).toContain("Local file references");
     expect(html).toContain("Approval note.");
     expect(html).toContain("Submit proof");
+  });
+});
+
+describe("SettingsPanel", () => {
+  it("renders settings as split navigation with one detail pane", () => {
+    const html = renderToStaticMarkup(
+      <I18nProvider>
+        <SettingsPanel
+          provider={providerStatus}
+          webResearch={webResearchStatus}
+          contextSources={contextSourceStatus}
+          localAgents={[]}
+          aimContext={null}
+          onProvider={noop}
+          onWeb={noop}
+          onContextSources={noop}
+          onRefreshAgents={asyncNoop}
+        />
+      </I18nProvider>,
+    );
+
+    expect(html).toContain("od-settings-split");
+    expect(html).toContain('aria-current="page"');
+    expect(html).toContain("Settings sections");
+    expect(html).toContain("Overview");
+    expect(html).toContain("Planning model");
+    expect(html).toContain("Local CLI agents");
+    expect(html).toContain("Web research");
+    expect(html).toContain("Context sources");
+    expect(html).toContain("Helper readiness");
+    expect(html).not.toContain("API key");
+    expect(html).not.toContain("Rescan");
   });
 });

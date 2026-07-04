@@ -2806,7 +2806,7 @@ function StageMetric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function SettingsPanel(props: {
+export function SettingsPanel(props: {
   provider: ProviderStatus | null;
   webResearch: WebResearchStatus | null;
   contextSources: ContextSourceStatus | null;
@@ -2823,6 +2823,9 @@ function SettingsPanel(props: {
   onReturnToAim?: () => void;
 }) {
   const { t } = useI18n();
+  const [activeSection, setActiveSection] = useState<SettingsSectionId>(() =>
+    props.aimContext ? settingsSectionForFocus(props.aimContext.profile.settingsFocus) : "overview",
+  );
   const providerReady = Boolean(props.provider?.configured);
   const readyLocalAgents = props.localAgents.filter((agent) => agent.available && agent.authStatus !== "missing");
   const availableLocalAgents = props.localAgents.filter((agent) => agent.available);
@@ -2836,6 +2839,7 @@ function SettingsPanel(props: {
   const providerRuntime = [props.provider?.provider, props.provider?.model].filter(Boolean).join(" / ");
 
   const providerHelper = {
+    id: "provider",
     title: t("settings.helper.provider.title"),
     body: t("settings.helper.provider.body"),
     status: providerReady ? t("intake.ready") : localAgentReady ? t("context.sources.status.optional") : t("os.blocked"),
@@ -2848,6 +2852,7 @@ function SettingsPanel(props: {
   } satisfies SettingsHelper;
 
   const localAgentHelper = {
+    id: "local",
     title: t("settings.helper.local.title"),
     body: t("settings.helper.local.body"),
     status: localAgentReady ? t("intake.ready") : providerReady ? t("context.sources.status.optional") : t("os.blocked"),
@@ -2860,6 +2865,7 @@ function SettingsPanel(props: {
   } satisfies SettingsHelper;
 
   const webResearchHelper = {
+    id: "web",
     title: t("settings.helper.web.title"),
     body: t("settings.helper.web.body"),
     status: webResearchReady ? t("intake.ready") : webResearchEnabled ? t("os.blocked") : t("context.sources.status.optional"),
@@ -2872,6 +2878,7 @@ function SettingsPanel(props: {
   } satisfies SettingsHelper;
 
   const contextHelper = {
+    id: "context",
     title: t("settings.helper.context.title"),
     body: t("settings.helper.context.body"),
     status: contextReady ? t("intake.ready") : contextHasAnySource ? t("settings.status.partial") : t("os.blocked"),
@@ -2891,6 +2898,58 @@ function SettingsPanel(props: {
       : !webResearchReady
         ? t("settings.overall.next.web")
         : t("settings.overall.next.aim");
+  const overviewHelper = {
+    id: "overview",
+    title: t("settings.nav.overview"),
+    body: t("settings.nav.overview.body"),
+    status: planningReady ? t("settings.status.readyToPlan") : t("os.blocked"),
+    tone: planningReady ? "success" : "warn",
+    next: overallNext,
+  } satisfies SettingsHelper;
+  const navItems = [overviewHelper, ...helpers];
+  const activeHelper = navItems.find((item) => item.id === activeSection) ?? overviewHelper;
+
+  useEffect(() => {
+    setActiveSection(props.aimContext ? settingsSectionForFocus(props.aimContext.profile.settingsFocus) : "overview");
+  }, [props.aimContext?.profile.settingsFocus, props.aimContext?.title]);
+
+  let detailPane: ReactNode;
+  if (activeSection === "overview") {
+    detailPane = (
+      <SettingsOverviewPane
+        helper={overviewHelper}
+        helpers={helpers}
+        planningReady={planningReady}
+        overallNext={overallNext}
+        aimContext={props.aimContext}
+        onReturnToAim={props.onReturnToAim}
+      />
+    );
+  } else if (activeSection === "provider") {
+    detailPane = (
+      <SettingsDetailPane helper={providerHelper}>
+        <ProviderForm status={props.provider} onSaved={props.onProvider} />
+      </SettingsDetailPane>
+    );
+  } else if (activeSection === "local") {
+    detailPane = (
+      <SettingsDetailPane helper={localAgentHelper}>
+        <LocalAgentForm agents={props.localAgents} onRefresh={props.onRefreshAgents} />
+      </SettingsDetailPane>
+    );
+  } else if (activeSection === "web") {
+    detailPane = (
+      <SettingsDetailPane helper={webResearchHelper}>
+        <WebResearchForm status={props.webResearch} onSaved={props.onWeb} />
+      </SettingsDetailPane>
+    );
+  } else {
+    detailPane = (
+      <SettingsDetailPane helper={contextHelper}>
+        <ContextSourcesPanel status={props.contextSources} compact onSaved={props.onContextSources} />
+      </SettingsDetailPane>
+    );
+  }
 
   return (
     <section style={panelStyle()}>
@@ -2902,6 +2961,64 @@ function SettingsPanel(props: {
         </div>
       </div>
 
+      <div className="od-settings-split">
+        <nav className="od-settings-nav" aria-label={t("settings.navigationLabel")}>
+          {navItems.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className="od-settings-nav-item"
+              data-active={item.id === activeSection ? "true" : "false"}
+              aria-current={item.id === activeSection ? "page" : undefined}
+              onClick={() => setActiveSection(item.id)}
+            >
+              <span className="od-settings-nav-title">
+                <strong>{item.title}</strong>
+                <span className={`od-pill ${item.tone}`}>{item.status}</span>
+              </span>
+              <span className="od-settings-nav-body">{item.body}</span>
+              <span className="od-settings-nav-next">
+                <span>{t("settings.nextAction")}</span>
+                <strong>{item.next}</strong>
+              </span>
+            </button>
+          ))}
+        </nav>
+
+        <div className="od-settings-detail" aria-live="polite" aria-label={activeHelper.title}>
+          {detailPane}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+type SettingsSectionId = "overview" | "provider" | "local" | "web" | "context";
+
+function settingsSectionForFocus(focus: AimHelperProfile["settingsFocus"]): SettingsSectionId {
+  if (focus === "local") return "local";
+  if (focus === "web") return "web";
+  if (focus === "context") return "context";
+  return "provider";
+}
+
+function SettingsOverviewPane(props: {
+  helper: SettingsHelper;
+  helpers: SettingsHelper[];
+  planningReady: boolean;
+  overallNext: string;
+  aimContext: {
+    title: string;
+    profile: AimHelperProfile;
+    runtimeReady: boolean;
+  } | null;
+  onReturnToAim?: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <section className="od-settings-pane">
+      <SettingsPaneHeader helper={props.helper} />
+
       {props.aimContext ? (
         <SettingsAimContextPanel
           title={props.aimContext.title}
@@ -2911,20 +3028,20 @@ function SettingsPanel(props: {
         />
       ) : null}
 
-      <div className="od-helper-callout" data-state={planningReady ? "ready" : "blocked"}>
-        <span className={`od-pill ${planningReady ? "success" : "warn"}`}>
-          {planningReady ? t("settings.status.readyToPlan") : t("os.blocked")}
+      <div className="od-helper-callout" data-state={props.planningReady ? "ready" : "blocked"}>
+        <span className={`od-pill ${props.planningReady ? "success" : "warn"}`}>
+          {props.planningReady ? t("settings.status.readyToPlan") : t("os.blocked")}
         </span>
         <div>
           <span>{t("settings.nextAction")}</span>
-          <strong>{overallNext}</strong>
+          <strong>{props.overallNext}</strong>
         </div>
         <p>{t("settings.intakeNote")}</p>
       </div>
 
       <div className="od-helper-readiness" aria-label={t("settings.readinessLabel")}>
-        {helpers.map((helper) => (
-          <div className="od-helper-row" key={helper.title}>
+        {props.helpers.map((helper) => (
+          <div className="od-helper-row" key={helper.id}>
             <div className="od-helper-row-main">
               <strong>{helper.title}</strong>
               <span>{helper.body}</span>
@@ -2937,23 +3054,35 @@ function SettingsPanel(props: {
           </div>
         ))}
       </div>
-
-      <SettingsHelperSection helper={providerHelper}>
-        <ProviderForm status={props.provider} onSaved={props.onProvider} onClose={() => {}} />
-      </SettingsHelperSection>
-
-      <SettingsHelperSection helper={localAgentHelper}>
-        <LocalAgentForm agents={props.localAgents} onRefresh={props.onRefreshAgents} />
-      </SettingsHelperSection>
-
-      <SettingsHelperSection helper={webResearchHelper}>
-        <WebResearchForm status={props.webResearch} onSaved={props.onWeb} />
-      </SettingsHelperSection>
-
-      <SettingsHelperSection helper={contextHelper}>
-        <ContextSourcesPanel status={props.contextSources} compact onSaved={props.onContextSources} />
-      </SettingsHelperSection>
     </section>
+  );
+}
+
+function SettingsDetailPane(props: { helper: SettingsHelper; children: ReactNode }) {
+  return (
+    <section className="od-settings-pane">
+      <SettingsPaneHeader helper={props.helper} />
+      <div className="od-settings-pane-body">
+        {props.children}
+      </div>
+    </section>
+  );
+}
+
+function SettingsPaneHeader(props: { helper: SettingsHelper }) {
+  const { t } = useI18n();
+  return (
+    <header className="od-settings-pane-head">
+      <div>
+        <h3>{props.helper.title}</h3>
+        <p>{props.helper.body}</p>
+      </div>
+      <div className="od-settings-pane-status">
+        <span className={`od-pill ${props.helper.tone}`}>{props.helper.status}</span>
+        <span>{t("settings.nextAction")}</span>
+        <strong>{props.helper.next}</strong>
+      </div>
+    </header>
   );
 }
 
@@ -2988,29 +3117,12 @@ function SettingsAimContextPanel(props: {
 type SettingsHelperTone = "success" | "warn" | "blue" | "";
 
 interface SettingsHelper {
+  id: SettingsSectionId;
   title: string;
   body: string;
   status: string;
   tone: SettingsHelperTone;
   next: string;
-}
-
-function SettingsHelperSection(props: { helper: SettingsHelper; children: ReactNode }) {
-  return (
-    <section className="od-helper-section">
-      <div className="od-helper-section-head">
-        <div>
-          <h3>{props.helper.title}</h3>
-          <p>{props.helper.body}</p>
-        </div>
-        <div className="od-helper-section-status">
-          <span className={`od-pill ${props.helper.tone}`}>{props.helper.status}</span>
-          <span>{props.helper.next}</span>
-        </div>
-      </div>
-      {props.children}
-    </section>
-  );
 }
 
 function activeContextSourceCount(status: ContextSourceStatus | null): number {

@@ -46,7 +46,7 @@ The local CLI agent harness lives in `apps/desktop/src/main/local-agents.ts`. It
 
 This harness is an Aimcub runtime layer, not MCP. Aimcub owns aim decomposition, context, permissions, evidence, and eval; local CLIs are execution runtimes when no API provider is configured or when the user chooses local execution.
 
-Desktop settings include a thin "Local CLI agents" panel with detection and explicit read-only smoke tests. Keep it thin until milestone execution and evidence capture are deeper.
+Desktop settings use a split view: category navigation on the left and one detail pane on the right. Provider setup, local CLI agent detection, web research, and context sources stay separated by category instead of stacked into one long page. The "Local CLI agents" detail pane includes detection and explicit read-only smoke tests; keep it thin until milestone execution and evidence capture are deeper.
 
 ## Next Desktop Direction
 

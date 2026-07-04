@@ -389,6 +389,12 @@ export const STRINGS = {
     en: "Aim intake stays available. Planning starts when either a model provider or authenticated local CLI agent is ready.",
     zh: "Aim 输入保持可用。只要模型提供方或已认证的本地 CLI agent 之一就绪，就可以开始规划。",
   },
+  "settings.navigationLabel": { en: "Settings sections", zh: "设置分类" },
+  "settings.nav.overview": { en: "Overview", zh: "概览" },
+  "settings.nav.overview.body": {
+    en: "Readiness, aim-specific guidance, and the next setup action.",
+    zh: "查看就绪状态、针对当前 Aim 的建议和下一步设置。",
+  },
   "settings.readinessLabel": { en: "Helper readiness", zh: "助手就绪状态" },
   "settings.nextAction": { en: "Next setup action", zh: "下一步设置" },
   "settings.status.partial": { en: "Partial", zh: "部分就绪" },

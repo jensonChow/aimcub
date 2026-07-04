@@ -5,20 +5,20 @@ Branch: `main`
 
 ## Current Session
 
-- Refreshed project memory after the product-loop integration and the `stash@{0}` review.
-- Promoted the Context Sources planning-gate rule from transient handoff into durable Desktop and design-system memory.
-- Kept the handoff focused on current transfer state instead of carrying the full eight-branch integration transcript.
-- Removed the stale `codex/wip-planning-tools-before-main-restore` local/remote branch and dropped the old `pre-integration-main-staged-cleanup` stash after confirming both were superseded by `main`.
+- Reworked Desktop Settings into a split view with persistent category navigation and a single selected detail pane.
+- Separated Overview, Planning model, Local CLI agents, Web research, and Context sources so their forms no longer stack in one long page.
+- Added a renderer test that verifies the split navigation, current category marker, and one-pane default rendering.
+- Promoted the Settings split-view requirement into durable Desktop and design-system memory.
 
 ## Current State
 
-- `main` supports the local Aim OS loop: aim-first onboarding, context bundle review, editable sub-aim/eval plans, explicit human/agent/model routing, manual proof evidence, evidence/eval review, Context Inbox review, and completion recap.
-- Context Sources now has one setup summary, compact planning readiness gates, and one editable control surface. The gates cover context bundle, research fusion, gap intake, scope guard, and sub-aim readiness.
-- No stash entries or unmerged local/remote WIP branches are expected after the cleanup.
+- `codex/settings-split-view` supports the local Aim OS loop from `main` plus the split-view Settings surface.
+- Settings keeps helper setup product-focused: overview/readiness stays in the Overview detail pane, and provider, local agent, web research, and context-source configuration each occupy their own detail pane.
+- Context Sources still has one setup summary, compact planning readiness gates, and one editable control surface. The gates cover context bundle, research fusion, gap intake, scope guard, and sub-aim readiness.
 
 ## Verification
 
-- Verification passed after the product-loop merge, after the Context Sources planning-gate integration, and for this memory refresh:
+- Verification passed for the Settings split-view change:
   - `pnpm build`
   - `pnpm test`
   - `pnpm typecheck`
@@ -34,5 +34,5 @@ Notes:
 ## Next Session Prompt
 
 ```text
-Continue from main. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md, then load only task-relevant module memory. Preserve the integrated Aim OS loop and the Context Sources rule: one summary, compact planning readiness gates, and one editable control surface. If changes are made, update docs/handoff.md and run the full required verification command set.
+Continue from `codex/settings-split-view`. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md, then load only task-relevant module memory. Preserve the Settings split view: category navigation on the left and one selected detail pane on the right. Preserve the Context Sources rule: one summary, compact planning readiness gates, and one editable control surface. If changes are made, update docs/handoff.md and run the full required verification command set.
 ```

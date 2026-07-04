@@ -27,7 +27,7 @@ const PROVIDER_OPTIONS = LLM_PROVIDER_CATALOG;
 interface ProviderFormProps {
   status: ProviderStatus | null;
   onSaved: (s: ProviderStatus) => void;
-  onClose: () => void;
+  onClose?: () => void;
 }
 
 export function ProviderForm({ status, onSaved, onClose }: ProviderFormProps) {
@@ -115,7 +115,7 @@ export function ProviderForm({ status, onSaved, onClose }: ProviderFormProps) {
     <div style={{ ...card(), background: "#fbfaf7" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
         <div style={{ fontWeight: 600, fontSize: 15 }}>{t("pf.title")}</div>
-        <button onClick={onClose} style={{ ...linkButton() }}>{t("common.close")}</button>
+        {onClose ? <button onClick={onClose} style={{ ...linkButton() }}>{t("common.close")}</button> : null}
       </div>
       <div style={{ fontSize: 12, color: C.muted, margin: "4px 0 14px" }}>{t("pf.blurb")}</div>
 
