@@ -16,7 +16,7 @@ Aimcub is a universal aim-management layer: it holds the aim, routes work across
 - Eval must be personalized. Benchmarks without user/org context are not enough.
 
 ## Locked Invariants
-- Hosted Supabase is the online source of truth for web/MCP evidence and the future platform.
+- Hosted Supabase is the online source of truth for MCP evidence and the future platform.
 - Local Aim OS state is local-store first until sync parity is explicitly needed.
 - Evidence is append-only and idempotent; milestone completion is derived by `evaluate()`, never written directly.
 - `@core/*` is the only place business logic lives: pure TypeScript, zero platform dependencies, unit-tested.

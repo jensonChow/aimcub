@@ -2,8 +2,8 @@
  * @core/types — the single source of truth for the Aimcub domain model.
  *
  * Pure zod schemas + the TS types inferred from them. Zero platform dependencies
- * (depends only on zod, a pure validation library). All four clients
- * (web / ios / mcp / extension) and the Edge Functions pull their types from here.
+ * (depends only on zod, a pure validation library). Desktop, CLI, MCP, and the
+ * Edge Functions pull their types from here.
  * The DB schema (packages/db) is kept aligned with this file via a CI check
  * (generate_typescript_types).
  */

@@ -4,7 +4,7 @@
 
 Aimcub is an aim-management layer, not a task list, chat shell, or avatar manager. It manages aims across humans and agents, routes work to the best available path, and accrues durable context plus personalized eval from real work.
 
-Aimcub is being built first as an open-source local Aim OS agent harness. The online Aim platform comes later for multiplayer collaboration, sync, teams, permissions, managed infrastructure, and Aim Share.
+Aimcub is being built first as an open-source local Aim OS agent harness. The online Aim platform comes later for multiplayer collaboration, sync, teams, permissions, managed infrastructure, and Aim Share. There is no active iOS app, browser extension, or hosted web app in the current workspace.
 
 ## Product Pillars
 

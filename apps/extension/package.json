@@ -1,6 +1,0 @@
-{
-  "name": "@app/extension",
-  "private": true,
-  "version": "0.0.0",
-  "description": "Placeholder — Chrome MV3 extension activated in v3. No build/test scripts so Turbo skips it."
-}

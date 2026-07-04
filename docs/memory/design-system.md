@@ -116,7 +116,7 @@ Reference links:
 - Semantic states must not rely on color alone. Pair color with label text, icon, position, or shape.
 - Borders should do most separation work. Shadows are rare and shallow, reserved for overlays, popovers, floating restore controls, or modal-like layers.
 - Avoid dominant one-note palettes, purple/purple-blue gradients, dark slate themes, beige/brown themes, decorative orbs, bokeh backgrounds, and purely atmospheric images in app UI.
-- Existing `@ui/tokens` is not yet aligned with Desktop. Future token work should reconcile it with this light operational system before using it as the Desktop source of truth.
+- The old cross-platform `@ui/tokens` package was removed. Future token work should start from this light operational system and only add a shared package when multiple active surfaces need it.
 
 ## Radius, Borders, and Elevation
 
@@ -185,7 +185,7 @@ Reference links:
 
 - The source of truth for Desktop today is `apps/desktop/src/renderer/cockpit.css`.
 - `apps/desktop/src/renderer/styles.ts` contains older shared inline-style helpers and should gradually converge toward the CSS token system.
-- `packages/ui-tokens` currently represents an older dark cross-platform palette. Do not use it to drive Desktop visuals until it is updated to match this document or split into platform-specific token sets.
+- The removed `packages/ui-tokens` package represented an older dark cross-platform palette. Do not recreate it unless it matches this document or is split into platform-specific token sets.
 
 ## Review Checklist
 

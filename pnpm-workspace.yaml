@@ -1,4 +1,10 @@
 packages:
-  - "packages/*"
-  - "apps/*"
-  - "tooling/*"
+  - "packages/api"
+  - "packages/core"
+  - "packages/db"
+  - "packages/llm"
+  - "packages/store"
+  - "packages/types"
+  - "apps/cli"
+  - "apps/desktop"
+  - "apps/mcp"

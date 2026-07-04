@@ -51,6 +51,7 @@ the local Aim OS harness.
 - Not the multiplayer collaboration platform.
 - Not Aim Share.
 - Not a cloud-agent runner.
+- Not a current hosted web, native iOS, or browser-extension product surface.
 - Not MCP as the substrate for local tools. Local read/search/memory/context
   tools are first-party Aimcub runtime tools; MCP remains the external extension
   boundary.
@@ -105,7 +106,7 @@ The online platform should own:
   capabilities, and paid/cross-org participation.
 
 Supabase remains the hosted source of truth for the online platform and for the
-existing web/MCP evidence spine. Local Aim OS state starts in the local store and
+existing MCP evidence spine. Local Aim OS state starts in the local store and
 gets Supabase parity only when the hosted collaboration layer needs it.
 
 ## Core Loop
@@ -185,8 +186,8 @@ DoD:
 
 - Supabase has parity for the local Aim OS orchestration entities that need sync.
 - Teams can share aims, assignments, permissions, and context routing.
-- Hosted web is no longer only the H1 evidence surface; it becomes the online
-  collaboration layer for the same Aim OS model.
+- A hosted app can be reintroduced as the online collaboration layer for the
+  same Aim OS model.
 
 ### Aim Share
 
@@ -202,6 +203,6 @@ DoD:
 - Full cloud-agent execution.
 - Cross-org Aim Share.
 - Calendar as a complete time-management layer.
-- Native iOS/extension product surfaces beyond placeholders.
+- Hosted web, native iOS, and browser-extension product surfaces.
 - Heavy memory infrastructure such as vectors, unless a concrete local harness
   trigger proves the lean single-table model is insufficient.

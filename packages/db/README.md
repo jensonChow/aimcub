@@ -1,7 +1,7 @@
 # @core/db — Hosted Supabase Schema
 
 `supabase/migrations/` contains the SQL migrations named by sequence number for
-the hosted web/MCP evidence spine and future online platform. The local Aim OS
+the hosted MCP evidence spine and future online platform. The local Aim OS
 agent harness is local-store first; Supabase parity for newer local
 orchestration entities is added only when hosted sync/collaboration needs it.
 

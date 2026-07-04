@@ -2,11 +2,11 @@
 
 ## Source Of Truth
 
-Hosted Supabase is the online source of truth for web/MCP evidence and the future platform: Postgres, Auth, RLS, Realtime, and Storage.
+Hosted Supabase is the online source of truth for MCP evidence and the future platform: Postgres, Auth, RLS, Realtime, and Storage.
 
 The local Aim OS harness is local-store first until sync parity is explicitly needed. Current desktop data lives outside the repo under `~/.aimcub/store.json`; provider and context-source settings live beside it under `~/.aimcub/`.
 
-Do not assume hosted Web has local orchestration tables until Supabase migrations and API adapters are added.
+Do not reintroduce a hosted Web app until Supabase parity, collaboration, or sync needs a product surface. Do not assume hosted platform tables for local orchestration until Supabase migrations and API adapters are added.
 
 ## Core Boundaries
 

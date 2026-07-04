@@ -3,8 +3,8 @@
  *
  * Generates the same `DecompositionOutput` shape the LLM returns, so downstream code
  * (validatePlan, materialization) is identical whether the plan came from Claude or
- * from here. Lives in `@core/llm` (next to `decompose`) so the web app and the desktop
- * app share one fallback. Pure — depends only on `@core/types`.
+ * from here. Lives in `@core/llm` (next to `decompose`) so Desktop and CLI share
+ * one fallback. Pure — depends only on `@core/types`.
  */
 import type { AcceptanceRule, DecompositionContract, DecompositionOutput, EstEffort, GoalDomain, PlanNode } from "@core/types";
 

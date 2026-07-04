@@ -10,7 +10,7 @@ The old v1a/v1b split is historical. `WORKTREES.md` documents the completed v1a/
 
 ## Historical Product Shift
 
-The project moved from a hosted milestone auto-light demo toward a local-first Aim OS agent harness. Desktop is now the primary local orchestration surface; Web and MCP remain hosted/platform evidence surfaces.
+The project moved from a hosted milestone auto-light demo toward a local-first Aim OS agent harness. Desktop is now the primary local orchestration surface; MCP remains the hosted external evidence surface. The old Web app, iOS app, extension placeholder, and unused cross-platform UI tokens package were removed from the active workspace on 2026-07-04.
 
 The local Aim OS direction consolidated context/eval around a shared planning-context workflow in `packages/llm/src/context-workflow.ts`. CLI and Desktop use shared store-port helpers for planning context selection, aim intake, clarify/capture/lineage/decomposition learning, decomposition strategy, and review/assumption context candidates.
 

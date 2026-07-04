@@ -39,7 +39,7 @@ intentionally TBD before public release.
 
 - **The hosted backend's single source of truth = Supabase** (Postgres + Auth + RLS + Realtime + Storage).
 - **Evidence is append-only + idempotent**; milestone completion is derived from the evidence stream via `evaluate()`, never written directly.
-- **`@core/*` is the single logic source for all clients** (pure TS, zero platform dependencies, unit-testable). Each app shell handles only I/O, rendering, and platform bridging.
+- **`@core/*` is the single logic source for active surfaces** (pure TS, zero platform dependencies, unit-testable). Each app shell handles only I/O, rendering, and platform bridging.
 - Lean-first: a jobs table + pg_cron (not pgmq), linear milestones (not a DAG), a single-table memory (no vectors). Complexity is added back only when a trigger condition demands it.
 
 ## Monorepo layout
@@ -51,20 +51,17 @@ packages/
   db/          @core/db          Supabase migrations + RLS + Edge Functions
   api/         @core/api-client  supabase-js wrapper
   llm/         @core/llm         Claude gateway (model routing + metering) + goal decomposition
-  ui-tokens/   @ui/tokens        design tokens
+  store/       @core/store       local Aim OS store and planning-context persistence
 apps/
   desktop/    Electron desktop app           - active local Aim OS harness
-  web/         Next.js @ Vercel              - hosted evidence/platform surface
+  cli/         Node CLI                       - active scriptable/debuggable companion
   mcp/         MCP server (Streamable HTTP)  - active
-  ios/         Expo RN                       - v2 (placeholder)
-  extension/   Chrome MV3                    - v3 (placeholder)
 ```
 
 ## Live deployment
 
 | Surface | Where | Notes |
 |---|---|---|
-| Web app | [aimcub.com](https://aimcub.com) | Next.js @ Vercel; email+password auth; hosted evidence spine and future platform surface |
 | MCP server | `https://mcp.aimcub.com` | Cloudflare Workers; OAuth 2.1 resource server (Supabase AS, Path A); RFC 9728 metadata at `/.well-known/oauth-protected-resource` |
 | Database | Supabase `gtasruxwmcsxicyujlfu` (us-west-1) | migrations 0001-0013; RLS verified (users cannot forge milestones) |
 | Evidence ingest | Edge Functions `ingest` (emitter tokens) + `github-webhook` (HMAC) | both feed the same idempotent `handleIngest` pipeline |
@@ -79,7 +76,7 @@ corepack enable pnpm
 pnpm install
 pnpm desktop      # fixed local desktop entry
 pnpm build        # turbo full build
-pnpm test         # @core/domain unit tests
+pnpm test         # workspace test suite
 pnpm core:purity  # verify core has zero platform dependencies
 ```
 
@@ -109,9 +106,9 @@ example `AIMCUB_LIVE_DEEPSEEK_MODEL=deepseek-v4-flash`.
 
 ## Roadmap (with falsifiable gates)
 
-- **v0** Complete: Foundation: monorepo + `@core` + Supabase evidence spine. DoD = core imported by both web and mcp + zero-dependency build passes.
+- **v0** Complete: Foundation: monorepo + `@core` + Supabase evidence spine. DoD = core imported by the active app/evidence surfaces + zero-dependency build passes.
 - **v1** Local Aim OS agent harness: Desktop-first aim intake, context gathering, decomposition, routing, local agent runs, evidence, eval, and context inbox. The old v1a/v1b labels are now validation history, not the active roadmap.
-- **v2** Online multiplayer Aim platform: Supabase parity for local Aim OS entities, sync, teams, permissions, and per-person context routing.
+- **v2** Online multiplayer Aim platform: reintroduce the hosted app when Supabase parity, sync, teams, permissions, and per-person context routing need a product surface.
 - **v3** Aim Share: cross-org aim sharing and a paid network for goals, specialized context, and capability signals. Calendar remains a time-management component throughout.
 
 See [`docs/vision.md`](docs/vision.md) for the full direction,

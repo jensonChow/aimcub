@@ -9,6 +9,7 @@
 **Historical v1a goal**: Web sets a goal → Sonnet decomposes it → MCP/GitHub evidence → milestone **auto-lights**.
 
 The linked git worktrees lived under `./worktrees/` (gitignored), each on a `v1a/*` branch cut from `main`.
+The active `apps/web` package was later removed from the workspace when v1 narrowed to the Desktop-first local Aim OS harness.
 
 ## Integration seam
 The frozen `@core/types` + `@core/api-client` contract is how the worktrees stay compatible while built in parallel. **No worktree may change `packages/types`** (or other worktrees' owned packages) without coordination — if the contract looks wrong, flag it, don't fork it. All external I/O (Supabase, Claude API, OAuth) is **mocked**; live wiring is a separate integration step performed once credentials exist.
