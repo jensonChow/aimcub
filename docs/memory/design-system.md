@@ -46,6 +46,7 @@ Reference links:
 - Calm density: Aimcub is an operational desktop tool. Prefer compact, scannable, quiet layouts over marketing-like hero sections, decorative cards, large illustrations, or expressive gradients.
 - Context is a substrate: show context health as concise status, setup controls, and review affordances. Do not turn memory/context into a profile page or a decorative feed.
 - Context source setup must keep one clear summary plus one editable control surface; do not repeat local, online, web, deep research, context-session, or questionnaire controls as separate card, table, and toggle representations.
+- Context bundle review is a default product surface before/inside planning. It should separate used context, skipped or unread context, permission/setup gaps, and unresolved decomposition risks without exposing raw prompts, model traces, or chain-of-thought.
 - Evidence is trustworthy UI: completion, progress, warnings, and quality claims must show the evidence or review path behind them without exposing private chain-of-thought.
 - No style churn: do not adopt platform fashion changes, glass effects, 3D depth, or animation-heavy treatments unless they improve Aimcub's actual workflow.
 
@@ -57,6 +58,7 @@ Reference links:
 - Optional inspector: process, context, quality, activity, and debug details may exist as an opt-in overlay, drawer, popover, or developer-mode surface. It must be independently scrollable and cannot displace the primary task by default.
 - Stage model: Aim -> Context -> Plan/Contracts -> Execute -> Eval. Stage navigation may be visible, but each stage must still present a single dominant action.
 - New aim title and description belong to the Aim stage. The Context stage should confirm the captured aim and collect answers, attachments, and sources; it must not show a second title/description composer unless the user explicitly opens child-aim breakdown or an unsaved-aim edit path.
+- Context and Plan/Contracts stages should show the context bundle review as part of the default workflow, using compact buckets and clear empty states rather than a hidden inspector or debug trace.
 - Execute and Eval are distinct stages. Execute answers "Who/what should do the next work?" with assignments, agent run, human proof, and child-breakdown actions. Eval answers "What evidence exists, did it satisfy the rule, and what needs review?" with evidence counts/details, evaluator status, trust/explanation, and pending context candidates when present.
 - Existing aims open to Aim overview first. Do not jump users into Run details or show an empty composer on the Context stage.
 - Settings are an aim-helper setup surface, not a flat runtime control panel. Frame provider setup, local CLI agent detection, web research, and context sources as helpers needed to complete aims; keep their configuration clear and thin unless setup is the user's current task.

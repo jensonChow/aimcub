@@ -9,6 +9,7 @@ import type {
   GoalDetail,
   LocalAgentDetection,
   PlanningDebugTrace,
+  PlanningLiveEvent,
   PlanResult,
   ProviderStatus,
   WebResearchStatus,
@@ -16,6 +17,7 @@ import type {
 
 import { CockpitShell, type CockpitStage } from "./CockpitShell";
 import { ContextSourcesPanel } from "./ContextSourcesPanel";
+import { buildContextBundleReview, type ContextBundleReview, type ContextReviewItem } from "./contextReview";
 import {
   deriveAimHelperProfile,
   hasPlanningRuntime,
@@ -24,6 +26,13 @@ import {
   type AimHelperProfile,
 } from "./firstRunFlow";
 import { I18nProvider, useI18n } from "./i18n";
+import {
+  aimIntakeOf,
+  contextCategoryLabel,
+  planningContextOf,
+  planningToolsOf,
+  reviewOf,
+} from "./labels";
 import { LocalAgentForm } from "./LocalAgentForm";
 import { Notice } from "./Notice";
 import { mergePlanningDebugTraces } from "./PlanningDebugPanel";
@@ -244,6 +253,17 @@ function shortId(value: string): string {
   return value.length <= 8 ? value : value.slice(0, 8);
 }
 
+function latestLiveValue<T>(
+  events: readonly PlanningLiveEvent[],
+  pick: (event: PlanningLiveEvent) => T | null | undefined,
+): T | null {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const value = pick(events[index]!);
+    if (value !== null && value !== undefined) return value;
+  }
+  return null;
+}
+
 function formatTrust(value: number): string {
   return `${Math.round(value * 100)}%`;
 }
@@ -274,6 +294,7 @@ function AimOsApp() {
   const [finalPlan, setFinalPlan] = useState<DecompositionOutput | null>(null);
   const [planResult, setPlanResult] = useState<PlanResult | null>(null);
   const [planningDebugTraces, setPlanningDebugTraces] = useState<PlanningDebugTrace[]>([]);
+  const [planningLiveEvents, setPlanningLiveEvents] = useState<PlanningLiveEvent[]>([]);
   const [intakeClarify, setIntakeClarify] = useState<ClarifyOutput | null>(null);
   const [intakeAnswers, setIntakeAnswers] = useState<AnswerMap>({});
   const [clarifyPhase, setClarifyPhase] = useState<ClarifyPhase>(null);
@@ -290,9 +311,18 @@ function AimOsApp() {
     void refreshAll();
   }, []);
 
+  useEffect(() => {
+    return window.aimcub.onPlanningLiveEvent((event) => {
+      const activeRunId = planningRunIdRef.current;
+      if (!activeRunId || event.runId !== activeRunId) return;
+      setPlanningLiveEvents((current) => [...current, event].slice(-80));
+    });
+  }, []);
+
   function startPlanningRun(): string {
     const runId = createPlanningRunId();
     planningRunIdRef.current = runId;
+    setPlanningLiveEvents([]);
     return runId;
   }
 
@@ -330,6 +360,7 @@ function AimOsApp() {
     setFinalPlan(null);
     setPlanResult(null);
     setPlanningDebugTraces([]);
+    setPlanningLiveEvents([]);
     clearPlanningRun();
     setIntakeClarify(null);
     setIntakeAnswers({});
@@ -355,6 +386,7 @@ function AimOsApp() {
     setFinalPlan(null);
     setPlanResult(null);
     setPlanningDebugTraces([]);
+    setPlanningLiveEvents([]);
     clearPlanningRun();
     setIntakeClarify(null);
     setIntakeAnswers({});
@@ -617,6 +649,21 @@ function AimOsApp() {
     () => deriveAimHelperProfile({ title: activeAimTitle, description: activeAimDescription }),
     [activeAimDescription, activeAimTitle],
   );
+  const livePlanningContext = latestLiveValue(planningLiveEvents, (event) => event.planningContext);
+  const livePlanningTools = latestLiveValue(planningLiveEvents, (event) => event.planningTools);
+  const liveIntake = latestLiveValue(planningLiveEvents, (event) => event.intake);
+  const currentPlanningContext = planResult?.planningContext ?? livePlanningContext ?? (selected ? planningContextOf(selected) : null);
+  const currentPlanningTools = planResult?.planningTools ?? livePlanningTools ?? (selected ? planningToolsOf(selected) : null);
+  const currentIntake = planResult?.intake ?? liveIntake ?? (selected ? aimIntakeOf(selected) : null);
+  const currentReview = planResult?.review ?? (selected ? reviewOf(selected) : null);
+  const contextReview = useMemo(() => buildContextBundleReview({
+    planningContext: currentPlanningContext,
+    planningTools: currentPlanningTools,
+    intake: currentIntake,
+    review: currentReview,
+    plan: activePlan,
+    answeredQuestionIds: [...builtIntakeAnswers, ...builtAnswers].map((answer) => answer.question_id),
+  }), [activePlan, builtAnswers, builtIntakeAnswers, currentIntake, currentPlanningContext, currentPlanningTools, currentReview]);
 
   function openCockpitStage(stage: CockpitStage) {
     setStageOverride(stage);
@@ -764,12 +811,18 @@ function AimOsApp() {
             />
           )}
           <ContextSourcesPanel status={contextSources} disabled={Boolean(busy)} onSaved={setContextSources} />
+          <ContextReviewPanel bundle={contextReview} running={mode === "contexting" && Boolean(busy)} />
           {clarifyPanel}
         </>
       );
     }
     if (activeStage === "contracts") {
-      return planPanel ?? (
+      return planPanel ? (
+        <>
+          <ContextReviewPanel bundle={contextReview} running={mode === "drafting" && Boolean(busy)} />
+          {planPanel}
+        </>
+      ) : (
         <LockedStagePanel
           eyebrow={t("os.stepPlan")}
           title={t("cockpit.contractsLockedTitle")}
@@ -848,6 +901,100 @@ function AimOsApp() {
       )}
     />
   );
+}
+
+function ContextReviewPanel(props: {
+  bundle: ContextBundleReview;
+  running: boolean;
+}) {
+  const { t } = useI18n();
+  const totalItems = props.bundle.usedContext.length
+    + props.bundle.skippedContext.length
+    + props.bundle.permissionGaps.length
+    + props.bundle.decompositionRisks.length;
+  return (
+    <section className="od-context-review">
+      <div className="od-stage-panel-head">
+        <div>
+          <div className="od-stage-kicker">{t("contextReview.eyebrow")}</div>
+          <h2>{t("contextReview.title")}</h2>
+          <p>{t(totalItems === 0 ? "contextReview.emptyBody" : "contextReview.body")}</p>
+        </div>
+        {props.running ? <span className="od-pill blue">{t("debug.pending")}</span> : null}
+      </div>
+
+      <div className="od-stage-metrics" aria-label={t("contextReview.title")}>
+        <StageMetric label={t("contextReview.metric.used")} value={String(props.bundle.usedContext.length)} />
+        <StageMetric label={t("contextReview.metric.skipped")} value={String(props.bundle.skippedContext.length)} />
+        <StageMetric label={t("contextReview.metric.gaps")} value={String(props.bundle.permissionGaps.length)} />
+      </div>
+
+      <div className="od-context-review-grid">
+        <ContextReviewBucket
+          title={t("contextReview.used")}
+          items={props.bundle.usedContext}
+          empty={t("contextReview.empty.used")}
+        />
+        <ContextReviewBucket
+          title={t("contextReview.skipped")}
+          items={props.bundle.skippedContext}
+          empty={t("contextReview.empty.skipped")}
+        />
+        <ContextReviewBucket
+          title={t("contextReview.permissions")}
+          items={props.bundle.permissionGaps}
+          empty={t("contextReview.empty.permissions")}
+        />
+        <ContextReviewBucket
+          title={t("contextReview.risks")}
+          items={props.bundle.decompositionRisks}
+          empty={t("contextReview.empty.risks")}
+        />
+      </div>
+    </section>
+  );
+}
+
+function ContextReviewBucket(props: {
+  title: string;
+  items: ContextReviewItem[];
+  empty: string;
+}) {
+  const { t } = useI18n();
+  const visible = props.items.slice(0, 4);
+  const extra = Math.max(0, props.items.length - visible.length);
+  return (
+    <section className="od-context-review-bucket">
+      <div className="od-card-head">
+        <h3>{props.title}</h3>
+        <span className="od-pill">{String(props.items.length)}</span>
+      </div>
+      {visible.length === 0 ? (
+        <div className="od-empty-inline">{props.empty}</div>
+      ) : (
+        <div className="od-context-review-list">
+          {visible.map((item) => (
+            <article key={item.id} className={`od-context-review-item ${contextReviewToneClass(item.tone)}`}>
+              <div className="od-context-review-item-head">
+                <strong>{item.title}</strong>
+                {item.category ? <span className="od-pill">{contextCategoryLabel(item.category, t)}</span> : null}
+              </div>
+              <p>{shortText(item.body, 220)}</p>
+              {item.meta.length ? <small>{item.meta.filter(Boolean).slice(0, 3).join(" · ")}</small> : null}
+            </article>
+          ))}
+          {extra > 0 ? <div className="od-context-review-more">{t("contextReview.more", { n: extra })}</div> : null}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function contextReviewToneClass(tone: ContextReviewItem["tone"]): string {
+  if (tone === "success") return "success";
+  if (tone === "warn") return "warn";
+  if (tone === "danger") return "danger";
+  return "";
 }
 
 function AimOverviewPanel(props: {
