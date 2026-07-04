@@ -2,26 +2,24 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 
 import type { AimIntakeReport, AimProgressReadModel } from "@core/domain";
 import type { ClarifyAnswer, ClarifyOutput, ClarifyQuestion, ClarifySelectionMode } from "@core/llm";
-import type { ContextCategory, DecompositionOutput, Goal, Memory, Milestone } from "@core/types";
+import type { ContextCategory, DecompositionOutput, Goal, Milestone } from "@core/types";
 import type {
   ClarifyIpcResult,
   ContextSourceStatus,
   GoalDetail,
   LocalAgentDetection,
   PlanningDebugTrace,
-  PlanningLiveEvent,
   PlanResult,
   ProviderStatus,
   WebResearchStatus,
 } from "../shared/ipc";
 
 import { CockpitShell, type CockpitStage } from "./CockpitShell";
-import { ContextInbox } from "./ContextInbox";
 import { ContextSourcesPanel } from "./ContextSourcesPanel";
 import { I18nProvider, useI18n } from "./i18n";
 import { LocalAgentForm } from "./LocalAgentForm";
 import { Notice } from "./Notice";
-import { mergePlanningDebugTraces, PlanningDebugPanel } from "./PlanningDebugPanel";
+import { mergePlanningDebugTraces } from "./PlanningDebugPanel";
 import { ProviderForm } from "./ProviderForm";
 import { WebResearchForm } from "./WebResearchForm";
 import { C, inputStyle, primaryButton, secondaryButton } from "./styles";
@@ -216,7 +214,6 @@ function AimOsApp() {
   const [selected, setSelected] = useState<Goal | null>(null);
   const [detail, setDetail] = useState<GoalDetail | null>(null);
   const [progress, setProgress] = useState<AimProgressReadModel | null>(null);
-  const [contextCandidates, setContextCandidates] = useState<Memory[]>([]);
   const [provider, setProvider] = useState<ProviderStatus | null>(null);
   const [webResearch, setWebResearch] = useState<WebResearchStatus | null>(null);
   const [contextSources, setContextSources] = useState<ContextSourceStatus | null>(null);
@@ -228,7 +225,6 @@ function AimOsApp() {
   const [finalPlan, setFinalPlan] = useState<DecompositionOutput | null>(null);
   const [planResult, setPlanResult] = useState<PlanResult | null>(null);
   const [planningDebugTraces, setPlanningDebugTraces] = useState<PlanningDebugTrace[]>([]);
-  const [planningLiveEvents, setPlanningLiveEvents] = useState<PlanningLiveEvent[]>([]);
   const [intakeClarify, setIntakeClarify] = useState<ClarifyOutput | null>(null);
   const [intakeAnswers, setIntakeAnswers] = useState<AnswerMap>({});
   const [clarifyPhase, setClarifyPhase] = useState<ClarifyPhase>(null);
@@ -244,22 +240,14 @@ function AimOsApp() {
     void refreshAll();
   }, []);
 
-  useEffect(() => window.aimcub.onPlanningLiveEvent((event) => {
-    const activeRunId = planningRunIdRef.current;
-    if (!activeRunId || event.runId !== activeRunId) return;
-    setPlanningLiveEvents((current) => [...current, event].slice(-80));
-  }), []);
-
   function startPlanningRun(): string {
     const runId = createPlanningRunId();
     planningRunIdRef.current = runId;
-    setPlanningLiveEvents([]);
     return runId;
   }
 
   function clearPlanningRun() {
     planningRunIdRef.current = null;
-    setPlanningLiveEvents([]);
   }
 
   function hasCliPlanningRuntime(): boolean {
@@ -267,20 +255,18 @@ function AimOsApp() {
   }
 
   async function refreshAll() {
-    const [nextGoals, nextProvider, nextWeb, nextSources, nextAgents, nextCandidates] = await Promise.all([
+    const [nextGoals, nextProvider, nextWeb, nextSources, nextAgents] = await Promise.all([
       window.aimcub.listGoals().catch(() => []),
       window.aimcub.getProviderConfig().catch(() => null),
       window.aimcub.getWebResearchConfig().catch(() => null),
       window.aimcub.getContextSourceConfig().catch(() => null),
       window.aimcub.listLocalAgents().catch(() => []),
-      window.aimcub.listContextCandidates().catch(() => []),
     ]);
     setGoals(nextGoals);
     setProvider(nextProvider);
     setWebResearch(nextWeb);
     setContextSources(nextSources);
     setLocalAgents(nextAgents);
-    setContextCandidates(nextCandidates);
     if (!selected && nextGoals[0]) void openGoal(nextGoals[0]);
     if (!nextProvider?.configured && !nextAgents.some((agent) => agent.available && agent.authStatus !== "missing")) {
       setMode("settings");
@@ -291,7 +277,7 @@ function AimOsApp() {
   async function openGoal(goal: Goal) {
     setSelected(goal);
     setMode("cockpit");
-    setStageOverride("run");
+    setStageOverride("aim");
     setError(null);
     setDraft(null);
     setFinalPlan(null);
@@ -494,7 +480,6 @@ function AimOsApp() {
         answers: [...builtIntakeAnswers, ...builtAnswers],
         assumptions: clarify?.assumptions ?? [],
       });
-      setContextCandidates(saved.contextCandidates ?? []);
       resetComposer();
       await refreshAll();
       await openGoal(saved.goal);
@@ -512,14 +497,12 @@ function AimOsApp() {
     try {
       const result = await window.aimcub.runMilestoneAgent({ goalId: selected.id, milestoneId: milestone.id });
       if (!result.ok && result.error) setError(result.error);
-      const [nextDetail, nextProgress, nextCandidates] = await Promise.all([
+      const [nextDetail, nextProgress] = await Promise.all([
         window.aimcub.getGoal(selected.id),
         window.aimcub.getAimProgress(selected.id),
-        window.aimcub.listContextCandidates(),
       ]);
       setDetail(nextDetail);
       setProgress(nextProgress);
-      setContextCandidates(nextCandidates);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -537,13 +520,9 @@ function AimOsApp() {
         milestoneId: milestone.id,
         summary: `Confirmed sub-aim: ${milestone.title}`,
       });
-      const [nextProgress, nextCandidates] = await Promise.all([
-        window.aimcub.getAimProgress(selected.id),
-        window.aimcub.listContextCandidates(),
-      ]);
+      const nextProgress = await window.aimcub.getAimProgress(selected.id);
       setDetail(nextDetail);
       setProgress(nextProgress);
-      setContextCandidates(nextCandidates);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -571,16 +550,6 @@ function AimOsApp() {
     ].filter(Boolean).join("\n"));
     setMode("cockpit");
     setStageOverride("aim");
-  }
-
-  async function acceptContext(candidate: Memory, content: string, scope: "aim" | "global") {
-    await window.aimcub.acceptContextCandidate({ id: candidate.id, content, scope });
-    setContextCandidates(await window.aimcub.listContextCandidates());
-  }
-
-  async function rejectContext(candidate: Memory) {
-    await window.aimcub.rejectContextCandidate(candidate.id);
-    setContextCandidates(await window.aimcub.listContextCandidates());
   }
 
   const activePlan = (finalPlan ?? draft ?? detail?.goal.plan_json ?? null) as DecompositionOutput | null;
@@ -690,7 +659,7 @@ function AimOsApp() {
     if (activeStage === "context") {
       return (
         <>
-          {!selected || draft || mode === "contexting" ? composerPanel : null}
+          {!selected || draft || parent ? composerPanel : null}
           <ContextSourcesPanel status={contextSources} disabled={Boolean(busy)} onSaved={setContextSources} />
           {clarifyPanel}
         </>
@@ -748,14 +717,6 @@ function AimOsApp() {
       goals={goals}
       selected={selected}
       activeStage={activeStage}
-      completed={completed}
-      total={total}
-      progress={progress}
-      provider={provider}
-      webResearch={webResearch}
-      contextSources={contextSources}
-      localAgents={localAgents}
-      pendingContextCount={contextCandidates.length}
       busy={busy}
       error={error}
       onNewAim={startNewAim}
@@ -766,34 +727,6 @@ function AimOsApp() {
           {error ? <Notice tone="error">{error}</Notice> : null}
           {busy ? <Notice tone="info">{busy}</Notice> : null}
           {mainStageContent}
-        </>
-      )}
-      inspector={(
-        <>
-          <PlanningDebugPanel
-            mode={mode}
-            busy={busy}
-            provider={provider}
-            planResult={planResult}
-            debugTraces={planningDebugTraces}
-            liveEvents={planningLiveEvents}
-            intakeClarify={intakeClarify}
-            intakeAnswers={builtIntakeAnswers}
-            clarify={clarifyPhase === "postDraft" ? clarify : null}
-            clarifyAnswers={builtAnswers}
-            contextNote={contextNote}
-            plan={activePlan}
-            detail={detail}
-          />
-          <ContextInbox candidates={contextCandidates} onAccept={acceptContext} onReject={rejectContext} />
-          <RuntimePanel
-            provider={provider}
-            webResearch={webResearch}
-            contextSources={contextSources}
-            localAgents={localAgents}
-            progress={progress}
-            contextCount={contextCandidates.length}
-          />
         </>
       )}
     />
@@ -1236,42 +1169,6 @@ function SettingsPanel(props: {
   );
 }
 
-function RuntimePanel(props: {
-  provider: ProviderStatus | null;
-  webResearch: WebResearchStatus | null;
-  contextSources: ContextSourceStatus | null;
-  localAgents: LocalAgentDetection[];
-  progress: AimProgressReadModel | null;
-  contextCount: number;
-}) {
-  const { t } = useI18n();
-  return (
-    <section style={rightPanelStyle()}>
-      <div style={eyebrowStyle()}>{t("os.runtime")}</div>
-      <h2 style={sectionTitleStyle()}>{t("os.runtimeHeading")}</h2>
-      <div style={{ display: "grid", gap: 10, marginTop: 14 }}>
-        <Metric
-          label={t("os.provider")}
-          value={props.provider?.configured
-            ? props.provider.provider ?? "configured"
-            : props.localAgents.some((agent) => agent.available && agent.authStatus !== "missing")
-              ? "local CLI"
-              : t("os.missing")}
-        />
-        <Metric label={t("os.webResearch")} value={props.webResearch?.enabled ? "on" : "off"} />
-        <Metric
-          label={t("context.sources.local")}
-          value={String((props.contextSources?.local.resolvedWorkspaceRoot ? 1 : 0) + (props.contextSources?.local.resolvedFilePaths.length ?? 0))}
-        />
-        <Metric label={t("context.sources.online")} value={String(props.contextSources?.online.enabledCount ?? 0)} />
-        <Metric label={t("os.localAgents")} value={`${props.localAgents.filter((agent) => agent.available).length}/${props.localAgents.length}`} />
-        <Metric label={t("os.pendingContext")} value={String(props.contextCount)} />
-        <Metric label={t("os.blocked")} value={String(props.progress?.blocked_count ?? 0)} />
-      </div>
-    </section>
-  );
-}
-
 function ProgressDonut({ done, total }: { done: number; total: number }) {
   const value = pct(done, total);
   return (
@@ -1298,16 +1195,9 @@ function Metric({ label, value }: { label: string; value: string }) {
 function panelStyle(): CSSProperties {
   return {
     background: "#fff",
-    border: `1px solid ${C.border}`,
-    borderRadius: 8,
-    padding: 18,
-  };
-}
-
-function rightPanelStyle(): CSSProperties {
-  return {
-    ...panelStyle(),
-    marginBottom: 0,
+    border: "none",
+    borderRadius: 0,
+    padding: 0,
   };
 }
 
