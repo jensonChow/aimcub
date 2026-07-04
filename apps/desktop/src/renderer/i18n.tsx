@@ -143,6 +143,16 @@ export const STRINGS = {
     zh: "当前 Aim 已打开。可以继续收集 Context，或开始一个新的 Aim。",
   },
   "aimIntake.cta": { en: "Enter context collection", zh: "进入 Context 收集" },
+  "aimContext.body": {
+    en: "Aim text is captured. Add answers, files, and source context below before generating a plan.",
+    zh: "Aim 文本已记录。请在下方补充回答、文件和来源 Context，然后生成计划。",
+  },
+  "aimContext.savedBody": {
+    en: "This saved aim is open. Add source context or answer plan questions here; do not re-enter the aim.",
+    zh: "当前已打开已保存 Aim。这里用于添加来源 Context 或回答规划问题，不需要重新输入 Aim。",
+  },
+  "aimContext.noDescription": { en: "No extra description provided.", zh: "没有额外描述。" },
+  "aimContext.edit": { en: "Edit aim", zh: "编辑 Aim" },
   "os.clarifyHeading": { en: "Answer only the questions that change the plan", zh: "只回答会改变计划的问题" },
   "os.contextIntakeHeading": { en: "Complete context before planning", zh: "先补齐上下文再拆分" },
   "os.contextIntakeBody": { en: "Aimcub will not draft sub-aims until the blocking context is answered or written down.", zh: "阻塞性上下文没有回答或写明前，Aimcub 不会先生成子目标。" },
@@ -198,6 +208,11 @@ export const STRINGS = {
   "cockpit.contractsLockedBody": {
     en: "Aimcub will not show concrete sub-aims until context sources, scope, and blocking questions are clear enough to avoid fake certainty.",
     zh: "在上下文来源、范围和阻塞问题足够清楚前，Aimcub 不展示具体子目标，避免把假设伪装成确定计划。",
+  },
+  "cockpit.contextLockedTitle": { en: "Describe the aim first", zh: "请先描述目标" },
+  "cockpit.contextLockedBody": {
+    en: "The Context stage uses the aim you already entered. Start on Aim, then come back here to answer questions and attach sources.",
+    zh: "Context 阶段会使用你已经输入的 Aim。请先在 Aim 阶段填写目标，再回到这里回答问题并添加来源。",
   },
   "cockpit.runLockedTitle": { en: "Run is waiting for a saved plan", zh: "执行区正在等待已保存计划" },
   "cockpit.runLockedBody": {

@@ -779,6 +779,42 @@ select:focus-visible {
   white-space: nowrap;
 }
 
+.od-aim-context-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
+  gap: 18px;
+  align-items: start;
+  padding: 15px 16px;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-md);
+  background: var(--od-surface-warm);
+}
+
+.od-aim-context-summary h2 {
+  min-width: 0;
+  margin: 5px 0 0;
+  color: var(--od-fg);
+  font-size: 20px;
+  line-height: 1.28;
+}
+
+.od-aim-context-summary p {
+  margin: 8px 0 0;
+  color: var(--od-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.od-aim-context-actions {
+  display: grid;
+  justify-items: end;
+  gap: 10px;
+  color: var(--od-muted);
+  font-size: 12px;
+  line-height: 1.42;
+  text-align: right;
+}
+
 .od-inspector {
   min-width: 0;
   min-height: 0;
@@ -1007,5 +1043,14 @@ select:focus-visible {
 
   .od-aim-overview-strip {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .od-aim-context-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .od-aim-context-actions {
+    justify-items: start;
+    text-align: left;
   }
 }

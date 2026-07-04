@@ -1,25 +1,21 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-04
-Branch: `main`
+Branch: `codex/avoid-duplicate-aim-intake`
 
 ## Current Session
 
-- Fixed the root `pnpm desktop:pack` script so it runs the Desktop package script instead of pnpm's built-in pack command.
-- Built an openable macOS app bundle and copied it to the project root at `Aimcub.app`. The bundle is an ignored local artifact and is not committed.
-- Refreshed project memory so `docs/memory/operations.md` and `docs/memory/history.md` match the simplified workspace and root app-bundle handoff.
-- Removed inactive product surfaces from the active workspace: `apps/web`, `apps/ios`, `apps/extension`, and the old `docs/charters/web.md`.
-- Removed unused `packages/ui-tokens`; Desktop token direction now lives in `docs/memory/design-system.md` and current renderer CSS.
-- Replaced broad workspace globs with explicit active packages in `pnpm-workspace.yaml`: Desktop, CLI, MCP, and core packages only.
-- Updated root/docs memory to state that v1 is Desktop-first local Aim OS, with hosted web/iOS/extension deferred until a real product trigger.
-- Cleaned local ignored remnants for the removed surfaces, including old Vercel metadata and local package caches.
+- Updated the Desktop new/open aim journey so the Aim step owns new aim title and description input.
+- Changed the Context stage to show a compact captured-aim summary plus context sources/questions instead of a second title/description composer.
+- Added a locked Context empty state for users who navigate there before describing an aim.
+- Preserved the explicit child aim breakdown path, which can still use the composer when breaking down a parent milestone.
+- Recorded the new Desktop flow invariant in `docs/memory/design-system.md`.
 
 ## Current State
 
-- Active app surfaces are `apps/desktop`, `apps/cli`, and `apps/mcp`.
-- Active packages are `packages/core`, `packages/types`, `packages/store`, `packages/llm`, `packages/api`, and `packages/db`.
-- `pnpm desktop:pack` produces the local folder-style app bundle under `apps/desktop/dist/mac-arm64/Aimcub.app`; copy it to root `Aimcub.app` when the user wants the app directly inside the project folder.
-- Hosted Supabase remains the online source of truth for MCP evidence and the future platform; the hosted web app should not be reintroduced until sync/collaboration needs it.
+- Normal new aim flow reads: describe aim -> enter context collection -> answer/attach context -> generate plan.
+- Existing saved aims still open to Aim overview first. Their Context stage shows context collection controls and the saved aim summary, not an empty composer.
+- Unsaved new aims can return to the Aim stage through "Edit aim" when title/description needs adjustment.
 
 ## Verification
 
@@ -34,17 +30,16 @@ PATH=/Users/jenson/.local/node/bin:$PATH pnpm core:purity
 git diff --check
 ```
 
-Packaging command also passed:
+Notes:
 
-```bash
-PATH=/Users/jenson/.local/node/bin:$PATH pnpm desktop:pack
-```
+- `node_modules` was absent at the start of verification. `pnpm install` was required; the sandboxed install hit DNS restrictions and then succeeded with approved network access.
+- Turbo emitted non-fatal `IO error: Operation not permitted` warnings while all required tasks exited successfully.
 
-Commit/push status: this handoff is part of the memory refresh commit; use `git log -1` for the final hash after the session commits and pushes.
+Commit/push status: this handoff is part of the session commit; use `git log -1` for the final hash after commit.
 
 ## Next Session Prompt
 
 ```text
-Continue from the simplified Aimcub workspace. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md. Then load only the module memory relevant to the task.
-Treat Desktop, CLI, MCP, and the core packages as the active code hierarchy. Do not reintroduce hosted web, iOS, browser-extension, or cross-platform token packages without a concrete product trigger and matching memory update.
+Continue from the Desktop-first Aim OS workspace. Start by reading AGENTS.md, docs/handoff.md, docs/memory/README.md, then load the module memory relevant to the task.
+Keep new aim title/description owned by the Aim stage. Context should collect answers, attachments, and sources without asking users to re-enter the same aim, except for explicit child-aim breakdown or unsaved-aim editing paths.
 ```

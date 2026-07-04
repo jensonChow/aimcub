@@ -555,6 +555,7 @@ function AimOsApp() {
   const activePlan = (finalPlan ?? draft ?? detail?.goal.plan_json ?? null) as DecompositionOutput | null;
   const completed = progress?.completed_milestones ?? detail?.milestones.filter((m) => m.status === "completed").length ?? 0;
   const total = progress?.total_milestones ?? detail?.milestones.length ?? 0;
+  const hasUnsavedAim = aimTitle.trim().length > 0;
   const activeStage = stageOverride ?? cockpitStageFor(mode, selected, activePlan);
 
   function openCockpitStage(stage: CockpitStage) {
@@ -657,9 +658,27 @@ function AimOsApp() {
   const mainStageContent = (() => {
     if (activeStage === "settings") return settingsPanel;
     if (activeStage === "context") {
+      if (!selected && !parent && !hasUnsavedAim) {
+        return (
+          <LockedStagePanel
+            eyebrow={t("os.stepContext")}
+            title={t("cockpit.contextLockedTitle")}
+            body={t("cockpit.contextLockedBody")}
+            action={t("os.stepAim")}
+            onAction={() => openCockpitStage("aim")}
+          />
+        );
+      }
       return (
         <>
-          {!selected || draft || parent ? composerPanel : null}
+          {parent ? composerPanel : (
+            <ContextAimSummaryPanel
+              title={selected?.title ?? aimTitle}
+              description={selected?.description ?? aimDescription}
+              saved={Boolean(selected)}
+              onEdit={selected ? undefined : () => openCockpitStage("aim")}
+            />
+          )}
           <ContextSourcesPanel status={contextSources} disabled={Boolean(busy)} onSaved={setContextSources} />
           {clarifyPanel}
         </>
@@ -840,6 +859,33 @@ function AimIntakePanel(props: {
         <button className="od-aim-primary" type="button" onClick={props.onDraft} disabled={disabled}>
           {submitting ? t("os.drafting") : t("aimIntake.cta")}
         </button>
+      </div>
+    </section>
+  );
+}
+
+function ContextAimSummaryPanel(props: {
+  title: string;
+  description: string | undefined | null;
+  saved: boolean;
+  onEdit?: () => void;
+}) {
+  const { t } = useI18n();
+  const description = props.description?.trim();
+  return (
+    <section className="od-aim-context-summary">
+      <div>
+        <div className="od-aim-kicker">{props.saved ? t("shell.savedAim") : t("os.stepContext")}</div>
+        <h2>{props.title}</h2>
+        <p>{description ? shortText(description, 260) : t("aimContext.noDescription")}</p>
+      </div>
+      <div className="od-aim-context-actions">
+        <span>{t(props.saved ? "aimContext.savedBody" : "aimContext.body")}</span>
+        {props.onEdit ? (
+          <button className="od-aim-secondary" type="button" onClick={props.onEdit}>
+            {t("aimContext.edit")}
+          </button>
+        ) : null}
       </div>
     </section>
   );
