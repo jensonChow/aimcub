@@ -769,7 +769,7 @@ describe("createJsonFileStore · evidence and confirmations", () => {
       file_paths: ["/tmp/approval-note.pdf"],
       required_evidence: [{ text: "Approval note.", satisfied: true }],
     });
-    expect(progress?.milestones[0]?.evidence[0]?.id).toBe(result!.evidence?.id);
+    expect(progress?.milestones[0]?.evidence[0]?.evidence.id).toBe(result!.evidence?.id);
     expect(progress?.milestones[0]?.evaluator_results[0]?.matched_evidence_ids).toContain(result!.evidence?.id);
   });
 
@@ -826,7 +826,8 @@ describe("createJsonFileStore · evidence and confirmations", () => {
     await store.confirmMilestone({
       goalId: goal.id,
       milestoneId: milestones[0]!.id,
-      summary: "Confirmed release approval.",
+      proofNote: "Confirmed release approval.",
+      requiredEvidence: [{ text: "Approval note.", satisfied: true }],
     });
     const candidates = await store.sedimentContextFromGoal(goal.id);
     const accepted = await store.acceptMemoryCandidate({

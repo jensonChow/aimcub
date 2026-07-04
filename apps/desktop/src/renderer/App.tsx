@@ -523,7 +523,7 @@ function evidencePayloadText(item: ProgressEvidenceReviewItem): string {
 }
 
 function evidenceTitle(item: ProgressEvidenceReviewItem): string {
-  const summary = item.evidence.summary.trim();
+  const summary = evidenceDisplaySummary(item.evidence).trim();
   return summary || evidencePayloadText(item) || formatEvidenceKind(item.evidence.kind);
 }
 

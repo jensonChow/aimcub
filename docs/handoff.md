@@ -16,8 +16,19 @@ Branch: `codex/product-loop-integration`
 
 ## Verification
 
-- `pnpm typecheck` passed during intermediate merges.
-- Full final verification is pending: `pnpm build`, `pnpm test`, `pnpm typecheck`, `pnpm lint`, and `pnpm core:purity`.
+- Final verification passed:
+  - `pnpm build`
+  - `pnpm test`
+  - `pnpm typecheck`
+  - `pnpm lint`
+  - `pnpm core:purity`
+  - `git diff --check`
+  - `git diff --cached --check`
+- Desktop UI coverage came from the production renderer build plus renderer SSR tests for proof submission, context inbox, context review, and completion recap. A live Electron GUI visual smoke was not run in this integration session.
+
+Notes:
+- MCP worker tests intentionally log the expected missing-Supabase opaque-error path while passing.
+- The branch still needs to be pushed to `origin` after final commit.
 
 ## Next Session Prompt
 
