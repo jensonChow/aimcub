@@ -1,5 +1,9 @@
 # CHARTER — `v1a/data` worktree
 
+> Status: archived historical memory. This charter describes the completed v1a/H1
+> hosted evidence-spine worktree. It is not the active roadmap. Current v1 work is
+> the local Aim OS agent harness in `docs/v1-spec.md`.
+
 Owner: data-access layer + DB. Branch `v1a/data`.
 
 ## Scope (owned paths)

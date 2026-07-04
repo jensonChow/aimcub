@@ -1,5 +1,9 @@
 # Worktree Charter — `apps/mcp` (Aimcub MCP server)
 
+> Status: archived historical memory. This charter describes the completed v1a/H1
+> hosted evidence-spine worktree. It is not the active roadmap. Current v1 work is
+> the local Aim OS agent harness in `docs/v1-spec.md`.
+
 Branch: `v1a/mcp`. This worktree owns **only** `apps/mcp/**` (plus this `CHARTER.md`).
 
 ## Scope

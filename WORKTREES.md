@@ -1,8 +1,14 @@
-# v1a Parallel Worktrees
+# Archived v1a Parallel Worktrees
 
-**v1a goal**: Web sets a goal → Sonnet decomposes it → MCP/GitHub evidence → milestone **auto-lights**. See `CLAUDE.md` and `docs/vision.md` for the full picture.
+> Status: historical memory. This file documents the completed v1a/H1 parallel
+> worktree plan that built the hosted evidence spine. It is not the active
+> roadmap. Current v1 work is the local Aim OS agent harness in
+> `docs/v1-spec.md`; Supabase parity for newer local Aim OS orchestration
+> entities is deferred until the online collaboration platform needs sync.
 
-Linked git worktrees live under `./worktrees/` (gitignored), each on a `v1a/*` branch cut from `main`.
+**Historical v1a goal**: Web sets a goal → Sonnet decomposes it → MCP/GitHub evidence → milestone **auto-lights**.
+
+The linked git worktrees lived under `./worktrees/` (gitignored), each on a `v1a/*` branch cut from `main`.
 
 ## Integration seam
 The frozen `@core/types` + `@core/api-client` contract is how the worktrees stay compatible while built in parallel. **No worktree may change `packages/types`** (or other worktrees' owned packages) without coordination — if the contract looks wrong, flag it, don't fork it. All external I/O (Supabase, Claude API, OAuth) is **mocked**; live wiring is a separate integration step performed once credentials exist.
@@ -18,6 +24,6 @@ The frozen `@core/types` + `@core/api-client` contract is how the worktrees stay
 | `worktrees/web` | `v1a/web` | `apps/web` | Goal-creation UI, decomposition view, Realtime milestone auto-light, progress bar |
 
 ## Dependency note
-`v1a/data` is the critical path (everything reads/writes through it), but because the integration seam is a stable contract, `decompose` / `evidence` / `mcp` / `web` build against it + mocks in parallel right now. The aud-bound-token finding from `v1a/data` informs `v1a/mcp`'s auth design.
+`v1a/data` was the critical path (everything read/wrote through it), but the integration seam was a stable contract, so `decompose` / `evidence` / `mcp` / `web` built against it + mocks in parallel. The aud-bound-token finding from `v1a/data` informed `v1a/mcp`'s auth design.
 
-Each worktree carries a `CHARTER.md` with its detailed scope, boundaries, mock strategy, acceptance criteria, and explicit live-integration TODOs.
+Each worktree carried a `CHARTER.md` with its detailed scope, boundaries, mock strategy, acceptance criteria, and explicit live-integration TODOs.

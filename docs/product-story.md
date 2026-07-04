@@ -76,9 +76,17 @@ accrues* — is identical across all of these. Only the translators at the two e
 - Honesty is the brand: a milestone lights only on **real** progress — that's why evidence is verified
   (eval), and that's what makes the resulting context worth something.
 
-## Sequencing (why developers first)
+## Sequencing
 
-v1a proves the hardest version of the promise — fully automatic, verified, zero-check-in evidence —
-with the audience whose tools make that possible today (developers). The next gate (v1b) is about the
-value that the work leaves behind: a per-person **context** and a **personalized eval**. Generalizing
-the four life evaluators makes this story true for everyone, with the interaction unchanged.
+The current product sequence is local harness first, online platform second.
+
+v1 builds the open-source local Aim OS agent harness: aim intake, context gathering,
+decomposition, human/agent routing, local agent execution, evidence, eval, and context review.
+Developers are still the first credible wedge because local coding agents, git, and CI produce
+inspectable evidence today, but the product being proved is not "developer task tracking." It is
+the local loop where a person states an aim, agents help execute it, real evidence accumulates, and
+context/eval improves the next aim.
+
+The old v1a/v1b split is validation history. v1a proved the hosted automatic-evidence spine; v1b's
+context/eval value is now part of the local harness itself. The online Aim platform comes after the
+local loop is worth using: sync, teams, permissions, managed infrastructure, and eventually Aim Share.

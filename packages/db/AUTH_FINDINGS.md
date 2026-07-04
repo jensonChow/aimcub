@@ -1,5 +1,9 @@
 # AUTH_FINDINGS — aud-bound MCP token (RFC 8707) P0
 
+> Status: archived historical memory from the v1a/H1 hosted evidence-spine work.
+> Keep this as auth context for the existing MCP resource server; do not treat it
+> as the active v1 roadmap. Current v1 work is the local Aim OS agent harness.
+
 Owner: `v1a/data`. Audience: the `v1a/mcp` worktree (this finding drives its auth design).
 Researched June 2026 against current Supabase Auth, the MCP authorization spec, and
 Cloudflare `workers-oauth-provider`. All sources cited at the bottom.

@@ -42,6 +42,7 @@ Last updated: 2026-07-04
 ## Current Implementation State
 
 - Active plan document: `docs/v1-spec.md`, now reframed as "Local Aim OS Agent Harness." The old v1a/v1b labels are not the primary roadmap.
+- Memory/planning docs have been synchronized with the local Aim OS harness direction: `AGENTS.md`, `CLAUDE.md`, `README.md`, `WORKTREES.md`, `docs/product-story.md`, `docs/charters/*`, and `packages/db/*` docs now either point at the current local harness plan or mark old v1a/H1 material as archived historical memory.
 - Historical wrap-up branch: `codex/v1b-context-eval-wrapup`.
 - The context/eval slice has been consolidated around a shared planning-context workflow in
   `packages/llm/src/context-workflow.ts`. CLI and Desktop now use the same store-port helpers

@@ -16,14 +16,14 @@ A universal **aim-management** layer for the harness era. Humans and agents are 
 - **Personalized eval** — benchmarks don't represent real use; every person/org has its own. Eval without context is meaningless.
 
 ## Locked invariants (do not break without explicit sign-off)
-- **Supabase is the single source of truth** (Postgres + Auth + RLS + Realtime + Storage).
+- **Hosted Supabase is the online source of truth** (Postgres + Auth + RLS + Realtime + Storage) for web/MCP evidence and the future platform; local Aim OS state is local-store first until sync parity is needed.
 - **Evidence is append-only + idempotent**; milestone completion is state *derived* from the evidence stream via `evaluate()`, never written directly.
 - **`@core/*` is the only place business logic lives** — pure TS, zero platform deps, unit-tested. App shells (`apps/*`) only do I/O, rendering, platform bridging. CI guards purity via ESLint `no-restricted-imports` + `types:[]` tsc.
 - **Lean-first**: a `jobs` table + pg_cron (not pgmq), linear milestones (not DAG), single-table memory (no vectors). Add complexity only when a concrete trigger demands it.
 - **Built-in planning tools first**: local read/search/memory/context tools are first-party Aimcub runtime tools; MCP is the external extension boundary, not the substrate for core primitives.
 
 ## Layout
-`packages/{core (@core/domain), types (@core/types), db, api, llm, ui-tokens}` + `apps/{web, mcp = active; ios = v2, extension = v3 = placeholders}`. Full table in `README.md`.
+`packages/{core (@core/domain), types (@core/types), db, api, llm, ui-tokens}` + `apps/{desktop = active local harness; web, mcp = hosted surfaces; ios = v2, extension = v3 = placeholders}`. Full table in `README.md`.
 
 ## Commands
 `pnpm install` · `pnpm build` · `pnpm test` · `pnpm typecheck` · `pnpm lint` · `pnpm core:purity`

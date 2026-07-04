@@ -1,5 +1,9 @@
 # Worktree Charter — `v1a/web` (the Aimcub web app)
 
+> Status: archived historical memory. This charter describes the completed v1a/H1
+> hosted evidence-spine worktree. It is not the active roadmap. Current v1 work is
+> the local Aim OS agent harness in `docs/v1-spec.md`.
+
 ## Scope
 Deliver the v1a web experience: **set a goal → see it decompose → watch a milestone light up by itself**, fully demoable locally with mocked data and **no backend**. The web app renders goals + milestones + decomposition + progress + auth only.
 
