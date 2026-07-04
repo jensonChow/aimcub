@@ -233,6 +233,22 @@ export const Evidence = z.object({
 });
 export type Evidence = z.infer<typeof Evidence>;
 
+export const ManualEvidenceRequiredItem = z.object({
+  text: z.string().min(1),
+  satisfied: z.boolean().default(false),
+});
+export type ManualEvidenceRequiredItem = z.infer<typeof ManualEvidenceRequiredItem>;
+
+export const ManualEvidencePayload = z.object({
+  confirmed: z.literal(true).default(true),
+  milestone_id: z.string().uuid(),
+  proof_note: z.string().min(1).optional(),
+  urls: z.array(z.string().url()).default([]),
+  file_paths: z.array(z.string().min(1)).default([]),
+  required_evidence: z.array(ManualEvidenceRequiredItem).default([]),
+});
+export type ManualEvidencePayload = z.infer<typeof ManualEvidencePayload>;
+
 // ──────────────────────────────────────────────────────────────────────────
 // Goal / Milestone / Plan (decomposition)
 // ──────────────────────────────────────────────────────────────────────────
@@ -279,6 +295,20 @@ export type Milestone = z.infer<typeof Milestone>;
 export const DecompositionOwner = z.enum(["human", "agent", "either", "mixed"]);
 export type DecompositionOwner = z.infer<typeof DecompositionOwner>;
 
+export const PlanRoutingOwner = z.enum(["human", "agent"]);
+export type PlanRoutingOwner = z.infer<typeof PlanRoutingOwner>;
+
+export const PlanRoutingOverride = z.object({
+  owner: PlanRoutingOwner,
+  agent_id: z.string().min(1).nullable().default(null),
+  agent_label: z.string().min(1).nullable().default(null),
+  run_mode: AgentRunMode.nullable().default(null),
+  model: z.string().min(1).nullable().default(null),
+  model_label: z.string().min(1).nullable().default(null),
+  reason: z.string().default("User routing override."),
+});
+export type PlanRoutingOverride = z.infer<typeof PlanRoutingOverride>;
+
 export const DecompositionContextGap = z.object({
   category: ContextCategory,
   question: z.string().min(1),
@@ -309,6 +339,7 @@ export const PlanNode = z.object({
   xp_reward: z.number().int().positive().default(10),
   acceptance_rule: AcceptanceRule,
   decomposition_contract: DecompositionContract.nullable().default(null),
+  routing_override: PlanRoutingOverride.nullable().default(null),
 });
 export type PlanNode = z.infer<typeof PlanNode>;
 
@@ -526,12 +557,40 @@ export const EvaluatorRuntimeResult = z.object({
 });
 export type EvaluatorRuntimeResult = z.infer<typeof EvaluatorRuntimeResult>;
 
+export const EvaluationReview = z.object({
+  passed: z.boolean().default(false),
+  matched_evidence_ids: z.array(z.string().uuid()).default([]),
+  trust_score: z.number().min(0).max(1).default(0),
+  reason: z.string().default(""),
+  next_action: z.string().default(""),
+});
+export type EvaluationReview = z.infer<typeof EvaluationReview>;
+
+export const EvidenceReviewStatus = z.enum(["matched", "unmatched", "low_trust"]);
+export type EvidenceReviewStatus = z.infer<typeof EvidenceReviewStatus>;
+
+export const EvidenceRuleMatch = z.object({
+  clause_index: z.number().int().nonnegative(),
+  evaluator: Evaluator,
+});
+export type EvidenceRuleMatch = z.infer<typeof EvidenceRuleMatch>;
+
+export const EvidenceReviewItem = z.object({
+  evidence: Evidence,
+  rule_matches: z.array(EvidenceRuleMatch).default([]),
+  status: EvidenceReviewStatus.default("unmatched"),
+  review_note: z.string().default(""),
+});
+export type EvidenceReviewItem = z.infer<typeof EvidenceReviewItem>;
+
 export const AimProgressMilestoneRead = z.object({
   milestone: Milestone,
   assignment: Assignment.nullable().default(null),
   latest_run: Run.nullable().default(null),
   child_relations: z.array(SubAimRelation).default([]),
+  eval_review: EvaluationReview.default({}),
   evaluator_results: z.array(EvaluatorRuntimeResult).default([]),
+  evidence: z.array(EvidenceReviewItem).default([]),
   evidence_count: z.number().int().nonnegative().default(0),
   completed: z.boolean().default(false),
   blocked: z.boolean().default(false),
@@ -558,6 +617,60 @@ export const Memory = z.object({
 });
 export type Memory = z.infer<typeof Memory>;
 
+export const AimCompletionRecapEvidenceRead = z.object({
+  id: z.string().uuid(),
+  milestone_id: z.string().uuid().nullable().default(null),
+  kind: EvidenceKind,
+  summary: z.string().default(""),
+  occurred_at: z.string(),
+  trust_score: z.number().min(0).max(1).default(0),
+});
+export type AimCompletionRecapEvidenceRead = z.infer<typeof AimCompletionRecapEvidenceRead>;
+
+export const AimCompletionRecapEvalRead = z.object({
+  milestone_id: z.string().uuid(),
+  evaluator: Evaluator,
+  status: EvaluatorRuntimeStatus,
+  explanation: z.string().default(""),
+  trust_score: z.number().min(0).max(1).default(0),
+  matched_evidence_ids: z.array(z.string().uuid()).default([]),
+});
+export type AimCompletionRecapEvalRead = z.infer<typeof AimCompletionRecapEvalRead>;
+
+export const AimCompletionRecapSubAimRead = z.object({
+  milestone_id: z.string().uuid(),
+  title: z.string(),
+  outcome: z.string().default(""),
+  completed_at: z.string().nullable().default(null),
+  decided_by: DecidedBy.nullable().default(null),
+  evidence_ids: z.array(z.string().uuid()).default([]),
+  eval_status: EvaluatorRuntimeStatus.nullable().default(null),
+});
+export type AimCompletionRecapSubAimRead = z.infer<typeof AimCompletionRecapSubAimRead>;
+
+export const AimCompletionRecapMemoryRead = z.object({
+  id: z.string().uuid(),
+  content: z.string(),
+  category: ContextCategory,
+  source: z.enum(["agent_inferred", "user_stated", "evidence_derived"]),
+  status: MemoryStatus,
+  scope: z.enum(["aim", "global"]),
+  confidence: z.number().min(0).max(1).default(0),
+});
+export type AimCompletionRecapMemoryRead = z.infer<typeof AimCompletionRecapMemoryRead>;
+
+export const AimCompletionRecapRead = z.object({
+  complete: z.boolean().default(false),
+  final_outcome: z.string().default(""),
+  completed_sub_aims: z.array(AimCompletionRecapSubAimRead).default([]),
+  passing_evidence: z.array(AimCompletionRecapEvidenceRead).default([]),
+  eval_results: z.array(AimCompletionRecapEvalRead).default([]),
+  learned_context: z.array(AimCompletionRecapMemoryRead).default([]),
+  evidence_empty_reason: z.string().default(""),
+  context_empty_reason: z.string().default(""),
+});
+export type AimCompletionRecapRead = z.infer<typeof AimCompletionRecapRead>;
+
 export const AimProgressReadModel = z.object({
   goal: Goal,
   milestones: z.array(AimProgressMilestoneRead),
@@ -566,6 +679,7 @@ export const AimProgressReadModel = z.object({
   runs: z.array(Run).default([]),
   sub_aim_relations: z.array(SubAimRelation).default([]),
   context_candidates: z.array(Memory).default([]),
+  completion_recap: AimCompletionRecapRead.nullable().default(null),
   completed_milestones: z.number().int().nonnegative().default(0),
   total_milestones: z.number().int().nonnegative().default(0),
   blocked_count: z.number().int().nonnegative().default(0),

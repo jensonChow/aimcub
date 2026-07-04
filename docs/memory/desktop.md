@@ -18,6 +18,8 @@ The default desktop shell is a simplified two-column product layout:
 
 Selecting an existing aim should open Aim overview first instead of jumping directly into Run details. Existing aims should not show an empty composer on the Context stage.
 
+Completed aims are the exception to the overview default: if `AimProgressReadModel.completion_recap.complete` is true, Desktop should open the Eval stage and show the completion recap.
+
 The renderer was reset from the old debug-heavy cockpit into a compact Aim OS cockpit MVP. It should keep one primary task per screen and avoid stacking unrelated status/debug/runtime panels.
 
 ## Design System
@@ -30,7 +32,11 @@ Desktop context collection is a first-class setup layer. `context-sources.json` 
 
 Planning consumes context before decomposition through `context.linked_sources`, `local.read`, optional `web.search`/`web.fetch`, `context.distill`, and structured user questions. Connector references are locations or access gaps until a runtime can actually read them.
 
+The Context and Sub-aims stages show a default context bundle review before/inside planning. It classifies used context, skipped/unread context, permission/setup gaps, and unresolved decomposition risks from planning context reports, tool traces, intake questions, review gaps, and plan contract gaps.
+
 User-facing intake questions should come from `generateAimIntakeQuestions` grounded in available context. Do not surface template prompts like "Ask for..." directly to users.
+
+The main Desktop loop reaches Context Inbox from the Eval stage. Pending context candidates render as editable review rows with source, category, confidence, and scope; accept/reject uses the existing context-candidate IPC. Accepting global context makes it active memory for future aim planning, while accepting aim scope keeps it tied to the current aim.
 
 ## Local Agents
 

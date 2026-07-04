@@ -27,9 +27,13 @@ Agent routing should be agent-forward. Digital, research, coding, summarization,
 
 The product loop is: user enters an aim -> Aim OS collects context -> Aim OS creates sub-aims with eval rules -> each sub-aim is assigned to an agent or human, or decomposed further -> evidence and eval update progress -> useful context returns to memory.
 
+When every sub-aim is complete, the product should show a completion recap instead of another work queue: final outcome, completed sub-aims, passing evidence, eval result, learned memory/context, and how accepted context can shape the next aim.
+
 ## Context Behavior
 
 Context collection is a core local harness capability. It should gather enough context to improve decomposition, acceptance rules, routing, and future reuse without becoming a profile editor.
+
+Planning should make context provenance reviewable by default: show what context was used, what was skipped or unread, what permissions/setup blocked access, and what unresolved questions could still change decomposition.
 
 Durable/global context must be separated from aim-local context. Long-lived preferences, constraints, eval signals, and capability facts become memory candidates. Short-lived facts stay scoped to the current aim.
 

@@ -46,6 +46,7 @@ Reference links:
 - Calm density: Aimcub is an operational desktop tool. Prefer compact, scannable, quiet layouts over marketing-like hero sections, decorative cards, large illustrations, or expressive gradients.
 - Context is a substrate: show context health as concise status, setup controls, and review affordances. Do not turn memory/context into a profile page or a decorative feed.
 - Context source setup must keep one clear summary plus one editable control surface; do not repeat local, online, web, deep research, context-session, or questionnaire controls as separate card, table, and toggle representations.
+- Context bundle review is a default product surface before/inside planning. It should separate used context, skipped or unread context, permission/setup gaps, and unresolved decomposition risks without exposing raw prompts, model traces, or chain-of-thought.
 - Evidence is trustworthy UI: completion, progress, warnings, and quality claims must show the evidence or review path behind them without exposing private chain-of-thought.
 - No style churn: do not adopt platform fashion changes, glass effects, 3D depth, or animation-heavy treatments unless they improve Aimcub's actual workflow.
 
@@ -57,9 +58,14 @@ Reference links:
 - Optional inspector: process, context, quality, activity, and debug details may exist as an opt-in overlay, drawer, popover, or developer-mode surface. It must be independently scrollable and cannot displace the primary task by default.
 - Stage model: Aim -> Context -> Plan/Contracts -> Execute -> Eval. Stage navigation may be visible, but each stage must still present a single dominant action.
 - New aim title and description belong to the Aim stage. The Context stage should confirm the captured aim and collect answers, attachments, and sources; it must not show a second title/description composer unless the user explicitly opens child-aim breakdown or an unsaved-aim edit path.
+- Context and Plan/Contracts stages should show the context bundle review as part of the default workflow, using compact buckets and clear empty states rather than a hidden inspector or debug trace.
 - Execute and Eval are distinct stages. Execute answers "Who/what should do the next work?" with assignments, agent run, human proof, and child-breakdown actions. Eval answers "What evidence exists, did it satisfy the rule, and what needs review?" with evidence counts/details, evaluator status, trust/explanation, and pending context candidates when present.
+- Execute and Eval must be evidence-detail-first. Counts alone are insufficient: evidence rows should show summaries, trust, matched acceptance rule indexes/evaluators, pass/fail reasoning, and actionable missing/low-trust states from the core read model.
+- Context Inbox belongs in the Eval review flow, not Settings or developer/debug surfaces. Candidate rows should use compact review cards with provenance chips, editable text, explicit aim/global scope controls, and primary accept plus secondary reject actions. Copy must make clear that accepted global context is reused for future aim planning.
+- Completed aims use the Eval stage for a completion recap. The recap should stay factual and compact: final outcome, completed sub-aims, passing evidence, eval result, learned context, and future reuse. Do not turn this into celebration, marketing copy, or a decorative success page.
 - Existing aims open to Aim overview first. Do not jump users into Run details or show an empty composer on the Context stage.
 - Settings are an aim-helper setup surface, not a flat runtime control panel. Frame provider setup, local CLI agent detection, web research, and context sources as helpers needed to complete aims; keep their configuration clear and thin unless setup is the user's current task.
+- First-run with no provider or local CLI agent must stay aim-first. Capture the aim before helper setup, then explain the required helper capability from that aim and link to contextual Aim helpers settings.
 
 ## Layout Rules
 
@@ -150,6 +156,8 @@ Reference links:
 - Pointer targets should be at least 24 by 24 CSS px, with practical Aimcub targets usually 32 to 44 px.
 - Do not interrupt the user with modal dialogs for recoverable actions. Prefer inline banners, undo, or a review surface.
 - Planning question surfaces must distinguish blocking pre-draft context from optional post-draft refinements. Pre-draft intake should make the blocked next step explicit; post-draft clarification should keep accepting the draft available without implying the user is stuck.
+- Generated plan review must support direct pre-save editing of sub-aim text, eval/acceptance rules, merge/split, and reorder without leaving the Plan/Contracts stage. Validation issues should be inline and must disable saving until the plan is executable.
+- Manual proof confirmation must open an evidence submission surface before recording confirmation. The surface should collect proof note, URL, local file references when available, and required-evidence checklist mapping; Eval should show the submitted evidence details.
 - Destructive actions need undo when possible. If undo is not possible, require explicit confirmation with action-specific button labels.
 - Loading states should preserve layout dimensions. Avoid spinners that replace large content areas without a stable skeleton, label, or status.
 - Motion should be fast, direct, and functional. Keep transitions around 120 to 180 ms. Avoid decorative animation loops.

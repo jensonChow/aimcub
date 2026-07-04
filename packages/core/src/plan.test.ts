@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { DecompositionOutput } from "@core/types";
-import { planMerge, validatePlan, type ExistingMilestone } from "./plan";
+import {
+  mergePlanNodes,
+  movePlanNode,
+  planMerge,
+  splitPlanNode,
+  updatePlanNode,
+  validateExecutablePlan,
+  validatePlan,
+  type ExistingMilestone,
+} from "./plan";
 
 function mkNode(key: string, title: string) {
   return {
@@ -10,7 +19,20 @@ function mkNode(key: string, title: string) {
   };
 }
 
-function plan(nodes: ReturnType<typeof mkNode>[], edges: { from: string; to: string }[] = []) {
+function mkCiNode(key: string, title: string) {
+  return {
+    key,
+    title,
+    description: "Verify with CI.",
+    acceptance_rule: {
+      clauses: [{ evaluator: "ci_status", match: { conclusion: "success" } }],
+    },
+  };
+}
+
+type TestNode = ReturnType<typeof mkNode> | ReturnType<typeof mkCiNode>;
+
+function plan(nodes: TestNode[], edges: { from: string; to: string }[] = []) {
   return DecompositionOutput.parse({ nodes, edges });
 }
 
@@ -40,6 +62,82 @@ describe("validatePlan", () => {
       ],
     );
     expect(validatePlan(p).errors).toContain("dependency cycle detected");
+  });
+});
+
+describe("plan editing transformations", () => {
+  it("edits sub-aim text and acceptance rules while keeping the plan executable", () => {
+    const base = plan([mkNode("a", "Draft"), mkCiNode("b", "Verify")], [{ from: "a", to: "b" }]);
+    const nextRule = base.nodes[1]!.acceptance_rule;
+    const edited = updatePlanNode(base, "a", {
+      title: "Draft launch checklist",
+      description: "Create the concrete checklist the release will use.",
+      acceptance_rule: nextRule,
+    });
+
+    expect(edited.nodes[0]).toMatchObject({
+      key: "a",
+      title: "Draft launch checklist",
+      description: "Create the concrete checklist the release will use.",
+    });
+    expect(edited.nodes[0]!.acceptance_rule.clauses[0]!.evaluator).toBe("ci_status");
+    expect(validateExecutablePlan(edited)).toEqual({ ok: true, errors: [] });
+  });
+
+  it("merges two sub-aims and combines their eval rules into one executable node", () => {
+    const base = plan([mkNode("a", "Draft"), mkCiNode("b", "Verify")], [{ from: "a", to: "b" }]);
+
+    const merged = mergePlanNodes(base, "a", "b");
+
+    expect(merged.nodes).toHaveLength(1);
+    expect(merged.nodes[0]!.title).toBe("Draft + Verify");
+    expect(merged.nodes[0]!.acceptance_rule.logic).toBe("all");
+    expect(merged.nodes[0]!.acceptance_rule.clauses.map((clause) => clause.evaluator)).toEqual([
+      "manual_confirm",
+      "ci_status",
+    ]);
+    expect(merged.edges).toEqual([]);
+    expect(validateExecutablePlan(merged)).toEqual({ ok: true, errors: [] });
+  });
+
+  it("splits one sub-aim into two sequential executable nodes", () => {
+    const base = plan([mkNode("a", "Draft"), mkCiNode("b", "Verify")], [{ from: "a", to: "b" }]);
+
+    const split = splitPlanNode(base, "a", {
+      first: { title: "Draft outline" },
+      second: {
+        title: "Draft final checklist",
+        description: "Turn the outline into the final checklist.",
+      },
+    });
+
+    expect(split.nodes.map((node) => node.title)).toEqual(["Draft outline", "Draft final checklist", "Verify"]);
+    expect(split.nodes[1]!.key).toBe("a-split");
+    expect(split.edges).toEqual([
+      { from: "a", to: "a-split" },
+      { from: "a-split", to: "b" },
+    ]);
+    expect(validateExecutablePlan(split)).toEqual({ ok: true, errors: [] });
+  });
+
+  it("reorders sub-aims and rewrites dependencies to match the new order", () => {
+    const base = plan([mkNode("a", "Draft"), mkCiNode("b", "Verify")], [{ from: "a", to: "b" }]);
+
+    const moved = movePlanNode(base, "b", 0);
+
+    expect(moved.nodes.map((node) => node.key)).toEqual(["b", "a"]);
+    expect(moved.edges).toEqual([{ from: "b", to: "a" }]);
+    expect(validateExecutablePlan(moved)).toEqual({ ok: true, errors: [] });
+  });
+
+  it("reports schema errors for edited payloads that are not saveable plans", () => {
+    const base = plan([mkNode("a", "Draft")]);
+    const invalid = updatePlanNode(base, "a", { title: "" });
+
+    const validation = validateExecutablePlan(invalid);
+
+    expect(validation.ok).toBe(false);
+    expect(validation.errors.some((error) => error.includes("nodes.0.title"))).toBe(true);
   });
 });
 

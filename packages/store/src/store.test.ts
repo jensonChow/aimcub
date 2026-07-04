@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { movePlanNode, splitPlanNode, updatePlanNode } from "@core/domain";
 import type { DecompositionOutput } from "@core/types";
 
 import {
@@ -136,6 +137,24 @@ const MANUAL_PLAN = {
   ],
   edges: [],
 } as unknown as DecompositionOutput;
+
+const ROUTING_OVERRIDE = {
+  owner: "agent",
+  agent_id: "codex",
+  agent_label: "Codex CLI",
+  run_mode: "local_cli",
+  model: "gpt-5",
+  model_label: "GPT-5",
+  reason: "User selected Codex CLI.",
+} as const;
+
+const ROUTED_PLAN = {
+  ...PLAN,
+  nodes: [
+    { ...PLAN.nodes[0]!, routing_override: ROUTING_OVERRIDE },
+    PLAN.nodes[1]!,
+  ],
+} as DecompositionOutput;
 
 function freshStore() {
   const dir = mkdtempSync(join(tmpdir(), "aimcub-store-"));
@@ -312,6 +331,68 @@ describe("createJsonFileStore · round-trip", () => {
     const { goal } = await store.createGoal({ title: "x", plan: PLAN, memories: [{ content: "  " }] });
     expect(goal.id).toBeTruthy();
     expect(await store.listMemories(goal.id)).toEqual([]);
+  });
+
+  it("saves an edited pre-save plan payload into plan JSON and milestones", async () => {
+    const store = freshStore();
+    const manualRule: DecompositionOutput["nodes"][number]["acceptance_rule"] = {
+      logic: "all",
+      threshold: 1,
+      completion_mode: "manual",
+      clauses: [{ evaluator: "manual_confirm", auto_verifiable: false, match: {} }],
+    };
+    const editedTitlePlan = updatePlanNode(PLAN, "m1", {
+      title: "Scope edited release",
+      description: "Capture the exact edited release scope.",
+      acceptance_rule: manualRule,
+    });
+    const splitPlan = splitPlanNode(editedTitlePlan, "m2", {
+      first: { title: "Implement edited release" },
+      second: {
+        title: "Verify edited release",
+        description: "Confirm the saved payload drives the final milestone.",
+      },
+    });
+    const edited = movePlanNode(splitPlan, "m2-split", 1);
+
+    const { goal, milestones } = await store.createGoal({
+      title: "Edited plan aim",
+      plan: edited,
+    });
+
+    expect(goal.plan_json).toEqual(edited);
+    expect(milestones.map((milestone) => milestone.title)).toEqual([
+      "Scope edited release",
+      "Verify edited release",
+      "Implement edited release",
+    ]);
+    expect(milestones[0]!.description).toBe("Capture the exact edited release scope.");
+    expect(milestones[0]!.acceptance_rule).toEqual(manualRule);
+    expect(milestones[1]!.depends_on_id).toBe(milestones[0]!.id);
+    expect(milestones[2]!.depends_on_id).toBe(milestones[1]!.id);
+    expect(milestones[1]!.metadata.plan_key).toBe("m2-split");
+  });
+
+  it("persists routing overrides into the plan, milestone metadata, and assignments", async () => {
+    const store = freshStore();
+    const { goal, milestones } = await store.createGoal({
+      title: "Build a CLI todo app",
+      plan: ROUTED_PLAN,
+    });
+
+    const savedPlan = goal.plan_json as DecompositionOutput;
+    expect(savedPlan.nodes[0]?.routing_override).toEqual(ROUTING_OVERRIDE);
+    expect(milestones[0]?.metadata.routing_override).toEqual(ROUTING_OVERRIDE);
+
+    const assignments = await store.listAssignments(goal.id);
+    const routed = assignments.find((assignment) => assignment.milestone_id === milestones[0]?.id);
+    expect(routed).toMatchObject({
+      actor_kind: "agent",
+      source: "user_override",
+    });
+    expect(routed?.reason).toContain("Codex CLI / GPT-5");
+    expect(routed?.capability_tags).toContain("agent:codex");
+    expect(routed?.capability_tags).toContain("model:gpt-5");
   });
 });
 
@@ -621,6 +702,12 @@ describe("createJsonFileStore · evidence and confirmations", () => {
     });
     expect(progress?.milestones[0]?.completed).toBe(false);
     expect(progress?.milestones[0]?.evidence_count).toBe(1);
+    expect(progress?.milestones[0]?.eval_review.reason).toContain("trust floor");
+    expect(progress?.milestones[0]?.evidence[0]).toMatchObject({
+      evidence: { id: result.evidence.id, summary: "Agent says the scaffold is done.", trust_score: 0.6 },
+      status: "low_trust",
+      rule_matches: [],
+    });
   });
 
   it("dedupes evidence by emitter/source event", async () => {
@@ -647,13 +734,71 @@ describe("createJsonFileStore · evidence and confirmations", () => {
     const store = freshStore();
     const { goal, milestones } = await store.createGoal({ title: "Build a CLI todo app", plan: PLAN });
 
-    const result = await store.confirmMilestone({ goalId: goal.id, milestoneId: milestones[1]!.id });
+    const result = await store.confirmMilestone({
+      goalId: goal.id,
+      milestoneId: milestones[1]!.id,
+      proofNote: "Verified implementation with a passing CI run.",
+    });
     expect(result).not.toBeNull();
     expect(result!.evidence?.kind).toBe("manual_check");
     expect(result!.completion?.decided_by).toBe("user_confirm");
 
     const got = await store.getGoal(goal.id);
     expect(got!.milestones[1]!.status).toBe("completed");
+  });
+
+  it("manual proof stores note, URLs, file references, and required evidence mapping", async () => {
+    const store = freshStore();
+    const { goal, milestones } = await store.createGoal({ title: "Manual proof", plan: MANUAL_PLAN });
+
+    const result = await store.confirmMilestone({
+      goalId: goal.id,
+      milestoneId: milestones[0]!.id,
+      proofNote: "Reviewed the release approval in the signed note.",
+      urls: ["https://example.com/approval"],
+      filePaths: ["/tmp/approval-note.pdf"],
+      requiredEvidence: [{ text: "Approval note.", satisfied: true }],
+    });
+    const progress = await store.getAimProgress(goal.id);
+
+    expect(result!.evidence?.payload).toMatchObject({
+      confirmed: true,
+      milestone_id: milestones[0]!.id,
+      proof_note: "Reviewed the release approval in the signed note.",
+      urls: ["https://example.com/approval"],
+      file_paths: ["/tmp/approval-note.pdf"],
+      required_evidence: [{ text: "Approval note.", satisfied: true }],
+    });
+    expect(progress?.milestones[0]?.evidence[0]?.evidence.id).toBe(result!.evidence?.id);
+    expect(progress?.milestones[0]?.evaluator_results[0]?.matched_evidence_ids).toContain(result!.evidence?.id);
+  });
+
+  it("validates manual proof before appending evidence", async () => {
+    const store = freshStore();
+    const { goal, milestones } = await store.createGoal({ title: "Manual proof", plan: MANUAL_PLAN });
+    const milestoneId = milestones[0]!.id;
+
+    await expect(store.confirmMilestone({ goalId: goal.id, milestoneId })).rejects.toThrow(/note, URL, or file/i);
+    await expect(store.confirmMilestone({
+      goalId: goal.id,
+      milestoneId,
+      proofNote: "Reviewed the approval.",
+      urls: ["not-a-url"],
+      requiredEvidence: [{ text: "Approval note.", satisfied: true }],
+    })).rejects.toThrow(/URL is invalid/i);
+    await expect(store.confirmMilestone({
+      goalId: goal.id,
+      milestoneId,
+      proofNote: "Reviewed the approval.",
+      requiredEvidence: [{ text: "Approval note.", satisfied: false }],
+    })).rejects.toThrow(/at least one required evidence/i);
+    await expect(store.confirmMilestone({
+      goalId: goal.id,
+      milestoneId,
+      proofNote: "Reviewed the approval.",
+      requiredEvidence: [{ text: "Different evidence.", satisfied: true }],
+    })).rejects.toThrow(/does not belong/i);
+    expect(await store.listEvidence(goal.id)).toHaveLength(0);
   });
 
   it("human proof sedimentation creates pending durable context", async () => {
@@ -663,12 +808,42 @@ describe("createJsonFileStore · evidence and confirmations", () => {
     await store.confirmMilestone({
       goalId: goal.id,
       milestoneId: milestones[0]!.id,
-      summary: "Confirmed release approval.",
+      proofNote: "Confirmed release approval.",
+      urls: ["https://example.com/release-approval"],
+      filePaths: ["/tmp/release-approval.txt"],
+      requiredEvidence: [{ text: "Approval note.", satisfied: true }],
     });
     const candidates = await store.sedimentContextFromGoal(goal.id);
 
     expect(candidates.some((candidate) => candidate.status === "pending" && candidate.category === "eval_signal")).toBe(true);
     expect((await store.listMemories()).map((memory) => memory.id)).not.toContain(candidates[0]!.id);
+  });
+
+  it("includes accepted aim context in the completion recap", async () => {
+    const store = freshStore();
+    const { goal, milestones } = await store.createGoal({ title: "Manual proof", plan: MANUAL_PLAN });
+
+    await store.confirmMilestone({
+      goalId: goal.id,
+      milestoneId: milestones[0]!.id,
+      proofNote: "Confirmed release approval.",
+      requiredEvidence: [{ text: "Approval note.", satisfied: true }],
+    });
+    const candidates = await store.sedimentContextFromGoal(goal.id);
+    const accepted = await store.acceptMemoryCandidate({
+      id: candidates[0]!.id,
+      content: "Eval signal: Release approval is complete when the user confirms it.",
+      goalId: goal.id,
+    });
+    const progress = await store.getAimProgress(goal.id);
+
+    expect(accepted?.status).toBe("active");
+    expect(progress?.completion_recap?.complete).toBe(true);
+    expect(progress?.completion_recap?.learned_context).toContainEqual(expect.objectContaining({
+      id: accepted!.id,
+      status: "active",
+      scope: "aim",
+    }));
   });
 
   it("manual sub-aim decomposition creates a relation that the cockpit can roll up", async () => {
@@ -684,7 +859,12 @@ describe("createJsonFileStore · evidence and confirmations", () => {
       parentMilestoneId: parentMilestones[0]!.id,
     });
 
-    await store.confirmMilestone({ goalId: child.id, milestoneId: childMilestones[0]!.id });
+    await store.confirmMilestone({
+      goalId: child.id,
+      milestoneId: childMilestones[0]!.id,
+      proofNote: "Child aim proof was reviewed.",
+      requiredEvidence: [{ text: "Approval note.", satisfied: true }],
+    });
     const relations = await store.listSubAimRelations(parent.id);
     const progress = await store.getAimProgress(parent.id);
 

@@ -3,6 +3,7 @@ import type {
   AcceptanceRule,
   Actor,
   ActorKind,
+  AimCompletionRecapRead,
   AimProgressReadModel,
   Assignment,
   AssignmentSource,
@@ -11,17 +12,25 @@ import type {
   ContextIntakeSessionStatus,
   Evidence,
   EvidenceAttribution,
+  EvaluationReview,
+  EvidenceReviewItem,
   EvaluatorRuntimeResult,
   Goal,
   Memory,
   Milestone,
   MilestoneCompletion,
+  DecompositionOutput,
+  DecompositionOwner,
+  PlanNode,
+  PlanRoutingOverride as PlanRoutingOverrideValue,
+  PlanRoutingOwner,
   Run,
   SubAimRelation,
   SubAimRelationStatus,
   ToolTrace,
 } from "@core/types";
-import { evaluate } from "./evaluate";
+import { PlanRoutingOverride } from "@core/types";
+import { AUTO_VERIFY_MIN_TRUST, evaluate } from "./evaluate";
 import type { ContextSedimentationCandidateInput } from "./context-sedimentation";
 
 export interface RoutedAssignment {
@@ -33,6 +42,50 @@ export interface RoutedAssignment {
   source: AssignmentSource;
   reason: string;
   capabilityTags: string[];
+}
+
+export interface RoutingModelOption {
+  id: string;
+  label?: string;
+}
+
+export interface RoutingRuntimeAgentOption {
+  id: string;
+  label: string;
+  available: boolean;
+  authenticated: boolean;
+  models: readonly RoutingModelOption[];
+  unavailableReason?: string | null;
+}
+
+export interface PlanNodeRoutingRecommendation {
+  likelyOwner: DecompositionOwner;
+  recommendedOwner: PlanRoutingOwner;
+  rationale: string;
+  capabilityTags: string[];
+}
+
+export type PlanRoutingValidationIssueCode =
+  | "human_route_unavailable"
+  | "missing_agent_runtime"
+  | "missing_agent_selection"
+  | "unknown_agent"
+  | "agent_unavailable"
+  | "agent_unauthenticated"
+  | "missing_agent_model"
+  | "unknown_agent_model"
+  | "human_route_has_agent_selection";
+
+export interface PlanRoutingValidationIssue {
+  nodeKey: string;
+  title: string;
+  code: PlanRoutingValidationIssueCode;
+  message: string;
+}
+
+export interface PlanRoutingValidation {
+  ok: boolean;
+  issues: PlanRoutingValidationIssue[];
 }
 
 export interface ContextIntakeDecisionInput {
@@ -59,7 +112,9 @@ export interface EvaluationRuntimeReport {
   passed: boolean;
   matchedEvidenceIds: string[];
   trustScore: number;
+  evalReview: EvaluationReview;
   evaluatorResults: EvaluatorRuntimeResult[];
+  evidenceReview: EvidenceReviewItem[];
 }
 
 export interface BuildAimProgressInput {
@@ -74,6 +129,7 @@ export interface BuildAimProgressInput {
   evidence?: readonly Evidence[];
   completions?: readonly MilestoneCompletion[];
   contextCandidates?: readonly Memory[];
+  acceptedContext?: readonly Memory[];
 }
 
 function cleanText(value: unknown): string {
@@ -88,8 +144,12 @@ function contractOf(milestone: Pick<Milestone, "metadata">): Record<string, unkn
   return asRecord(milestone.metadata?.decomposition_contract);
 }
 
-function contractLikelyOwner(milestone: Pick<Milestone, "metadata">): "human" | "agent" | "either" | "mixed" {
-  const owner = contractOf(milestone)?.likely_owner;
+function isDecompositionOwner(value: unknown): value is DecompositionOwner {
+  return value === "human" || value === "agent" || value === "either" || value === "mixed";
+}
+
+function contractLikelyOwnerValue(contract: Record<string, unknown> | null | undefined): DecompositionOwner {
+  const owner = contract?.likely_owner;
   return owner === "human" || owner === "agent" || owner === "either" || owner === "mixed" ? owner : "either";
 }
 
@@ -97,33 +157,45 @@ function hasManualOnlyRule(rule: AcceptanceRule): boolean {
   return rule.clauses.every((clause) => clause.evaluator === "manual_confirm");
 }
 
-function requiresHumanJudgment(milestone: Milestone): boolean {
-  const contract = contractOf(milestone);
-  const text = [
-    milestone.title,
-    milestone.description,
-    cleanText(contract?.definition_of_done),
-    cleanText(contract?.eval_signal),
-    Array.isArray(contract?.required_evidence) ? contract.required_evidence.map(cleanText).join(" ") : "",
-  ].join(" ").toLowerCase();
+function requiredEvidenceText(contract: Record<string, unknown> | null | undefined): string {
+  return Array.isArray(contract?.required_evidence) ? contract.required_evidence.map(cleanText).join(" ") : "";
+}
+
+function requiresHumanJudgmentText(parts: readonly string[]): boolean {
+  const text = parts.join(" ").toLowerCase();
   return /\b(approve|approval|secret|credential|access|taste|choose|decide|sign off|physical|call|meeting)\b/.test(text)
     || /审批|批准|密钥|凭证|权限|品味|选择|决定|线下|电话|会议|人工确认/.test(text);
 }
 
-function capabilityTagsForMilestone(milestone: Milestone): string[] {
+function requiresHumanJudgment(milestone: Milestone): boolean {
   const contract = contractOf(milestone);
-  const text = [
+  return requiresHumanJudgmentText([
     milestone.title,
     milestone.description,
     cleanText(contract?.definition_of_done),
-    Array.isArray(contract?.required_evidence) ? contract.required_evidence.map(cleanText).join(" ") : "",
-  ].join(" ").toLowerCase();
+    cleanText(contract?.eval_signal),
+    requiredEvidenceText(contract),
+  ]);
+}
+
+function capabilityTagsForText(parts: readonly string[]): string[] {
+  const text = parts.join(" ").toLowerCase();
   const tags = new Set<string>();
   if (/\b(code|commit|test|ci|typescript|react|api|database|migration|repo|build)\b/.test(text)) tags.add("software");
   if (/\b(search|research|compare|market|docs|documentation|web)\b/.test(text)) tags.add("research");
   if (/\b(write|summarize|doc|brief|copy|content)\b/.test(text)) tags.add("writing");
   if (/\b(approve|secret|credential|access|taste|physical|meeting)\b/.test(text)) tags.add("human_judgment");
   return [...tags];
+}
+
+function capabilityTagsForMilestone(milestone: Milestone): string[] {
+  const contract = contractOf(milestone);
+  return capabilityTagsForText([
+    milestone.title,
+    milestone.description,
+    cleanText(contract?.definition_of_done),
+    requiredEvidenceText(contract),
+  ]);
 }
 
 function findActor(actors: readonly Actor[], kind: ActorKind, capabilityTags: readonly string[]): Actor | null {
@@ -135,26 +207,106 @@ function findActor(actors: readonly Actor[], kind: ActorKind, capabilityTags: re
   return withCapability ?? active[0] ?? null;
 }
 
+function routingRationale(input: {
+  likelyOwner: DecompositionOwner;
+  humanRequired: boolean;
+  manualOnly: boolean;
+  humanJudgment: boolean;
+}): string {
+  if (input.likelyOwner === "human") {
+    return "The decomposition marks this as human-owned because it depends on judgment, access, approval, or manual proof.";
+  }
+  if (input.likelyOwner === "mixed") {
+    return "The decomposition marks this as mixed work, so Aimcub keeps the route human-gated unless you delegate the digital part to an agent.";
+  }
+  if (input.manualOnly) {
+    return "The eval rule requires manual confirmation, so Aimcub recommends a human route.";
+  }
+  if (input.humanJudgment) {
+    return "The contract mentions approval, access, taste, a decision, or physical-world work, so Aimcub recommends a human route.";
+  }
+  if (input.likelyOwner === "agent") {
+    return "The decomposition marks this as agent-owned and the work can be proved with digital evidence.";
+  }
+  return "No non-delegable blocker was found, so Aimcub recommends the agent path for this digital or evidence-backed work.";
+}
+
+export function routingRecommendationForPlanNode(node: PlanNode): PlanNodeRoutingRecommendation {
+  const contract = node.decomposition_contract;
+  const contractRecord = contract ? contract as Record<string, unknown> : null;
+  const likelyOwner = contract?.likely_owner && isDecompositionOwner(contract.likely_owner)
+    ? contract.likely_owner
+    : "either";
+  const manualOnly = hasManualOnlyRule(node.acceptance_rule);
+  const humanJudgment = requiresHumanJudgmentText([
+    node.title,
+    node.description,
+    cleanText(contract?.definition_of_done),
+    cleanText(contract?.eval_signal),
+    requiredEvidenceText(contractRecord),
+  ]);
+  const humanRequired = likelyOwner === "human" || likelyOwner === "mixed" || manualOnly || humanJudgment;
+  return {
+    likelyOwner,
+    recommendedOwner: humanRequired ? "human" : "agent",
+    rationale: routingRationale({ likelyOwner, humanRequired, manualOnly, humanJudgment }),
+    capabilityTags: capabilityTagsForText([
+      node.title,
+      node.description,
+      cleanText(contract?.definition_of_done),
+      requiredEvidenceText(contractRecord),
+    ]),
+  };
+}
+
+function routingRecommendationForMilestone(milestone: Milestone): PlanNodeRoutingRecommendation {
+  const contract = contractOf(milestone);
+  const likelyOwner = contractLikelyOwnerValue(contract);
+  const manualOnly = hasManualOnlyRule(milestone.acceptance_rule);
+  const humanJudgment = requiresHumanJudgment(milestone);
+  const humanRequired = likelyOwner === "human" || likelyOwner === "mixed" || manualOnly || humanJudgment;
+  return {
+    likelyOwner,
+    recommendedOwner: humanRequired ? "human" : "agent",
+    rationale: routingRationale({ likelyOwner, humanRequired, manualOnly, humanJudgment }),
+    capabilityTags: capabilityTagsForMilestone(milestone),
+  };
+}
+
+export function routingOverrideForMilestone(milestone: Pick<Milestone, "metadata">): PlanRoutingOverrideValue | null {
+  const parsed = PlanRoutingOverride.nullable().safeParse(milestone.metadata?.routing_override ?? null);
+  return parsed.success ? parsed.data : null;
+}
+
+function routingOverrideLabel(override: PlanRoutingOverrideValue): string {
+  if (override.owner === "human") return "User override: route this sub-aim to a human.";
+  const agent = override.agent_label || override.agent_id || "the selected local agent";
+  const model = override.model_label || override.model;
+  return `User override: route this sub-aim to ${model ? `${agent} / ${model}` : agent}.`;
+}
+
 export function recommendAssignmentForMilestone(input: {
   milestone: Milestone;
   actors?: readonly Actor[];
 }): RoutedAssignment {
   const actors = input.actors ?? [];
-  const likelyOwner = contractLikelyOwner(input.milestone);
-  const capabilityTags = capabilityTagsForMilestone(input.milestone);
-  const humanRequired = likelyOwner === "human" || hasManualOnlyRule(input.milestone.acceptance_rule) || requiresHumanJudgment(input.milestone);
-  const actorKind: ActorKind = humanRequired ? "human" : "agent";
+  const recommendation = routingRecommendationForMilestone(input.milestone);
+  const override = routingOverrideForMilestone(input.milestone);
+  const actorKind: ActorKind = override?.owner ?? recommendation.recommendedOwner;
+  const capabilityTags = [
+    ...recommendation.capabilityTags,
+    ...(override?.owner === "agent" && override.agent_id ? [`agent:${override.agent_id}`] : []),
+    ...(override?.owner === "agent" && override.model ? [`model:${override.model}`] : []),
+  ];
   const actor = findActor(actors, actorKind, capabilityTags);
-  const reason = humanRequired
-    ? "Routed to a human because the sub-aim depends on judgment, access, approval, or manual proof."
-    : "Routed to an agent because the sub-aim is digital, researchable, or evidence-backed.";
+  const reason = override ? routingOverrideLabel(override) : recommendation.rationale;
   return {
     goalId: input.milestone.goal_id,
     milestoneId: input.milestone.id,
     actorKind,
     actorId: actor?.id ?? null,
     status: "assigned",
-    source: "routing",
+    source: override ? "user_override" : "routing",
     reason,
     capabilityTags,
   };
@@ -168,6 +320,80 @@ export function routeMilestones(input: {
     milestone,
     actors: input.actors,
   }));
+}
+
+function readyAgents(agents: readonly RoutingRuntimeAgentOption[]): RoutingRuntimeAgentOption[] {
+  return agents.filter((agent) => agent.available && agent.authenticated);
+}
+
+function issue(node: PlanNode, code: PlanRoutingValidationIssueCode, message: string): PlanRoutingValidationIssue {
+  return { nodeKey: node.key, title: node.title, code, message };
+}
+
+export function validatePlanRouting(input: {
+  plan: DecompositionOutput;
+  agents?: readonly RoutingRuntimeAgentOption[];
+  allowHuman?: boolean;
+}): PlanRoutingValidation {
+  const agents = input.agents ?? [];
+  const availableAgents = readyAgents(agents);
+  const agentById = new Map(agents.map((agent) => [agent.id, agent]));
+  const issues: PlanRoutingValidationIssue[] = [];
+
+  for (const node of input.plan.nodes) {
+    const recommendation = routingRecommendationForPlanNode(node);
+    const override = node.routing_override ?? null;
+    const owner = override?.owner ?? recommendation.recommendedOwner;
+
+    if (owner === "human") {
+      if (input.allowHuman === false) {
+        issues.push(issue(node, "human_route_unavailable", "Human routing is not available in this runtime."));
+      }
+      if (override && (override.agent_id || override.model)) {
+        issues.push(issue(node, "human_route_has_agent_selection", "Human-owned work cannot keep an agent or model selection."));
+      }
+      continue;
+    }
+
+    if (availableAgents.length === 0) {
+      issues.push(issue(
+        node,
+        "missing_agent_runtime",
+        "No authenticated local CLI agent is available. Choose Human for this sub-aim or set up Codex or Claude CLI.",
+      ));
+      continue;
+    }
+
+    if (!override) continue;
+    if (!override.agent_id) {
+      issues.push(issue(node, "missing_agent_selection", "Choose a local agent for this agent-owned sub-aim."));
+      continue;
+    }
+
+    const selectedAgent = agentById.get(override.agent_id);
+    if (!selectedAgent) {
+      issues.push(issue(node, "unknown_agent", `Selected agent "${override.agent_id}" is not part of the current runtime configuration.`));
+      continue;
+    }
+    if (!selectedAgent.available) {
+      issues.push(issue(node, "agent_unavailable", `${selectedAgent.label} is not installed or is not executable.`));
+      continue;
+    }
+    if (!selectedAgent.authenticated) {
+      issues.push(issue(node, "agent_unauthenticated", `${selectedAgent.label} is installed but not authenticated.`));
+      continue;
+    }
+
+    if (selectedAgent.models.length > 0 && !override.model) {
+      issues.push(issue(node, "missing_agent_model", `Choose a model for ${selectedAgent.label}.`));
+      continue;
+    }
+    if (override.model && selectedAgent.models.length > 0 && !selectedAgent.models.some((model) => model.id === override.model)) {
+      issues.push(issue(node, "unknown_agent_model", `${selectedAgent.label} does not expose model "${override.model}".`));
+    }
+  }
+
+  return { ok: issues.length === 0, issues };
 }
 
 export function decideContextIntakeSession(input: ContextIntakeDecisionInput): Pick<
@@ -228,6 +454,123 @@ function unsupportedEvaluator(clause: AcceptanceClause): boolean {
   return clause.evaluator === "file_uploaded" || clause.evaluator === "url" || clause.evaluator === "llm_judge";
 }
 
+function plural(count: number, singular: string, pluralForm = `${singular}s`): string {
+  return `${count} ${count === 1 ? singular : pluralForm}`;
+}
+
+function acceptanceModeText(rule: AcceptanceRule): string {
+  if (rule.logic === "any") return "At least one acceptance rule";
+  if (rule.logic === "weighted") return "The weighted acceptance threshold";
+  return "All acceptance rules";
+}
+
+function buildEvidenceReviewItems(
+  rule: AcceptanceRule,
+  evidenceRows: readonly Evidence[],
+  evaluatorResults: readonly EvaluatorRuntimeResult[],
+): EvidenceReviewItem[] {
+  const matchesByEvidence = new Map<string, EvidenceReviewItem["rule_matches"]>();
+  evaluatorResults.forEach((result, index) => {
+    result.matched_evidence_ids.forEach((evidenceId) => {
+      const matches = matchesByEvidence.get(evidenceId) ?? [];
+      matches.push({ clause_index: index, evaluator: result.evaluator });
+      matchesByEvidence.set(evidenceId, matches);
+    });
+  });
+  const hasAutoVerifiableRule = rule.clauses.some((clause) => clause.auto_verifiable);
+  const trustFloor = Math.round(AUTO_VERIFY_MIN_TRUST * 100);
+  return evidenceRows.map((evidence): EvidenceReviewItem => {
+    const ruleMatches = matchesByEvidence.get(evidence.id) ?? [];
+    if (ruleMatches.length > 0) {
+      const labels = ruleMatches.map((match) => `rule ${match.clause_index + 1} (${match.evaluator})`).join(", ");
+      return {
+        evidence,
+        rule_matches: ruleMatches,
+        status: "matched",
+        review_note: `Matches ${labels}.`,
+      };
+    }
+    if (hasAutoVerifiableRule && evidence.trust_score < AUTO_VERIFY_MIN_TRUST) {
+      return {
+        evidence,
+        rule_matches: [],
+        status: "low_trust",
+        review_note: `Trust is below the ${trustFloor}% floor for auto-verifiable rules; add trusted evidence or confirm manually.`,
+      };
+    }
+    return {
+      evidence,
+      rule_matches: [],
+      status: "unmatched",
+      review_note: "Recorded evidence does not satisfy any current acceptance rule.",
+    };
+  });
+}
+
+function evaluationReason(input: {
+  rule: AcceptanceRule;
+  evidenceCount: number;
+  passed: boolean;
+  matchedCount: number;
+  evaluatorResults: readonly EvaluatorRuntimeResult[];
+  evidenceReview: readonly EvidenceReviewItem[];
+}): string {
+  if (input.passed) {
+    return `${acceptanceModeText(input.rule)} passed with ${plural(input.matchedCount, "matched evidence item")}.`;
+  }
+  const unsupported = input.evaluatorResults.filter((result) => result.status === "unsupported");
+  if (unsupported.length > 0) {
+    return `Cannot auto-evaluate ${unsupported.map((result) => result.evaluator).join(", ")} in the v1 runtime.`;
+  }
+  if (input.evidenceCount === 0) {
+    return "No evidence has been recorded for this sub-aim yet.";
+  }
+  const needsHuman = input.evaluatorResults.some((result) => result.status === "needs_human");
+  if (needsHuman) {
+    return "Manual confirmation evidence is still required for this acceptance rule.";
+  }
+  const lowTrustCount = input.evidenceReview.filter((item) => item.status === "low_trust").length;
+  if (lowTrustCount > 0) {
+    return lowTrustCount === 1
+      ? "1 evidence item is below the auto-verification trust floor."
+      : `${lowTrustCount} evidence items are below the auto-verification trust floor.`;
+  }
+  const failedCount = input.evaluatorResults.filter((result) => result.status === "failed").length;
+  if (failedCount > 0) {
+    return failedCount === 1
+      ? "1 acceptance rule still has no matching evidence."
+      : `${failedCount} acceptance rules still have no matching evidence.`;
+  }
+  return "The eval is pending until matching evidence is recorded.";
+}
+
+function evaluationNextAction(input: {
+  rule: AcceptanceRule;
+  evidenceCount: number;
+  passed: boolean;
+  evaluatorResults: readonly EvaluatorRuntimeResult[];
+  evidenceReview: readonly EvidenceReviewItem[];
+}): string {
+  if (input.passed) {
+    return input.rule.completion_mode === "auto"
+      ? "Review the matched evidence for the audit trail."
+      : "Review matched evidence, then confirm only if it proves real completion.";
+  }
+  if (input.evaluatorResults.some((result) => result.status === "unsupported")) {
+    return "Collect manual proof or revise the acceptance rule to a supported evaluator.";
+  }
+  if (input.evidenceCount === 0) {
+    return "Run the assigned agent, add trusted evidence, or confirm human proof.";
+  }
+  if (input.evaluatorResults.some((result) => result.status === "needs_human")) {
+    return "Use Confirm proof after the work is complete and evidence is inspectable.";
+  }
+  if (input.evidenceReview.some((item) => item.status === "low_trust")) {
+    return "Add trusted webhook or CI evidence, or confirm manually if the proof is sufficient.";
+  }
+  return "Add evidence that matches the rule, or break down the sub-aim if the rule is wrong.";
+}
+
 export function evaluateWithRuntimeReport(rule: AcceptanceRule, evidence: readonly Evidence[]): EvaluationRuntimeReport {
   const evidenceRows = [...evidence];
   const base = evaluate(rule, evidenceRows);
@@ -263,11 +606,35 @@ export function evaluateWithRuntimeReport(rule: AcceptanceRule, evidence: readon
       requires_human_confirmation: clause.evaluator === "manual_confirm" || rule.completion_mode === "manual",
     };
   });
+  const evidenceReview = buildEvidenceReviewItems(rule, evidenceRows, evaluatorResults);
+  const reason = evaluationReason({
+    rule,
+    evidenceCount: evidenceRows.length,
+    passed: base.passed,
+    matchedCount: base.matchedEvidenceIds.length,
+    evaluatorResults,
+    evidenceReview,
+  });
+  const nextAction = evaluationNextAction({
+    rule,
+    evidenceCount: evidenceRows.length,
+    passed: base.passed,
+    evaluatorResults,
+    evidenceReview,
+  });
   return {
     passed: base.passed,
     matchedEvidenceIds: base.matchedEvidenceIds,
     trustScore: base.trustScore,
+    evalReview: {
+      passed: base.passed,
+      matched_evidence_ids: base.matchedEvidenceIds,
+      trust_score: base.trustScore,
+      reason,
+      next_action: nextAction,
+    },
     evaluatorResults,
+    evidenceReview,
   };
 }
 
@@ -286,6 +653,21 @@ function relationStatus(
 
 function latestByCreatedAt<T extends { created_at?: string }>(rows: readonly T[]): T | null {
   return rows.slice().sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""))[0] ?? null;
+}
+
+function uniqueRowsById<T extends { id: string }>(rows: readonly T[]): T[] {
+  const seen = new Set<string>();
+  const unique: T[] = [];
+  for (const row of rows) {
+    if (seen.has(row.id)) continue;
+    seen.add(row.id);
+    unique.push(row);
+  }
+  return unique;
+}
+
+function uniqueStrings(values: readonly string[]): string[] {
+  return [...new Set(values)];
 }
 
 function nextActionForMilestone(input: {
@@ -312,6 +694,93 @@ function nextActionForMilestone(input: {
   return "Continue the active run.";
 }
 
+export function buildAimCompletionRecap(input: {
+  goal: Goal;
+  milestones: readonly AimProgressReadModel["milestones"][number][];
+  evidence?: readonly Evidence[];
+  completions?: readonly MilestoneCompletion[];
+  learnedContext?: readonly Memory[];
+}): AimCompletionRecapRead | null {
+  if (input.milestones.length === 0 || input.milestones.some((row) => !row.completed)) {
+    return null;
+  }
+
+  const completionByMilestone = new Map((input.completions ?? []).map((completion) => [completion.milestone_id, completion]));
+  const passedEvalResults = input.milestones.flatMap((row) =>
+    row.evaluator_results
+      .filter((result) => result.status === "passed")
+      .map((result) => ({
+        milestone_id: row.milestone.id,
+        evaluator: result.evaluator,
+        status: result.status,
+        explanation: result.explanation,
+        trust_score: result.trust_score,
+        matched_evidence_ids: result.matched_evidence_ids,
+      })),
+  );
+  const evidenceIds = uniqueStrings([
+    ...passedEvalResults.flatMap((result) => result.matched_evidence_ids),
+    ...(input.completions ?? []).flatMap((completion) => completion.triggering_evidence_ids),
+  ]);
+  const passingEvidence = (input.evidence ?? [])
+    .filter((row) => evidenceIds.includes(row.id))
+    .map((row) => ({
+      id: row.id,
+      milestone_id: row.milestone_id,
+      kind: row.kind,
+      summary: row.summary,
+      occurred_at: row.occurred_at,
+      trust_score: row.trust_score,
+    }));
+  const learnedContext = uniqueRowsById(input.learnedContext ?? [])
+    .filter((memory) => memory.status === "pending" || memory.status === "active")
+    .map((memory) => ({
+      id: memory.id,
+      content: memory.content,
+      category: memory.category,
+      source: memory.source,
+      status: memory.status,
+      scope: memory.goal_id ? "aim" as const : "global" as const,
+      confidence: memory.confidence,
+    }));
+
+  const completedSubAims = input.milestones.map((row) => {
+    const completion = completionByMilestone.get(row.milestone.id) ?? null;
+    const passed = row.evaluator_results.find((result) => result.status === "passed") ?? null;
+    const contract = contractOf(row.milestone);
+    const outcome = cleanText(contract?.definition_of_done)
+      || cleanText(row.milestone.description)
+      || "Sub-aim completed.";
+    return {
+      milestone_id: row.milestone.id,
+      title: row.milestone.title,
+      outcome,
+      completed_at: row.milestone.completed_at ?? completion?.created_at ?? null,
+      decided_by: completion?.decided_by ?? null,
+      evidence_ids: uniqueStrings([
+        ...(completion?.triggering_evidence_ids ?? []),
+        ...(passed?.matched_evidence_ids ?? []),
+      ]),
+      eval_status: passed?.status ?? "passed" as const,
+    };
+  });
+
+  return {
+    complete: true,
+    final_outcome: `Completed ${completedSubAims.length}/${input.milestones.length} sub-aims for "${input.goal.title}".`,
+    completed_sub_aims: completedSubAims,
+    passing_evidence: passingEvidence,
+    eval_results: passedEvalResults,
+    learned_context: learnedContext,
+    evidence_empty_reason: passingEvidence.length === 0
+      ? "No matched evidence rows were recorded for this completion. The recap can still show completed sub-aims, but future eval reuse will need evidence on later aims."
+      : "",
+    context_empty_reason: learnedContext.length === 0
+      ? "No new memory candidates or accepted aim context were recorded from this completion."
+      : "",
+  };
+}
+
 export function buildAimProgressReadModel(input: BuildAimProgressInput): AimProgressReadModel {
   const evidence = input.evidence ?? [];
   const completions = input.completions ?? [];
@@ -335,7 +804,9 @@ export function buildAimProgressReadModel(input: BuildAimProgressInput): AimProg
       assignment,
       latest_run: latestRun,
       child_relations: childRelations,
+      eval_review: evaluation.evalReview,
       evaluator_results: evaluation.evaluatorResults,
+      evidence: evaluation.evidenceReview,
       evidence_count: milestoneEvidence.length,
       completed,
       blocked,
@@ -350,6 +821,16 @@ export function buildAimProgressReadModel(input: BuildAimProgressInput): AimProg
     };
   });
   const incomplete = milestones.find((row) => !row.completed && !row.blocked) ?? milestones.find((row) => !row.completed);
+  const completionRecap = buildAimCompletionRecap({
+    goal: input.goal,
+    milestones,
+    evidence,
+    completions,
+    learnedContext: [
+      ...(input.contextCandidates ?? []),
+      ...(input.acceptedContext ?? []),
+    ],
+  });
   return {
     goal: input.goal,
     milestones,
@@ -358,6 +839,7 @@ export function buildAimProgressReadModel(input: BuildAimProgressInput): AimProg
     runs: [...runs],
     sub_aim_relations: relationRows.map((relation) => ({ ...relation, status: relationStatus(relation, input.milestonesByGoal) })),
     context_candidates: [...(input.contextCandidates ?? [])],
+    completion_recap: completionRecap,
     completed_milestones: milestones.filter((row) => row.completed).length,
     total_milestones: milestones.length,
     blocked_count: milestones.filter((row) => row.blocked).length,

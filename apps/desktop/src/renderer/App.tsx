@@ -1,22 +1,68 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
-import type { AimIntakeReport, AimProgressReadModel } from "@core/domain";
+import {
+  AcceptanceRule,
+  mergePlanNodes,
+  movePlanNode,
+  routingOverrideForMilestone,
+  routingRecommendationForPlanNode,
+  splitPlanNode,
+  updatePlanNode,
+  validateExecutablePlan,
+  validatePlanRouting,
+  type AimIntakeReport,
+  type AimProgressReadModel,
+  type PlanRoutingValidation,
+  type RoutingRuntimeAgentOption,
+} from "@core/domain";
 import type { ClarifyAnswer, ClarifyOutput, ClarifyQuestion, ClarifySelectionMode } from "@core/llm";
-import type { ContextCategory, DecompositionOutput, Goal, Milestone } from "@core/types";
+import type {
+  AcceptanceRule as AcceptanceRuleType,
+  ContextCategory,
+  DecompositionContract,
+  DecompositionOutput,
+  Evidence,
+  Goal,
+  ManualEvidenceRequiredItem,
+  Memory,
+  Milestone,
+  PlanNode,
+  PlanRoutingOverride,
+  PlanRoutingOwner,
+} from "@core/types";
 import type {
   ClarifyIpcResult,
+  ConfirmMilestoneRequest,
   ContextSourceStatus,
   GoalDetail,
   LocalAgentDetection,
   PlanningDebugTrace,
+  PlanningLiveEvent,
   PlanResult,
   ProviderStatus,
   WebResearchStatus,
 } from "../shared/ipc";
 
 import { CockpitShell, type CockpitStage } from "./CockpitShell";
+import { hasCompletionRecap, stageForOpenedAim } from "./completionRecap";
+import { buildContextCandidateAcceptRequest, ContextInbox, type ContextInboxScope } from "./ContextInbox";
 import { ContextSourcesPanel } from "./ContextSourcesPanel";
-import { I18nProvider, useI18n } from "./i18n";
+import { buildContextBundleReview, type ContextBundleReview, type ContextReviewItem } from "./contextReview";
+import {
+  deriveAimHelperProfile,
+  hasPlanningRuntime,
+  routeAfterAimSubmit,
+  routeAfterRefresh,
+  type AimHelperProfile,
+} from "./firstRunFlow";
+import { I18nProvider, useI18n, type I18n } from "./i18n";
+import {
+  aimIntakeOf,
+  contextCategoryLabel,
+  planningContextOf,
+  planningToolsOf,
+  reviewOf,
+} from "./labels";
 import { LocalAgentForm } from "./LocalAgentForm";
 import { Notice } from "./Notice";
 import { mergePlanningDebugTraces } from "./PlanningDebugPanel";
@@ -28,12 +74,88 @@ type AppMode = "cockpit" | "contexting" | "drafting" | "answering" | "reviewing"
 type ClarifyPhase = "intake" | "postDraft" | null;
 type AnswerMap = Record<string, { labels: string[]; other: string }>;
 type ProgressMilestoneRow = AimProgressReadModel["milestones"][number];
+type ProgressEvidenceReviewItem = ProgressMilestoneRow["evidence"][number];
 type EvalState = "passed" | "failed" | "needs_human" | "unsupported" | "error" | "pending";
+type EvidenceSubmissionDraft = {
+  proofNote: string;
+  url: string;
+  filePaths: string[];
+  requiredEvidence: ManualEvidenceRequiredItem[];
+};
 
 function shortText(value: string | undefined | null, max = 120): string {
   const cleaned = (value ?? "").replace(/\s+/g, " ").trim();
   if (cleaned.length <= max) return cleaned;
   return `${cleaned.slice(0, max - 1).trim()}…`;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
+}
+
+function requiredEvidenceForMilestone(milestone: Milestone): string[] {
+  const contract = asRecord(milestone.metadata?.decomposition_contract);
+  return stringArray(contract?.required_evidence);
+}
+
+function emptyEvidenceDraft(milestone: Milestone): EvidenceSubmissionDraft {
+  return {
+    proofNote: "",
+    url: "",
+    filePaths: [],
+    requiredEvidence: requiredEvidenceForMilestone(milestone).map((text) => ({ text, satisfied: false })),
+  };
+}
+
+function proofUrlsFromDraft(url: string): string[] {
+  return url.split(/[\n,]+/).map((item) => item.trim()).filter(Boolean);
+}
+
+function evidenceDraftIsSubmittable(draft: EvidenceSubmissionDraft): boolean {
+  const hasProof = draft.proofNote.trim().length > 0 || proofUrlsFromDraft(draft.url).length > 0 || draft.filePaths.length > 0;
+  const requiredOk = draft.requiredEvidence.length === 0 || draft.requiredEvidence.some((item) => item.satisfied);
+  return hasProof && requiredOk;
+}
+
+function evidenceSubmissionPayload(
+  draft: EvidenceSubmissionDraft,
+): Omit<ConfirmMilestoneRequest, "goalId" | "milestoneId"> {
+  return {
+    proofNote: draft.proofNote.trim(),
+    urls: proofUrlsFromDraft(draft.url),
+    filePaths: draft.filePaths,
+    requiredEvidence: draft.requiredEvidence,
+  };
+}
+
+function manualPayloadField(evidence: Evidence, key: string): unknown {
+  return asRecord(evidence.payload)?.[key];
+}
+
+function evidenceReferenceMeta(evidence: Evidence): string {
+  const urls = stringArray(manualPayloadField(evidence, "urls"));
+  const files = stringArray(manualPayloadField(evidence, "file_paths"));
+  const required = Array.isArray(manualPayloadField(evidence, "required_evidence"))
+    ? (manualPayloadField(evidence, "required_evidence") as unknown[])
+      .map(asRecord)
+      .filter((item): item is Record<string, unknown> => Boolean(item))
+    : [];
+  const checked = required.filter((item) => item.satisfied === true).length;
+  return [
+    evidence.kind,
+    urls.length ? `${urls.length} URL${urls.length === 1 ? "" : "s"}` : "",
+    files.length ? `${files.length} file${files.length === 1 ? "" : "s"}` : "",
+    required.length ? `${checked}/${required.length} required` : "",
+  ].filter(Boolean).join(" · ");
+}
+
+function evidenceDisplaySummary(evidence: Evidence): string {
+  const proofNote = manualPayloadField(evidence, "proof_note");
+  return typeof proofNote === "string" && proofNote.trim() ? proofNote : evidence.summary;
 }
 
 function pct(done: number, total: number): number {
@@ -43,6 +165,30 @@ function pct(done: number, total: number): number {
 function planNodeForMilestone(plan: DecompositionOutput | null | undefined, milestone: Milestone) {
   const key = typeof milestone.metadata?.plan_key === "string" ? milestone.metadata.plan_key : null;
   return plan?.nodes.find((node) => node.key === key) ?? plan?.nodes.find((node) => node.title === milestone.title) ?? null;
+}
+
+function formatAcceptanceRule(rule: AcceptanceRuleType): string {
+  return JSON.stringify(rule, null, 2);
+}
+
+function defaultContractForNode(node: PlanNode): DecompositionContract {
+  return {
+    why: "This sub-aim supports the aim.",
+    definition_of_done: node.description.trim() || node.title,
+    required_evidence: ["Evidence that the sub-aim is complete."],
+    likely_owner: "either",
+    context_gaps: [],
+    eval_signal: "Evidence confirms the sub-aim is complete.",
+  };
+}
+
+function editableContractForNode(node: PlanNode): DecompositionContract {
+  return node.decomposition_contract ?? defaultContractForNode(node);
+}
+
+function evidenceLines(value: string): string[] {
+  const lines = value.split(/\r?\n/g).map((line) => line.trim()).filter(Boolean);
+  return lines.length > 0 ? lines : ["Evidence that the sub-aim is complete."];
 }
 
 function createPlanningRunId(): string {
@@ -207,7 +353,15 @@ function progressRows(detail: GoalDetail, progress: AimProgressReadModel | null)
     assignment: null,
     latest_run: null,
     child_relations: [],
+    eval_review: {
+      passed: milestone.status === "completed",
+      matched_evidence_ids: [],
+      trust_score: 0,
+      reason: "",
+      next_action: "",
+    },
     evaluator_results: [],
+    evidence: [],
     evidence_count: 0,
     completed: milestone.status === "completed",
     blocked: milestone.status === "blocked",
@@ -215,8 +369,72 @@ function progressRows(detail: GoalDetail, progress: AimProgressReadModel | null)
   }));
 }
 
+function routingAgentsFromDetections(agents: readonly LocalAgentDetection[]): RoutingRuntimeAgentOption[] {
+  return agents.map((agent) => ({
+    id: agent.id,
+    label: agent.name,
+    available: agent.available,
+    authenticated: agent.authStatus !== "missing",
+    models: agent.models,
+    unavailableReason: agent.authMessage ?? agent.diagnostics[0] ?? null,
+  }));
+}
+
+function readyRoutingAgents(agents: readonly RoutingRuntimeAgentOption[]): RoutingRuntimeAgentOption[] {
+  return agents.filter((agent) => agent.available && agent.authenticated);
+}
+
+function findRoutingAgent(agents: readonly RoutingRuntimeAgentOption[], id: string | null | undefined): RoutingRuntimeAgentOption | null {
+  return id ? agents.find((agent) => agent.id === id) ?? null : null;
+}
+
+function firstModel(agent: RoutingRuntimeAgentOption | null | undefined): string | null {
+  return agent?.models[0]?.id ?? null;
+}
+
+function modelLabel(agent: RoutingRuntimeAgentOption | null | undefined, modelId: string | null | undefined): string | null {
+  if (!agent || !modelId) return modelId ?? null;
+  return agent.models.find((model) => model.id === modelId)?.label ?? modelId;
+}
+
+function makeRoutingOverride(input: {
+  owner: PlanRoutingOwner;
+  agents: readonly RoutingRuntimeAgentOption[];
+  agentId?: string | null;
+  model?: string | null;
+}): PlanRoutingOverride {
+  if (input.owner === "human") {
+    return {
+      owner: "human",
+      agent_id: null,
+      agent_label: null,
+      run_mode: null,
+      model: null,
+      model_label: null,
+      reason: "User selected the human route.",
+    };
+  }
+  const ready = readyRoutingAgents(input.agents);
+  const agent = findRoutingAgent(ready, input.agentId) ?? ready[0] ?? null;
+  const selectedModel = input.model ?? firstModel(agent);
+  return {
+    owner: "agent",
+    agent_id: agent?.id ?? input.agentId ?? null,
+    agent_label: agent?.label ?? null,
+    run_mode: "local_cli",
+    model: selectedModel,
+    model_label: modelLabel(agent, selectedModel),
+    reason: "User selected the agent route.",
+  };
+}
+
+function formatRoutingValidation(validation: PlanRoutingValidation): string {
+  return validation.issues.map((issue) => `${issue.title}: ${issue.message}`).join("\n");
+}
+
 function evalStateOf(row: ProgressMilestoneRow): EvalState {
   const statuses = row.evaluator_results.map((result) => result.status);
+  if (row.eval_review.passed) return "passed";
   if (statuses.includes("error")) return "error";
   if (statuses.includes("needs_human")) return "needs_human";
   if (statuses.includes("unsupported")) return "unsupported";
@@ -233,12 +451,98 @@ function evalToneClass(state: EvalState): string {
   return "";
 }
 
+function evalLabel(t: I18n["t"], state: EvalState): string {
+  switch (state) {
+    case "passed":
+      return t("os.evalStatus.passed");
+    case "failed":
+      return t("os.evalStatus.failed");
+    case "needs_human":
+      return t("os.evalStatus.needsHuman");
+    case "unsupported":
+      return t("os.evalStatus.unsupported");
+    case "error":
+      return t("os.evalStatus.error");
+    case "pending":
+      return t("os.evalStatus.pending");
+  }
+}
+
 function shortId(value: string): string {
   return value.length <= 8 ? value : value.slice(0, 8);
 }
 
+function latestLiveValue<T>(
+  events: readonly PlanningLiveEvent[],
+  pick: (event: PlanningLiveEvent) => T | null | undefined,
+): T | null {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const value = pick(events[index]!);
+    if (value !== null && value !== undefined) return value;
+  }
+  return null;
+}
+
 function formatTrust(value: number): string {
   return `${Math.round(value * 100)}%`;
+}
+
+function formatEvidenceKind(kind: string): string {
+  return kind.replace(/_/g, " ");
+}
+
+function formatEvidenceTime(value: string | undefined): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function evidencePayloadText(item: ProgressEvidenceReviewItem): string {
+  const payload = item.evidence.payload;
+  const parts: string[] = [];
+  const proofNote = manualPayloadField(item.evidence, "proof_note");
+  const message = typeof payload.message === "string" ? payload.message.trim() : "";
+  const branch = typeof payload.branch === "string" ? payload.branch.trim() : "";
+  const workflow = typeof payload.workflow === "string" ? payload.workflow.trim() : "";
+  const conclusion = typeof payload.conclusion === "string" ? payload.conclusion.trim() : "";
+  const files = Array.isArray(payload.files) ? payload.files.filter((file): file is string => typeof file === "string") : [];
+  if (typeof proofNote === "string" && proofNote.trim()) parts.push(proofNote.trim());
+  if (message) parts.push(message);
+  if (workflow || conclusion) parts.push([workflow, conclusion].filter(Boolean).join(" "));
+  if (branch) parts.push(`branch ${branch}`);
+  if (files.length > 0) parts.push(`${files.length} file${files.length === 1 ? "" : "s"}: ${files.slice(0, 3).join(", ")}`);
+  const referenceMeta = evidenceReferenceMeta(item.evidence);
+  if (referenceMeta && referenceMeta !== item.evidence.kind) parts.push(referenceMeta);
+  return parts.join(" · ");
+}
+
+function evidenceTitle(item: ProgressEvidenceReviewItem): string {
+  const summary = evidenceDisplaySummary(item.evidence).trim();
+  return summary || evidencePayloadText(item) || formatEvidenceKind(item.evidence.kind);
+}
+
+function evidenceStatusTone(item: ProgressEvidenceReviewItem): string {
+  if (item.status === "matched") return "success";
+  if (item.status === "low_trust") return "warn";
+  return "";
+}
+
+function matchedRuleText(item: ProgressEvidenceReviewItem): string {
+  return item.rule_matches.map((match) => `#${match.clause_index + 1} ${match.evaluator}`).join(", ");
+}
+
+function matchedEvidenceText(row: ProgressMilestoneRow, evidenceIds: readonly string[]): string {
+  const ids = new Set(evidenceIds);
+  return row.evidence
+    .filter((item) => ids.has(item.evidence.id))
+    .map((item) => shortText(evidenceTitle(item), 64))
+    .join(", ");
 }
 
 export function App() {
@@ -267,6 +571,7 @@ function AimOsApp() {
   const [finalPlan, setFinalPlan] = useState<DecompositionOutput | null>(null);
   const [planResult, setPlanResult] = useState<PlanResult | null>(null);
   const [planningDebugTraces, setPlanningDebugTraces] = useState<PlanningDebugTrace[]>([]);
+  const [planningLiveEvents, setPlanningLiveEvents] = useState<PlanningLiveEvent[]>([]);
   const [intakeClarify, setIntakeClarify] = useState<ClarifyOutput | null>(null);
   const [intakeAnswers, setIntakeAnswers] = useState<AnswerMap>({});
   const [clarifyPhase, setClarifyPhase] = useState<ClarifyPhase>(null);
@@ -276,24 +581,30 @@ function AimOsApp() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [stageOverride, setStageOverride] = useState<CockpitStage | null>(null);
+  const [runtimeGuidanceVisible, setRuntimeGuidanceVisible] = useState(false);
   const planningRunIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     void refreshAll();
   }, []);
 
+  useEffect(() => {
+    return window.aimcub.onPlanningLiveEvent((event) => {
+      const activeRunId = planningRunIdRef.current;
+      if (!activeRunId || event.runId !== activeRunId) return;
+      setPlanningLiveEvents((current) => [...current, event].slice(-80));
+    });
+  }, []);
+
   function startPlanningRun(): string {
     const runId = createPlanningRunId();
     planningRunIdRef.current = runId;
+    setPlanningLiveEvents([]);
     return runId;
   }
 
   function clearPlanningRun() {
     planningRunIdRef.current = null;
-  }
-
-  function hasCliPlanningRuntime(): boolean {
-    return localAgents.some((agent) => agent.available && agent.authStatus !== "missing");
   }
 
   async function refreshAll() {
@@ -309,35 +620,43 @@ function AimOsApp() {
     setWebResearch(nextWeb);
     setContextSources(nextSources);
     setLocalAgents(nextAgents);
-    if (!selected && nextGoals[0]) void openGoal(nextGoals[0]);
-    if (!nextProvider?.configured && !nextAgents.some((agent) => agent.available && agent.authStatus !== "missing")) {
-      setMode("settings");
-      setStageOverride("settings");
+    const route = routeAfterRefresh({ hasSelectedAim: Boolean(selected), hasGoals: nextGoals.length > 0 });
+    if (route.autoOpenFirstGoal && nextGoals[0]) void openGoal(nextGoals[0]);
+    if (route.stageOverride) {
+      setMode("cockpit");
+      setStageOverride(route.stageOverride);
     }
   }
 
   async function openGoal(goal: Goal) {
     setSelected(goal);
     setMode("cockpit");
-    setStageOverride("aim");
     setError(null);
     setDraft(null);
     setFinalPlan(null);
     setPlanResult(null);
     setPlanningDebugTraces([]);
+    setPlanningLiveEvents([]);
     clearPlanningRun();
     setIntakeClarify(null);
     setIntakeAnswers({});
     setClarifyPhase(null);
     setClarify(null);
     setAnswers({});
+    setRuntimeGuidanceVisible(false);
     setContextNote("");
+    await refreshGoalState(goal);
+  }
+
+  async function refreshGoalState(goal: Goal | null = selected) {
+    if (!goal) return;
     const [nextDetail, nextProgress] = await Promise.all([
       window.aimcub.getGoal(goal.id),
       window.aimcub.getAimProgress(goal.id),
     ]);
     setDetail(nextDetail);
     setProgress(nextProgress);
+    setStageOverride(stageForOpenedAim(nextProgress));
   }
 
   function resetComposer() {
@@ -349,12 +668,14 @@ function AimOsApp() {
     setFinalPlan(null);
     setPlanResult(null);
     setPlanningDebugTraces([]);
+    setPlanningLiveEvents([]);
     clearPlanningRun();
     setIntakeClarify(null);
     setIntakeAnswers({});
     setClarifyPhase(null);
     setClarify(null);
     setAnswers({});
+    setRuntimeGuidanceVisible(false);
     setContextNote("");
     setSelected(null);
     setDetail(null);
@@ -397,12 +718,16 @@ function AimOsApp() {
 
   async function startDraft(options: { skipIntakeGate?: boolean } = {}) {
     const title = aimTitle.trim();
-    if (!title) return;
-    if (!provider?.configured && !hasCliPlanningRuntime()) {
-      setMode("settings");
-      setStageOverride("settings");
+    const route = routeAfterAimSubmit({ title, provider, localAgents });
+    if (route === "missing_aim") return;
+    if (route === "show_helper_guidance") {
+      setError(null);
+      setRuntimeGuidanceVisible(true);
+      setMode("cockpit");
+      setStageOverride("aim");
       return;
     }
+    setRuntimeGuidanceVisible(false);
     setError(null);
     setPlanningDebugTraces([]);
     const runId = startPlanningRun();
@@ -501,6 +826,24 @@ function AimOsApp() {
   async function savePlan() {
     const plan = finalPlan ?? draft;
     if (!plan) return;
+    const validation = validateExecutablePlan(plan);
+    if (!validation.ok) {
+      setError(t("plan.validationFailed", { errors: validation.errors.join("; ") }));
+      setMode("reviewing");
+      setStageOverride("contracts");
+      return;
+    }
+    const routingValidation = validatePlanRouting({
+      plan,
+      agents: routingAgentsFromDetections(localAgents),
+      allowHuman: true,
+    });
+    if (!routingValidation.ok) {
+      setError(formatRoutingValidation(routingValidation));
+      setStageOverride("contracts");
+      setMode("reviewing");
+      return;
+    }
     setBusy(t("os.busy.save"));
     setError(null);
     try {
@@ -539,12 +882,7 @@ function AimOsApp() {
     try {
       const result = await window.aimcub.runMilestoneAgent({ goalId: selected.id, milestoneId: milestone.id });
       if (!result.ok && result.error) setError(result.error);
-      const [nextDetail, nextProgress] = await Promise.all([
-        window.aimcub.getGoal(selected.id),
-        window.aimcub.getAimProgress(selected.id),
-      ]);
-      setDetail(nextDetail);
-      setProgress(nextProgress);
+      await refreshGoalState(selected);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -552,7 +890,7 @@ function AimOsApp() {
     }
   }
 
-  async function confirmMilestone(milestone: Milestone) {
+  async function confirmMilestone(milestone: Milestone, submission: Omit<ConfirmMilestoneRequest, "goalId" | "milestoneId">) {
     if (!selected) return;
     setBusy(t("os.busy.confirm"));
     setError(null);
@@ -560,11 +898,41 @@ function AimOsApp() {
       const nextDetail = await window.aimcub.confirmMilestone({
         goalId: selected.id,
         milestoneId: milestone.id,
-        summary: `Confirmed sub-aim: ${milestone.title}`,
+        ...submission,
       });
       const nextProgress = await window.aimcub.getAimProgress(selected.id);
       setDetail(nextDetail);
       setProgress(nextProgress);
+      if (hasCompletionRecap(nextProgress)) {
+        setMode("reviewing");
+        setStageOverride("eval");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function acceptContextCandidate(candidate: Memory, content: string, scope: ContextInboxScope) {
+    setBusy(t("os.busy.contextReview"));
+    setError(null);
+    try {
+      await window.aimcub.acceptContextCandidate(buildContextCandidateAcceptRequest(candidate, content, scope));
+      await refreshGoalState();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function rejectContextCandidate(candidate: Memory) {
+    setBusy(t("os.busy.contextReview"));
+    setError(null);
+    try {
+      await window.aimcub.rejectContextCandidate(candidate.id);
+      await refreshGoalState();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -595,10 +963,44 @@ function AimOsApp() {
   }
 
   const activePlan = (finalPlan ?? draft ?? detail?.goal.plan_json ?? null) as DecompositionOutput | null;
+  const activePlanValidation = activePlan ? validateExecutablePlan(activePlan) : null;
+  const routingAgents = useMemo(() => routingAgentsFromDetections(localAgents), [localAgents]);
+  const planRoutingValidation = useMemo(
+    () => activePlan ? validatePlanRouting({ plan: activePlan, agents: routingAgents, allowHuman: true }) : null,
+    [activePlan, routingAgents],
+  );
   const completed = progress?.completed_milestones ?? detail?.milestones.filter((m) => m.status === "completed").length ?? 0;
   const total = progress?.total_milestones ?? detail?.milestones.length ?? 0;
+  const aimComplete = hasCompletionRecap(progress) || (total > 0 && completed === total);
   const hasUnsavedAim = aimTitle.trim().length > 0;
   const activeStage = stageOverride ?? cockpitStageFor(mode, selected, activePlan);
+  const planningRuntimeReady = hasPlanningRuntime(provider, localAgents);
+  const activeAimTitle = selected?.title ?? aimTitle.trim();
+  const activeAimDescription = selected?.description ?? aimDescription;
+  const activeAimHelper = useMemo(
+    () => deriveAimHelperProfile({ title: activeAimTitle, description: activeAimDescription }),
+    [activeAimDescription, activeAimTitle],
+  );
+  const livePlanningContext = latestLiveValue(planningLiveEvents, (event) => event.planningContext);
+  const livePlanningTools = latestLiveValue(planningLiveEvents, (event) => event.planningTools);
+  const liveIntake = latestLiveValue(planningLiveEvents, (event) => event.intake);
+  const currentPlanningContext = planResult?.planningContext ?? livePlanningContext ?? (selected ? planningContextOf(selected) : null);
+  const currentPlanningTools = planResult?.planningTools ?? livePlanningTools ?? (selected ? planningToolsOf(selected) : null);
+  const currentIntake = planResult?.intake ?? liveIntake ?? (selected ? aimIntakeOf(selected) : null);
+  const currentReview = planResult?.review ?? (selected ? reviewOf(selected) : null);
+  const contextReview = useMemo(() => buildContextBundleReview({
+    planningContext: currentPlanningContext,
+    planningTools: currentPlanningTools,
+    intake: currentIntake,
+    review: currentReview,
+    plan: activePlan,
+    answeredQuestionIds: [...builtIntakeAnswers, ...builtAnswers].map((answer) => answer.question_id),
+  }), [activePlan, builtAnswers, builtIntakeAnswers, currentIntake, currentPlanningContext, currentPlanningTools, currentReview]);
+
+  function applyPlanEdit(nextPlan: DecompositionOutput) {
+    setFinalPlan(nextPlan);
+    setPlanResult((current) => (current ? { ...current, output: nextPlan } : current));
+  }
 
   function openCockpitStage(stage: CockpitStage) {
     setStageOverride(stage);
@@ -623,6 +1025,17 @@ function AimOsApp() {
 
   function startNewAim() {
     resetComposer();
+    setMode("cockpit");
+    setStageOverride("aim");
+  }
+
+  function openSettingsForAim() {
+    setMode("settings");
+    setStageOverride("settings");
+  }
+
+  function returnToAim() {
+    if (planningRuntimeReady) setRuntimeGuidanceVisible(false);
     setMode("cockpit");
     setStageOverride("aim");
   }
@@ -668,7 +1081,11 @@ function AimOsApp() {
       quality={planResult?.quality ?? null}
       review={planResult?.review ?? null}
       saved={Boolean(selected)}
-      disabled={Boolean(busy)}
+      disabled={Boolean(busy) || activePlanValidation?.ok === false}
+      validationErrors={activePlanValidation?.errors ?? []}
+      routingAgents={routingAgents}
+      routingValidation={planRoutingValidation}
+      onChange={selected ? undefined : applyPlanEdit}
       onSave={() => void savePlan()}
     />
   ) : null;
@@ -679,7 +1096,11 @@ function AimOsApp() {
       progress={progress}
       disabled={Boolean(busy)}
       onRunAgent={(milestone) => void runAgent(milestone)}
-      onConfirm={(milestone) => void confirmMilestone(milestone)}
+      onConfirm={confirmMilestone}
+      onPickFiles={async () => {
+        const result = await window.aimcub.pickLocalContextFiles();
+        return result.canceled ? [] : result.paths;
+      }}
       onBreakDown={breakDown}
     />
   ) : null;
@@ -688,6 +1109,9 @@ function AimOsApp() {
     <EvalPanel
       detail={detail}
       progress={progress}
+      disabled={Boolean(busy)}
+      onAcceptContextCandidate={(candidate, content, scope) => void acceptContextCandidate(candidate, content, scope)}
+      onRejectContextCandidate={(candidate) => void rejectContextCandidate(candidate)}
     />
   ) : null;
 
@@ -701,6 +1125,12 @@ function AimOsApp() {
       onWeb={setWebResearch}
       onContextSources={setContextSources}
       onRefreshAgents={async () => setLocalAgents(await window.aimcub.listLocalAgents())}
+      aimContext={activeAimTitle ? {
+        title: activeAimTitle,
+        profile: activeAimHelper,
+        runtimeReady: planningRuntimeReady,
+      } : null}
+      onReturnToAim={activeAimTitle ? returnToAim : undefined}
     />
   );
 
@@ -729,12 +1159,18 @@ function AimOsApp() {
             />
           )}
           <ContextSourcesPanel status={contextSources} disabled={Boolean(busy)} onSaved={setContextSources} />
+          <ContextReviewPanel bundle={contextReview} running={mode === "contexting" && Boolean(busy)} />
           {clarifyPanel}
         </>
       );
     }
     if (activeStage === "contracts") {
-      return planPanel ?? (
+      return planPanel ? (
+        <>
+          <ContextReviewPanel bundle={contextReview} running={mode === "drafting" && Boolean(busy)} />
+          {planPanel}
+        </>
+      ) : (
         <LockedStagePanel
           eyebrow={t("os.stepPlan")}
           title={t("cockpit.contractsLockedTitle")}
@@ -773,7 +1209,9 @@ function AimOsApp() {
           progress={progress}
           completed={completed}
           total={total}
+          complete={aimComplete}
           onContext={() => openCockpitStage("context")}
+          onRecap={() => openCockpitStage("eval")}
           onNewAim={startNewAim}
         />
       ) : (
@@ -786,6 +1224,9 @@ function AimOsApp() {
           onTitle={setAimTitle}
           onDescription={setAimDescription}
           onDraft={() => void startDraft()}
+          runtimeGuidance={runtimeGuidanceVisible && !planningRuntimeReady ? activeAimHelper : null}
+          onOpenSettings={openSettingsForAim}
+          onKeepEditing={() => setRuntimeGuidanceVisible(false)}
         />
       )
     );
@@ -812,17 +1253,113 @@ function AimOsApp() {
   );
 }
 
+function ContextReviewPanel(props: {
+  bundle: ContextBundleReview;
+  running: boolean;
+}) {
+  const { t } = useI18n();
+  const totalItems = props.bundle.usedContext.length
+    + props.bundle.skippedContext.length
+    + props.bundle.permissionGaps.length
+    + props.bundle.decompositionRisks.length;
+  return (
+    <section className="od-context-review">
+      <div className="od-stage-panel-head">
+        <div>
+          <div className="od-stage-kicker">{t("contextReview.eyebrow")}</div>
+          <h2>{t("contextReview.title")}</h2>
+          <p>{t(totalItems === 0 ? "contextReview.emptyBody" : "contextReview.body")}</p>
+        </div>
+        {props.running ? <span className="od-pill blue">{t("debug.pending")}</span> : null}
+      </div>
+
+      <div className="od-stage-metrics" aria-label={t("contextReview.title")}>
+        <StageMetric label={t("contextReview.metric.used")} value={String(props.bundle.usedContext.length)} />
+        <StageMetric label={t("contextReview.metric.skipped")} value={String(props.bundle.skippedContext.length)} />
+        <StageMetric label={t("contextReview.metric.gaps")} value={String(props.bundle.permissionGaps.length)} />
+      </div>
+
+      <div className="od-context-review-grid">
+        <ContextReviewBucket
+          title={t("contextReview.used")}
+          items={props.bundle.usedContext}
+          empty={t("contextReview.empty.used")}
+        />
+        <ContextReviewBucket
+          title={t("contextReview.skipped")}
+          items={props.bundle.skippedContext}
+          empty={t("contextReview.empty.skipped")}
+        />
+        <ContextReviewBucket
+          title={t("contextReview.permissions")}
+          items={props.bundle.permissionGaps}
+          empty={t("contextReview.empty.permissions")}
+        />
+        <ContextReviewBucket
+          title={t("contextReview.risks")}
+          items={props.bundle.decompositionRisks}
+          empty={t("contextReview.empty.risks")}
+        />
+      </div>
+    </section>
+  );
+}
+
+function ContextReviewBucket(props: {
+  title: string;
+  items: ContextReviewItem[];
+  empty: string;
+}) {
+  const { t } = useI18n();
+  const visible = props.items.slice(0, 4);
+  const extra = Math.max(0, props.items.length - visible.length);
+  return (
+    <section className="od-context-review-bucket">
+      <div className="od-card-head">
+        <h3>{props.title}</h3>
+        <span className="od-pill">{String(props.items.length)}</span>
+      </div>
+      {visible.length === 0 ? (
+        <div className="od-empty-inline">{props.empty}</div>
+      ) : (
+        <div className="od-context-review-list">
+          {visible.map((item) => (
+            <article key={item.id} className={`od-context-review-item ${contextReviewToneClass(item.tone)}`}>
+              <div className="od-context-review-item-head">
+                <strong>{item.title}</strong>
+                {item.category ? <span className="od-pill">{contextCategoryLabel(item.category, t)}</span> : null}
+              </div>
+              <p>{shortText(item.body, 220)}</p>
+              {item.meta.length ? <small>{item.meta.filter(Boolean).slice(0, 3).join(" · ")}</small> : null}
+            </article>
+          ))}
+          {extra > 0 ? <div className="od-context-review-more">{t("contextReview.more", { n: extra })}</div> : null}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function contextReviewToneClass(tone: ContextReviewItem["tone"]): string {
+  if (tone === "success") return "success";
+  if (tone === "warn") return "warn";
+  if (tone === "danger") return "danger";
+  return "";
+}
+
 function AimOverviewPanel(props: {
   goal: Goal;
   progress: AimProgressReadModel | null;
   completed: number;
   total: number;
+  complete: boolean;
   onContext: () => void;
+  onRecap: () => void;
   onNewAim: () => void;
 }) {
   const { t } = useI18n();
   const completion = pct(props.completed, props.total);
-  const nextAction = props.progress?.next_action || t("shell.noNextAction");
+  const nextAction = props.complete ? t("completion.nextAction") : props.progress?.next_action || t("shell.noNextAction");
   const summary = props.goal.description?.trim() || nextAction;
   return (
     <section className="od-aim-overview">
@@ -844,18 +1381,18 @@ function AimOverviewPanel(props: {
         <div>
           <span>{t("shell.nextAction")}</span>
           <strong>{shortText(nextAction, 120)}</strong>
-          <small>{t("aimIntake.contextGate")}</small>
+          <small>{props.complete ? t("completion.reuseShort") : t("aimIntake.contextGate")}</small>
         </div>
       </div>
 
       <div className="od-aim-intake-footer">
-        <p>{t("aimIntake.currentHint")}</p>
+        <p>{props.complete ? t("completion.overviewHint") : t("aimIntake.currentHint")}</p>
         <div className="od-aim-intake-actions">
           <button className="od-aim-secondary" type="button" onClick={props.onNewAim}>
             {t("os.newAim")}
           </button>
-          <button className="od-aim-primary" type="button" onClick={props.onContext}>
-            {t("aimIntake.cta")}
+          <button className="od-aim-primary" type="button" onClick={props.complete ? props.onRecap : props.onContext}>
+            {props.complete ? t("completion.reviewRecap") : t("aimIntake.cta")}
           </button>
         </div>
       </div>
@@ -869,9 +1406,12 @@ function AimIntakePanel(props: {
   parent: { goalId: string; milestoneId: string } | null;
   mode: AppMode;
   disabled: boolean;
+  runtimeGuidance: AimHelperProfile | null;
   onTitle: (value: string) => void;
   onDescription: (value: string) => void;
   onDraft: () => void;
+  onOpenSettings: () => void;
+  onKeepEditing: () => void;
 }) {
   const { t } = useI18n();
   const hasAim = props.title.trim().length > 0;
@@ -920,7 +1460,98 @@ function AimIntakePanel(props: {
           {submitting ? t("os.drafting") : t("aimIntake.cta")}
         </button>
       </div>
+
+      {props.runtimeGuidance ? (
+        <AimHelperGuidancePanel
+          title={props.title}
+          profile={props.runtimeGuidance}
+          onOpenSettings={props.onOpenSettings}
+          onKeepEditing={props.onKeepEditing}
+        />
+      ) : null}
     </section>
+  );
+}
+
+function helperCapabilityLabel(profile: AimHelperProfile, t: ReturnType<typeof useI18n>["t"]): string {
+  switch (profile.capability) {
+    case "code_execution":
+      return t("firstRun.capability.code");
+    case "current_research":
+      return t("firstRun.capability.research");
+    case "source_context":
+      return t("firstRun.capability.context");
+    case "general_planning":
+      return t("firstRun.capability.planning");
+  }
+}
+
+function helperPreferenceLabel(profile: AimHelperProfile, t: ReturnType<typeof useI18n>["t"]): string {
+  switch (profile.preferredHelper) {
+    case "local_agent":
+      return t("firstRun.helper.localAgent");
+    case "provider_with_web":
+      return t("firstRun.helper.providerWithWeb");
+    case "provider":
+      return t("firstRun.helper.provider");
+    case "either":
+      return t("firstRun.helper.either");
+  }
+}
+
+function helperReason(profile: AimHelperProfile, t: ReturnType<typeof useI18n>["t"]): string {
+  switch (profile.capability) {
+    case "code_execution":
+      return t("firstRun.reason.code");
+    case "current_research":
+      return t("firstRun.reason.research");
+    case "source_context":
+      return t("firstRun.reason.context");
+    case "general_planning":
+      return t("firstRun.reason.planning");
+  }
+}
+
+function AimHelperGuidancePanel(props: {
+  title: string;
+  profile: AimHelperProfile;
+  onOpenSettings: () => void;
+  onKeepEditing: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <section className="od-first-run-helper">
+      <div className="od-first-run-helper-head">
+        <div>
+          <div className="od-aim-kicker">{t("firstRun.eyebrow")}</div>
+          <h2>{t("firstRun.heading")}</h2>
+          <p>{t("firstRun.body", { aim: shortText(props.title, 120) })}</p>
+        </div>
+      </div>
+      <div className="od-first-run-helper-grid">
+        <HelperFact label={t("firstRun.requiredLabel")} value={t("firstRun.requiredValue")} />
+        <HelperFact label={t("firstRun.capabilityLabel")} value={helperCapabilityLabel(props.profile, t)} />
+        <HelperFact label={t("firstRun.bestHelperLabel")} value={helperPreferenceLabel(props.profile, t)} />
+      </div>
+      <p className="od-first-run-helper-reason">{helperReason(props.profile, t)}</p>
+      <div className="od-aim-intake-actions">
+        <button className="od-aim-primary" type="button" onClick={props.onOpenSettings}>
+          {t("firstRun.openSettings")}
+        </button>
+        <button className="od-aim-secondary" type="button" onClick={props.onKeepEditing}>
+          {t("firstRun.keepEditing")}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function HelperFact(props: { label: string; value: string }) {
+  return (
+    <div className="od-first-run-helper-fact">
+      <span>{props.label}</span>
+      <strong>{props.value}</strong>
+    </div>
   );
 }
 
@@ -1127,42 +1758,367 @@ function PlanPanel(props: {
   review: PlanResult["review"] | null;
   saved: boolean;
   disabled: boolean;
+  validationErrors: string[];
+  routingAgents: RoutingRuntimeAgentOption[];
+  routingValidation: PlanRoutingValidation | null;
+  onChange?: (plan: DecompositionOutput) => void;
   onSave: () => void;
 }) {
   const { t } = useI18n();
+  const editable = !props.saved && Boolean(props.onChange);
+  const [ruleDrafts, setRuleDrafts] = useState<Record<string, string>>({});
+  const [ruleErrors, setRuleErrors] = useState<Record<string, string>>({});
+  const hasRuleErrors = Object.keys(ruleErrors).length > 0;
+  const validation = props.routingValidation ?? validatePlanRouting({ plan: props.plan, agents: props.routingAgents, allowHuman: true });
+  const readyAgents = readyRoutingAgents(props.routingAgents);
+  const issuesByNode = new Map<string, string[]>();
+  for (const issue of validation.issues) {
+    const rows = issuesByNode.get(issue.nodeKey) ?? [];
+    rows.push(issue.message);
+    issuesByNode.set(issue.nodeKey, rows);
+  }
+  const saveDisabled = props.disabled || hasRuleErrors || props.validationErrors.length > 0 || !validation.ok;
+
+  useEffect(() => {
+    const keys = new Set(props.plan.nodes.map((node) => node.key));
+    setRuleDrafts((current) => {
+      const next: Record<string, string> = {};
+      for (const node of props.plan.nodes) {
+        next[node.key] = current[node.key] ?? formatAcceptanceRule(node.acceptance_rule);
+      }
+      return next;
+    });
+    setRuleErrors((current) => {
+      const next: Record<string, string> = {};
+      for (const [key, value] of Object.entries(current)) {
+        if (keys.has(key)) next[key] = value;
+      }
+      return next;
+    });
+  }, [props.plan.nodes]);
+
+  function apply(nextPlan: DecompositionOutput) {
+    props.onChange?.(nextPlan);
+  }
+
+  function applyStructureEdit(nextPlan: DecompositionOutput) {
+    setRuleDrafts({});
+    setRuleErrors({});
+    apply(nextPlan);
+  }
+
+  function updateNode(node: PlanNode, patch: Parameters<typeof updatePlanNode>[2]) {
+    apply(updatePlanNode(props.plan, node.key, patch));
+  }
+
+  function updateContract(node: PlanNode, patch: Partial<DecompositionContract>) {
+    updateNode(node, {
+      decomposition_contract: {
+        ...editableContractForNode(node),
+        ...patch,
+      },
+    });
+  }
+
+  function ruleTextFor(node: PlanNode): string {
+    return ruleDrafts[node.key] ?? formatAcceptanceRule(node.acceptance_rule);
+  }
+
+  function parseRuleText(text: string): AcceptanceRuleType | string {
+    let value: unknown;
+    try {
+      value = JSON.parse(text);
+    } catch (err) {
+      return err instanceof Error ? err.message : String(err);
+    }
+    const parsed = AcceptanceRule.safeParse(value);
+    if (!parsed.success) {
+      return parsed.error.issues.map((issue) => `${issue.path.join(".") || "rule"}: ${issue.message}`).join("; ");
+    }
+    return parsed.data;
+  }
+
+  function applyRuleText(node: PlanNode, text: string) {
+    const parsed = parseRuleText(text);
+    if (typeof parsed === "string") {
+      setRuleErrors((current) => ({ ...current, [node.key]: t("plan.ruleInvalid", { error: parsed }) }));
+      return;
+    }
+    setRuleErrors((current) => {
+      const next = { ...current };
+      delete next[node.key];
+      return next;
+    });
+    updateNode(node, { acceptance_rule: parsed });
+  }
+
+  function commitRule(node: PlanNode) {
+    applyRuleText(node, ruleTextFor(node));
+  }
+
+  function applyOverride(node: PlanNode, override: PlanRoutingOverride | null) {
+    apply(updatePlanNode(props.plan, node.key, { routing_override: override }));
+  }
+
+  function chooseOwner(node: PlanNode, owner: PlanRoutingOwner) {
+    applyOverride(node, makeRoutingOverride({ owner, agents: props.routingAgents }));
+  }
+
+  function chooseAgent(node: PlanNode, agentId: string) {
+    const current = node.routing_override;
+    const agent = findRoutingAgent(props.routingAgents, agentId);
+    applyOverride(node, makeRoutingOverride({
+      owner: "agent",
+      agents: props.routingAgents,
+      agentId,
+      model: agent?.models.some((model) => model.id === current?.model) ? current?.model : firstModel(agent),
+    }));
+  }
+
+  function chooseModel(node: PlanNode, model: string) {
+    const currentAgentId = node.routing_override?.agent_id ?? readyAgents[0]?.id ?? null;
+    applyOverride(node, makeRoutingOverride({
+      owner: "agent",
+      agents: props.routingAgents,
+      agentId: currentAgentId,
+      model,
+    }));
+  }
+
   return (
-    <section style={panelStyle()}>
-      <div style={sectionHeaderStyle()}>
+    <section className="od-stage-panel od-plan-editor">
+      <div className="od-stage-panel-head">
         <div>
-          <div style={eyebrowStyle()}>{t("os.stepPlan")}</div>
-          <h2 style={sectionTitleStyle()}>{t("os.planHeading")}</h2>
+          <div className="od-stage-kicker">{t("os.stepPlan")}</div>
+          <h2>{t("os.planHeading")}</h2>
+          <p>{editable ? t("plan.editBody") : t("plan.reviewBody")}</p>
         </div>
         {!props.saved ? (
-          <button onClick={props.onSave} disabled={props.disabled} style={{ ...primaryButton(props.disabled), marginTop: 0 }}>
+          <button className="od-aim-primary" type="button" onClick={props.onSave} disabled={saveDisabled}>
             {t("os.saveAim")}
           </button>
         ) : null}
       </div>
-      <div style={scoreRowStyle()}>
-        <Metric label={t("os.metricSubAims")} value={String(props.plan.nodes.length)} />
-        <Metric label={t("os.metricQuality")} value={props.quality ? `${props.quality.grade} · ${props.quality.score}` : "-"} />
-        <Metric label={t("os.metricActions")} value={String(props.review?.actions.length ?? 0)} />
+
+      <div className="od-stage-metrics">
+        <StageMetric label={t("os.metricSubAims")} value={String(props.plan.nodes.length)} />
+        <StageMetric label={t("os.metricQuality")} value={props.quality ? `${props.quality.grade} · ${props.quality.score}` : "-"} />
+        <StageMetric label={t("os.metricActions")} value={String(props.review?.actions.length ?? 0)} />
       </div>
-      <div style={{ display: "grid", gap: 10, marginTop: 14 }}>
-        {props.plan.nodes.map((node, index) => (
-          <div key={node.key} style={nodeCardStyle()}>
-            <div style={{ ...badgeStyle("#eef6f8", C.accent) }}>{index + 1}</div>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontWeight: 800 }}>{node.title}</div>
-              <div style={mutedTextStyle()}>{shortText(node.description, 180)}</div>
-              <div style={contractLineStyle()}>
-                <span>{node.decomposition_contract?.likely_owner ?? "either"}</span>
-                <span>{node.acceptance_rule.completion_mode}</span>
-                <span>{node.acceptance_rule.clauses.map((clause) => clause.evaluator).join(" + ")}</span>
+
+      {props.validationErrors.length > 0 ? (
+        <div className="od-plan-validation" role="status">
+          <strong>{t("plan.validationIssues")}</strong>
+          <span>{props.validationErrors.join("; ")}</span>
+        </div>
+      ) : null}
+
+      {!validation.ok ? (
+        <div className="od-routing-alert">
+          <strong>{t("routing.validationTitle")}</strong>
+          <span>{validation.issues[0]?.message ?? t("routing.validationBody")}</span>
+        </div>
+      ) : null}
+
+      <div className="od-plan-list">
+        {props.plan.nodes.map((node, index) => {
+          const contract = editableContractForNode(node);
+          const recommendation = routingRecommendationForPlanNode(node);
+          const override = node.routing_override;
+          const owner = override?.owner ?? recommendation.recommendedOwner;
+          const selectedAgent = findRoutingAgent(props.routingAgents, override?.agent_id) ?? readyAgents[0] ?? null;
+          const selectedModel = override?.model ?? firstModel(selectedAgent) ?? "";
+          const nodeIssues = issuesByNode.get(node.key) ?? [];
+          return (
+            <article key={node.key} className={`od-plan-card${nodeIssues.length ? " has-warning" : ""}`}>
+              <div className="od-plan-card-index">{index + 1}</div>
+              <div className="od-plan-card-main">
+                <div className="od-plan-card-head">
+                  <div className="od-work-title">
+                    <strong>{node.title}</strong>
+                    <span className="od-pill">{node.acceptance_rule.completion_mode}</span>
+                    <span className="od-pill blue">{t("routing.likely", { owner: recommendation.likelyOwner })}</span>
+                    <span className="od-pill">{t("routing.recommended", { owner: recommendation.recommendedOwner })}</span>
+                    {override ? <span className="od-pill warn">{t("routing.override")}</span> : null}
+                  </div>
+                  {editable ? (
+                    <div className="od-plan-actions">
+                      <button type="button" onClick={() => applyStructureEdit(movePlanNode(props.plan, node.key, index - 1))} disabled={index === 0}>
+                        {t("plan.moveUp")}
+                      </button>
+                      <button type="button" onClick={() => applyStructureEdit(movePlanNode(props.plan, node.key, index + 1))} disabled={index >= props.plan.nodes.length - 1}>
+                        {t("plan.moveDown")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => applyStructureEdit(mergePlanNodes(props.plan, props.plan.nodes[index - 1]!.key, node.key))}
+                        disabled={index === 0}
+                      >
+                        {t("plan.mergeUp")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => applyStructureEdit(mergePlanNodes(props.plan, node.key, props.plan.nodes[index + 1]!.key))}
+                        disabled={index >= props.plan.nodes.length - 1}
+                      >
+                        {t("plan.mergeDown")}
+                      </button>
+                      <button type="button" onClick={() => applyStructureEdit(splitPlanNode(props.plan, node.key))} disabled={props.plan.nodes.length >= 15}>
+                        {t("plan.split")}
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+
+                {editable ? (
+                  <div className="od-plan-edit-grid">
+                    <label className="od-plan-field">
+                      <span>{t("subAim.title")}</span>
+                      <input value={node.title} onChange={(event) => updateNode(node, { title: event.target.value })} />
+                    </label>
+                    <label className="od-plan-field">
+                      <span>{t("subAim.body")}</span>
+                      <textarea
+                        value={node.description}
+                        onChange={(event) => updateNode(node, { description: event.target.value })}
+                        rows={3}
+                      />
+                    </label>
+                    <label className="od-plan-field">
+                      <span>{t("plan.contractDone")}</span>
+                      <textarea
+                        value={contract.definition_of_done}
+                        onChange={(event) => updateContract(node, { definition_of_done: event.target.value })}
+                        rows={2}
+                      />
+                    </label>
+                    <label className="od-plan-field">
+                      <span>{t("plan.contractEvidence")}</span>
+                      <textarea
+                        value={contract.required_evidence.join("\n")}
+                        onChange={(event) => updateContract(node, { required_evidence: evidenceLines(event.target.value) })}
+                        rows={2}
+                      />
+                    </label>
+                    <label className="od-plan-field od-plan-field-wide">
+                      <span>{t("plan.contractEval")}</span>
+                      <input value={contract.eval_signal} onChange={(event) => updateContract(node, { eval_signal: event.target.value })} />
+                    </label>
+                    <div className="od-plan-field od-plan-field-wide">
+                      <div className="od-plan-field-head">
+                        <span>{t("plan.acceptanceRule")}</span>
+                        <button type="button" onClick={() => commitRule(node)}>
+                          {t("plan.applyRule")}
+                        </button>
+                      </div>
+                      <textarea
+                        aria-label={t("plan.acceptanceRule")}
+                        className="od-plan-rule-input"
+                        value={ruleTextFor(node)}
+                        onBlur={() => commitRule(node)}
+                        onChange={(event) => {
+                          const text = event.target.value;
+                          setRuleDrafts((current) => ({ ...current, [node.key]: text }));
+                          applyRuleText(node, text);
+                        }}
+                        rows={8}
+                        spellCheck={false}
+                      />
+                      {ruleErrors[node.key] ? <small className="od-plan-error">{ruleErrors[node.key]}</small> : null}
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {node.description ? <p>{shortText(node.description, 220)}</p> : null}
+                    <div className="od-work-note">
+                      <strong>{t("plan.contractEval")}</strong>
+                      <span>{node.decomposition_contract?.eval_signal ?? node.acceptance_rule.clauses.map((clause) => clause.evaluator).join(" + ")}</span>
+                    </div>
+                  </>
+                )}
+
+                <div className="od-routing-rationale">
+                  <span>{t("routing.rationale")}</span>
+                  <strong>{recommendation.rationale}</strong>
+                </div>
+
+                <div className="od-routing-controls" aria-label={t("routing.controls")}>
+                  <div className="od-routing-owner" role="group" aria-label={t("routing.owner")}>
+                    <button
+                      type="button"
+                      className={owner === "human" ? "active" : ""}
+                      disabled={!editable || props.disabled}
+                      onClick={() => chooseOwner(node, "human")}
+                    >
+                      {t("os.actorHuman")}
+                    </button>
+                    <button
+                      type="button"
+                      className={owner === "agent" ? "active" : ""}
+                      disabled={!editable || props.disabled}
+                      onClick={() => chooseOwner(node, "agent")}
+                    >
+                      {t("os.actorAgent")}
+                    </button>
+                  </div>
+
+                  {owner === "agent" ? (
+                    <div className="od-routing-selects">
+                      <label>
+                        <span>{t("routing.agent")}</span>
+                        <select
+                          value={selectedAgent?.id ?? ""}
+                          disabled={!editable || props.disabled || readyAgents.length === 0}
+                          onChange={(event) => chooseAgent(node, event.target.value)}
+                        >
+                          {readyAgents.length === 0 ? <option value="">{t("routing.noAgents")}</option> : null}
+                          {readyAgents.map((agent) => (
+                            <option key={agent.id} value={agent.id}>{agent.label}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        <span>{t("routing.model")}</span>
+                        <select
+                          value={selectedModel}
+                          disabled={!editable || props.disabled || !selectedAgent || selectedAgent.models.length === 0}
+                          onChange={(event) => chooseModel(node, event.target.value)}
+                        >
+                          {selectedAgent?.models.length ? selectedAgent.models.map((model) => (
+                            <option key={model.id} value={model.id}>{model.label ?? model.id}</option>
+                          )) : <option value="">{t("routing.noModels")}</option>}
+                        </select>
+                      </label>
+                    </div>
+                  ) : null}
+
+                  {override && editable ? (
+                    <button
+                      className="od-routing-reset"
+                      type="button"
+                      disabled={props.disabled}
+                      onClick={() => applyOverride(node, null)}
+                    >
+                      {t("routing.useRecommendation")}
+                    </button>
+                  ) : null}
+                </div>
+
+                <div className="od-plan-contract-line">
+                  <span>{node.acceptance_rule.completion_mode}</span>
+                  <span>{node.acceptance_rule.clauses.map((clause) => clause.evaluator).join(" + ")}</span>
+                  {override?.owner === "agent" && override.agent_label ? (
+                    <span>{[override.agent_label, override.model_label ?? override.model].filter(Boolean).join(" / ")}</span>
+                  ) : null}
+                </div>
+
+                {nodeIssues.length ? (
+                  <div className="od-routing-issue">{nodeIssues[0]}</div>
+                ) : null}
               </div>
-            </div>
-          </div>
-        ))}
+            </article>
+          );
+        })}
       </div>
     </section>
   );
@@ -1173,7 +2129,8 @@ function ExecutePanel(props: {
   progress: AimProgressReadModel | null;
   disabled: boolean;
   onRunAgent: (milestone: Milestone) => void;
-  onConfirm: (milestone: Milestone) => void;
+  onConfirm: (milestone: Milestone, submission: Omit<ConfirmMilestoneRequest, "goalId" | "milestoneId">) => Promise<void>;
+  onPickFiles: () => Promise<string[]>;
   onBreakDown: (milestone: Milestone) => void;
 }) {
   const { t } = useI18n();
@@ -1181,8 +2138,60 @@ function ExecutePanel(props: {
   const openRows = rows.filter((row) => !row.completed);
   const agentAssignments = rows.filter((row) => row.assignment?.actor_kind === "agent").length;
   const humanAssignments = rows.filter((row) => row.assignment?.actor_kind === "human").length;
+  const [activeProofId, setActiveProofId] = useState<string | null>(null);
+  const [proofDrafts, setProofDrafts] = useState<Record<string, EvidenceSubmissionDraft>>({});
+  const [pickingFilesFor, setPickingFilesFor] = useState<string | null>(null);
+
+  function proofDraftFor(milestone: Milestone): EvidenceSubmissionDraft {
+    return proofDrafts[milestone.id] ?? emptyEvidenceDraft(milestone);
+  }
+
+  function updateProofDraft(milestone: Milestone, updater: (draft: EvidenceSubmissionDraft) => EvidenceSubmissionDraft): void {
+    setProofDrafts((current) => ({
+      ...current,
+      [milestone.id]: updater(current[milestone.id] ?? emptyEvidenceDraft(milestone)),
+    }));
+  }
+
+  function openProof(milestone: Milestone): void {
+    setActiveProofId(milestone.id);
+    setProofDrafts((current) => current[milestone.id] ? current : { ...current, [milestone.id]: emptyEvidenceDraft(milestone) });
+  }
+
+  async function pickProofFiles(milestone: Milestone): Promise<void> {
+    setPickingFilesFor(milestone.id);
+    try {
+      const paths = await props.onPickFiles();
+      if (paths.length === 0) return;
+      updateProofDraft(milestone, (draft) => ({
+        ...draft,
+        filePaths: [...new Set([...draft.filePaths, ...paths.map((path) => path.trim()).filter(Boolean)])],
+      }));
+    } finally {
+      setPickingFilesFor(null);
+    }
+  }
+
+  async function submitProof(milestone: Milestone): Promise<void> {
+    const draft = proofDraftFor(milestone);
+    if (!evidenceDraftIsSubmittable(draft)) return;
+    await props.onConfirm(milestone, evidenceSubmissionPayload(draft));
+    setActiveProofId(null);
+    setProofDrafts((current) => {
+      const next = { ...current };
+      delete next[milestone.id];
+      return next;
+    });
+  }
 
   function actorLabel(row: ProgressMilestoneRow): string {
+    const override = routingOverrideForMilestone(row.milestone);
+    if (override?.owner === "human") return t("os.actorHuman");
+    if (override?.owner === "agent") {
+      const agent = override.agent_label || override.agent_id || t("os.actorAgent");
+      const model = override.model_label || override.model;
+      return model ? `${t("os.actorAgent")} · ${agent} / ${model}` : `${t("os.actorAgent")} · ${agent}`;
+    }
     if (!row.assignment) return t("os.unassigned");
     const kind = row.assignment.actor_kind === "human" ? t("os.actorHuman") : t("os.actorAgent");
     const actor = row.assignment.actor_id
@@ -1259,13 +2268,15 @@ function ExecutePanel(props: {
                 <span>{t("os.nextWork")}</span>
                 <strong>{row.next_action || t("shell.noNextAction")}</strong>
               </div>
+
+              <EvidenceReviewList row={row} limit={2} compact />
             </div>
 
             <div className="od-work-actions">
               <button
                 className="od-aim-secondary"
                 type="button"
-                disabled={props.disabled || row.completed}
+                disabled={props.disabled || row.completed || row.assignment?.actor_kind === "human"}
                 onClick={() => props.onRunAgent(row.milestone)}
               >
                 {t("os.runAgent")}
@@ -1274,7 +2285,7 @@ function ExecutePanel(props: {
                 className="od-aim-secondary"
                 type="button"
                 disabled={props.disabled || row.completed}
-                onClick={() => props.onConfirm(row.milestone)}
+                onClick={() => openProof(row.milestone)}
               >
                 {t("os.confirmProof")}
               </button>
@@ -1287,8 +2298,373 @@ function ExecutePanel(props: {
                 {t("os.breakDown")}
               </button>
             </div>
+
+            {activeProofId === row.milestone.id ? (
+              <EvidenceSubmissionForm
+                milestone={row.milestone}
+                draft={proofDraftFor(row.milestone)}
+                disabled={props.disabled}
+                pickingFiles={pickingFilesFor === row.milestone.id}
+                onChange={(next) => updateProofDraft(row.milestone, () => next)}
+                onPickFiles={() => void pickProofFiles(row.milestone)}
+                onCancel={() => setActiveProofId(null)}
+                onSubmit={() => void submitProof(row.milestone)}
+              />
+            ) : null}
           </article>
         ))}
+      </div>
+    </section>
+  );
+}
+
+export function EvidenceSubmissionForm(props: {
+  milestone: Milestone;
+  draft: EvidenceSubmissionDraft;
+  disabled: boolean;
+  pickingFiles: boolean;
+  onChange: (draft: EvidenceSubmissionDraft) => void;
+  onPickFiles: () => void;
+  onCancel: () => void;
+  onSubmit: () => void;
+}) {
+  const { t } = useI18n();
+  const hasProof = props.draft.proofNote.trim().length > 0
+    || proofUrlsFromDraft(props.draft.url).length > 0
+    || props.draft.filePaths.length > 0;
+  const requiredOk = props.draft.requiredEvidence.length === 0
+    || props.draft.requiredEvidence.some((item) => item.satisfied);
+  const canSubmit = hasProof && requiredOk;
+
+  function setRequiredEvidence(text: string, satisfied: boolean): void {
+    props.onChange({
+      ...props.draft,
+      requiredEvidence: props.draft.requiredEvidence.map((item) =>
+        item.text === text ? { ...item, satisfied } : item,
+      ),
+    });
+  }
+
+  function removeFile(path: string): void {
+    props.onChange({
+      ...props.draft,
+      filePaths: props.draft.filePaths.filter((item) => item !== path),
+    });
+  }
+
+  return (
+    <form
+      className="od-proof-form"
+      onSubmit={(event) => {
+        event.preventDefault();
+        props.onSubmit();
+      }}
+    >
+      <div className="od-proof-head">
+        <div>
+          <strong>{t("os.proofHeading")}</strong>
+          <span>{t("os.proofBody")}</span>
+        </div>
+        <span className="od-pill">{shortText(props.milestone.title, 48)}</span>
+      </div>
+
+      <label className="od-proof-field">
+        <span>{t("os.proofNote")}</span>
+        <textarea
+          value={props.draft.proofNote}
+          disabled={props.disabled}
+          rows={3}
+          placeholder={t("os.proofNotePlaceholder")}
+          onChange={(event) => props.onChange({ ...props.draft, proofNote: event.currentTarget.value })}
+        />
+      </label>
+
+      <label className="od-proof-field">
+        <span>{t("os.proofUrl")}</span>
+        <textarea
+          value={props.draft.url}
+          disabled={props.disabled}
+          rows={2}
+          placeholder={t("os.proofUrlPlaceholder")}
+          onChange={(event) => props.onChange({ ...props.draft, url: event.currentTarget.value })}
+        />
+      </label>
+
+      <div className="od-proof-field">
+        <span>{t("os.proofFiles")}</span>
+        <div className="od-proof-file-actions">
+          <button
+            className="od-aim-secondary"
+            type="button"
+            disabled={props.disabled || props.pickingFiles}
+            onClick={props.onPickFiles}
+          >
+            {props.pickingFiles ? t("os.proofPickingFiles") : t("os.proofAddFiles")}
+          </button>
+          <small>{t("os.proofFilesHint")}</small>
+        </div>
+        {props.draft.filePaths.length === 0 ? (
+          <div className="od-empty-inline">{t("os.proofNoFiles")}</div>
+        ) : (
+          <div className="od-proof-file-list">
+            {props.draft.filePaths.map((path) => (
+              <div key={path} className="od-proof-file-row">
+                <span>{path}</span>
+                <button
+                  type="button"
+                  disabled={props.disabled}
+                  aria-label={`${t("os.proofRemoveFile")}: ${path}`}
+                  onClick={() => removeFile(path)}
+                >
+                  {t("os.proofRemoveFile")}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <fieldset className="od-proof-required">
+        <legend>{t("os.proofRequiredEvidence")}</legend>
+        {props.draft.requiredEvidence.length === 0 ? (
+          <div className="od-empty-inline">{t("os.proofNoRequiredEvidence")}</div>
+        ) : (
+          <div className="od-proof-required-list">
+            {props.draft.requiredEvidence.map((item) => (
+              <label key={item.text} className="od-proof-check-row">
+                <input
+                  type="checkbox"
+                  checked={item.satisfied}
+                  disabled={props.disabled}
+                  onChange={(event) => setRequiredEvidence(item.text, event.currentTarget.checked)}
+                />
+                <span>{item.text}</span>
+              </label>
+            ))}
+          </div>
+        )}
+      </fieldset>
+
+      {!canSubmit ? (
+        <div className="od-proof-validation">
+          {!hasProof ? t("os.proofNeedsDetail") : t("os.proofNeedsRequired")}
+        </div>
+      ) : null}
+
+      <div className="od-proof-actions">
+        <button className="od-aim-secondary" type="button" disabled={props.disabled} onClick={props.onCancel}>
+          {t("common.cancel")}
+        </button>
+        <button className="od-aim-primary" type="submit" disabled={props.disabled || !canSubmit}>
+          {t("os.submitProof")}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function EvidenceReviewList(props: {
+  row: ProgressMilestoneRow;
+  limit?: number;
+  compact?: boolean;
+}) {
+  const { t } = useI18n();
+  const items = props.limit ? props.row.evidence.slice(0, props.limit) : props.row.evidence;
+  const hiddenCount = Math.max(0, props.row.evidence.length - items.length);
+
+  function statusLabel(item: ProgressEvidenceReviewItem): string {
+    switch (item.status) {
+      case "matched":
+        return t("os.evidenceStatus.matched");
+      case "low_trust":
+        return t("os.evidenceStatus.lowTrust");
+      case "unmatched":
+        return t("os.evidenceStatus.unmatched");
+    }
+  }
+
+  return (
+    <div className={`od-evidence-review${props.compact ? " is-compact" : ""}`}>
+      <div className="od-evidence-review-head">
+        <span>{t("os.evidenceDetails")}</span>
+        <span>{t("os.evidenceCount", { n: props.row.evidence_count })}</span>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="od-empty-inline od-evidence-empty">
+          <strong>{t("os.evidenceNoDetails")}</strong>
+          <span>{props.row.eval_review.next_action || t("os.evidenceNoDetailsAction")}</span>
+        </div>
+      ) : (
+        <div className="od-evidence-list">
+          {items.map((item) => {
+            const ruleMatches = matchedRuleText(item);
+            const payloadText = evidencePayloadText(item);
+            const occurred = formatEvidenceTime(item.evidence.occurred_at);
+            return (
+              <div key={item.evidence.id} className={`od-evidence-row ${item.status}`}>
+                <div className="od-evidence-row-head">
+                  <strong>{shortText(evidenceTitle(item), props.compact ? 96 : 150)}</strong>
+                  <span className={`od-pill ${evidenceStatusTone(item)}`}>{statusLabel(item)}</span>
+                </div>
+                {payloadText ? <p>{shortText(payloadText, props.compact ? 110 : 220)}</p> : null}
+                <small>
+                  {[formatEvidenceKind(item.evidence.kind), occurred, t("os.evidenceTrust", { n: formatTrust(item.evidence.trust_score) })]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </small>
+                <small>
+                  {ruleMatches ? t("os.evidenceRules", { rules: ruleMatches }) : t("os.evidenceNoRules")}
+                </small>
+                {item.review_note ? <small>{item.review_note}</small> : null}
+              </div>
+            );
+          })}
+          {hiddenCount > 0 ? (
+            <div className="od-evidence-more">{t("os.evidenceMore", { n: hiddenCount })}</div>
+          ) : null}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CompletionRecapPanel(props: {
+  progress: AimProgressReadModel;
+}) {
+  const { t } = useI18n();
+  const recap = props.progress.completion_recap;
+  if (!recap) return null;
+  const completedCount = recap.completed_sub_aims.length;
+  const evidenceCount = recap.passing_evidence.length;
+  const contextCount = recap.learned_context.length;
+  const futureReuse = contextCount > 0
+    ? t("completion.futureReuseBody")
+    : t("completion.futureReuseEmptyBody");
+
+  return (
+    <section className="od-stage-panel od-completion-recap">
+      <div className="od-stage-panel-head">
+        <div>
+          <div className="od-stage-kicker">{t("completion.eyebrow")}</div>
+          <h2>{t("completion.heading")}</h2>
+          <p>{recap.final_outcome}</p>
+        </div>
+      </div>
+
+      <div className="od-stage-metrics" aria-label={t("completion.heading")}>
+        <StageMetric label={t("completion.metricSubAims")} value={String(completedCount)} />
+        <StageMetric label={t("completion.metricEvidence")} value={String(evidenceCount)} />
+        <StageMetric label={t("completion.metricContext")} value={String(contextCount)} />
+      </div>
+
+      <div className="od-recap-section">
+        <div className="od-card-head">
+          <h3>{t("completion.subAimsTitle")}</h3>
+          <span className="od-pill success">{t("completion.complete")}</span>
+        </div>
+        <div className="od-work-list">
+          {recap.completed_sub_aims.map((item) => (
+            <article key={item.milestone_id} className="od-work-card od-recap-subaim is-complete">
+              <div className="od-work-card-main">
+                <div className="od-work-title">
+                  <strong>{item.title}</strong>
+                  <span className="od-pill success">{item.eval_status ? evalLabel(t, item.eval_status) : t("completion.complete")}</span>
+                  {item.decided_by ? <span className="od-pill">{item.decided_by}</span> : null}
+                </div>
+                <p>{shortText(item.outcome, 220)}</p>
+                <div className="od-work-note">
+                  <strong>{t("completion.evidenceIds")}</strong>
+                  <span>{item.evidence_ids.length ? item.evidence_ids.map(shortId).join(", ") : t("completion.noEvidenceIds")}</span>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+
+      <div className="od-recap-grid">
+        <div className="od-recap-section">
+          <div className="od-card-head">
+            <h3>{t("completion.evidenceTitle")}</h3>
+            <span className="od-pill">{String(evidenceCount)}</span>
+          </div>
+          {recap.passing_evidence.length === 0 ? (
+            <div className="od-empty-inline">{recap.evidence_empty_reason}</div>
+          ) : (
+            <div className="od-recap-list">
+              {recap.passing_evidence.map((item) => (
+                <div key={item.id} className="od-recap-row">
+                  <div>
+                    <strong>{shortText(item.summary || item.kind, 130)}</strong>
+                    <span>{[item.kind, shortId(item.id), t("os.evalTrust", { n: formatTrust(item.trust_score) })].join(" · ")}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="od-recap-section">
+          <div className="od-card-head">
+            <h3>{t("completion.evalTitle")}</h3>
+            <span className="od-pill">{String(recap.eval_results.length)}</span>
+          </div>
+          {recap.eval_results.length === 0 ? (
+            <div className="od-empty-inline">{t("completion.noEvalResults")}</div>
+          ) : (
+            <div className="od-recap-list">
+              {recap.eval_results.map((result, index) => (
+                <div key={`${result.milestone_id}-${result.evaluator}-${index}`} className="od-recap-row">
+                  <div>
+                    <strong>{result.evaluator}</strong>
+                    <span>
+                      {[
+                        evalLabel(t, result.status),
+                        t("os.evalMatchedCount", { n: result.matched_evidence_ids.length }),
+                        t("os.evalTrust", { n: formatTrust(result.trust_score) }),
+                      ].join(" · ")}
+                    </span>
+                  </div>
+                  <p>{result.explanation}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="od-recap-section">
+        <div className="od-card-head">
+          <h3>{t("completion.contextTitle")}</h3>
+          <span className="od-pill">{String(contextCount)}</span>
+        </div>
+        {recap.learned_context.length === 0 ? (
+          <div className="od-empty-inline">{recap.context_empty_reason}</div>
+        ) : (
+          <div className="od-recap-list">
+            {recap.learned_context.map((item) => (
+              <div key={item.id} className="od-recap-row">
+                <div>
+                  <strong>{shortText(item.content, 150)}</strong>
+                  <span>
+                    {[
+                      item.status === "pending" ? t("completion.contextPending") : t("completion.contextAccepted"),
+                      item.scope,
+                      item.category,
+                      formatTrust(item.confidence),
+                    ].join(" · ")}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="od-recap-reuse">
+        <span>{t("completion.futureReuseTitle")}</span>
+        <strong>{futureReuse}</strong>
       </div>
     </section>
   );
@@ -1297,31 +2673,21 @@ function ExecutePanel(props: {
 function EvalPanel(props: {
   detail: GoalDetail;
   progress: AimProgressReadModel | null;
+  disabled: boolean;
+  onAcceptContextCandidate: (candidate: Memory, content: string, scope: ContextInboxScope) => void;
+  onRejectContextCandidate: (candidate: Memory) => void;
 }) {
   const { t } = useI18n();
+  if (props.progress?.completion_recap?.complete) {
+    return <CompletionRecapPanel progress={props.progress} />;
+  }
   const rows = progressRows(props.detail, props.progress);
   const evidenceTotal = rows.reduce((sum, row) => sum + row.evidence_count, 0);
   const evaluatorResults = rows.flatMap((row) => row.evaluator_results);
   const satisfiedRows = rows.filter((row) => evalStateOf(row) === "passed").length;
   const pendingCandidates = props.progress?.context_candidates.filter((candidate) => candidate.status === "pending") ?? [];
-  const reviewItems = evaluatorResults.filter((result) => result.status !== "passed").length + pendingCandidates.length;
-
-  function evalLabel(state: EvalState): string {
-    switch (state) {
-      case "passed":
-        return t("os.evalStatus.passed");
-      case "failed":
-        return t("os.evalStatus.failed");
-      case "needs_human":
-        return t("os.evalStatus.needsHuman");
-      case "unsupported":
-        return t("os.evalStatus.unsupported");
-      case "error":
-        return t("os.evalStatus.error");
-      case "pending":
-        return t("os.evalStatus.pending");
-    }
-  }
+  const evidenceReviewItems = rows.flatMap((row) => row.evidence).filter((item) => item.status !== "matched").length;
+  const reviewItems = evaluatorResults.filter((result) => result.status !== "passed").length + evidenceReviewItems + pendingCandidates.length;
 
   return (
     <section className="od-stage-panel od-eval-panel">
@@ -1349,8 +2715,9 @@ function EvalPanel(props: {
                 <div className="od-work-card-head">
                   <div className="od-work-title">
                     <strong>{row.milestone.title}</strong>
-                    <span className={`od-pill ${evalToneClass(state)}`}>{evalLabel(state)}</span>
+                    <span className={`od-pill ${evalToneClass(state)}`}>{evalLabel(t, state)}</span>
                     <span className="od-pill">{t("os.evidenceCount", { n: row.evidence_count })}</span>
+                    <span className="od-pill">{t("os.evalTrust", { n: formatTrust(row.eval_review.trust_score) })}</span>
                   </div>
                 </div>
 
@@ -1367,51 +2734,65 @@ function EvalPanel(props: {
                   </div>
                 </div>
 
+                <div className="od-eval-summary">
+                  <div>
+                    <span>{t("os.evalReason")}</span>
+                    <strong>{row.eval_review.reason || t("os.evalNoResults")}</strong>
+                  </div>
+                  <div>
+                    <span>{t("os.evalNextAction")}</span>
+                    <strong>{row.eval_review.next_action || row.next_action || t("shell.noNextAction")}</strong>
+                  </div>
+                </div>
+
                 <div className="od-evaluator-list">
                   {row.evaluator_results.length === 0 ? (
                     <div className="od-empty-inline">{t("os.evalNoResults")}</div>
-                  ) : row.evaluator_results.map((result, index) => (
-                    <div key={`${result.evaluator}-${index}`} className="od-evaluator-row">
-                      <div className="od-evaluator-head">
-                        <strong>{result.evaluator}</strong>
-                        <span className={`od-pill ${evalToneClass(result.status)}`}>{evalLabel(result.status)}</span>
+                  ) : row.evaluator_results.map((result, index) => {
+                    const matchedEvidence = matchedEvidenceText(row, result.matched_evidence_ids);
+                    return (
+                      <div key={`${result.evaluator}-${index}`} className="od-evaluator-row">
+                        <div className="od-evaluator-head">
+                          <strong>{`#${index + 1} ${result.evaluator}`}</strong>
+                          <span className={`od-pill ${evalToneClass(result.status)}`}>{evalLabel(t, result.status)}</span>
+                        </div>
+                        <p>{result.explanation || result.failure_reason || t("os.noEval")}</p>
+                        <small>
+                          {t("os.evalTrust", { n: formatTrust(result.trust_score) })}
+                          {" · "}
+                          {t("os.evalMatchedCount", { n: result.matched_evidence_ids.length })}
+                          {result.requires_human_confirmation ? ` · ${t("os.evalHumanConfirmation")}` : ""}
+                        </small>
+                        <small>{matchedEvidence ? t("os.evalMatchedEvidenceDetail", { evidence: matchedEvidence }) : t("os.evalNoMatchedEvidence")}</small>
                       </div>
-                      <p>{result.explanation || result.failure_reason || t("os.noEval")}</p>
-                      <small>
-                        {t("os.evalTrust", { n: formatTrust(result.trust_score) })}
-                        {" · "}
-                        {t("os.evalMatchedCount", { n: result.matched_evidence_ids.length })}
-                        {result.requires_human_confirmation ? ` · ${t("os.evalHumanConfirmation")}` : ""}
-                      </small>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
+
+                <EvidenceReviewList row={row} />
               </div>
             </article>
           );
         })}
       </div>
 
-      <div className="od-eval-context">
-        <div className="od-card-head">
-          <h3>{t("os.evalPendingCandidates")}</h3>
-          <span className="od-pill">{String(pendingCandidates.length)}</span>
-        </div>
-        {pendingCandidates.length === 0 ? (
-          <div className="od-empty-inline">{t("os.evalNoPendingCandidates")}</div>
-        ) : (
-          <div className="od-eval-context-list">
-            {pendingCandidates.slice(0, 6).map((candidate) => (
-              <div key={candidate.id} className="od-eval-candidate">
-                <strong>{shortText(candidate.content, 160)}</strong>
-                <span>
-                  {[candidate.category, candidate.source, formatTrust(candidate.confidence)].filter(Boolean).join(" · ")}
-                </span>
-              </div>
-            ))}
+      {pendingCandidates.length === 0 ? (
+        <div className="od-eval-context">
+          <div className="od-card-head">
+            <h3>{t("os.evalPendingCandidates")}</h3>
+            <span className="od-pill">{String(pendingCandidates.length)}</span>
           </div>
-        )}
-      </div>
+          <div className="od-empty-inline">{t("os.evalNoPendingCandidates")}</div>
+        </div>
+      ) : (
+        <ContextInbox
+          candidates={pendingCandidates}
+          currentAimTitle={props.detail.goal.title}
+          disabled={props.disabled}
+          onAccept={props.onAcceptContextCandidate}
+          onReject={props.onRejectContextCandidate}
+        />
+      )}
     </section>
   );
 }
@@ -1430,10 +2811,16 @@ function SettingsPanel(props: {
   webResearch: WebResearchStatus | null;
   contextSources: ContextSourceStatus | null;
   localAgents: LocalAgentDetection[];
+  aimContext: {
+    title: string;
+    profile: AimHelperProfile;
+    runtimeReady: boolean;
+  } | null;
   onProvider: (status: ProviderStatus) => void;
   onWeb: (status: WebResearchStatus) => void;
   onContextSources: (status: ContextSourceStatus) => void;
   onRefreshAgents: () => Promise<void>;
+  onReturnToAim?: () => void;
 }) {
   const { t } = useI18n();
   const providerReady = Boolean(props.provider?.configured);
@@ -1515,6 +2902,15 @@ function SettingsPanel(props: {
         </div>
       </div>
 
+      {props.aimContext ? (
+        <SettingsAimContextPanel
+          title={props.aimContext.title}
+          profile={props.aimContext.profile}
+          runtimeReady={props.aimContext.runtimeReady}
+          onReturnToAim={props.onReturnToAim}
+        />
+      ) : null}
+
       <div className="od-helper-callout" data-state={planningReady ? "ready" : "blocked"}>
         <span className={`od-pill ${planningReady ? "success" : "warn"}`}>
           {planningReady ? t("settings.status.readyToPlan") : t("os.blocked")}
@@ -1557,6 +2953,34 @@ function SettingsPanel(props: {
       <SettingsHelperSection helper={contextHelper}>
         <ContextSourcesPanel status={props.contextSources} compact onSaved={props.onContextSources} />
       </SettingsHelperSection>
+    </section>
+  );
+}
+
+function SettingsAimContextPanel(props: {
+  title: string;
+  profile: AimHelperProfile;
+  runtimeReady: boolean;
+  onReturnToAim?: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <section className="od-settings-aim-context" data-state={props.runtimeReady ? "ready" : "blocked"}>
+      <div className="od-settings-aim-context-main">
+        <div className="od-aim-kicker">{t("firstRun.settingsEyebrow")}</div>
+        <h3>{shortText(props.title, 140)}</h3>
+        <p>{props.runtimeReady ? t("firstRun.settingsReady") : t("firstRun.settingsBlocked")}</p>
+      </div>
+      <div className="od-first-run-helper-grid">
+        <HelperFact label={t("firstRun.capabilityLabel")} value={helperCapabilityLabel(props.profile, t)} />
+        <HelperFact label={t("firstRun.bestHelperLabel")} value={helperPreferenceLabel(props.profile, t)} />
+      </div>
+      <p className="od-first-run-helper-reason">{helperReason(props.profile, t)}</p>
+      {props.onReturnToAim ? (
+        <button className="od-aim-secondary" type="button" onClick={props.onReturnToAim}>
+          {t("firstRun.returnToAim")}
+        </button>
+      ) : null}
     </section>
   );
 }
@@ -1610,15 +3034,6 @@ function ProgressDonut({ done, total }: { done: number; total: number }) {
           <span>{done}/{total}</span>
         </div>
       </div>
-    </div>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={metricStyle()}>
-      <span>{label}</span>
-      <strong>{value}</strong>
     </div>
   );
 }
@@ -1680,44 +3095,6 @@ function choiceStyle(active: boolean): CSSProperties {
     textAlign: "left",
     color: C.text,
     cursor: "pointer",
-  };
-}
-
-function scoreRowStyle(): CSSProperties {
-  return { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 };
-}
-
-function metricStyle(): CSSProperties {
-  return {
-    border: `1px solid ${C.border}`,
-    borderRadius: 8,
-    padding: "10px 12px",
-    background: "#fff",
-    display: "grid",
-    gap: 4,
-  };
-}
-
-function nodeCardStyle(): CSSProperties {
-  return {
-    border: `1px solid ${C.border}`,
-    borderRadius: 8,
-    padding: 12,
-    display: "grid",
-    gridTemplateColumns: "32px minmax(0, 1fr)",
-    gap: 12,
-    background: "#fff",
-  };
-}
-
-function contractLineStyle(): CSSProperties {
-  return {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: 8,
-    color: C.muted,
-    fontSize: 12,
-    marginTop: 8,
   };
 }
 

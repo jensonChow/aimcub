@@ -1,13 +1,26 @@
 import { describe, expect, it } from "vitest";
 
-import type { Evidence, Goal, Milestone, MilestoneCompletion, Run, SubAimRelation, ToolTrace } from "@core/types";
 import {
+  DecompositionOutput,
+  type Evidence,
+  type Goal,
+  type Memory,
+  type Milestone,
+  type MilestoneCompletion,
+  type Run,
+  type SubAimRelation,
+  type ToolTrace,
+} from "@core/types";
+import {
+  buildAimCompletionRecap,
   buildAimProgressReadModel,
   buildHumanTaskHandoff,
   decideContextIntakeSession,
   deriveContextCandidatesFromWork,
   evaluateWithRuntimeReport,
   recommendAssignmentForMilestone,
+  routingRecommendationForPlanNode,
+  validatePlanRouting,
 } from "./aim-os";
 
 const OWNER = "00000000-0000-4000-8000-000000000001";
@@ -120,6 +133,83 @@ describe("Aim OS routing and human handoff", () => {
     expect(handoff.secretOrAccessRequired).toBe(true);
     expect(handoff.finalConfirmationRequired).toBe(true);
   });
+
+  it("validates impossible agent routes against the available runtime", () => {
+    const plan = DecompositionOutput.parse({
+      nodes: [{
+        key: "agent-work",
+        title: "Implement CLI",
+        description: "Build the command.",
+        acceptance_rule: {
+          clauses: [{ evaluator: "commit_pattern", auto_verifiable: true, match: { message_pattern: "cli" } }],
+        },
+        decomposition_contract: {
+          why: "Code can be delegated.",
+          definition_of_done: "The command is implemented.",
+          required_evidence: ["Commit with CLI implementation."],
+          likely_owner: "agent",
+          context_gaps: [],
+          eval_signal: "A commit proves the CLI exists.",
+        },
+      }],
+      edges: [],
+    });
+
+    const missingRuntime = validatePlanRouting({ plan, agents: [] });
+    expect(missingRuntime.ok).toBe(false);
+    expect(missingRuntime.issues[0]?.code).toBe("missing_agent_runtime");
+
+    const withHumanOverride = DecompositionOutput.parse({
+      ...plan,
+      nodes: [{ ...plan.nodes[0]!, routing_override: { owner: "human" } }],
+    });
+    expect(validatePlanRouting({ plan: withHumanOverride, agents: [] }).ok).toBe(true);
+  });
+
+  it("requires selected agent models to belong to the current runtime", () => {
+    const plan = DecompositionOutput.parse({
+      nodes: [{
+        key: "agent-work",
+        title: "Implement CLI",
+        acceptance_rule: {
+          clauses: [{ evaluator: "commit_pattern", auto_verifiable: true, match: { message_pattern: "cli" } }],
+        },
+        decomposition_contract: {
+          why: "Code can be delegated.",
+          definition_of_done: "The command is implemented.",
+          required_evidence: ["Commit with CLI implementation."],
+          likely_owner: "agent",
+          context_gaps: [],
+          eval_signal: "A commit proves the CLI exists.",
+        },
+        routing_override: {
+          owner: "agent",
+          agent_id: "codex",
+          agent_label: "Codex CLI",
+          run_mode: "local_cli",
+          model: "missing-model",
+          model_label: "missing-model",
+        },
+      }],
+      edges: [],
+    });
+    const agents = [{
+      id: "codex",
+      label: "Codex CLI",
+      available: true,
+      authenticated: true,
+      models: [{ id: "gpt-5", label: "GPT-5" }],
+    }];
+
+    expect(validatePlanRouting({ plan, agents }).issues[0]?.code).toBe("unknown_agent_model");
+
+    const valid = DecompositionOutput.parse({
+      ...plan,
+      nodes: [{ ...plan.nodes[0]!, routing_override: { ...plan.nodes[0]!.routing_override!, model: "gpt-5" } }],
+    });
+    expect(validatePlanRouting({ plan: valid, agents }).ok).toBe(true);
+    expect(routingRecommendationForPlanNode(valid.nodes[0]!).rationale).toMatch(/agent/i);
+  });
 });
 
 describe("Aim OS evaluator registry surface", () => {
@@ -151,10 +241,74 @@ describe("Aim OS evaluator registry surface", () => {
 
     expect(unsupported.passed).toBe(false);
     expect(unsupported.evaluatorResults[0]?.status).toBe("unsupported");
+    expect(unsupported.evalReview.reason).toContain("Cannot auto-evaluate");
   });
 });
 
 describe("Aim OS cockpit read model", () => {
+  it("adds evidence details, trust, reasoning, and rule matches to milestone rows", () => {
+    const trusted: Evidence = {
+      id: "00000000-0000-4000-8000-000000000070",
+      owner_id: OWNER,
+      goal_id: GOAL,
+      milestone_id: MILESTONE,
+      emitter_id: null,
+      kind: "git_commit",
+      source_event_id: "sha-trusted",
+      occurred_at: "2026-07-03T00:00:00.000Z",
+      summary: "init project",
+      payload: { sha: "sha-trusted", message: "init project", files: ["src/index.ts"] },
+      trust_score: 0.95,
+    };
+    const lowTrust: Evidence = {
+      ...trusted,
+      id: "00000000-0000-4000-8000-000000000071",
+      source_event_id: "sha-low",
+      summary: "agent reported init project",
+      payload: { sha: "sha-low", message: "init project", files: ["src/index.ts"] },
+      trust_score: 0.5,
+    };
+
+    const model = buildAimProgressReadModel({
+      goal: goal(),
+      milestones: [milestone()],
+      evidence: [trusted, lowTrust],
+    });
+    const row = model.milestones[0]!;
+
+    expect(row.eval_review).toMatchObject({
+      passed: true,
+      matched_evidence_ids: [trusted.id],
+      trust_score: 0.95,
+    });
+    expect(row.eval_review.reason).toContain("passed");
+    expect(row.evidence).toHaveLength(2);
+    expect(row.evidence[0]).toMatchObject({
+      evidence: { id: trusted.id, summary: "init project", trust_score: 0.95 },
+      rule_matches: [{ clause_index: 0, evaluator: "commit_pattern" }],
+      status: "matched",
+    });
+    expect(row.evidence[1]).toMatchObject({
+      evidence: { id: lowTrust.id, trust_score: 0.5 },
+      rule_matches: [],
+      status: "low_trust",
+    });
+  });
+
+  it("makes missing evidence actionable in the eval review", () => {
+    const model = buildAimProgressReadModel({
+      goal: goal(),
+      milestones: [milestone()],
+      evidence: [],
+    });
+    const row = model.milestones[0]!;
+
+    expect(row.eval_review.passed).toBe(false);
+    expect(row.eval_review.reason).toBe("No evidence has been recorded for this sub-aim yet.");
+    expect(row.eval_review.next_action).toContain("Run the assigned agent");
+    expect(row.evidence).toEqual([]);
+  });
+
   it("rolls child aim status back into the parent milestone view", () => {
     const childMilestone = milestone({
       id: CHILD_MILESTONE,
@@ -229,5 +383,81 @@ describe("Aim OS cockpit read model", () => {
 
     expect(candidates.map((candidate) => candidate.category)).toContain("eval_signal");
     expect(candidates.map((candidate) => candidate.category)).toContain("procedure");
+  });
+
+  it("maps completed progress into a completion recap with evidence, eval, and learned context", () => {
+    const ev: Evidence = {
+      id: "00000000-0000-4000-8000-000000000070",
+      owner_id: OWNER,
+      goal_id: GOAL,
+      milestone_id: MILESTONE,
+      emitter_id: null,
+      kind: "git_commit",
+      source_event_id: "sha",
+      occurred_at: "2026-07-03T00:00:00.000Z",
+      summary: "init project",
+      payload: { sha: "sha", message: "init project", files: ["src/index.ts"] },
+      trust_score: 1,
+    };
+    const completion: MilestoneCompletion = {
+      id: "00000000-0000-4000-8000-000000000071",
+      milestone_id: MILESTONE,
+      owner_id: OWNER,
+      decided_by: "rule_auto",
+      triggering_evidence_ids: [ev.id],
+      awarded_xp: 10,
+      created_at: "2026-07-03T00:01:00.000Z",
+    };
+    const candidate: Memory = {
+      id: "00000000-0000-4000-8000-000000000072",
+      owner_id: OWNER,
+      goal_id: GOAL,
+      kind: "semantic",
+      category: "eval_signal",
+      content: "Eval signal: trusted commits can complete scaffold work.",
+      confidence: 0.78,
+      source: "evidence_derived",
+      status: "pending",
+      superseded_by: null,
+      created_at: "2026-07-03T00:01:00.000Z",
+    };
+    const model = buildAimProgressReadModel({
+      goal: goal(),
+      milestones: [milestone({
+        status: "completed",
+        completed_at: "2026-07-03T00:01:00.000Z",
+      })],
+      evidence: [ev],
+      completions: [completion],
+      contextCandidates: [candidate],
+    });
+
+    const recap = model.completion_recap ?? buildAimCompletionRecap({
+      goal: goal(),
+      milestones: model.milestones,
+      evidence: [ev],
+      completions: [completion],
+      learnedContext: [candidate],
+    });
+
+    expect(recap?.complete).toBe(true);
+    expect(recap?.completed_sub_aims).toMatchObject([{
+      title: "Implement CLI",
+      decided_by: "rule_auto",
+      evidence_ids: [ev.id],
+      eval_status: "passed",
+    }]);
+    expect(recap?.passing_evidence).toMatchObject([{ id: ev.id, summary: "init project", kind: "git_commit" }]);
+    expect(recap?.eval_results).toMatchObject([{ milestone_id: MILESTONE, evaluator: "commit_pattern", status: "passed" }]);
+    expect(recap?.learned_context).toMatchObject([{ id: candidate.id, status: "pending", scope: "aim" }]);
+  });
+
+  it("does not create a completion recap while an aim still has open sub-aims", () => {
+    const model = buildAimProgressReadModel({
+      goal: goal(),
+      milestones: [milestone()],
+    });
+
+    expect(model.completion_recap).toBeNull();
   });
 });

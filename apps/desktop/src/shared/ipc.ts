@@ -3,7 +3,7 @@
  * Renderer imports these as `import type` only, so this module is erased from the
  * renderer bundle — only main/preload pull in the channel constants at runtime.
  */
-import type { DecompositionOutput, Goal, Memory, Milestone } from "@core/types";
+import type { DecompositionOutput, Goal, ManualEvidenceRequiredItem, Memory, Milestone } from "@core/types";
 import type { AimIntakeReport, AimProgressReadModel, ContextHealthRow, ContextLineageLearningReport, ContextProfileReport, DecompositionLearningReport, DecompositionStrategyReport, PlanQualityReport, PlanReviewReport } from "@core/domain";
 import type { LlmProvider } from "@core/llm/providers";
 import type { ContextSourceSettings } from "@core/store";
@@ -210,6 +210,10 @@ export interface ConfirmMilestoneRequest {
   goalId: string;
   milestoneId: string;
   summary?: string;
+  proofNote?: string;
+  urls?: string[];
+  filePaths?: string[];
+  requiredEvidence?: ManualEvidenceRequiredItem[];
 }
 
 export interface AcceptContextCandidateRequest {
@@ -382,6 +386,7 @@ export interface RunMilestoneAgentRequest {
   goalId: string;
   milestoneId: string;
   agentId?: LocalAgentId;
+  model?: string;
   prompt?: string;
 }
 
