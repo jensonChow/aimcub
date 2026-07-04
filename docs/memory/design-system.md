@@ -45,6 +45,7 @@ Reference links:
 - One primary task per screen: a view should make one user action obvious. Secondary facts can be visible only when they support that action.
 - Desktop quality bar: Aimcub should feel like a focused desktop workbench, not a web dashboard inside Electron. Prefer stable panes, compact command surfaces, native-feeling shortcuts, complete control states, and strict row/spacing rhythm over page-by-page component stacks.
 - Calm density: Aimcub is an operational desktop tool. Prefer compact, scannable, quiet layouts over marketing-like hero sections, decorative cards, large illustrations, or expressive gradients.
+- First-run quality bar: an empty Aimcub workspace must feel like a desktop command composer, not a dashboard form or wizard. Capture the user's intended outcome first, keep workflow machinery quiet, and reveal process detail only after it helps the next action.
 - Context is a substrate: show context health as concise status, setup controls, and review affordances. Do not turn memory/context into a profile page or a decorative feed.
 - Context source setup must keep one clear summary plus one editable control surface; do not repeat local, online, web, deep research, context-session, or questionnaire controls as separate card, table, and toggle representations. Planning readiness gates may sit under the summary as compact rows when they explain why planning can proceed or what remains blocked.
 - Context bundle review is a default product surface before/inside planning. It should separate used context, skipped or unread context, permission/setup gaps, and unresolved decomposition risks without exposing raw prompts, model traces, or chain-of-thought.
@@ -56,6 +57,8 @@ Reference links:
 - Default shell: native-feeling titlebar/status strip, left aim sidebar, center workspace. No default right inspector.
 - Sidebar: brand, language toggle, New Aim, aim search/filter, recent aim list, settings entry. Keep it narrow enough to preserve work area, currently around 280 px.
 - Center workspace: workflow step navigation, then the active stage surface. The workspace should sit in a constrained max width so text lines and controls do not stretch across large windows.
+- New/empty Aim stage: hide workflow step navigation until there is an Aim or the user moves into later stages. The first surface should be a centered command-composer workbench with a concise title, one outcome input, optional supporting context, and one primary continue action.
+- Empty sidebar state: when there are no aims, do not show search, filters, or a large dashed empty card. Show a compact history placeholder under Recent aims. Add search/filter only after aim history exists.
 - Command palette: Desktop must provide a Cmd/Ctrl+K command surface for common navigation and actions. Keyboard shortcuts should be real, visible where useful, and not merely decorative labels.
 - Optional inspector: process, context, quality, activity, and debug details may exist as an opt-in overlay, drawer, popover, or developer-mode surface. It must be independently scrollable and cannot displace the primary task by default.
 - Stage model: Aim -> Context -> Plan/Contracts -> Execute -> Eval. Stage navigation may be visible, but each stage must still present a single dominant action.
@@ -149,6 +152,7 @@ Reference links:
 - Toggles/checkboxes: use for binary settings. Do not use pills as toggles unless the state is explicit.
 - Menus/popovers: use for option sets and overflow commands. They must not hide the primary next action.
 - Inputs: 36 px minimum for compact search, 44 to 56 px for main task forms. Labels sit above inputs, not only as placeholders.
+- Command-composer inputs are the one exception to visible label placement: when the composer is the primary task surface, use accessible labels plus clear placeholder text, and keep supporting context visually subordinate.
 - Textareas: use at least 140 to 160 px height for aim/context input, with clear resize or fixed growth behavior.
 - Progress: use thin 6 px bars for passive progress and explicit text for milestone/evidence status.
 - Pills/chips: use for compact status, filters, and lightweight commands. Avoid long chip labels and do not stack many chip rows in the main task area.

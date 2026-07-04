@@ -10,5 +10,5 @@ interface NoticeProps {
 export function Notice({ tone, children }: NoticeProps) {
   const bg = tone === "error" ? "#fcebeb" : C.accentBg;
   const fg = tone === "error" ? C.danger : C.accent;
-  return <div style={{ ...card(), background: bg, color: fg, fontSize: 14 }}>{children}</div>;
+  return <div className="od-notice" style={{ ...card(), background: bg, color: fg, fontSize: 14 }}>{children}</div>;
 }

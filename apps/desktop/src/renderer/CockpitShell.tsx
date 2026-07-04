@@ -66,6 +66,7 @@ export function CockpitShell({
   const [filter, setFilter] = useState<"all" | "active" | "paused">("all");
   const [paletteOpen, setPaletteOpen] = useState(false);
   const usingSettingsSidebar = activeStage === "settings" && Boolean(settingsSidebar);
+  const hasGoals = goals.length > 0;
 
   const stages = useMemo<StageItem[]>(() => [
     { stage: "aim", index: "1", title: t("os.stepAim") },
@@ -159,32 +160,41 @@ export function CockpitShell({
               </button>
 
               <section className="od-aim-browser" aria-label={t("shell.recentAims")}>
-                <div className="od-sidebar-search">
-                  <label htmlFor="aim-search">{t("shell.searchAims")}</label>
-                  <input
-                    id="aim-search"
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    placeholder={t("shell.searchAims")}
-                  />
-                </div>
-                <div className="od-filter-row" aria-label={t("shell.recentAims")}>
-                  <button className={filter === "all" ? "active" : ""} type="button" onClick={() => setFilter("all")}>
-                    {t("cockpit.filter.all")}
-                  </button>
-                  <button className={filter === "active" ? "active" : ""} type="button" onClick={() => setFilter("active")}>
-                    {t("cockpit.filter.active")}
-                  </button>
-                  <button className={filter === "paused" ? "active" : ""} type="button" onClick={() => setFilter("paused")}>
-                    {t("cockpit.filter.paused")}
-                  </button>
-                </div>
+                {hasGoals ? (
+                  <>
+                    <div className="od-sidebar-search">
+                      <label htmlFor="aim-search">{t("shell.searchAims")}</label>
+                      <input
+                        id="aim-search"
+                        value={query}
+                        onChange={(event) => setQuery(event.target.value)}
+                        placeholder={t("shell.searchAims")}
+                      />
+                    </div>
+                    <div className="od-filter-row" aria-label={t("shell.recentAims")}>
+                      <button className={filter === "all" ? "active" : ""} type="button" onClick={() => setFilter("all")}>
+                        {t("cockpit.filter.all")}
+                      </button>
+                      <button className={filter === "active" ? "active" : ""} type="button" onClick={() => setFilter("active")}>
+                        {t("cockpit.filter.active")}
+                      </button>
+                      <button className={filter === "paused" ? "active" : ""} type="button" onClick={() => setFilter("paused")}>
+                        {t("cockpit.filter.paused")}
+                      </button>
+                    </div>
+                  </>
+                ) : null}
                 <div className="od-section-label">
                   <span>{t("shell.recentAims")}</span>
                   <span>{visibleGoals.length}</span>
                 </div>
                 <div className="od-aim-list">
-                  {visibleGoals.length === 0 ? <div className="od-empty">{t("shell.noSearchResults")}</div> : null}
+                  {visibleGoals.length === 0 ? (
+                    <div className="od-sidebar-empty">
+                      <strong>{t(hasGoals ? "shell.noSearchResults" : "shell.noAimsTitle")}</strong>
+                      <span>{t(hasGoals ? "shell.noSearchResultsBody" : "shell.noAimsBody")}</span>
+                    </div>
+                  ) : null}
                   {visibleGoals.map((goal) => (
                     <button
                       key={goal.id}
@@ -214,7 +224,7 @@ export function CockpitShell({
         </aside>
 
         <main className={`od-main od-main-${activeStage}`} data-od-id="main-delivery-workbench">
-          {activeStage !== "settings" ? (
+          {activeStage !== "settings" && activeStage !== "aim" ? (
             <nav className="od-stage-nav" aria-label={t("cockpit.workflow")}>
               {stages.map((item) => (
                 <button

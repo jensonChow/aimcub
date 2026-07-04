@@ -1432,48 +1432,43 @@ function AimIntakePanel(props: {
   const hasAim = props.title.trim().length > 0;
   const submitting = props.mode === "contexting" || props.mode === "drafting";
   const disabled = props.disabled || !hasAim;
+  const intakeTitle = props.parent ? t("os.breakdownTitle") : t("aimIntake.workbenchTitle");
+  const intakeBody = props.parent ? t("aimIntake.subAimBody") : t("aimIntake.workbenchBody");
   return (
-    <section className="od-aim-intake">
+    <section className={props.parent ? "od-aim-intake od-aim-intake-child" : "od-aim-intake"}>
       <div className="od-aim-intake-head">
         <div>
-          <div className="od-aim-kicker">{props.parent ? t("os.subAimMode") : t("os.newAim")}</div>
-          <h1>{props.parent ? t("os.breakdownTitle") : t("os.heroTitle")}</h1>
-          <p>{props.parent ? t("aimIntake.subAimBody") : t("aimIntake.body")}</p>
+          <div className="od-aim-kicker">{props.parent ? t("os.subAimMode") : t("aimIntake.workbenchKicker")}</div>
+          <h1>{intakeTitle}</h1>
+          <p>{intakeBody}</p>
         </div>
       </div>
 
-      <div className="od-aim-intake-form">
-        <div className="od-field-head">
-          <label htmlFor="aim-title">{t("aimIntake.titleLabel")}</label>
-          <span>{hasAim ? t("aimIntake.ready") : t("aimIntake.empty")}</span>
-        </div>
+      <div className="od-aim-composer">
         <input
           id="aim-title"
           className="od-aim-title-input"
           value={props.title}
           onChange={(event) => props.onTitle(event.target.value)}
-          placeholder={t("os.aimPlaceholder")}
+          placeholder={t("aimIntake.composerPlaceholder")}
+          aria-label={t("aimIntake.titleLabel")}
+          autoFocus
         />
-
-        <div className="od-field-head">
-          <label htmlFor="aim-context">{t("aimIntake.contextLabel")}</label>
-          <span>{t("aimIntake.optional")}</span>
-        </div>
         <textarea
           id="aim-context"
           className="od-aim-context-input"
           value={props.description}
           onChange={(event) => props.onDescription(event.target.value)}
-          placeholder={t("os.contextPlaceholder")}
-          rows={5}
+          placeholder={t("aimIntake.contextPlaceholder")}
+          aria-label={t("aimIntake.contextLabel")}
+          rows={4}
         />
-      </div>
-
-      <div className="od-aim-intake-footer">
-        <p>{hasAim ? t("aimIntake.contextGate") : t("aimIntake.unsaved")}</p>
-        <button className="od-aim-primary" type="button" onClick={props.onDraft} disabled={disabled}>
-          {submitting ? t("os.drafting") : t("aimIntake.cta")}
-        </button>
+        <div className="od-aim-composer-footer">
+          <span>{hasAim ? t("aimIntake.readyHint") : t("aimIntake.emptyHint")}</span>
+          <button className="od-aim-primary" type="button" onClick={props.onDraft} disabled={disabled}>
+            {submitting ? t("os.drafting") : t("aimIntake.cta")}
+          </button>
+        </div>
       </div>
 
       {props.runtimeGuidance ? (
