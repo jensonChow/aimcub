@@ -8,12 +8,13 @@ Branch: `main`
 - Refreshed project memory after the product-loop integration and the `stash@{0}` review.
 - Promoted the Context Sources planning-gate rule from transient handoff into durable Desktop and design-system memory.
 - Kept the handoff focused on current transfer state instead of carrying the full eight-branch integration transcript.
+- Removed the stale `codex/wip-planning-tools-before-main-restore` local/remote branch and dropped the old `pre-integration-main-staged-cleanup` stash after confirming both were superseded by `main`.
 
 ## Current State
 
 - `main` supports the local Aim OS loop: aim-first onboarding, context bundle review, editable sub-aim/eval plans, explicit human/agent/model routing, manual proof evidence, evidence/eval review, Context Inbox review, and completion recap.
 - Context Sources now has one setup summary, compact planning readiness gates, and one editable control surface. The gates cover context bundle, research fusion, gap intake, scope guard, and sub-aim readiness.
-- `stash@{0}` remains as `pre-integration-main-staged-cleanup`. Its viable Context Sources gate intent has been integrated; the rest is older renderer/settings/workspace configuration that would regress the current product loop if applied wholesale.
+- No stash entries or unmerged local/remote WIP branches are expected after the cleanup.
 
 ## Verification
 
@@ -33,5 +34,5 @@ Notes:
 ## Next Session Prompt
 
 ```text
-Continue from main. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md, then load only task-relevant module memory. Preserve the integrated Aim OS loop and the Context Sources rule: one summary, compact planning readiness gates, and one editable control surface. Do not apply stash@{0} blindly; inspect it against the current product loop first. If changes are made, update docs/handoff.md and run the full required verification command set.
+Continue from main. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md, then load only task-relevant module memory. Preserve the integrated Aim OS loop and the Context Sources rule: one summary, compact planning readiness gates, and one editable control surface. If changes are made, update docs/handoff.md and run the full required verification command set.
 ```
