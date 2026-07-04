@@ -28,6 +28,7 @@ type AppMode = "cockpit" | "contexting" | "drafting" | "answering" | "reviewing"
 type ClarifyPhase = "intake" | "postDraft" | null;
 type AnswerMap = Record<string, { labels: string[]; other: string }>;
 type ProgressMilestoneRow = AimProgressReadModel["milestones"][number];
+type ProgressEvidenceReviewItem = ProgressMilestoneRow["evidence"][number];
 type EvalState = "passed" | "failed" | "needs_human" | "unsupported" | "error" | "pending";
 
 function shortText(value: string | undefined | null, max = 120): string {
@@ -207,7 +208,15 @@ function progressRows(detail: GoalDetail, progress: AimProgressReadModel | null)
     assignment: null,
     latest_run: null,
     child_relations: [],
+    eval_review: {
+      passed: milestone.status === "completed",
+      matched_evidence_ids: [],
+      trust_score: 0,
+      reason: "",
+      next_action: "",
+    },
     evaluator_results: [],
+    evidence: [],
     evidence_count: 0,
     completed: milestone.status === "completed",
     blocked: milestone.status === "blocked",
@@ -217,6 +226,7 @@ function progressRows(detail: GoalDetail, progress: AimProgressReadModel | null)
 
 function evalStateOf(row: ProgressMilestoneRow): EvalState {
   const statuses = row.evaluator_results.map((result) => result.status);
+  if (row.eval_review.passed) return "passed";
   if (statuses.includes("error")) return "error";
   if (statuses.includes("needs_human")) return "needs_human";
   if (statuses.includes("unsupported")) return "unsupported";
@@ -239,6 +249,60 @@ function shortId(value: string): string {
 
 function formatTrust(value: number): string {
   return `${Math.round(value * 100)}%`;
+}
+
+function formatEvidenceKind(kind: string): string {
+  return kind.replace(/_/g, " ");
+}
+
+function formatEvidenceTime(value: string | undefined): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function evidencePayloadText(item: ProgressEvidenceReviewItem): string {
+  const payload = item.evidence.payload;
+  const parts: string[] = [];
+  const message = typeof payload.message === "string" ? payload.message.trim() : "";
+  const branch = typeof payload.branch === "string" ? payload.branch.trim() : "";
+  const workflow = typeof payload.workflow === "string" ? payload.workflow.trim() : "";
+  const conclusion = typeof payload.conclusion === "string" ? payload.conclusion.trim() : "";
+  const files = Array.isArray(payload.files) ? payload.files.filter((file): file is string => typeof file === "string") : [];
+  if (message) parts.push(message);
+  if (workflow || conclusion) parts.push([workflow, conclusion].filter(Boolean).join(" "));
+  if (branch) parts.push(`branch ${branch}`);
+  if (files.length > 0) parts.push(`${files.length} file${files.length === 1 ? "" : "s"}: ${files.slice(0, 3).join(", ")}`);
+  return parts.join(" · ");
+}
+
+function evidenceTitle(item: ProgressEvidenceReviewItem): string {
+  const summary = item.evidence.summary.trim();
+  return summary || evidencePayloadText(item) || formatEvidenceKind(item.evidence.kind);
+}
+
+function evidenceStatusTone(item: ProgressEvidenceReviewItem): string {
+  if (item.status === "matched") return "success";
+  if (item.status === "low_trust") return "warn";
+  return "";
+}
+
+function matchedRuleText(item: ProgressEvidenceReviewItem): string {
+  return item.rule_matches.map((match) => `#${match.clause_index + 1} ${match.evaluator}`).join(", ");
+}
+
+function matchedEvidenceText(row: ProgressMilestoneRow, evidenceIds: readonly string[]): string {
+  const ids = new Set(evidenceIds);
+  return row.evidence
+    .filter((item) => ids.has(item.evidence.id))
+    .map((item) => shortText(evidenceTitle(item), 64))
+    .join(", ");
 }
 
 export function App() {
@@ -1259,6 +1323,8 @@ function ExecutePanel(props: {
                 <span>{t("os.nextWork")}</span>
                 <strong>{row.next_action || t("shell.noNextAction")}</strong>
               </div>
+
+              <EvidenceReviewList row={row} limit={2} compact />
             </div>
 
             <div className="od-work-actions">
@@ -1294,6 +1360,72 @@ function ExecutePanel(props: {
   );
 }
 
+function EvidenceReviewList(props: {
+  row: ProgressMilestoneRow;
+  limit?: number;
+  compact?: boolean;
+}) {
+  const { t } = useI18n();
+  const items = props.limit ? props.row.evidence.slice(0, props.limit) : props.row.evidence;
+  const hiddenCount = Math.max(0, props.row.evidence.length - items.length);
+
+  function statusLabel(item: ProgressEvidenceReviewItem): string {
+    switch (item.status) {
+      case "matched":
+        return t("os.evidenceStatus.matched");
+      case "low_trust":
+        return t("os.evidenceStatus.lowTrust");
+      case "unmatched":
+        return t("os.evidenceStatus.unmatched");
+    }
+  }
+
+  return (
+    <div className={`od-evidence-review${props.compact ? " is-compact" : ""}`}>
+      <div className="od-evidence-review-head">
+        <span>{t("os.evidenceDetails")}</span>
+        <span>{t("os.evidenceCount", { n: props.row.evidence_count })}</span>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="od-empty-inline od-evidence-empty">
+          <strong>{t("os.evidenceNoDetails")}</strong>
+          <span>{props.row.eval_review.next_action || t("os.evidenceNoDetailsAction")}</span>
+        </div>
+      ) : (
+        <div className="od-evidence-list">
+          {items.map((item) => {
+            const ruleMatches = matchedRuleText(item);
+            const payloadText = evidencePayloadText(item);
+            const occurred = formatEvidenceTime(item.evidence.occurred_at);
+            return (
+              <div key={item.evidence.id} className={`od-evidence-row ${item.status}`}>
+                <div className="od-evidence-row-head">
+                  <strong>{shortText(evidenceTitle(item), props.compact ? 96 : 150)}</strong>
+                  <span className={`od-pill ${evidenceStatusTone(item)}`}>{statusLabel(item)}</span>
+                </div>
+                {payloadText ? <p>{shortText(payloadText, props.compact ? 110 : 220)}</p> : null}
+                <small>
+                  {[formatEvidenceKind(item.evidence.kind), occurred, t("os.evidenceTrust", { n: formatTrust(item.evidence.trust_score) })]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </small>
+                <small>
+                  {ruleMatches ? t("os.evidenceRules", { rules: ruleMatches }) : t("os.evidenceNoRules")}
+                </small>
+                {item.review_note ? <small>{item.review_note}</small> : null}
+              </div>
+            );
+          })}
+          {hiddenCount > 0 ? (
+            <div className="od-evidence-more">{t("os.evidenceMore", { n: hiddenCount })}</div>
+          ) : null}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EvalPanel(props: {
   detail: GoalDetail;
   progress: AimProgressReadModel | null;
@@ -1304,7 +1436,8 @@ function EvalPanel(props: {
   const evaluatorResults = rows.flatMap((row) => row.evaluator_results);
   const satisfiedRows = rows.filter((row) => evalStateOf(row) === "passed").length;
   const pendingCandidates = props.progress?.context_candidates.filter((candidate) => candidate.status === "pending") ?? [];
-  const reviewItems = evaluatorResults.filter((result) => result.status !== "passed").length + pendingCandidates.length;
+  const evidenceReviewItems = rows.flatMap((row) => row.evidence).filter((item) => item.status !== "matched").length;
+  const reviewItems = evaluatorResults.filter((result) => result.status !== "passed").length + evidenceReviewItems + pendingCandidates.length;
 
   function evalLabel(state: EvalState): string {
     switch (state) {
@@ -1351,6 +1484,7 @@ function EvalPanel(props: {
                     <strong>{row.milestone.title}</strong>
                     <span className={`od-pill ${evalToneClass(state)}`}>{evalLabel(state)}</span>
                     <span className="od-pill">{t("os.evidenceCount", { n: row.evidence_count })}</span>
+                    <span className="od-pill">{t("os.evalTrust", { n: formatTrust(row.eval_review.trust_score) })}</span>
                   </div>
                 </div>
 
@@ -1367,25 +1501,42 @@ function EvalPanel(props: {
                   </div>
                 </div>
 
+                <div className="od-eval-summary">
+                  <div>
+                    <span>{t("os.evalReason")}</span>
+                    <strong>{row.eval_review.reason || t("os.evalNoResults")}</strong>
+                  </div>
+                  <div>
+                    <span>{t("os.evalNextAction")}</span>
+                    <strong>{row.eval_review.next_action || row.next_action || t("shell.noNextAction")}</strong>
+                  </div>
+                </div>
+
                 <div className="od-evaluator-list">
                   {row.evaluator_results.length === 0 ? (
                     <div className="od-empty-inline">{t("os.evalNoResults")}</div>
-                  ) : row.evaluator_results.map((result, index) => (
-                    <div key={`${result.evaluator}-${index}`} className="od-evaluator-row">
-                      <div className="od-evaluator-head">
-                        <strong>{result.evaluator}</strong>
-                        <span className={`od-pill ${evalToneClass(result.status)}`}>{evalLabel(result.status)}</span>
+                  ) : row.evaluator_results.map((result, index) => {
+                    const matchedEvidence = matchedEvidenceText(row, result.matched_evidence_ids);
+                    return (
+                      <div key={`${result.evaluator}-${index}`} className="od-evaluator-row">
+                        <div className="od-evaluator-head">
+                          <strong>{`#${index + 1} ${result.evaluator}`}</strong>
+                          <span className={`od-pill ${evalToneClass(result.status)}`}>{evalLabel(result.status)}</span>
+                        </div>
+                        <p>{result.explanation || result.failure_reason || t("os.noEval")}</p>
+                        <small>
+                          {t("os.evalTrust", { n: formatTrust(result.trust_score) })}
+                          {" · "}
+                          {t("os.evalMatchedCount", { n: result.matched_evidence_ids.length })}
+                          {result.requires_human_confirmation ? ` · ${t("os.evalHumanConfirmation")}` : ""}
+                        </small>
+                        <small>{matchedEvidence ? t("os.evalMatchedEvidenceDetail", { evidence: matchedEvidence }) : t("os.evalNoMatchedEvidence")}</small>
                       </div>
-                      <p>{result.explanation || result.failure_reason || t("os.noEval")}</p>
-                      <small>
-                        {t("os.evalTrust", { n: formatTrust(result.trust_score) })}
-                        {" · "}
-                        {t("os.evalMatchedCount", { n: result.matched_evidence_ids.length })}
-                        {result.requires_human_confirmation ? ` · ${t("os.evalHumanConfirmation")}` : ""}
-                      </small>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
+
+                <EvidenceReviewList row={row} />
               </div>
             </article>
           );

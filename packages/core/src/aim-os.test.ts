@@ -151,10 +151,74 @@ describe("Aim OS evaluator registry surface", () => {
 
     expect(unsupported.passed).toBe(false);
     expect(unsupported.evaluatorResults[0]?.status).toBe("unsupported");
+    expect(unsupported.evalReview.reason).toContain("Cannot auto-evaluate");
   });
 });
 
 describe("Aim OS cockpit read model", () => {
+  it("adds evidence details, trust, reasoning, and rule matches to milestone rows", () => {
+    const trusted: Evidence = {
+      id: "00000000-0000-4000-8000-000000000070",
+      owner_id: OWNER,
+      goal_id: GOAL,
+      milestone_id: MILESTONE,
+      emitter_id: null,
+      kind: "git_commit",
+      source_event_id: "sha-trusted",
+      occurred_at: "2026-07-03T00:00:00.000Z",
+      summary: "init project",
+      payload: { sha: "sha-trusted", message: "init project", files: ["src/index.ts"] },
+      trust_score: 0.95,
+    };
+    const lowTrust: Evidence = {
+      ...trusted,
+      id: "00000000-0000-4000-8000-000000000071",
+      source_event_id: "sha-low",
+      summary: "agent reported init project",
+      payload: { sha: "sha-low", message: "init project", files: ["src/index.ts"] },
+      trust_score: 0.5,
+    };
+
+    const model = buildAimProgressReadModel({
+      goal: goal(),
+      milestones: [milestone()],
+      evidence: [trusted, lowTrust],
+    });
+    const row = model.milestones[0]!;
+
+    expect(row.eval_review).toMatchObject({
+      passed: true,
+      matched_evidence_ids: [trusted.id],
+      trust_score: 0.95,
+    });
+    expect(row.eval_review.reason).toContain("passed");
+    expect(row.evidence).toHaveLength(2);
+    expect(row.evidence[0]).toMatchObject({
+      evidence: { id: trusted.id, summary: "init project", trust_score: 0.95 },
+      rule_matches: [{ clause_index: 0, evaluator: "commit_pattern" }],
+      status: "matched",
+    });
+    expect(row.evidence[1]).toMatchObject({
+      evidence: { id: lowTrust.id, trust_score: 0.5 },
+      rule_matches: [],
+      status: "low_trust",
+    });
+  });
+
+  it("makes missing evidence actionable in the eval review", () => {
+    const model = buildAimProgressReadModel({
+      goal: goal(),
+      milestones: [milestone()],
+      evidence: [],
+    });
+    const row = model.milestones[0]!;
+
+    expect(row.eval_review.passed).toBe(false);
+    expect(row.eval_review.reason).toBe("No evidence has been recorded for this sub-aim yet.");
+    expect(row.eval_review.next_action).toContain("Run the assigned agent");
+    expect(row.evidence).toEqual([]);
+  });
+
   it("rolls child aim status back into the parent milestone view", () => {
     const childMilestone = milestone({
       id: CHILD_MILESTONE,

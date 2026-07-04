@@ -58,6 +58,7 @@ Reference links:
 - Stage model: Aim -> Context -> Plan/Contracts -> Execute -> Eval. Stage navigation may be visible, but each stage must still present a single dominant action.
 - New aim title and description belong to the Aim stage. The Context stage should confirm the captured aim and collect answers, attachments, and sources; it must not show a second title/description composer unless the user explicitly opens child-aim breakdown or an unsaved-aim edit path.
 - Execute and Eval are distinct stages. Execute answers "Who/what should do the next work?" with assignments, agent run, human proof, and child-breakdown actions. Eval answers "What evidence exists, did it satisfy the rule, and what needs review?" with evidence counts/details, evaluator status, trust/explanation, and pending context candidates when present.
+- Execute and Eval must be evidence-detail-first. Counts alone are insufficient: evidence rows should show summaries, trust, matched acceptance rule indexes/evaluators, pass/fail reasoning, and actionable missing/low-trust states from the core read model.
 - Existing aims open to Aim overview first. Do not jump users into Run details or show an empty composer on the Context stage.
 - Settings are an aim-helper setup surface, not a flat runtime control panel. Frame provider setup, local CLI agent detection, web research, and context sources as helpers needed to complete aims; keep their configuration clear and thin unless setup is the user's current task.
 

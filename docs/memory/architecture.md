@@ -20,6 +20,8 @@ Evidence is append-only and idempotent. Milestone completion is state derived fr
 
 Agent runs may record low-trust evidence with attribution, but should not auto-complete milestones unless eval/manual confirmation derives completion.
 
+Execution progress read models must expose evidence review details from core, not UI-only state: each milestone row carries evidence items, trust, matched acceptance rule indexes/evaluators, pass/fail reasoning, and the next review action.
+
 ## Lean Defaults
 
 Stay lean until concrete triggers demand more: use a jobs table plus pg_cron, linear milestones rather than DAGs, and single-table memory rather than vector infrastructure.
