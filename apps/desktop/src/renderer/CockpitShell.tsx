@@ -92,7 +92,7 @@ export function CockpitShell({
   const [collapsed, setCollapsed] = useState(false);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "paused">("all");
-  const [sidebarWidth, setSidebarWidth] = useState(300);
+  const [sidebarWidth, setSidebarWidth] = useState(264);
   const dragState = useRef<{ pointerId: number } | null>(null);
 
   const stages = useMemo<StageItem[]>(() => [
@@ -114,8 +114,8 @@ export function CockpitShell({
     .slice(0, 5);
 
   const completion = pct(completed, total);
-  const nextAction = progress?.next_action || t("shell.noNextAction");
-  const currentAimTitle = selected?.title || t("shell.untitledAim");
+  const nextAction = selected ? progress?.next_action || t("shell.noNextAction") : t("aimIntake.unsaved");
+  const currentAimTitle = selected?.title || t("os.newAim");
   const sidebarStyle = { "--sidebar-width": `${sidebarWidth}px` } as CSSProperties;
 
   function startResize(event: React.PointerEvent<HTMLDivElement>) {
@@ -126,7 +126,7 @@ export function CockpitShell({
 
   function moveResize(event: React.PointerEvent<HTMLDivElement>) {
     if (!dragState.current) return;
-    const next = Math.max(248, Math.min(380, event.clientX));
+    const next = Math.max(232, Math.min(320, event.clientX));
     setSidebarWidth(next);
   }
 
@@ -142,7 +142,7 @@ export function CockpitShell({
     event.preventDefault();
     setSidebarWidth((current) => {
       const delta = event.key === "ArrowRight" ? 16 : -16;
-      return Math.max(248, Math.min(380, current + delta));
+      return Math.max(232, Math.min(320, current + delta));
     });
   }
 
@@ -153,7 +153,7 @@ export function CockpitShell({
         <div className="od-titlebar-status">{busy || error || t("cockpit.titlebar.ready")}</div>
       </header>
 
-      <div className={`od-app${collapsed ? " sidebar-collapsed" : ""}`} style={sidebarStyle}>
+      <div className={`od-app od-app-stage-${activeStage}${collapsed ? " sidebar-collapsed" : ""}`} style={sidebarStyle}>
         <aside className="od-sidebar" aria-hidden={collapsed} data-od-id="left-aim-sidebar">
           <div className="od-sidebar-head">
             <div>
@@ -266,8 +266,8 @@ export function CockpitShell({
           role="separator"
           aria-orientation="vertical"
           aria-label={t("cockpit.resizeSidebar")}
-          aria-valuemin={248}
-          aria-valuemax={380}
+          aria-valuemin={232}
+          aria-valuemax={320}
           aria-valuenow={sidebarWidth}
           tabIndex={0}
           onPointerDown={startResize}
@@ -277,7 +277,7 @@ export function CockpitShell({
           onKeyDown={resizeWithKeyboard}
         />
 
-        <main className="od-main" data-od-id="main-delivery-workbench">
+        <main className={`od-main od-main-${activeStage}`} data-od-id="main-delivery-workbench">
           <nav className="od-stage-nav" aria-label={t("cockpit.workflow")}>
             {stages.map((item) => (
               <button
@@ -296,7 +296,7 @@ export function CockpitShell({
             ))}
           </nav>
 
-          <section className="od-workspace" data-od-id="workflow-panels">
+          <section className={`od-workspace od-workspace-${activeStage}`} data-od-id="workflow-panels">
             {main}
           </section>
         </main>

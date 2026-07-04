@@ -609,20 +609,11 @@ function AimOsApp() {
     setMode("cockpit");
   }
 
-  const heroPanel = (
-    <section style={heroPanelStyle()}>
-      <div>
-        <div style={eyebrowStyle()}>{t("os.flow")}</div>
-        <h1 style={{ margin: "6px 0 8px", fontSize: 30, letterSpacing: 0 }}>
-          {selected ? selected.title : parent ? t("os.breakdownTitle") : t("os.heroTitle")}
-        </h1>
-        <p style={{ margin: 0, color: C.muted, maxWidth: 680, lineHeight: 1.55 }}>
-          {selected ? shortText(selected.description || progress?.next_action || t("os.heroBody"), 220) : t("os.heroBody")}
-        </p>
-      </div>
-      <ProgressDonut done={completed} total={total} />
-    </section>
-  );
+  function startNewAim() {
+    resetComposer();
+    setMode("cockpit");
+    setStageOverride("aim");
+  }
 
   const composerPanel = (
     <ComposerPanel
@@ -728,10 +719,27 @@ function AimOsApp() {
       );
     }
     return (
-      <>
-        {heroPanel}
-        {!selected || draft || parent ? composerPanel : null}
-      </>
+      selected && !draft && !parent ? (
+        <AimOverviewPanel
+          goal={selected}
+          progress={progress}
+          completed={completed}
+          total={total}
+          onContext={() => openCockpitStage("context")}
+          onNewAim={startNewAim}
+        />
+      ) : (
+        <AimIntakePanel
+          title={aimTitle}
+          description={aimDescription}
+          parent={parent}
+          mode={mode}
+          disabled={Boolean(busy)}
+          onTitle={setAimTitle}
+          onDescription={setAimDescription}
+          onDraft={() => void startDraft()}
+        />
+      )
     );
   })();
 
@@ -750,11 +758,7 @@ function AimOsApp() {
       pendingContextCount={contextCandidates.length}
       busy={busy}
       error={error}
-      onNewAim={() => {
-        resetComposer();
-        setMode("cockpit");
-        setStageOverride("aim");
-      }}
+      onNewAim={startNewAim}
       onOpenGoal={(goal) => void openGoal(goal)}
       onStage={openCockpitStage}
       main={(
@@ -793,6 +797,118 @@ function AimOsApp() {
         </>
       )}
     />
+  );
+}
+
+function AimOverviewPanel(props: {
+  goal: Goal;
+  progress: AimProgressReadModel | null;
+  completed: number;
+  total: number;
+  onContext: () => void;
+  onNewAim: () => void;
+}) {
+  const { t } = useI18n();
+  const completion = pct(props.completed, props.total);
+  const nextAction = props.progress?.next_action || t("shell.noNextAction");
+  const summary = props.goal.description?.trim() || nextAction;
+  return (
+    <section className="od-aim-overview">
+      <div className="od-aim-intake-head">
+        <div>
+          <div className="od-aim-kicker">{t("shell.currentAim")}</div>
+          <h1>{props.goal.title}</h1>
+          <p>{shortText(summary, 260)}</p>
+        </div>
+        <ProgressDonut done={props.completed} total={props.total} />
+      </div>
+
+      <div className="od-aim-overview-strip">
+        <div>
+          <span>{t("shell.progress")}</span>
+          <strong>{completion}%</strong>
+          <small>{t("shell.progressValue", { done: props.completed, total: props.total })}</small>
+        </div>
+        <div>
+          <span>{t("shell.nextAction")}</span>
+          <strong>{shortText(nextAction, 120)}</strong>
+          <small>{t("aimIntake.contextGate")}</small>
+        </div>
+      </div>
+
+      <div className="od-aim-intake-footer">
+        <p>{t("aimIntake.currentHint")}</p>
+        <div className="od-aim-intake-actions">
+          <button className="od-aim-secondary" type="button" onClick={props.onNewAim}>
+            {t("os.newAim")}
+          </button>
+          <button className="od-aim-primary" type="button" onClick={props.onContext}>
+            {t("aimIntake.cta")}
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function AimIntakePanel(props: {
+  title: string;
+  description: string;
+  parent: { goalId: string; milestoneId: string } | null;
+  mode: AppMode;
+  disabled: boolean;
+  onTitle: (value: string) => void;
+  onDescription: (value: string) => void;
+  onDraft: () => void;
+}) {
+  const { t } = useI18n();
+  const hasAim = props.title.trim().length > 0;
+  const submitting = props.mode === "contexting" || props.mode === "drafting";
+  const disabled = props.disabled || !hasAim;
+  return (
+    <section className="od-aim-intake">
+      <div className="od-aim-intake-head">
+        <div>
+          <div className="od-aim-kicker">{props.parent ? t("os.subAimMode") : t("os.newAim")}</div>
+          <h1>{props.parent ? t("os.breakdownTitle") : t("os.heroTitle")}</h1>
+          <p>{props.parent ? t("aimIntake.subAimBody") : t("aimIntake.body")}</p>
+        </div>
+      </div>
+
+      <div className="od-aim-intake-form">
+        <div className="od-field-head">
+          <label htmlFor="aim-title">{t("aimIntake.titleLabel")}</label>
+          <span>{hasAim ? t("aimIntake.ready") : t("aimIntake.empty")}</span>
+        </div>
+        <input
+          id="aim-title"
+          className="od-aim-title-input"
+          value={props.title}
+          onChange={(event) => props.onTitle(event.target.value)}
+          placeholder={t("os.aimPlaceholder")}
+        />
+
+        <div className="od-field-head">
+          <label htmlFor="aim-context">{t("aimIntake.contextLabel")}</label>
+          <span>{t("aimIntake.optional")}</span>
+        </div>
+        <textarea
+          id="aim-context"
+          className="od-aim-context-input"
+          value={props.description}
+          onChange={(event) => props.onDescription(event.target.value)}
+          placeholder={t("os.contextPlaceholder")}
+          rows={5}
+        />
+      </div>
+
+      <div className="od-aim-intake-footer">
+        <p>{hasAim ? t("aimIntake.contextGate") : t("aimIntake.unsaved")}</p>
+        <button className="od-aim-primary" type="button" onClick={props.onDraft} disabled={disabled}>
+          {submitting ? t("os.drafting") : t("aimIntake.cta")}
+        </button>
+      </div>
+    </section>
   );
 }
 
@@ -1177,19 +1293,6 @@ function Metric({ label, value }: { label: string; value: string }) {
       <strong>{value}</strong>
     </div>
   );
-}
-
-function heroPanelStyle(): CSSProperties {
-  return {
-    background: "#fff",
-    border: `1px solid ${C.border}`,
-    borderRadius: 8,
-    padding: 22,
-    display: "flex",
-    justifyContent: "space-between",
-    gap: 20,
-    alignItems: "center",
-  };
 }
 
 function panelStyle(): CSSProperties {
