@@ -927,28 +927,36 @@ function ClarifyPanel(props: {
   const { t } = useI18n();
   const intake = props.phase === "intake";
   const questions = intake && !props.questionnaireEnabled ? [] : props.clarify.questions;
-  const hasContextAnswer = !intake
-    || (props.conversationEnabled && props.contextNote.trim().length > 0)
-    || Object.values(props.answers).some((answer) => answer.other.trim() || answer.labels.length > 0);
-  const primaryDisabled = props.disabled || !hasContextAnswer;
+  const hasQuestionAnswer = Object.values(props.answers).some((answer) => answer.other.trim() || answer.labels.length > 0);
+  const hasContextAnswer = (props.conversationEnabled && props.contextNote.trim().length > 0)
+    || hasQuestionAnswer;
+  const primaryAcceptsDraft = !intake && !hasQuestionAnswer && Boolean(props.onSkip);
+  const primaryAction = primaryAcceptsDraft && props.onSkip ? props.onSkip : props.onRefine;
+  const primaryLabel = intake ? t("os.generateFromContext") : primaryAcceptsDraft ? t("os.acceptDraft") : t("os.refineDraft");
+  const secondaryLabel = hasQuestionAnswer ? t("os.acceptDraft") : t("os.skipRefinement");
+  const primaryDisabled = props.disabled || (intake && !hasContextAnswer);
+  const body = intake
+    ? t("os.contextIntakeBody")
+    : questions.length
+      ? t("os.clarifyBody")
+      : t("os.noQuestionsBody");
   return (
     <section style={panelStyle()}>
       <div style={sectionHeaderStyle()}>
         <div>
-          <div style={eyebrowStyle()}>{t("os.stepContext")}</div>
+          <div style={eyebrowStyle()}>{t(intake ? "os.contextIntakeEyebrow" : "os.draftRefinementEyebrow")}</div>
           <h2 style={sectionTitleStyle()}>
             {intake ? t("os.contextIntakeHeading") : questions.length ? t("os.clarifyHeading") : t("os.noQuestionsHeading")}
           </h2>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          {props.onSkip ? <button onClick={props.onSkip} style={{ ...secondaryButton(), marginTop: 0 }}>{t("os.useDraft")}</button> : null}
-          <button onClick={props.onRefine} disabled={primaryDisabled} style={{ ...primaryButton(primaryDisabled), marginTop: 0 }}>
-            {intake ? t("os.generateFromContext") : t("os.refine")}
+          {props.onSkip && !primaryAcceptsDraft ? <button onClick={props.onSkip} style={{ ...secondaryButton(), marginTop: 0 }}>{secondaryLabel}</button> : null}
+          <button onClick={primaryAction} disabled={primaryDisabled} style={{ ...primaryButton(primaryDisabled), marginTop: 0 }}>
+            {primaryLabel}
           </button>
         </div>
       </div>
-      {intake ? <p style={mutedTextStyle()}>{t("os.contextIntakeBody")}</p> : null}
-      {questions.length === 0 ? <p style={mutedTextStyle()}>{t("os.noQuestionsBody")}</p> : null}
+      <p style={mutedTextStyle()}>{body}</p>
       <div style={{ display: "grid", gap: 12 }}>
         {questions.map((question) => {
           const answer = props.answers[question.id] ?? { labels: [], other: "" };
