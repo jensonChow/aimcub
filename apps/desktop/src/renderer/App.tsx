@@ -24,6 +24,7 @@ import type {
   Evidence,
   Goal,
   ManualEvidenceRequiredItem,
+  Memory,
   Milestone,
   PlanNode,
   PlanRoutingOverride,
@@ -43,6 +44,7 @@ import type {
 } from "../shared/ipc";
 
 import { CockpitShell, type CockpitStage } from "./CockpitShell";
+import { buildContextCandidateAcceptRequest, ContextInbox, type ContextInboxScope } from "./ContextInbox";
 import { ContextSourcesPanel } from "./ContextSourcesPanel";
 import { buildContextBundleReview, type ContextBundleReview, type ContextReviewItem } from "./contextReview";
 import {
@@ -626,6 +628,11 @@ function AimOsApp() {
     setAnswers({});
     setRuntimeGuidanceVisible(false);
     setContextNote("");
+    await refreshGoalState(goal);
+  }
+
+  async function refreshGoalState(goal: Goal | null = selected) {
+    if (!goal) return;
     const [nextDetail, nextProgress] = await Promise.all([
       window.aimcub.getGoal(goal.id),
       window.aimcub.getAimProgress(goal.id),
@@ -857,12 +864,7 @@ function AimOsApp() {
     try {
       const result = await window.aimcub.runMilestoneAgent({ goalId: selected.id, milestoneId: milestone.id });
       if (!result.ok && result.error) setError(result.error);
-      const [nextDetail, nextProgress] = await Promise.all([
-        window.aimcub.getGoal(selected.id),
-        window.aimcub.getAimProgress(selected.id),
-      ]);
-      setDetail(nextDetail);
-      setProgress(nextProgress);
+      await refreshGoalState(selected);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -883,6 +885,32 @@ function AimOsApp() {
       const nextProgress = await window.aimcub.getAimProgress(selected.id);
       setDetail(nextDetail);
       setProgress(nextProgress);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function acceptContextCandidate(candidate: Memory, content: string, scope: ContextInboxScope) {
+    setBusy(t("os.busy.contextReview"));
+    setError(null);
+    try {
+      await window.aimcub.acceptContextCandidate(buildContextCandidateAcceptRequest(candidate, content, scope));
+      await refreshGoalState();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function rejectContextCandidate(candidate: Memory) {
+    setBusy(t("os.busy.contextReview"));
+    setError(null);
+    try {
+      await window.aimcub.rejectContextCandidate(candidate.id);
+      await refreshGoalState();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -1058,6 +1086,9 @@ function AimOsApp() {
     <EvalPanel
       detail={detail}
       progress={progress}
+      disabled={Boolean(busy)}
+      onAcceptContextCandidate={(candidate, content, scope) => void acceptContextCandidate(candidate, content, scope)}
+      onRejectContextCandidate={(candidate) => void rejectContextCandidate(candidate)}
     />
   ) : null;
 
@@ -2474,6 +2505,9 @@ function EvidenceReviewList(props: {
 function EvalPanel(props: {
   detail: GoalDetail;
   progress: AimProgressReadModel | null;
+  disabled: boolean;
+  onAcceptContextCandidate: (candidate: Memory, content: string, scope: ContextInboxScope) => void;
+  onRejectContextCandidate: (candidate: Memory) => void;
 }) {
   const { t } = useI18n();
   const rows = progressRows(props.detail, props.progress);
@@ -2588,26 +2622,23 @@ function EvalPanel(props: {
         })}
       </div>
 
-      <div className="od-eval-context">
-        <div className="od-card-head">
-          <h3>{t("os.evalPendingCandidates")}</h3>
-          <span className="od-pill">{String(pendingCandidates.length)}</span>
-        </div>
-        {pendingCandidates.length === 0 ? (
-          <div className="od-empty-inline">{t("os.evalNoPendingCandidates")}</div>
-        ) : (
-          <div className="od-eval-context-list">
-            {pendingCandidates.slice(0, 6).map((candidate) => (
-              <div key={candidate.id} className="od-eval-candidate">
-                <strong>{shortText(candidate.content, 160)}</strong>
-                <span>
-                  {[candidate.category, candidate.source, formatTrust(candidate.confidence)].filter(Boolean).join(" · ")}
-                </span>
-              </div>
-            ))}
+      {pendingCandidates.length === 0 ? (
+        <div className="od-eval-context">
+          <div className="od-card-head">
+            <h3>{t("os.evalPendingCandidates")}</h3>
+            <span className="od-pill">{String(pendingCandidates.length)}</span>
           </div>
-        )}
-      </div>
+          <div className="od-empty-inline">{t("os.evalNoPendingCandidates")}</div>
+        </div>
+      ) : (
+        <ContextInbox
+          candidates={pendingCandidates}
+          currentAimTitle={props.detail.goal.title}
+          disabled={props.disabled}
+          onAccept={props.onAcceptContextCandidate}
+          onReject={props.onRejectContextCandidate}
+        />
+      )}
     </section>
   );
 }

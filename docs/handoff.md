@@ -12,15 +12,16 @@ Branch: `codex/product-loop-integration`
 - Merged `codex/sub-aim-routing-overrides`, resolving conflicts so pre-save plan editing and per-sub-aim routing overrides share the same editable plan.
 - Merged `codex/manual-evidence-proof-flow`, resolving conflicts so Execute keeps routing-aware rows and Confirm opens structured proof submission.
 - Merged `codex/evidence-eval-review`, resolving conflicts so progress rows carry evidence review items with trust, rule matches, and manual proof evidence payloads.
+- Merged `codex/context-inbox-ui`, resolving conflicts so Eval keeps evidence review details and renders Context Inbox for candidate memory review.
 
 ## Current State
 
-- Desktop should keep aim-first onboarding, default context bundle review, editable plan transforms, explicit human/agent/model routing overrides, structured manual proof submission, and evidence/eval review details.
+- Desktop should keep aim-first onboarding, default context bundle review, editable plan transforms, explicit human/agent/model routing overrides, structured manual proof submission, evidence/eval review details, and Context Inbox accept/reject/edit flow in Eval.
 - Existing uncommitted staged changes from `main` were preserved in `stash@{0}` as `pre-integration-main-staged-cleanup` before this integration branch was created.
 
 ## Verification
 
-- `pnpm typecheck` passed after the routing and manual-evidence merges; full integration verification is still pending.
+- `pnpm typecheck` passed after the routing, manual-evidence, and evidence/eval merges; full integration verification is still pending.
 
 ## Next Session Prompt
 

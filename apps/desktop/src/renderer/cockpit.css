@@ -1913,10 +1913,10 @@ select:focus-visible {
 }
 
 .od-proof-validation {
-  border: 1px solid color-mix(in oklab, var(--od-warning), var(--od-bg) 68%);
+  border: 1px solid color-mix(in oklab, var(--od-warn), var(--od-bg) 68%);
   border-radius: var(--od-radius-sm);
-  background: color-mix(in oklab, var(--od-warning), var(--od-bg) 94%);
-  color: var(--od-warning);
+  background: color-mix(in oklab, var(--od-warn), var(--od-bg) 94%);
+  color: var(--od-warn);
   padding: 9px 10px;
   font-size: 12px;
   line-height: 1.4;
@@ -2100,8 +2100,8 @@ select:focus-visible {
 }
 
 .od-evidence-row.low_trust {
-  border-color: color-mix(in oklab, var(--od-warning), var(--od-bg) 70%);
-  background: color-mix(in oklab, var(--od-warning), var(--od-bg) 94%);
+  border-color: color-mix(in oklab, var(--od-warn), var(--od-bg) 70%);
+  background: color-mix(in oklab, var(--od-warn), var(--od-bg) 94%);
 }
 
 .od-evidence-row-head {
@@ -2130,6 +2130,149 @@ select:focus-visible {
 
 .od-evidence-more {
   padding: 2px 1px;
+}
+
+.od-card-head,
+.od-context-inbox-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.od-card-head h3,
+.od-context-inbox-head h3 {
+  margin: 0;
+  color: var(--od-fg);
+  font-size: 16px;
+  line-height: 1.35;
+  letter-spacing: 0;
+}
+
+.od-context-inbox {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid var(--od-border-soft);
+  padding-top: 14px;
+}
+
+.od-context-inbox-head p {
+  max-width: 640px;
+  margin: 4px 0 0;
+  color: var(--od-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.od-context-candidate-list {
+  display: grid;
+  gap: 10px;
+}
+
+.od-context-candidate {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-sm);
+  background: var(--od-surface-warm);
+  padding: 12px;
+}
+
+.od-context-candidate-meta {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.od-context-candidate-meta span {
+  min-height: 22px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-pill);
+  background: var(--od-bg);
+  color: var(--od-muted);
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.od-context-candidate textarea {
+  width: 100%;
+  min-height: 104px;
+  border: 1px solid var(--od-border);
+  border-radius: var(--od-radius-sm);
+  background: var(--od-bg);
+  color: var(--od-fg);
+  padding: 10px 12px;
+  resize: vertical;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.od-context-candidate textarea:disabled {
+  color: var(--od-muted);
+  background: var(--od-surface);
+}
+
+.od-context-warning,
+.od-context-scope-help {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.od-context-warning {
+  color: var(--od-warn);
+  font-weight: 650;
+}
+
+.od-context-scope-row,
+.od-context-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.od-scope-button {
+  min-height: 32px;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-pill);
+  background: var(--od-bg);
+  color: var(--od-muted);
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.od-scope-button:hover:not(:disabled),
+.od-scope-button.active {
+  border-color: color-mix(in oklab, var(--od-accent), var(--od-bg) 48%);
+  background: color-mix(in oklab, var(--od-accent), var(--od-bg) 92%);
+  color: var(--od-accent);
+}
+
+.od-scope-button:disabled {
+  cursor: default;
+  color: var(--od-meta);
+  background: var(--od-surface);
+}
+
+.od-context-scope-help {
+  color: var(--od-muted);
+}
+
+.od-context-actions .od-aim-primary,
+.od-context-actions .od-aim-secondary {
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: 13px;
 }
 
 .od-eval-context {
@@ -2580,6 +2723,11 @@ select:focus-visible {
   }
 
   .od-stage-panel-head {
+    display: grid;
+  }
+
+  .od-card-head,
+  .od-context-inbox-head {
     display: grid;
   }
 
