@@ -5,10 +5,10 @@
 > holds the aim, routes the work, and accrues the **context** + **eval** that make
 > the system intelligent.
 
-You set an aim (愿景 = long-term vision, 任务 = short-term task); the system
+You set an aim, whether long-term vision or short-term task; the system
 decomposes it, ingests real evidence of progress, and judges completion
-automatically. As you (and your agents) work, a durable context forms — your
-"résumé in the new era."
+automatically. As you and your agents work, a durable context forms: your
+new-era resume.
 
 **Core positioning**: Aimcub is being built first as a local **Aim OS agent
 harness**. Coding agents such as Codex and Claude Code are local runtimes inside
@@ -53,11 +53,11 @@ packages/
   llm/         @core/llm         Claude gateway (model routing + metering) + goal decomposition
   ui-tokens/   @ui/tokens        design tokens
 apps/
-  desktop/    Electron desktop app           — active local Aim OS harness
-  web/         Next.js @ Vercel              — hosted evidence/platform surface
-  mcp/         MCP server (Streamable HTTP)  — active
-  ios/         Expo RN                       — v2 (placeholder)
-  extension/   Chrome MV3                    — v3 (placeholder)
+  desktop/    Electron desktop app           - active local Aim OS harness
+  web/         Next.js @ Vercel              - hosted evidence/platform surface
+  mcp/         MCP server (Streamable HTTP)  - active
+  ios/         Expo RN                       - v2 (placeholder)
+  extension/   Chrome MV3                    - v3 (placeholder)
 ```
 
 ## Live deployment
@@ -68,7 +68,7 @@ apps/
 | MCP server | `https://mcp.aimcub.com` | Cloudflare Workers; OAuth 2.1 resource server (Supabase AS, Path A); RFC 9728 metadata at `/.well-known/oauth-protected-resource` |
 | Database | Supabase `gtasruxwmcsxicyujlfu` (us-west-1) | migrations 0001-0013; RLS verified (users cannot forge milestones) |
 | Evidence ingest | Edge Functions `ingest` (emitter tokens) + `github-webhook` (HMAC) | both feed the same idempotent `handleIngest` pipeline |
-| Judging | Edge Function `jobs-worker`, pg_cron every minute | `claim_jobs` batch → `evaluate()` → auto-completion; goal-level evidence fans out across open milestones |
+| Judging | Edge Function `jobs-worker`, pg_cron every minute | `claim_jobs` batch -> `evaluate()` -> auto-completion; goal-level evidence fans out across open milestones |
 | Passive evidence | GitHub App [Aimcub](https://github.com/apps/aimcub) | push / workflow_run events; secrets in Vault |
 | Goal decomposition | Claude Sonnet 4.6 structured output | all-required + nullable schema (the optional-property grammar blowup is real); deterministic local fallback |
 
@@ -109,9 +109,11 @@ example `AIMCUB_LIVE_DEEPSEEK_MODEL=deepseek-v4-flash`.
 
 ## Roadmap (with falsifiable gates)
 
-- **v0** ✅ Foundation: monorepo + `@core` + Supabase evidence spine. DoD = core imported by both web and mcp + zero-dependency build passes.
+- **v0** Complete: Foundation: monorepo + `@core` + Supabase evidence spine. DoD = core imported by both web and mcp + zero-dependency build passes.
 - **v1** Local Aim OS agent harness: Desktop-first aim intake, context gathering, decomposition, routing, local agent runs, evidence, eval, and context inbox. The old v1a/v1b labels are now validation history, not the active roadmap.
 - **v2** Online multiplayer Aim platform: Supabase parity for local Aim OS entities, sync, teams, permissions, and per-person context routing.
 - **v3** Aim Share: cross-org aim sharing and a paid network for goals, specialized context, and capability signals. Calendar remains a time-management component throughout.
 
-See [`docs/vision.md`](docs/vision.md) for the full direction and [`docs/v1-spec.md`](docs/v1-spec.md) for the current local harness plan.
+See [`docs/vision.md`](docs/vision.md) for the full direction,
+[`docs/v1-spec.md`](docs/v1-spec.md) for the current local harness plan, and
+[`docs/memory/README.md`](docs/memory/README.md) for the agent memory map.

@@ -1,38 +1,33 @@
-# Aimcub — Project Rules
+# Aimcub - Core Project Memory
 
-A universal **aim-management** layer for the harness era. Humans and agents are interchangeable tools for reaching a goal; aimcub is the architecture that holds the aim (愿景 = long-term vision, 任务 = short-term task), routes work across people and agents, and accrues the durable **context** + **eval** that make the system intelligent. A coding agent (Codex) is one of many evidence *emitters* via MCP; git/CI webhooks are another. Positioning: developers first, general users second.
+Aimcub is a universal aim-management layer: it holds the aim, routes work across humans and agents, and accrues the context plus eval that make the system intelligent.
 
-## Working agreement
-- **Language**: the user gives instructions in Chinese and you may reply in Chinese, but **everything committed to the repo is English** — code, comments, identifiers, commit messages, docs, SQL. **Exception**: end-user UI is bilingual via i18n — English is the source-of-truth + a `zh` locale (only `zh` translation values are Chinese; keys/code/comments stay English).
-- **This file is the project's top-level rule set. Keep it ≤50 lines.** Detailed direction lives in `docs/vision.md` — never grow AGENTS.md into it.
-- Current handoff and recent decisions live in `docs/handoff.md`; update it when transferring work.
-- After making repository changes, create a focused commit and push it before ending the turn unless the user explicitly asks not to; stage only files that belong to the completed work.
-- Verify before claiming "done": `pnpm build && pnpm test && pnpm typecheck && pnpm lint && pnpm core:purity` must stay green.
+## Non-Negotiables
+- Keep this file at 50 lines or fewer. It is the root memory for MUST/NEVER rules only.
+- Put durable module memory in `docs/memory/`; put transient session transfer in `docs/handoff.md`.
+- All committed repo content must be English: code, comments, identifiers, commit messages, docs, and SQL. Only `zh` i18n values may be Chinese.
+- After repository changes, run `pnpm build && pnpm test && pnpm typecheck && pnpm lint && pnpm core:purity`, then create a focused commit and push unless the user explicitly says not to.
+- Update `docs/handoff.md` before ending a session that changes the repo.
 
-## North star (the four pillars)
-- **Humans are agents too** — the product manages *aims*, not avatars. People and agents are both just paths to the goal; the system auto-judges which work goes to whom.
-- **Memory + Eval are the core** — memory keeps the org stable, eval keeps it correct. Aim management is AI-centric, never hand-maintained.
-- **Context is the product** — a person's context forms *naturally* by working in the system and becomes their "resume in the new era" (packageable, sellable).
-- **Personalized eval** — benchmarks don't represent real use; every person/org has its own. Eval without context is meaningless.
+## Product Contract
+- Aimcub must manage aims, not avatars. Humans and agents are both paths to the goal.
+- Memory and eval are core product pillars; memory keeps the org stable, eval keeps it correct.
+- Context is the product: durable context must form naturally from work, not from hand-maintained profiles.
+- Eval must be personalized. Benchmarks without user/org context are not enough.
 
-## Locked invariants (do not break without explicit sign-off)
-- **Hosted Supabase is the online source of truth** (Postgres + Auth + RLS + Realtime + Storage) for web/MCP evidence and the future platform; local Aim OS state is local-store first until sync parity is needed.
-- **Evidence is append-only + idempotent**; milestone completion is state *derived* from the evidence stream via `evaluate()`, never written directly.
-- **`@core/*` is the only place business logic lives** — pure TS, zero platform deps, unit-tested. App shells (`apps/*`) only do I/O, rendering, platform bridging. CI guards purity via ESLint `no-restricted-imports` + `types:[]` tsc.
-- **Lean-first**: a `jobs` table + pg_cron (not pgmq), linear milestones (not DAG), single-table memory (no vectors). Add complexity only when a concrete trigger demands it.
-- **Built-in planning tools first**: local read/search/memory/context tools are first-party Aimcub runtime tools; MCP is the external extension boundary, not the substrate for core primitives.
+## Locked Invariants
+- Hosted Supabase is the online source of truth for web/MCP evidence and the future platform.
+- Local Aim OS state is local-store first until sync parity is explicitly needed.
+- Evidence is append-only and idempotent; milestone completion is derived by `evaluate()`, never written directly.
+- `@core/*` is the only place business logic lives: pure TypeScript, zero platform dependencies, unit-tested.
+- App shells under `apps/*` only perform I/O, rendering, and platform bridging.
+- Stay lean-first: jobs table plus pg_cron, linear milestones, single-table memory, no vectors until concrete triggers demand more.
+- Built-in local planning tools are first-party Aimcub runtime tools; MCP is the external extension boundary.
 
-## Layout
-`packages/{core (@core/domain), types (@core/types), db, api, llm, ui-tokens}` + `apps/{desktop = active local harness; web, mcp = hosted surfaces; ios = v2, extension = v3 = placeholders}`. Full table in `README.md`.
+## Loading Order
+- Always read `docs/handoff.md` for the current transfer state.
+- Read `docs/memory/README.md`, then only the module memories relevant to the task.
+- Use `docs/vision.md` and `docs/v1-spec.md` for full product direction and current v1 scope.
 
 ## Commands
-`pnpm install` · `pnpm build` · `pnpm test` · `pnpm typecheck` · `pnpm lint` · `pnpm core:purity`
-
-## Roadmap (falsifiable gates)
-- **v0** ✅ foundation: monorepo + `@core` kernel + Supabase evidence spine.
-- **v1** — current: open-source local Aim OS agent harness. Desktop-first aim intake → context gathering → decomposition/eval contracts → human/agent routing → local agent runs/manual proof → evidence/eval → context inbox/reuse.
-- **H1/H2 legacy gates** — H1 auto-evidence and H2 context/eval are validation history and infrastructure inside v1, not the active phase split.
-- **v2** online multiplayer Aim platform: sync, teams, permissions, per-person context routing, managed infrastructure.
-- **v3** Aim Share: cross-org, a paid GitHub-for-goals network for aims, context, and capability signals. Calendar remains a time-management component throughout.
-
-Vision: `docs/vision.md`
+`pnpm install` - `pnpm build` - `pnpm test` - `pnpm typecheck` - `pnpm lint` - `pnpm core:purity`
