@@ -34,6 +34,8 @@ pnpm desktop:pack
 
 This creates `apps/desktop/dist/mac-arm64/Aimcub.app`; copy that bundle to root `Aimcub.app` for the current local handoff. In development macOS may label the Dock app as `Electron`, but the window title should be `Aimcub`.
 
+For Desktop UI changes that the user should inspect in the local app, `pnpm build` is not enough because it updates build output but not the project-root `Aimcub.app` bundle. Run `pnpm desktop:pack`, copy `apps/desktop/dist/mac-arm64/Aimcub.app` to root `Aimcub.app`, restart/open that exact bundle, and inspect the real window before claiming the visible app changed.
+
 Desktop release packaging for distributable DMG/zip artifacts uses:
 
 ```bash
