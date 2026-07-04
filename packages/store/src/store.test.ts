@@ -702,6 +702,12 @@ describe("createJsonFileStore · evidence and confirmations", () => {
     });
     expect(progress?.milestones[0]?.completed).toBe(false);
     expect(progress?.milestones[0]?.evidence_count).toBe(1);
+    expect(progress?.milestones[0]?.eval_review.reason).toContain("trust floor");
+    expect(progress?.milestones[0]?.evidence[0]).toMatchObject({
+      evidence: { id: result.evidence.id, summary: "Agent says the scaffold is done.", trust_score: 0.6 },
+      status: "low_trust",
+      rule_matches: [],
+    });
   });
 
   it("dedupes evidence by emitter/source event", async () => {

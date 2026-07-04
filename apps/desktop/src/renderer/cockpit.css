@@ -1979,6 +1979,36 @@ select:focus-visible {
   gap: 8px;
 }
 
+.od-eval-summary {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.od-eval-summary > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-sm);
+  background: var(--od-surface);
+  padding: 10px 12px;
+}
+
+.od-eval-summary span,
+.od-evidence-review-head {
+  color: var(--od-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.od-eval-summary strong {
+  color: var(--od-fg);
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 650;
+}
+
 .od-evaluator-row {
   min-width: 0;
   display: grid;
@@ -2020,6 +2050,86 @@ select:focus-visible {
   color: var(--od-muted);
   padding: 10px 12px;
   font-size: 13px;
+}
+
+.od-empty-inline strong,
+.od-empty-inline span {
+  display: block;
+}
+
+.od-empty-inline strong {
+  color: var(--od-fg);
+  font-weight: 650;
+}
+
+.od-empty-inline span {
+  margin-top: 3px;
+  line-height: 1.4;
+}
+
+.od-evidence-review {
+  display: grid;
+  gap: 8px;
+}
+
+.od-evidence-review.is-compact {
+  margin-top: 2px;
+}
+
+.od-evidence-review-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-weight: 650;
+}
+
+.od-evidence-list {
+  display: grid;
+  gap: 8px;
+}
+
+.od-evidence-row {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-sm);
+  background: var(--od-surface-warm);
+  padding: 10px;
+}
+
+.od-evidence-row.low_trust {
+  border-color: color-mix(in oklab, var(--od-warning), var(--od-bg) 70%);
+  background: color-mix(in oklab, var(--od-warning), var(--od-bg) 94%);
+}
+
+.od-evidence-row-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.od-evidence-row-head strong {
+  min-width: 0;
+  color: var(--od-fg);
+  font-size: 13px;
+  line-height: 1.35;
+  font-weight: 650;
+}
+
+.od-evidence-row p,
+.od-evidence-row small,
+.od-evidence-more {
+  margin: 0;
+  color: var(--od-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.od-evidence-more {
+  padding: 2px 1px;
 }
 
 .od-eval-context {
@@ -2435,6 +2545,7 @@ select:focus-visible {
   .od-plan-node-head,
   .od-routing-selects,
   .od-work-card,
+  .od-eval-summary,
   .od-work-detail-grid,
   .od-plan-card,
   .od-plan-card-head,

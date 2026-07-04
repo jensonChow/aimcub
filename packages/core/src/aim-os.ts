@@ -11,6 +11,8 @@ import type {
   ContextIntakeSessionStatus,
   Evidence,
   EvidenceAttribution,
+  EvaluationReview,
+  EvidenceReviewItem,
   EvaluatorRuntimeResult,
   Goal,
   Memory,
@@ -27,7 +29,7 @@ import type {
   ToolTrace,
 } from "@core/types";
 import { PlanRoutingOverride } from "@core/types";
-import { evaluate } from "./evaluate";
+import { AUTO_VERIFY_MIN_TRUST, evaluate } from "./evaluate";
 import type { ContextSedimentationCandidateInput } from "./context-sedimentation";
 
 export interface RoutedAssignment {
@@ -109,7 +111,9 @@ export interface EvaluationRuntimeReport {
   passed: boolean;
   matchedEvidenceIds: string[];
   trustScore: number;
+  evalReview: EvaluationReview;
   evaluatorResults: EvaluatorRuntimeResult[];
+  evidenceReview: EvidenceReviewItem[];
 }
 
 export interface BuildAimProgressInput {
@@ -448,6 +452,123 @@ function unsupportedEvaluator(clause: AcceptanceClause): boolean {
   return clause.evaluator === "file_uploaded" || clause.evaluator === "url" || clause.evaluator === "llm_judge";
 }
 
+function plural(count: number, singular: string, pluralForm = `${singular}s`): string {
+  return `${count} ${count === 1 ? singular : pluralForm}`;
+}
+
+function acceptanceModeText(rule: AcceptanceRule): string {
+  if (rule.logic === "any") return "At least one acceptance rule";
+  if (rule.logic === "weighted") return "The weighted acceptance threshold";
+  return "All acceptance rules";
+}
+
+function buildEvidenceReviewItems(
+  rule: AcceptanceRule,
+  evidenceRows: readonly Evidence[],
+  evaluatorResults: readonly EvaluatorRuntimeResult[],
+): EvidenceReviewItem[] {
+  const matchesByEvidence = new Map<string, EvidenceReviewItem["rule_matches"]>();
+  evaluatorResults.forEach((result, index) => {
+    result.matched_evidence_ids.forEach((evidenceId) => {
+      const matches = matchesByEvidence.get(evidenceId) ?? [];
+      matches.push({ clause_index: index, evaluator: result.evaluator });
+      matchesByEvidence.set(evidenceId, matches);
+    });
+  });
+  const hasAutoVerifiableRule = rule.clauses.some((clause) => clause.auto_verifiable);
+  const trustFloor = Math.round(AUTO_VERIFY_MIN_TRUST * 100);
+  return evidenceRows.map((evidence): EvidenceReviewItem => {
+    const ruleMatches = matchesByEvidence.get(evidence.id) ?? [];
+    if (ruleMatches.length > 0) {
+      const labels = ruleMatches.map((match) => `rule ${match.clause_index + 1} (${match.evaluator})`).join(", ");
+      return {
+        evidence,
+        rule_matches: ruleMatches,
+        status: "matched",
+        review_note: `Matches ${labels}.`,
+      };
+    }
+    if (hasAutoVerifiableRule && evidence.trust_score < AUTO_VERIFY_MIN_TRUST) {
+      return {
+        evidence,
+        rule_matches: [],
+        status: "low_trust",
+        review_note: `Trust is below the ${trustFloor}% floor for auto-verifiable rules; add trusted evidence or confirm manually.`,
+      };
+    }
+    return {
+      evidence,
+      rule_matches: [],
+      status: "unmatched",
+      review_note: "Recorded evidence does not satisfy any current acceptance rule.",
+    };
+  });
+}
+
+function evaluationReason(input: {
+  rule: AcceptanceRule;
+  evidenceCount: number;
+  passed: boolean;
+  matchedCount: number;
+  evaluatorResults: readonly EvaluatorRuntimeResult[];
+  evidenceReview: readonly EvidenceReviewItem[];
+}): string {
+  if (input.passed) {
+    return `${acceptanceModeText(input.rule)} passed with ${plural(input.matchedCount, "matched evidence item")}.`;
+  }
+  const unsupported = input.evaluatorResults.filter((result) => result.status === "unsupported");
+  if (unsupported.length > 0) {
+    return `Cannot auto-evaluate ${unsupported.map((result) => result.evaluator).join(", ")} in the v1 runtime.`;
+  }
+  if (input.evidenceCount === 0) {
+    return "No evidence has been recorded for this sub-aim yet.";
+  }
+  const needsHuman = input.evaluatorResults.some((result) => result.status === "needs_human");
+  if (needsHuman) {
+    return "Manual confirmation evidence is still required for this acceptance rule.";
+  }
+  const lowTrustCount = input.evidenceReview.filter((item) => item.status === "low_trust").length;
+  if (lowTrustCount > 0) {
+    return lowTrustCount === 1
+      ? "1 evidence item is below the auto-verification trust floor."
+      : `${lowTrustCount} evidence items are below the auto-verification trust floor.`;
+  }
+  const failedCount = input.evaluatorResults.filter((result) => result.status === "failed").length;
+  if (failedCount > 0) {
+    return failedCount === 1
+      ? "1 acceptance rule still has no matching evidence."
+      : `${failedCount} acceptance rules still have no matching evidence.`;
+  }
+  return "The eval is pending until matching evidence is recorded.";
+}
+
+function evaluationNextAction(input: {
+  rule: AcceptanceRule;
+  evidenceCount: number;
+  passed: boolean;
+  evaluatorResults: readonly EvaluatorRuntimeResult[];
+  evidenceReview: readonly EvidenceReviewItem[];
+}): string {
+  if (input.passed) {
+    return input.rule.completion_mode === "auto"
+      ? "Review the matched evidence for the audit trail."
+      : "Review matched evidence, then confirm only if it proves real completion.";
+  }
+  if (input.evaluatorResults.some((result) => result.status === "unsupported")) {
+    return "Collect manual proof or revise the acceptance rule to a supported evaluator.";
+  }
+  if (input.evidenceCount === 0) {
+    return "Run the assigned agent, add trusted evidence, or confirm human proof.";
+  }
+  if (input.evaluatorResults.some((result) => result.status === "needs_human")) {
+    return "Use Confirm proof after the work is complete and evidence is inspectable.";
+  }
+  if (input.evidenceReview.some((item) => item.status === "low_trust")) {
+    return "Add trusted webhook or CI evidence, or confirm manually if the proof is sufficient.";
+  }
+  return "Add evidence that matches the rule, or break down the sub-aim if the rule is wrong.";
+}
+
 export function evaluateWithRuntimeReport(rule: AcceptanceRule, evidence: readonly Evidence[]): EvaluationRuntimeReport {
   const evidenceRows = [...evidence];
   const base = evaluate(rule, evidenceRows);
@@ -483,11 +604,35 @@ export function evaluateWithRuntimeReport(rule: AcceptanceRule, evidence: readon
       requires_human_confirmation: clause.evaluator === "manual_confirm" || rule.completion_mode === "manual",
     };
   });
+  const evidenceReview = buildEvidenceReviewItems(rule, evidenceRows, evaluatorResults);
+  const reason = evaluationReason({
+    rule,
+    evidenceCount: evidenceRows.length,
+    passed: base.passed,
+    matchedCount: base.matchedEvidenceIds.length,
+    evaluatorResults,
+    evidenceReview,
+  });
+  const nextAction = evaluationNextAction({
+    rule,
+    evidenceCount: evidenceRows.length,
+    passed: base.passed,
+    evaluatorResults,
+    evidenceReview,
+  });
   return {
     passed: base.passed,
     matchedEvidenceIds: base.matchedEvidenceIds,
     trustScore: base.trustScore,
+    evalReview: {
+      passed: base.passed,
+      matched_evidence_ids: base.matchedEvidenceIds,
+      trust_score: base.trustScore,
+      reason,
+      next_action: nextAction,
+    },
     evaluatorResults,
+    evidenceReview,
   };
 }
 
@@ -555,8 +700,9 @@ export function buildAimProgressReadModel(input: BuildAimProgressInput): AimProg
       assignment,
       latest_run: latestRun,
       child_relations: childRelations,
+      eval_review: evaluation.evalReview,
       evaluator_results: evaluation.evaluatorResults,
-      evidence: milestoneEvidence,
+      evidence: evaluation.evidenceReview,
       evidence_count: milestoneEvidence.length,
       completed,
       blocked,

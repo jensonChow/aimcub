@@ -557,13 +557,40 @@ export const EvaluatorRuntimeResult = z.object({
 });
 export type EvaluatorRuntimeResult = z.infer<typeof EvaluatorRuntimeResult>;
 
+export const EvaluationReview = z.object({
+  passed: z.boolean().default(false),
+  matched_evidence_ids: z.array(z.string().uuid()).default([]),
+  trust_score: z.number().min(0).max(1).default(0),
+  reason: z.string().default(""),
+  next_action: z.string().default(""),
+});
+export type EvaluationReview = z.infer<typeof EvaluationReview>;
+
+export const EvidenceReviewStatus = z.enum(["matched", "unmatched", "low_trust"]);
+export type EvidenceReviewStatus = z.infer<typeof EvidenceReviewStatus>;
+
+export const EvidenceRuleMatch = z.object({
+  clause_index: z.number().int().nonnegative(),
+  evaluator: Evaluator,
+});
+export type EvidenceRuleMatch = z.infer<typeof EvidenceRuleMatch>;
+
+export const EvidenceReviewItem = z.object({
+  evidence: Evidence,
+  rule_matches: z.array(EvidenceRuleMatch).default([]),
+  status: EvidenceReviewStatus.default("unmatched"),
+  review_note: z.string().default(""),
+});
+export type EvidenceReviewItem = z.infer<typeof EvidenceReviewItem>;
+
 export const AimProgressMilestoneRead = z.object({
   milestone: Milestone,
   assignment: Assignment.nullable().default(null),
   latest_run: Run.nullable().default(null),
   child_relations: z.array(SubAimRelation).default([]),
+  eval_review: EvaluationReview.default({}),
   evaluator_results: z.array(EvaluatorRuntimeResult).default([]),
-  evidence: z.array(Evidence).default([]),
+  evidence: z.array(EvidenceReviewItem).default([]),
   evidence_count: z.number().int().nonnegative().default(0),
   completed: z.boolean().default(false),
   blocked: z.boolean().default(false),
