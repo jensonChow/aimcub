@@ -32,6 +32,8 @@ Planning consumes context before decomposition through `context.linked_sources`,
 
 User-facing intake questions should come from `generateAimIntakeQuestions` grounded in available context. Do not surface template prompts like "Ask for..." directly to users.
 
+The main Desktop loop reaches Context Inbox from the Eval stage. Pending context candidates render as editable review rows with source, category, confidence, and scope; accept/reject uses the existing context-candidate IPC. Accepting global context makes it active memory for future aim planning, while accepting aim scope keeps it tied to the current aim.
+
 ## Local Agents
 
 The local CLI agent harness lives in `apps/desktop/src/main/local-agents.ts`. It detects Codex and Claude CLIs through explicit env overrides, PATH, common install paths, version/auth/model probes, command construction, stdin prompt delivery, and JSONL/stream-json event normalization.
