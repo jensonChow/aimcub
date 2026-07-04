@@ -137,6 +137,24 @@ const MANUAL_PLAN = {
   edges: [],
 } as unknown as DecompositionOutput;
 
+const ROUTING_OVERRIDE = {
+  owner: "agent",
+  agent_id: "codex",
+  agent_label: "Codex CLI",
+  run_mode: "local_cli",
+  model: "gpt-5",
+  model_label: "GPT-5",
+  reason: "User selected Codex CLI.",
+} as const;
+
+const ROUTED_PLAN = {
+  ...PLAN,
+  nodes: [
+    { ...PLAN.nodes[0]!, routing_override: ROUTING_OVERRIDE },
+    PLAN.nodes[1]!,
+  ],
+} as DecompositionOutput;
+
 function freshStore() {
   const dir = mkdtempSync(join(tmpdir(), "aimcub-store-"));
   return createJsonFileStore(dir);
@@ -312,6 +330,28 @@ describe("createJsonFileStore · round-trip", () => {
     const { goal } = await store.createGoal({ title: "x", plan: PLAN, memories: [{ content: "  " }] });
     expect(goal.id).toBeTruthy();
     expect(await store.listMemories(goal.id)).toEqual([]);
+  });
+
+  it("persists routing overrides into the plan, milestone metadata, and assignments", async () => {
+    const store = freshStore();
+    const { goal, milestones } = await store.createGoal({
+      title: "Build a CLI todo app",
+      plan: ROUTED_PLAN,
+    });
+
+    const savedPlan = goal.plan_json as DecompositionOutput;
+    expect(savedPlan.nodes[0]?.routing_override).toEqual(ROUTING_OVERRIDE);
+    expect(milestones[0]?.metadata.routing_override).toEqual(ROUTING_OVERRIDE);
+
+    const assignments = await store.listAssignments(goal.id);
+    const routed = assignments.find((assignment) => assignment.milestone_id === milestones[0]?.id);
+    expect(routed).toMatchObject({
+      actor_kind: "agent",
+      source: "user_override",
+    });
+    expect(routed?.reason).toContain("Codex CLI / GPT-5");
+    expect(routed?.capability_tags).toContain("agent:codex");
+    expect(routed?.capability_tags).toContain("model:gpt-5");
   });
 });
 

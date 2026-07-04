@@ -382,6 +382,7 @@ export interface RunMilestoneAgentRequest {
   goalId: string;
   milestoneId: string;
   agentId?: LocalAgentId;
+  model?: string;
   prompt?: string;
 }
 

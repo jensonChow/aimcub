@@ -11,14 +11,17 @@ import type { NewMemory } from "@core/store";
 import {
   buildLocalHandoffManifest,
   critiquePlan,
+  routingOverrideForMilestone,
   reviewContextCaptureFulfillment,
   reviewContextHealth,
   reviewContextIntakeProgress,
   reviewContextProfile,
   reviewContextSedimentation,
   reviewPlan,
+  validatePlanRouting,
   type ContextIntakeProgressSignal,
   type DecompositionLearningReport,
+  type RoutingRuntimeAgentOption,
 } from "@core/domain";
 import {
   buildAimIntakeReport,
@@ -52,6 +55,8 @@ import {
   type ContextSourceConfig,
   type ContextSourceStatus,
   type LocalContextPickResult,
+  type LocalAgentDetection,
+  type LocalAgentId,
   type LocalAgentRunRequest,
   type LocalAgentRunResult,
   type PlanningDebugTraceStage,
@@ -114,19 +119,49 @@ function milestoneAgentPrompt(goal: Goal, milestone: Milestone, extra?: string):
   ].filter(Boolean).join("\n");
 }
 
+function isLocalAgentId(value: string | null | undefined): value is LocalAgentId {
+  return value === "codex" || value === "claude";
+}
+
+function routingAgentOptions(detections: readonly LocalAgentDetection[]): RoutingRuntimeAgentOption[] {
+  return detections.map((agent) => ({
+    id: agent.id,
+    label: agent.name,
+    available: agent.available,
+    authenticated: agent.authStatus !== "missing",
+    models: agent.models,
+    unavailableReason: agent.authMessage ?? agent.diagnostics[0] ?? null,
+  }));
+}
+
 async function runMilestoneAgent(req: RunMilestoneAgentRequest): Promise<RunMilestoneAgentResult> {
   const detail = await aimStore.getGoal(req.goalId);
   if (!detail) return { ok: false, run: null, detail: null, error: "Aim not found." };
   const milestone = detail.milestones.find((item) => item.id === req.milestoneId);
   if (!milestone) return { ok: false, run: null, detail, error: "Sub-aim not found." };
+  const override = routingOverrideForMilestone(milestone);
+  if (!req.agentId && override?.owner === "human") {
+    return {
+      ok: false,
+      run: null,
+      detail,
+      error: "This sub-aim is routed to a human. Reassign it to an agent before running a local agent.",
+    };
+  }
   const detections = await listLocalAgents();
-  const selected = req.agentId
-    ? detections.find((agent) => agent.id === req.agentId)
+  const overrideAgentId = override?.owner === "agent" && isLocalAgentId(override.agent_id) ? override.agent_id : undefined;
+  const requestedAgentId = req.agentId ?? overrideAgentId;
+  const selected = requestedAgentId
+    ? detections.find((agent) => agent.id === requestedAgentId)
     : detections.find((agent) => agent.id === "codex" && agent.available && agent.authStatus !== "missing")
       ?? detections.find((agent) => agent.available && agent.authStatus !== "missing");
   if (!selected || !selected.available || selected.authStatus === "missing") {
     return { ok: false, run: null, detail, error: "No authenticated local CLI agent is available." };
   }
+  const selectedModel = req.model?.trim()
+    || (override?.owner === "agent" ? override.model?.trim() : "")
+    || selected.models[0]?.id
+    || "default";
 
   const assignment = (await aimStore.listAssignments(detail.goal.id)).find((row) => row.milestone_id === milestone.id) ?? null;
   const orchestrationRun = await aimStore.createRun({
@@ -137,13 +172,13 @@ async function runMilestoneAgent(req: RunMilestoneAgentRequest): Promise<RunMile
     status: "running",
     sandbox: "read-only",
     networkEnabled: false,
-    model: selected.models[0]?.id ?? "default",
-    summary: `Local agent ${selected.name} started: ${milestone.title}`,
+    model: selectedModel,
+    summary: `Local agent ${selected.name} started with ${selectedModel}: ${milestone.title}`,
   });
   const run = await runLocalAgent({
     agentId: selected.id,
     prompt: milestoneAgentPrompt(detail.goal, milestone, req.prompt),
-    model: selected.models[0]?.id ?? "default",
+    model: selectedModel,
     permission: { sandbox: "read-only", network: false },
   });
 
@@ -156,11 +191,12 @@ async function runMilestoneAgent(req: RunMilestoneAgentRequest): Promise<RunMile
     summary: run.ok
       ? `Local agent ${selected.name} worked on: ${milestone.title}`
       : `Local agent ${selected.name} failed on: ${milestone.title}`,
-    payload: {
-      agent_id: selected.id,
-      command: run.command,
-      args: run.args,
-      ok: run.ok,
+      payload: {
+        agent_id: selected.id,
+        model: selectedModel,
+        command: run.command,
+        args: run.args,
+        ok: run.ok,
       output: run.outputText,
       events: run.events.map((event) => ({ type: event.type, summary: event.summary })),
       error: run.error,
@@ -663,6 +699,17 @@ export function registerIpc(): void {
   });
 
   ipcMain.handle(IPC.saveGoal, async (_e, req: SaveRequest): Promise<SavedGoal> => {
+    const routingValidation = validatePlanRouting({
+      plan: req.plan,
+      agents: routingAgentOptions(await listLocalAgents()),
+      allowHuman: true,
+    });
+    if (!routingValidation.ok) {
+      throw new Error([
+        "Routing validation failed:",
+        ...routingValidation.issues.map((item) => `${item.title}: ${item.message}`),
+      ].join("\n"));
+    }
     const selectedContext = await planningContext({ title: req.title, description: req.description });
     const lineageLearning = await contextLineageLearning();
     const memories: NewMemory[] = clarifyAnswersToMemories(req.questions, req.answers);
