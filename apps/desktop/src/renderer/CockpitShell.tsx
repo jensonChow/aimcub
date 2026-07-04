@@ -19,6 +19,7 @@ interface CockpitShellProps {
   onOpenGoal: (goal: Goal) => void;
   onStage: (stage: CockpitStage) => void;
   main: ReactNode;
+  settingsSidebar?: ReactNode;
 }
 
 interface StageItem {
@@ -47,10 +48,12 @@ export function CockpitShell({
   onOpenGoal,
   onStage,
   main,
+  settingsSidebar,
 }: CockpitShellProps) {
   const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "paused">("all");
+  const usingSettingsSidebar = activeStage === "settings" && Boolean(settingsSidebar);
 
   const stages = useMemo<StageItem[]>(() => [
     { stage: "aim", index: "1", title: t("os.stepAim") },
@@ -78,7 +81,11 @@ export function CockpitShell({
       </header>
 
       <div className={`od-app od-app-stage-${activeStage}`}>
-        <aside className="od-sidebar" data-od-id="left-aim-sidebar">
+        <aside
+          className="od-sidebar"
+          data-mode={usingSettingsSidebar ? "settings" : "aims"}
+          data-od-id={usingSettingsSidebar ? "left-settings-sidebar" : "left-aim-sidebar"}
+        >
           <div className="od-sidebar-head">
             <div>
               <h1>Aimcub</h1>
@@ -89,72 +96,78 @@ export function CockpitShell({
             </div>
           </div>
 
-          <button className="od-new-aim" type="button" onClick={onNewAim}>
-            {t("os.newAim")}
-          </button>
+          {usingSettingsSidebar ? settingsSidebar : (
+            <>
+              <button className="od-new-aim" type="button" onClick={onNewAim}>
+                {t("os.newAim")}
+              </button>
 
-          <section className="od-aim-browser" aria-label={t("shell.recentAims")}>
-            <div className="od-sidebar-search">
-              <label htmlFor="aim-search">{t("shell.searchAims")}</label>
-              <input
-                id="aim-search"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder={t("shell.searchAims")}
-              />
-            </div>
-            <div className="od-filter-row" aria-label={t("shell.recentAims")}>
-              <button className={filter === "all" ? "active" : ""} type="button" onClick={() => setFilter("all")}>
-                {t("cockpit.filter.all")}
-              </button>
-              <button className={filter === "active" ? "active" : ""} type="button" onClick={() => setFilter("active")}>
-                {t("cockpit.filter.active")}
-              </button>
-              <button className={filter === "paused" ? "active" : ""} type="button" onClick={() => setFilter("paused")}>
-                {t("cockpit.filter.paused")}
-              </button>
-            </div>
-            <div className="od-section-label">
-              <span>{t("shell.recentAims")}</span>
-              <span>{visibleGoals.length}</span>
-            </div>
-            <div className="od-aim-list">
-              {visibleGoals.length === 0 ? <div className="od-empty">{t("shell.noSearchResults")}</div> : null}
-              {visibleGoals.map((goal) => (
-                <button
-                  key={goal.id}
-                  className={`od-aim-card${selected?.id === goal.id ? " selected" : ""}`}
-                  type="button"
-                  onClick={() => onOpenGoal(goal)}
-                >
-                  <strong>{shortText(goal.title, 58)}</strong>
-                  <span>{statusLabel(goal)}</span>
-                </button>
-              ))}
-            </div>
-          </section>
+              <section className="od-aim-browser" aria-label={t("shell.recentAims")}>
+                <div className="od-sidebar-search">
+                  <label htmlFor="aim-search">{t("shell.searchAims")}</label>
+                  <input
+                    id="aim-search"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder={t("shell.searchAims")}
+                  />
+                </div>
+                <div className="od-filter-row" aria-label={t("shell.recentAims")}>
+                  <button className={filter === "all" ? "active" : ""} type="button" onClick={() => setFilter("all")}>
+                    {t("cockpit.filter.all")}
+                  </button>
+                  <button className={filter === "active" ? "active" : ""} type="button" onClick={() => setFilter("active")}>
+                    {t("cockpit.filter.active")}
+                  </button>
+                  <button className={filter === "paused" ? "active" : ""} type="button" onClick={() => setFilter("paused")}>
+                    {t("cockpit.filter.paused")}
+                  </button>
+                </div>
+                <div className="od-section-label">
+                  <span>{t("shell.recentAims")}</span>
+                  <span>{visibleGoals.length}</span>
+                </div>
+                <div className="od-aim-list">
+                  {visibleGoals.length === 0 ? <div className="od-empty">{t("shell.noSearchResults")}</div> : null}
+                  {visibleGoals.map((goal) => (
+                    <button
+                      key={goal.id}
+                      className={`od-aim-card${selected?.id === goal.id ? " selected" : ""}`}
+                      type="button"
+                      onClick={() => onOpenGoal(goal)}
+                    >
+                      <strong>{shortText(goal.title, 58)}</strong>
+                      <span>{statusLabel(goal)}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
 
-          <button className="od-settings-button" type="button" onClick={() => onStage("settings")}>
-            <span>{t("os.settings")}</span>
-            <span>{t("cockpit.settings.meta")}</span>
-          </button>
+              <button className="od-settings-button" type="button" onClick={() => onStage("settings")}>
+                <span>{t("os.settings")}</span>
+                <span>{t("cockpit.settings.meta")}</span>
+              </button>
+            </>
+          )}
         </aside>
 
         <main className={`od-main od-main-${activeStage}`} data-od-id="main-delivery-workbench">
-          <nav className="od-stage-nav" aria-label={t("cockpit.workflow")}>
-            {stages.map((item) => (
-              <button
-                key={item.stage}
-                className={activeStage === item.stage ? "active" : ""}
-                type="button"
-                aria-current={activeStage === item.stage ? "step" : undefined}
-                onClick={() => onStage(item.stage)}
-              >
-                <span className="od-stage-index">{item.index}</span>
-                <span className="od-stage-title">{item.title}</span>
-              </button>
-            ))}
-          </nav>
+          {activeStage !== "settings" ? (
+            <nav className="od-stage-nav" aria-label={t("cockpit.workflow")}>
+              {stages.map((item) => (
+                <button
+                  key={item.stage}
+                  className={activeStage === item.stage ? "active" : ""}
+                  type="button"
+                  aria-current={activeStage === item.stage ? "step" : undefined}
+                  onClick={() => onStage(item.stage)}
+                >
+                  <span className="od-stage-index">{item.index}</span>
+                  <span className="od-stage-title">{item.title}</span>
+                </button>
+              ))}
+            </nav>
+          ) : null}
 
           <section className={`od-workspace od-workspace-${activeStage}`} data-od-id="workflow-panels">
             {main}

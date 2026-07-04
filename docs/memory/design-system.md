@@ -65,7 +65,7 @@ Reference links:
 - Completed aims use the Eval stage for a completion recap. The recap should stay factual and compact: final outcome, completed sub-aims, passing evidence, eval result, learned context, and future reuse. Do not turn this into celebration, marketing copy, or a decorative success page.
 - Existing aims open to Aim overview first. Do not jump users into Run details or show an empty composer on the Context stage.
 - Settings are an aim-helper setup surface, not a flat runtime control panel. Frame provider setup, local CLI agent detection, web research, and context sources as helpers needed to complete aims; keep their configuration clear and thin unless setup is the user's current task.
-- Settings must use a split-view information architecture: a persistent settings sidebar for categories and one detail pane for the selected category. Do not stack provider, local CLI agent, web research, and context-source forms into one long settings page.
+- Settings must use a split-view information architecture where the primary left app sidebar becomes the settings category navigation and the center workspace becomes the selected detail pane. Do not add a second settings navigation inside the workspace, and do not stack provider, local CLI agent, web research, and context-source forms into one long settings page.
 - First-run with no provider or local CLI agent must stay aim-first. Capture the aim before helper setup, then explain the required helper capability from that aim and link to contextual Aim helpers settings.
 
 ## Layout Rules

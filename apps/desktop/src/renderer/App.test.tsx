@@ -4,8 +4,9 @@ import { describe, expect, it } from "vitest";
 import type { Milestone } from "@core/types";
 import type { ContextSourceStatus, ProviderStatus, WebResearchStatus } from "../shared/ipc";
 
-import { EvidenceSubmissionForm, SettingsPanel } from "./App";
-import { I18nProvider } from "./i18n";
+import { buildSettingsModel, EvidenceSubmissionForm, SettingsPanel } from "./App";
+import { CockpitShell } from "./CockpitShell";
+import { I18nProvider, translate, type I18n } from "./i18n";
 
 const OWNER = "00000000-0000-4000-8000-000000000001";
 const GOAL = "00000000-0000-4000-8000-000000000010";
@@ -42,6 +43,7 @@ const milestone: Milestone = {
 
 const noop = () => {};
 const asyncNoop = async () => {};
+const testT: I18n["t"] = (key, vars) => translate("en", key, vars);
 
 const providerStatus: ProviderStatus = {
   configured: false,
@@ -120,7 +122,13 @@ describe("EvidenceSubmissionForm", () => {
 });
 
 describe("SettingsPanel", () => {
-  it("renders settings as split navigation with one detail pane", () => {
+  it("renders only the selected settings detail pane", () => {
+    const model = buildSettingsModel({
+      provider: providerStatus,
+      webResearch: webResearchStatus,
+      contextSources: contextSourceStatus,
+      localAgents: [],
+    }, testT);
     const html = renderToStaticMarkup(
       <I18nProvider>
         <SettingsPanel
@@ -128,6 +136,8 @@ describe("SettingsPanel", () => {
           webResearch={webResearchStatus}
           contextSources={contextSourceStatus}
           localAgents={[]}
+          model={model}
+          activeSection="overview"
           aimContext={null}
           onProvider={noop}
           onWeb={noop}
@@ -137,16 +147,38 @@ describe("SettingsPanel", () => {
       </I18nProvider>,
     );
 
-    expect(html).toContain("od-settings-split");
-    expect(html).toContain('aria-current="page"');
-    expect(html).toContain("Settings sections");
     expect(html).toContain("Overview");
-    expect(html).toContain("Planning model");
-    expect(html).toContain("Local CLI agents");
-    expect(html).toContain("Web research");
-    expect(html).toContain("Context sources");
     expect(html).toContain("Helper readiness");
+    expect(html).not.toContain("Settings sections");
     expect(html).not.toContain("API key");
     expect(html).not.toContain("Rescan");
+  });
+});
+
+describe("CockpitShell", () => {
+  it("replaces the primary left sidebar with settings navigation on settings stage", () => {
+    const html = renderToStaticMarkup(
+      <I18nProvider>
+        <CockpitShell
+          goals={[]}
+          selected={null}
+          activeStage="settings"
+          busy={null}
+          error={null}
+          onNewAim={noop}
+          onOpenGoal={noop}
+          onStage={noop}
+          settingsSidebar={<nav aria-label="Settings sections"><button type="button">Planning model</button></nav>}
+          main={<div>Settings detail pane</div>}
+        />
+      </I18nProvider>,
+    );
+
+    expect(html).toContain('data-od-id="left-settings-sidebar"');
+    expect(html).toContain("Settings sections");
+    expect(html).toContain("Planning model");
+    expect(html).toContain("Settings detail pane");
+    expect(html).not.toContain("Search aims");
+    expect(html).not.toContain("Aim OS workflow");
   });
 });

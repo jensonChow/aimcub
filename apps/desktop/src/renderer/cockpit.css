@@ -120,6 +120,10 @@ select:focus-visible {
   scrollbar-gutter: stable;
 }
 
+.od-sidebar[data-mode="settings"] {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
 .od-app.sidebar-collapsed .od-sidebar {
   visibility: hidden;
   padding-inline: 0;
@@ -522,6 +526,10 @@ select:focus-visible {
   grid-template-rows: auto minmax(0, 1fr);
 }
 
+.od-main-settings {
+  grid-template-rows: minmax(0, 1fr);
+}
+
 .od-stage-nav {
   width: min(100%, 940px);
   margin: 0 auto;
@@ -622,20 +630,25 @@ select:focus-visible {
   line-height: 1.5;
 }
 
-.od-settings-split {
+.od-settings-sidebar-content {
+  min-height: 0;
   display: grid;
-  grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
-  gap: 18px;
-  align-items: start;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 14px;
+}
+
+.od-settings-back {
+  justify-self: stretch;
 }
 
 .od-settings-nav {
   min-width: 0;
   display: grid;
   gap: 8px;
-  position: sticky;
-  top: 0;
-  align-self: start;
+  align-content: start;
+  overflow: auto;
+  padding-right: 2px;
+  scrollbar-gutter: stable;
 }
 
 .od-settings-nav-item {
@@ -685,6 +698,10 @@ select:focus-visible {
   color: var(--od-muted);
   font-size: 12px;
   line-height: 1.4;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .od-settings-nav-next {
@@ -2875,12 +2892,6 @@ select:focus-visible {
 }
 
 @media (max-width: 1180px) {
-  .od-app,
-  .od-app.sidebar-collapsed {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .od-sidebar,
   .od-sidebar-resizer,
   .od-inspector {
     display: none;
@@ -2905,15 +2916,6 @@ select:focus-visible {
 
   .od-context-online-row input:nth-of-type(2) {
     grid-column: 1 / -1;
-  }
-
-  .od-settings-split {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .od-settings-nav {
-    position: static;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .od-helper-row,
@@ -2967,8 +2969,7 @@ select:focus-visible {
   .od-work-detail-grid,
   .od-plan-card,
   .od-plan-card-head,
-  .od-plan-edit-grid,
-  .od-settings-nav {
+  .od-plan-edit-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 

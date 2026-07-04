@@ -390,6 +390,7 @@ export const STRINGS = {
     zh: "Aim 输入保持可用。只要模型提供方或已认证的本地 CLI agent 之一就绪，就可以开始规划。",
   },
   "settings.navigationLabel": { en: "Settings sections", zh: "设置分类" },
+  "settings.backToAims": { en: "Back to aims", zh: "返回 Aim" },
   "settings.nav.overview": { en: "Overview", zh: "概览" },
   "settings.nav.overview.body": {
     en: "Readiness, aim-specific guidance, and the next setup action.",

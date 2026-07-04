@@ -582,6 +582,7 @@ function AimOsApp() {
   const [busy, setBusy] = useState<string | null>(null);
   const [stageOverride, setStageOverride] = useState<CockpitStage | null>(null);
   const [runtimeGuidanceVisible, setRuntimeGuidanceVisible] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<SettingsSectionId>("overview");
   const planningRunIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -1005,6 +1006,7 @@ function AimOsApp() {
   function openCockpitStage(stage: CockpitStage) {
     setStageOverride(stage);
     if (stage === "settings") {
+      setSettingsSection("overview");
       setMode("settings");
       return;
     }
@@ -1030,6 +1032,7 @@ function AimOsApp() {
   }
 
   function openSettingsForAim() {
+    setSettingsSection(settingsSectionForFocus(activeAimHelper.settingsFocus));
     setMode("settings");
     setStageOverride("settings");
   }
@@ -1115,12 +1118,15 @@ function AimOsApp() {
     />
   ) : null;
 
+  const settingsModel = buildSettingsModel({ provider, webResearch, contextSources, localAgents }, t);
   const settingsPanel = (
     <SettingsPanel
       provider={provider}
       webResearch={webResearch}
       contextSources={contextSources}
       localAgents={localAgents}
+      model={settingsModel}
+      activeSection={settingsSection}
       onProvider={setProvider}
       onWeb={setWebResearch}
       onContextSources={setContextSources}
@@ -1131,6 +1137,14 @@ function AimOsApp() {
         runtimeReady: planningRuntimeReady,
       } : null}
       onReturnToAim={activeAimTitle ? returnToAim : undefined}
+    />
+  );
+  const settingsSidebar = (
+    <SettingsPrimarySidebar
+      model={settingsModel}
+      activeSection={settingsSection}
+      onSection={setSettingsSection}
+      onBack={() => openCockpitStage("aim")}
     />
   );
 
@@ -1242,6 +1256,7 @@ function AimOsApp() {
       onNewAim={startNewAim}
       onOpenGoal={(goal) => void openGoal(goal)}
       onStage={openCockpitStage}
+      settingsSidebar={settingsSidebar}
       main={(
         <>
           {error ? <Notice tone="error">{error}</Notice> : null}
@@ -2811,6 +2826,8 @@ export function SettingsPanel(props: {
   webResearch: WebResearchStatus | null;
   contextSources: ContextSourceStatus | null;
   localAgents: LocalAgentDetection[];
+  model: SettingsModel;
+  activeSection: SettingsSectionId;
   aimContext: {
     title: string;
     profile: AimHelperProfile;
@@ -2823,20 +2840,104 @@ export function SettingsPanel(props: {
   onReturnToAim?: () => void;
 }) {
   const { t } = useI18n();
-  const [activeSection, setActiveSection] = useState<SettingsSectionId>(() =>
-    props.aimContext ? settingsSectionForFocus(props.aimContext.profile.settingsFocus) : "overview",
+  const { activeSection, model } = props;
+  const activeHelper = model.navItems.find((item) => item.id === activeSection) ?? model.overviewHelper;
+
+  let detailPane: ReactNode;
+  if (activeSection === "overview") {
+    detailPane = (
+      <SettingsOverviewPane
+        helper={model.overviewHelper}
+        helpers={model.helpers}
+        planningReady={model.planningReady}
+        overallNext={model.overallNext}
+        aimContext={props.aimContext}
+        onReturnToAim={props.onReturnToAim}
+      />
+    );
+  } else if (activeSection === "provider") {
+    detailPane = (
+      <SettingsDetailPane helper={model.providerHelper}>
+        <ProviderForm status={props.provider} onSaved={props.onProvider} />
+      </SettingsDetailPane>
+    );
+  } else if (activeSection === "local") {
+    detailPane = (
+      <SettingsDetailPane helper={model.localAgentHelper}>
+        <LocalAgentForm agents={props.localAgents} onRefresh={props.onRefreshAgents} />
+      </SettingsDetailPane>
+    );
+  } else if (activeSection === "web") {
+    detailPane = (
+      <SettingsDetailPane helper={model.webResearchHelper}>
+        <WebResearchForm status={props.webResearch} onSaved={props.onWeb} />
+      </SettingsDetailPane>
+    );
+  } else {
+    detailPane = (
+      <SettingsDetailPane helper={model.contextHelper}>
+        <ContextSourcesPanel status={props.contextSources} compact onSaved={props.onContextSources} />
+      </SettingsDetailPane>
+    );
+  }
+
+  return (
+    <section style={panelStyle()}>
+      <div className="od-helper-intro">
+        <div>
+          <div style={eyebrowStyle()}>{t("settings.eyebrow")}</div>
+          <h2>{t("settings.heading")}</h2>
+          <p>{t("settings.body")}</p>
+        </div>
+      </div>
+
+      <div className="od-settings-detail" aria-live="polite" aria-label={activeHelper.title}>
+        {detailPane}
+      </div>
+    </section>
   );
-  const providerReady = Boolean(props.provider?.configured);
-  const readyLocalAgents = props.localAgents.filter((agent) => agent.available && agent.authStatus !== "missing");
-  const availableLocalAgents = props.localAgents.filter((agent) => agent.available);
+}
+
+type SettingsSectionId = "overview" | "provider" | "local" | "web" | "context";
+
+function settingsSectionForFocus(focus: AimHelperProfile["settingsFocus"]): SettingsSectionId {
+  if (focus === "local") return "local";
+  if (focus === "web") return "web";
+  if (focus === "context") return "context";
+  return "provider";
+}
+
+interface SettingsModelInput {
+  provider: ProviderStatus | null;
+  webResearch: WebResearchStatus | null;
+  contextSources: ContextSourceStatus | null;
+  localAgents: LocalAgentDetection[];
+}
+
+interface SettingsModel {
+  navItems: SettingsHelper[];
+  helpers: SettingsHelper[];
+  overviewHelper: SettingsHelper;
+  providerHelper: SettingsHelper;
+  localAgentHelper: SettingsHelper;
+  webResearchHelper: SettingsHelper;
+  contextHelper: SettingsHelper;
+  planningReady: boolean;
+  overallNext: string;
+}
+
+export function buildSettingsModel(input: SettingsModelInput, t: I18n["t"]): SettingsModel {
+  const providerReady = Boolean(input.provider?.configured);
+  const readyLocalAgents = input.localAgents.filter((agent) => agent.available && agent.authStatus !== "missing");
+  const availableLocalAgents = input.localAgents.filter((agent) => agent.available);
   const localAgentReady = readyLocalAgents.length > 0;
   const planningReady = providerReady || localAgentReady;
-  const webResearchReady = Boolean(props.webResearch?.configured);
-  const webResearchEnabled = props.webResearch?.enabled ?? false;
-  const contextSourceCount = activeContextSourceCount(props.contextSources);
+  const webResearchReady = Boolean(input.webResearch?.configured);
+  const webResearchEnabled = input.webResearch?.enabled ?? false;
+  const contextSourceCount = activeContextSourceCount(input.contextSources);
   const contextReady = contextSourceCount >= 4;
   const contextHasAnySource = contextSourceCount > 0;
-  const providerRuntime = [props.provider?.provider, props.provider?.model].filter(Boolean).join(" / ");
+  const providerRuntime = [input.provider?.provider, input.provider?.model].filter(Boolean).join(" / ");
 
   const providerHelper = {
     id: "provider",
@@ -2906,100 +3007,57 @@ export function SettingsPanel(props: {
     tone: planningReady ? "success" : "warn",
     next: overallNext,
   } satisfies SettingsHelper;
-  const navItems = [overviewHelper, ...helpers];
-  const activeHelper = navItems.find((item) => item.id === activeSection) ?? overviewHelper;
 
-  useEffect(() => {
-    setActiveSection(props.aimContext ? settingsSectionForFocus(props.aimContext.profile.settingsFocus) : "overview");
-  }, [props.aimContext?.profile.settingsFocus, props.aimContext?.title]);
-
-  let detailPane: ReactNode;
-  if (activeSection === "overview") {
-    detailPane = (
-      <SettingsOverviewPane
-        helper={overviewHelper}
-        helpers={helpers}
-        planningReady={planningReady}
-        overallNext={overallNext}
-        aimContext={props.aimContext}
-        onReturnToAim={props.onReturnToAim}
-      />
-    );
-  } else if (activeSection === "provider") {
-    detailPane = (
-      <SettingsDetailPane helper={providerHelper}>
-        <ProviderForm status={props.provider} onSaved={props.onProvider} />
-      </SettingsDetailPane>
-    );
-  } else if (activeSection === "local") {
-    detailPane = (
-      <SettingsDetailPane helper={localAgentHelper}>
-        <LocalAgentForm agents={props.localAgents} onRefresh={props.onRefreshAgents} />
-      </SettingsDetailPane>
-    );
-  } else if (activeSection === "web") {
-    detailPane = (
-      <SettingsDetailPane helper={webResearchHelper}>
-        <WebResearchForm status={props.webResearch} onSaved={props.onWeb} />
-      </SettingsDetailPane>
-    );
-  } else {
-    detailPane = (
-      <SettingsDetailPane helper={contextHelper}>
-        <ContextSourcesPanel status={props.contextSources} compact onSaved={props.onContextSources} />
-      </SettingsDetailPane>
-    );
-  }
-
-  return (
-    <section style={panelStyle()}>
-      <div className="od-helper-intro">
-        <div>
-          <div style={eyebrowStyle()}>{t("settings.eyebrow")}</div>
-          <h2>{t("settings.heading")}</h2>
-          <p>{t("settings.body")}</p>
-        </div>
-      </div>
-
-      <div className="od-settings-split">
-        <nav className="od-settings-nav" aria-label={t("settings.navigationLabel")}>
-          {navItems.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className="od-settings-nav-item"
-              data-active={item.id === activeSection ? "true" : "false"}
-              aria-current={item.id === activeSection ? "page" : undefined}
-              onClick={() => setActiveSection(item.id)}
-            >
-              <span className="od-settings-nav-title">
-                <strong>{item.title}</strong>
-                <span className={`od-pill ${item.tone}`}>{item.status}</span>
-              </span>
-              <span className="od-settings-nav-body">{item.body}</span>
-              <span className="od-settings-nav-next">
-                <span>{t("settings.nextAction")}</span>
-                <strong>{item.next}</strong>
-              </span>
-            </button>
-          ))}
-        </nav>
-
-        <div className="od-settings-detail" aria-live="polite" aria-label={activeHelper.title}>
-          {detailPane}
-        </div>
-      </div>
-    </section>
-  );
+  return {
+    navItems: [overviewHelper, ...helpers],
+    helpers,
+    overviewHelper,
+    providerHelper,
+    localAgentHelper,
+    webResearchHelper,
+    contextHelper,
+    planningReady,
+    overallNext,
+  };
 }
 
-type SettingsSectionId = "overview" | "provider" | "local" | "web" | "context";
+function SettingsPrimarySidebar(props: {
+  model: SettingsModel;
+  activeSection: SettingsSectionId;
+  onSection: (section: SettingsSectionId) => void;
+  onBack: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <div className="od-settings-sidebar-content">
+      <button className="od-new-aim od-settings-back" type="button" onClick={props.onBack}>
+        {t("settings.backToAims")}
+      </button>
 
-function settingsSectionForFocus(focus: AimHelperProfile["settingsFocus"]): SettingsSectionId {
-  if (focus === "local") return "local";
-  if (focus === "web") return "web";
-  if (focus === "context") return "context";
-  return "provider";
+      <nav className="od-settings-nav" aria-label={t("settings.navigationLabel")}>
+        {props.model.navItems.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            className="od-settings-nav-item"
+            data-active={item.id === props.activeSection ? "true" : "false"}
+            aria-current={item.id === props.activeSection ? "page" : undefined}
+            onClick={() => props.onSection(item.id)}
+          >
+            <span className="od-settings-nav-title">
+              <strong>{item.title}</strong>
+              <span className={`od-pill ${item.tone}`}>{item.status}</span>
+            </span>
+            <span className="od-settings-nav-body">{item.body}</span>
+            <span className="od-settings-nav-next">
+              <span>{t("settings.nextAction")}</span>
+              <strong>{item.next}</strong>
+            </span>
+          </button>
+        ))}
+      </nav>
+    </div>
+  );
 }
 
 function SettingsOverviewPane(props: {
