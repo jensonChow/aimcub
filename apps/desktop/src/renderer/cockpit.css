@@ -1243,6 +1243,21 @@ select:focus-visible {
   font-size: 13px;
 }
 
+.od-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.od-card-head h3 {
+  min-width: 0;
+  margin: 0;
+  color: var(--od-fg);
+  font-size: 15px;
+  line-height: 1.35;
+}
+
 .od-eval-context {
   display: grid;
   gap: 10px;
@@ -1279,6 +1294,87 @@ select:focus-visible {
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.od-completion-recap {
+  max-width: 940px;
+}
+
+.od-recap-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.od-recap-section {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--od-border-soft);
+}
+
+.od-recap-subaim {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.od-recap-list {
+  display: grid;
+  gap: 8px;
+}
+
+.od-recap-row {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-sm);
+  background: var(--od-surface-warm);
+  padding: 10px 12px;
+}
+
+.od-recap-row > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.od-recap-row strong {
+  min-width: 0;
+  color: var(--od-fg);
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 700;
+}
+
+.od-recap-row span,
+.od-recap-row p {
+  margin: 0;
+  color: var(--od-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.od-recap-reuse {
+  display: grid;
+  gap: 5px;
+  border: 1px solid color-mix(in oklab, var(--od-accent), var(--od-bg) 80%);
+  border-radius: var(--od-radius-sm);
+  background: color-mix(in oklab, var(--od-accent), var(--od-bg) 96%);
+  padding: 12px 14px;
+}
+
+.od-recap-reuse span {
+  color: var(--od-accent);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.od-recap-reuse strong {
+  color: var(--od-fg);
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 600;
 }
 
 .od-inspector {
@@ -1644,6 +1740,7 @@ select:focus-visible {
   .od-context-online-row,
   .od-context-setting-row,
   .od-stage-metrics,
+  .od-recap-grid,
   .od-work-card,
   .od-work-detail-grid {
     grid-template-columns: minmax(0, 1fr);

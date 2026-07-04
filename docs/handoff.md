@@ -1,31 +1,28 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-04
-Branch: `main`
+Branch: `codex/completion-recap`
 
 ## Current Session
 
-- Previously merged `codex/avoid-duplicate-aim-intake`, `codex/clarify-journey-steps`, `codex/simplify-context-sources`, and `codex/runtime-helper-settings` into `main`.
-- Merged `codex/separate-execute-eval-stages` into `main`.
-- Resolved merge conflicts in `apps/desktop/src/renderer/cockpit.css`, `docs/memory/design-system.md`, and this handoff.
-- Kept all Desktop journey improvements: Context shows the captured aim instead of a second aim composer, pre-draft intake is blocking context, post-draft clarify is optional refinement, context source setup has one summary plus one editable control surface, Settings is framed as Aim helpers, and Execute/Eval are distinct stages.
-- Kept the pnpm config cleanup from the Execute/Eval branch: React overrides moved from `package.json#pnpm` to `pnpm-workspace.yaml`, with native build approvals and noninteractive module-purge config.
+- Added a derived completion recap to `AimProgressReadModel` in `@core/types` and `@core/domain`.
+- The recap is created only when all sub-aims are complete and maps completed sub-aims, final outcome, passing evidence summaries, passed evaluator rows, and pending or accepted context memory.
+- Desktop now opens completed aims on the Eval stage and shows the completion recap instead of the in-progress evidence review.
+- The Aim overview CTA changes to "Review recap" when the selected aim is complete.
+- Added Desktop routing tests, core recap mapping tests, and store coverage for accepted aim context in a recap.
+- Updated product, architecture, Desktop, and design-system memory for the durable completion behavior.
+- `pnpm install` was needed because this worktree had no `node_modules`; the install refreshed `pnpm-lock.yaml` to match the existing workspace-level React overrides.
 
 ## Current State
 
-- Normal new aim flow reads: describe aim -> enter context collection -> answer or attach context -> generate plan.
-- Context stage shows a compact captured-aim summary plus context sources/questions. It does not ask users to re-enter the same aim except for explicit child-aim breakdown or unsaved-aim editing paths.
-- Pre-draft intake is framed as blocking context before planning.
-- Post-draft clarification is framed as optional draft refinement; users can accept the draft without answering optional refinement questions.
-- Desktop context collection remains local-store first through `context-sources.json`; no planning/runtime behavior was changed by the context source UI simplification.
-- The context source panel presents active sources, attention state, and a single next action before the editable form, without repeated cards/tables/toggles for the same setting.
-- Desktop Settings starts with helper readiness and next setup action, then shows the existing configuration forms in this order: Planning model, Local CLI agents, Web research, Context sources.
-- Execute focuses on assignment ownership, latest run state, next work, run-agent action, human proof confirmation, and child breakdown.
-- Eval focuses on evidence totals, rule mode, matched evidence IDs, evaluator status, trust/explanation, human-review flags, and pending context candidates from progress.
+- In-progress aims keep the existing flow: Aim overview -> Context -> Sub-aims -> Execute -> Eval.
+- Completed aims derive completion from milestone progress, not from a written aim-completion flag.
+- Completion recap empty states explain when no passing evidence rows or no new learned context exist.
+- The recap's future reuse copy stays product-factual: accepted memory and approved candidates can shape future decomposition, routing, and eval rules.
 
 ## Verification
 
-Passed after merging `codex/separate-execute-eval-stages`:
+Passed on `codex/completion-recap`:
 
 ```bash
 PATH=/Users/jenson/.local/node/bin:$PATH pnpm build
@@ -34,18 +31,16 @@ PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck
 PATH=/Users/jenson/.local/node/bin:$PATH pnpm lint
 PATH=/Users/jenson/.local/node/bin:$PATH pnpm core:purity
 git diff --check
-git diff --cached --check
 ```
 
 Notes:
-- Turbo emitted non-fatal `IO error: Operation not permitted` warnings while all required tasks exited successfully.
-- The Execute/Eval branch reported desktop and narrow visual checks before merge; this merge session verified build, tests, typecheck, lint, purity, and whitespace.
+- Turbo emitted non-fatal `IO error: Operation not permitted` cache warnings while all required tasks exited successfully.
+- The full test run includes an expected MCP stderr path for an opaque 500 handling test; the suite passed.
 
-Commit/push status: this handoff is part of the merge commit that brings `codex/separate-execute-eval-stages` into `main`.
+Commit/push status: focused completion recap work is committed and pushed on `codex/completion-recap`.
 
 ## Next Session Prompt
 
 ```text
-Continue from main after the Desktop journey cleanup merges. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md. Then load only the module memory relevant to the task.
-Keep new aim title/description owned by the Aim stage. Context should collect answers, attachments, and sources without asking users to re-enter the same aim, except for explicit child-aim breakdown or unsaved-aim editing paths. Keep pre-draft intake framed as blocking context before planning and post-draft clarify framed as optional draft refinement. Keep context source setup product-first: one clear summary, one edit surface, and no repeated controls for the same source setting. Keep Settings framed as Aim helper setup rather than a runtime control panel. Keep Execute focused on next-work ownership/actions and Eval focused on evidence/rule review.
+Continue from codex/completion-recap or merge it to main. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md. Completed aims now route to the Eval stage completion recap from AimProgressReadModel.completion_recap. Keep completion derived from evidence/eval progress and keep recap copy factual: final outcome, completed sub-aims, passing evidence, eval result, learned context, and future reuse.
 ```

@@ -3,6 +3,7 @@ import type {
   AcceptanceRule,
   Actor,
   ActorKind,
+  AimCompletionRecapRead,
   AimProgressReadModel,
   Assignment,
   AssignmentSource,
@@ -74,6 +75,7 @@ export interface BuildAimProgressInput {
   evidence?: readonly Evidence[];
   completions?: readonly MilestoneCompletion[];
   contextCandidates?: readonly Memory[];
+  acceptedContext?: readonly Memory[];
 }
 
 function cleanText(value: unknown): string {
@@ -288,6 +290,21 @@ function latestByCreatedAt<T extends { created_at?: string }>(rows: readonly T[]
   return rows.slice().sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""))[0] ?? null;
 }
 
+function uniqueRowsById<T extends { id: string }>(rows: readonly T[]): T[] {
+  const seen = new Set<string>();
+  const unique: T[] = [];
+  for (const row of rows) {
+    if (seen.has(row.id)) continue;
+    seen.add(row.id);
+    unique.push(row);
+  }
+  return unique;
+}
+
+function uniqueStrings(values: readonly string[]): string[] {
+  return [...new Set(values)];
+}
+
 function nextActionForMilestone(input: {
   milestone: Milestone;
   assignment: Assignment | null;
@@ -310,6 +327,93 @@ function nextActionForMilestone(input: {
   if (latestRun.status === "failed") return "Inspect the failed run and retry or reassign.";
   if (latestRun.status === "completed") return "Review run evidence against the eval rule.";
   return "Continue the active run.";
+}
+
+export function buildAimCompletionRecap(input: {
+  goal: Goal;
+  milestones: readonly AimProgressReadModel["milestones"][number][];
+  evidence?: readonly Evidence[];
+  completions?: readonly MilestoneCompletion[];
+  learnedContext?: readonly Memory[];
+}): AimCompletionRecapRead | null {
+  if (input.milestones.length === 0 || input.milestones.some((row) => !row.completed)) {
+    return null;
+  }
+
+  const completionByMilestone = new Map((input.completions ?? []).map((completion) => [completion.milestone_id, completion]));
+  const passedEvalResults = input.milestones.flatMap((row) =>
+    row.evaluator_results
+      .filter((result) => result.status === "passed")
+      .map((result) => ({
+        milestone_id: row.milestone.id,
+        evaluator: result.evaluator,
+        status: result.status,
+        explanation: result.explanation,
+        trust_score: result.trust_score,
+        matched_evidence_ids: result.matched_evidence_ids,
+      })),
+  );
+  const evidenceIds = uniqueStrings([
+    ...passedEvalResults.flatMap((result) => result.matched_evidence_ids),
+    ...(input.completions ?? []).flatMap((completion) => completion.triggering_evidence_ids),
+  ]);
+  const passingEvidence = (input.evidence ?? [])
+    .filter((row) => evidenceIds.includes(row.id))
+    .map((row) => ({
+      id: row.id,
+      milestone_id: row.milestone_id,
+      kind: row.kind,
+      summary: row.summary,
+      occurred_at: row.occurred_at,
+      trust_score: row.trust_score,
+    }));
+  const learnedContext = uniqueRowsById(input.learnedContext ?? [])
+    .filter((memory) => memory.status === "pending" || memory.status === "active")
+    .map((memory) => ({
+      id: memory.id,
+      content: memory.content,
+      category: memory.category,
+      source: memory.source,
+      status: memory.status,
+      scope: memory.goal_id ? "aim" as const : "global" as const,
+      confidence: memory.confidence,
+    }));
+
+  const completedSubAims = input.milestones.map((row) => {
+    const completion = completionByMilestone.get(row.milestone.id) ?? null;
+    const passed = row.evaluator_results.find((result) => result.status === "passed") ?? null;
+    const contract = contractOf(row.milestone);
+    const outcome = cleanText(contract?.definition_of_done)
+      || cleanText(row.milestone.description)
+      || "Sub-aim completed.";
+    return {
+      milestone_id: row.milestone.id,
+      title: row.milestone.title,
+      outcome,
+      completed_at: row.milestone.completed_at ?? completion?.created_at ?? null,
+      decided_by: completion?.decided_by ?? null,
+      evidence_ids: uniqueStrings([
+        ...(completion?.triggering_evidence_ids ?? []),
+        ...(passed?.matched_evidence_ids ?? []),
+      ]),
+      eval_status: passed?.status ?? "passed" as const,
+    };
+  });
+
+  return {
+    complete: true,
+    final_outcome: `Completed ${completedSubAims.length}/${input.milestones.length} sub-aims for "${input.goal.title}".`,
+    completed_sub_aims: completedSubAims,
+    passing_evidence: passingEvidence,
+    eval_results: passedEvalResults,
+    learned_context: learnedContext,
+    evidence_empty_reason: passingEvidence.length === 0
+      ? "No matched evidence rows were recorded for this completion. The recap can still show completed sub-aims, but future eval reuse will need evidence on later aims."
+      : "",
+    context_empty_reason: learnedContext.length === 0
+      ? "No new memory candidates or accepted aim context were recorded from this completion."
+      : "",
+  };
 }
 
 export function buildAimProgressReadModel(input: BuildAimProgressInput): AimProgressReadModel {
@@ -350,6 +454,16 @@ export function buildAimProgressReadModel(input: BuildAimProgressInput): AimProg
     };
   });
   const incomplete = milestones.find((row) => !row.completed && !row.blocked) ?? milestones.find((row) => !row.completed);
+  const completionRecap = buildAimCompletionRecap({
+    goal: input.goal,
+    milestones,
+    evidence,
+    completions,
+    learnedContext: [
+      ...(input.contextCandidates ?? []),
+      ...(input.acceptedContext ?? []),
+    ],
+  });
   return {
     goal: input.goal,
     milestones,
@@ -358,6 +472,7 @@ export function buildAimProgressReadModel(input: BuildAimProgressInput): AimProg
     runs: [...runs],
     sub_aim_relations: relationRows.map((relation) => ({ ...relation, status: relationStatus(relation, input.milestonesByGoal) })),
     context_candidates: [...(input.contextCandidates ?? [])],
+    completion_recap: completionRecap,
     completed_milestones: milestones.filter((row) => row.completed).length,
     total_milestones: milestones.length,
     blocked_count: milestones.filter((row) => row.blocked).length,

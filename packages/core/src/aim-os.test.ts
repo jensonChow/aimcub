@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import type { Evidence, Goal, Milestone, MilestoneCompletion, Run, SubAimRelation, ToolTrace } from "@core/types";
+import type { Evidence, Goal, Memory, Milestone, MilestoneCompletion, Run, SubAimRelation, ToolTrace } from "@core/types";
 import {
+  buildAimCompletionRecap,
   buildAimProgressReadModel,
   buildHumanTaskHandoff,
   decideContextIntakeSession,
@@ -229,5 +230,81 @@ describe("Aim OS cockpit read model", () => {
 
     expect(candidates.map((candidate) => candidate.category)).toContain("eval_signal");
     expect(candidates.map((candidate) => candidate.category)).toContain("procedure");
+  });
+
+  it("maps completed progress into a completion recap with evidence, eval, and learned context", () => {
+    const ev: Evidence = {
+      id: "00000000-0000-4000-8000-000000000070",
+      owner_id: OWNER,
+      goal_id: GOAL,
+      milestone_id: MILESTONE,
+      emitter_id: null,
+      kind: "git_commit",
+      source_event_id: "sha",
+      occurred_at: "2026-07-03T00:00:00.000Z",
+      summary: "init project",
+      payload: { sha: "sha", message: "init project", files: ["src/index.ts"] },
+      trust_score: 1,
+    };
+    const completion: MilestoneCompletion = {
+      id: "00000000-0000-4000-8000-000000000071",
+      milestone_id: MILESTONE,
+      owner_id: OWNER,
+      decided_by: "rule_auto",
+      triggering_evidence_ids: [ev.id],
+      awarded_xp: 10,
+      created_at: "2026-07-03T00:01:00.000Z",
+    };
+    const candidate: Memory = {
+      id: "00000000-0000-4000-8000-000000000072",
+      owner_id: OWNER,
+      goal_id: GOAL,
+      kind: "semantic",
+      category: "eval_signal",
+      content: "Eval signal: trusted commits can complete scaffold work.",
+      confidence: 0.78,
+      source: "evidence_derived",
+      status: "pending",
+      superseded_by: null,
+      created_at: "2026-07-03T00:01:00.000Z",
+    };
+    const model = buildAimProgressReadModel({
+      goal: goal(),
+      milestones: [milestone({
+        status: "completed",
+        completed_at: "2026-07-03T00:01:00.000Z",
+      })],
+      evidence: [ev],
+      completions: [completion],
+      contextCandidates: [candidate],
+    });
+
+    const recap = model.completion_recap ?? buildAimCompletionRecap({
+      goal: goal(),
+      milestones: model.milestones,
+      evidence: [ev],
+      completions: [completion],
+      learnedContext: [candidate],
+    });
+
+    expect(recap?.complete).toBe(true);
+    expect(recap?.completed_sub_aims).toMatchObject([{
+      title: "Implement CLI",
+      decided_by: "rule_auto",
+      evidence_ids: [ev.id],
+      eval_status: "passed",
+    }]);
+    expect(recap?.passing_evidence).toMatchObject([{ id: ev.id, summary: "init project", kind: "git_commit" }]);
+    expect(recap?.eval_results).toMatchObject([{ milestone_id: MILESTONE, evaluator: "commit_pattern", status: "passed" }]);
+    expect(recap?.learned_context).toMatchObject([{ id: candidate.id, status: "pending", scope: "aim" }]);
+  });
+
+  it("does not create a completion recap while an aim still has open sub-aims", () => {
+    const model = buildAimProgressReadModel({
+      goal: goal(),
+      milestones: [milestone()],
+    });
+
+    expect(model.completion_recap).toBeNull();
   });
 });

@@ -558,6 +558,60 @@ export const Memory = z.object({
 });
 export type Memory = z.infer<typeof Memory>;
 
+export const AimCompletionRecapEvidenceRead = z.object({
+  id: z.string().uuid(),
+  milestone_id: z.string().uuid().nullable().default(null),
+  kind: EvidenceKind,
+  summary: z.string().default(""),
+  occurred_at: z.string(),
+  trust_score: z.number().min(0).max(1).default(0),
+});
+export type AimCompletionRecapEvidenceRead = z.infer<typeof AimCompletionRecapEvidenceRead>;
+
+export const AimCompletionRecapEvalRead = z.object({
+  milestone_id: z.string().uuid(),
+  evaluator: Evaluator,
+  status: EvaluatorRuntimeStatus,
+  explanation: z.string().default(""),
+  trust_score: z.number().min(0).max(1).default(0),
+  matched_evidence_ids: z.array(z.string().uuid()).default([]),
+});
+export type AimCompletionRecapEvalRead = z.infer<typeof AimCompletionRecapEvalRead>;
+
+export const AimCompletionRecapSubAimRead = z.object({
+  milestone_id: z.string().uuid(),
+  title: z.string(),
+  outcome: z.string().default(""),
+  completed_at: z.string().nullable().default(null),
+  decided_by: DecidedBy.nullable().default(null),
+  evidence_ids: z.array(z.string().uuid()).default([]),
+  eval_status: EvaluatorRuntimeStatus.nullable().default(null),
+});
+export type AimCompletionRecapSubAimRead = z.infer<typeof AimCompletionRecapSubAimRead>;
+
+export const AimCompletionRecapMemoryRead = z.object({
+  id: z.string().uuid(),
+  content: z.string(),
+  category: ContextCategory,
+  source: z.enum(["agent_inferred", "user_stated", "evidence_derived"]),
+  status: MemoryStatus,
+  scope: z.enum(["aim", "global"]),
+  confidence: z.number().min(0).max(1).default(0),
+});
+export type AimCompletionRecapMemoryRead = z.infer<typeof AimCompletionRecapMemoryRead>;
+
+export const AimCompletionRecapRead = z.object({
+  complete: z.boolean().default(false),
+  final_outcome: z.string().default(""),
+  completed_sub_aims: z.array(AimCompletionRecapSubAimRead).default([]),
+  passing_evidence: z.array(AimCompletionRecapEvidenceRead).default([]),
+  eval_results: z.array(AimCompletionRecapEvalRead).default([]),
+  learned_context: z.array(AimCompletionRecapMemoryRead).default([]),
+  evidence_empty_reason: z.string().default(""),
+  context_empty_reason: z.string().default(""),
+});
+export type AimCompletionRecapRead = z.infer<typeof AimCompletionRecapRead>;
+
 export const AimProgressReadModel = z.object({
   goal: Goal,
   milestones: z.array(AimProgressMilestoneRead),
@@ -566,6 +620,7 @@ export const AimProgressReadModel = z.object({
   runs: z.array(Run).default([]),
   sub_aim_relations: z.array(SubAimRelation).default([]),
   context_candidates: z.array(Memory).default([]),
+  completion_recap: AimCompletionRecapRead.nullable().default(null),
   completed_milestones: z.number().int().nonnegative().default(0),
   total_milestones: z.number().int().nonnegative().default(0),
   blocked_count: z.number().int().nonnegative().default(0),
