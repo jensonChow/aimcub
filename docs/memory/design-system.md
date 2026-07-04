@@ -58,7 +58,7 @@ Reference links:
 - Stage model: Aim -> Context -> Plan/Contracts -> Execute -> Eval. Stage navigation may be visible, but each stage must still present a single dominant action.
 - New aim title and description belong to the Aim stage. The Context stage should confirm the captured aim and collect answers, attachments, and sources; it must not show a second title/description composer unless the user explicitly opens child-aim breakdown or an unsaved-aim edit path.
 - Existing aims open to Aim overview first. Do not jump users into Run details or show an empty composer on the Context stage.
-- Settings are a utility surface. Keep provider setup, local CLI agent detection, web research settings, and context sources clear and thin unless they become the user's current task.
+- Settings are an aim-helper setup surface, not a flat runtime control panel. Frame provider setup, local CLI agent detection, web research, and context sources as helpers needed to complete aims; keep their configuration clear and thin unless setup is the user's current task.
 
 ## Layout Rules
 
