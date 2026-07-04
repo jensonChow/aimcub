@@ -677,6 +677,7 @@ function planNodeMetadata(node: PlanNode): Record<string, unknown> {
     est_effort: node.est_effort,
     plan_key: node.key,
     ...(node.decomposition_contract ? { decomposition_contract: node.decomposition_contract } : {}),
+    ...(node.routing_override ? { routing_override: node.routing_override } : {}),
   };
 }
 

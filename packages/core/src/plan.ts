@@ -22,6 +22,7 @@ export interface PlanNodePatch {
   description?: string;
   acceptance_rule?: AcceptanceRule;
   decomposition_contract?: DecompositionContract | null;
+  routing_override?: PlanNode["routing_override"];
 }
 
 export interface SplitPlanNodeInput {
@@ -176,6 +177,7 @@ function applyNodePatch(node: PlanNode, patch: PlanNodePatch): PlanNode {
     ...(patch.description !== undefined ? { description: patch.description } : {}),
     ...(patch.acceptance_rule !== undefined ? { acceptance_rule: cloneAcceptanceRule(patch.acceptance_rule) } : {}),
     ...(patch.decomposition_contract !== undefined ? { decomposition_contract: cloneContract(patch.decomposition_contract) } : {}),
+    ...(patch.routing_override !== undefined ? { routing_override: patch.routing_override } : {}),
   };
 }
 

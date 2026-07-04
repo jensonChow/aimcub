@@ -1230,6 +1230,228 @@ select:focus-visible {
   line-height: 1.25;
 }
 
+.od-routing-alert {
+  display: grid;
+  gap: 3px;
+  border: 1px solid color-mix(in oklab, var(--od-warn), var(--od-bg) 72%);
+  border-radius: var(--od-radius-sm);
+  background: color-mix(in oklab, var(--od-warn), var(--od-bg) 94%);
+  color: var(--od-warn);
+  padding: 10px 12px;
+}
+
+.od-routing-alert strong {
+  color: var(--od-fg);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.od-routing-alert span {
+  color: var(--od-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.od-plan-node-list {
+  display: grid;
+  gap: 10px;
+}
+
+.od-plan-node {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 12px;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-sm);
+  background: var(--od-bg);
+  padding: 12px;
+}
+
+.od-plan-node.has-warning {
+  border-color: color-mix(in oklab, var(--od-warn), var(--od-bg) 70%);
+}
+
+.od-plan-node-index {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--od-accent), var(--od-bg) 92%);
+  color: var(--od-accent);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.od-plan-node-main {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.od-plan-node-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.od-plan-node-head h3 {
+  margin: 0;
+  color: var(--od-fg);
+  font-size: 14px;
+  line-height: 1.35;
+  letter-spacing: 0;
+}
+
+.od-plan-node-head p {
+  margin: 4px 0 0;
+  color: var(--od-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.od-plan-node-pills,
+.od-plan-contract-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.od-routing-rationale {
+  display: grid;
+  gap: 3px;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-sm);
+  background: var(--od-surface-warm);
+  padding: 9px 10px;
+}
+
+.od-routing-rationale span,
+.od-plan-contract-line span {
+  color: var(--od-meta);
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.od-routing-rationale strong {
+  color: var(--od-fg-2);
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+.od-routing-controls {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.od-routing-owner {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--od-border);
+  border-radius: var(--od-radius-pill);
+  background: var(--od-bg);
+}
+
+.od-routing-owner button {
+  min-height: 34px;
+  border-left: 1px solid var(--od-border-soft);
+  background: transparent;
+  color: var(--od-muted);
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.od-routing-owner button:first-child {
+  border-left: 0;
+}
+
+.od-routing-owner button:hover:not(:disabled),
+.od-routing-owner button.active {
+  background: var(--od-surface);
+  color: var(--od-fg);
+}
+
+.od-routing-owner button.active {
+  box-shadow: inset 0 0 0 1px var(--od-accent);
+}
+
+.od-routing-owner button:disabled,
+.od-routing-selects select:disabled,
+.od-routing-reset:disabled {
+  cursor: default;
+  opacity: 0.58;
+}
+
+.od-routing-selects {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.od-routing-selects label {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.od-routing-selects span {
+  color: var(--od-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.od-routing-selects select {
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-sm);
+  background: var(--od-bg);
+  color: var(--od-fg);
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.od-routing-reset {
+  min-height: 34px;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-pill);
+  background: var(--od-bg);
+  color: var(--od-muted);
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 750;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.od-routing-reset:hover:not(:disabled) {
+  border-color: var(--od-border);
+  background: var(--od-surface);
+  color: var(--od-fg);
+}
+
+.od-plan-contract-line {
+  justify-content: flex-start;
+}
+
+.od-routing-issue {
+  border-left: 3px solid var(--od-warn);
+  color: var(--od-warn);
+  padding-left: 9px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .od-work-list {
   display: grid;
   gap: 10px;
@@ -1966,6 +2188,11 @@ select:focus-visible {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .od-routing-controls {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
   .od-helper-section-status {
     justify-items: start;
     text-align: left;
@@ -1995,12 +2222,28 @@ select:focus-visible {
   .od-settings-aim-context .od-first-run-helper-grid,
   .od-context-review-grid,
   .od-stage-metrics,
+  .od-plan-node,
+  .od-plan-node-head,
+  .od-routing-selects,
   .od-work-card,
   .od-work-detail-grid,
   .od-plan-card,
   .od-plan-card-head,
   .od-plan-edit-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .od-plan-node-pills {
+    justify-content: flex-start;
+  }
+
+  .od-routing-owner,
+  .od-routing-reset {
+    width: 100%;
+  }
+
+  .od-routing-owner button {
+    flex: 1 1 0;
   }
 
   .od-helper-row {

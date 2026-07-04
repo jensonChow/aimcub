@@ -188,13 +188,16 @@ function hasUnsupportedAutoEvaluator(rule: AcceptanceRule): boolean {
 function blockerCodes(node: PlanNode): PlanHandoffBlockerCode[] {
   const contract = node.decomposition_contract;
   const codes = new Set<PlanHandoffBlockerCode>();
+  const overrideOwner = node.routing_override?.owner ?? null;
 
   if (!contract) codes.add("missing_contract");
   if (contract?.context_gaps.length) codes.add("context_gaps");
   if (node.acceptance_rule.completion_mode === "manual") codes.add("manual_completion");
   if (!hasAgentEvidence(node.acceptance_rule)) codes.add("missing_agent_evidence");
   if (hasUnsupportedAutoEvaluator(node.acceptance_rule)) codes.add("unsupported_auto_evaluator");
-  if (contract?.likely_owner === "human" || contract?.likely_owner === "mixed") codes.add("human_handoff");
+  if (overrideOwner === "human" || (!overrideOwner && (contract?.likely_owner === "human" || contract?.likely_owner === "mixed"))) {
+    codes.add("human_handoff");
+  }
 
   return [...codes];
 }
@@ -225,7 +228,7 @@ function handoffBrief(node: PlanNode, prerequisiteKeys: readonly string[], summa
 }
 
 function taskForNode(node: PlanNode, prerequisites: Map<string, string[]>): PlanHandoffTask {
-  const likelyOwner = node.decomposition_contract?.likely_owner ?? "either";
+  const likelyOwner = node.routing_override?.owner ?? node.decomposition_contract?.likely_owner ?? "either";
   const codes = blockerCodes(node);
   const prerequisiteKeys = prerequisites.get(node.key) ?? [];
   const summary = acceptanceSummary(node.acceptance_rule);

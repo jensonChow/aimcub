@@ -16,11 +16,17 @@ import type {
   Memory,
   Milestone,
   MilestoneCompletion,
+  DecompositionOutput,
+  DecompositionOwner,
+  PlanNode,
+  PlanRoutingOverride as PlanRoutingOverrideValue,
+  PlanRoutingOwner,
   Run,
   SubAimRelation,
   SubAimRelationStatus,
   ToolTrace,
 } from "@core/types";
+import { PlanRoutingOverride } from "@core/types";
 import { evaluate } from "./evaluate";
 import type { ContextSedimentationCandidateInput } from "./context-sedimentation";
 
@@ -33,6 +39,50 @@ export interface RoutedAssignment {
   source: AssignmentSource;
   reason: string;
   capabilityTags: string[];
+}
+
+export interface RoutingModelOption {
+  id: string;
+  label?: string;
+}
+
+export interface RoutingRuntimeAgentOption {
+  id: string;
+  label: string;
+  available: boolean;
+  authenticated: boolean;
+  models: readonly RoutingModelOption[];
+  unavailableReason?: string | null;
+}
+
+export interface PlanNodeRoutingRecommendation {
+  likelyOwner: DecompositionOwner;
+  recommendedOwner: PlanRoutingOwner;
+  rationale: string;
+  capabilityTags: string[];
+}
+
+export type PlanRoutingValidationIssueCode =
+  | "human_route_unavailable"
+  | "missing_agent_runtime"
+  | "missing_agent_selection"
+  | "unknown_agent"
+  | "agent_unavailable"
+  | "agent_unauthenticated"
+  | "missing_agent_model"
+  | "unknown_agent_model"
+  | "human_route_has_agent_selection";
+
+export interface PlanRoutingValidationIssue {
+  nodeKey: string;
+  title: string;
+  code: PlanRoutingValidationIssueCode;
+  message: string;
+}
+
+export interface PlanRoutingValidation {
+  ok: boolean;
+  issues: PlanRoutingValidationIssue[];
 }
 
 export interface ContextIntakeDecisionInput {
@@ -88,8 +138,12 @@ function contractOf(milestone: Pick<Milestone, "metadata">): Record<string, unkn
   return asRecord(milestone.metadata?.decomposition_contract);
 }
 
-function contractLikelyOwner(milestone: Pick<Milestone, "metadata">): "human" | "agent" | "either" | "mixed" {
-  const owner = contractOf(milestone)?.likely_owner;
+function isDecompositionOwner(value: unknown): value is DecompositionOwner {
+  return value === "human" || value === "agent" || value === "either" || value === "mixed";
+}
+
+function contractLikelyOwnerValue(contract: Record<string, unknown> | null | undefined): DecompositionOwner {
+  const owner = contract?.likely_owner;
   return owner === "human" || owner === "agent" || owner === "either" || owner === "mixed" ? owner : "either";
 }
 
@@ -97,33 +151,45 @@ function hasManualOnlyRule(rule: AcceptanceRule): boolean {
   return rule.clauses.every((clause) => clause.evaluator === "manual_confirm");
 }
 
-function requiresHumanJudgment(milestone: Milestone): boolean {
-  const contract = contractOf(milestone);
-  const text = [
-    milestone.title,
-    milestone.description,
-    cleanText(contract?.definition_of_done),
-    cleanText(contract?.eval_signal),
-    Array.isArray(contract?.required_evidence) ? contract.required_evidence.map(cleanText).join(" ") : "",
-  ].join(" ").toLowerCase();
+function requiredEvidenceText(contract: Record<string, unknown> | null | undefined): string {
+  return Array.isArray(contract?.required_evidence) ? contract.required_evidence.map(cleanText).join(" ") : "";
+}
+
+function requiresHumanJudgmentText(parts: readonly string[]): boolean {
+  const text = parts.join(" ").toLowerCase();
   return /\b(approve|approval|secret|credential|access|taste|choose|decide|sign off|physical|call|meeting)\b/.test(text)
     || /审批|批准|密钥|凭证|权限|品味|选择|决定|线下|电话|会议|人工确认/.test(text);
 }
 
-function capabilityTagsForMilestone(milestone: Milestone): string[] {
+function requiresHumanJudgment(milestone: Milestone): boolean {
   const contract = contractOf(milestone);
-  const text = [
+  return requiresHumanJudgmentText([
     milestone.title,
     milestone.description,
     cleanText(contract?.definition_of_done),
-    Array.isArray(contract?.required_evidence) ? contract.required_evidence.map(cleanText).join(" ") : "",
-  ].join(" ").toLowerCase();
+    cleanText(contract?.eval_signal),
+    requiredEvidenceText(contract),
+  ]);
+}
+
+function capabilityTagsForText(parts: readonly string[]): string[] {
+  const text = parts.join(" ").toLowerCase();
   const tags = new Set<string>();
   if (/\b(code|commit|test|ci|typescript|react|api|database|migration|repo|build)\b/.test(text)) tags.add("software");
   if (/\b(search|research|compare|market|docs|documentation|web)\b/.test(text)) tags.add("research");
   if (/\b(write|summarize|doc|brief|copy|content)\b/.test(text)) tags.add("writing");
   if (/\b(approve|secret|credential|access|taste|physical|meeting)\b/.test(text)) tags.add("human_judgment");
   return [...tags];
+}
+
+function capabilityTagsForMilestone(milestone: Milestone): string[] {
+  const contract = contractOf(milestone);
+  return capabilityTagsForText([
+    milestone.title,
+    milestone.description,
+    cleanText(contract?.definition_of_done),
+    requiredEvidenceText(contract),
+  ]);
 }
 
 function findActor(actors: readonly Actor[], kind: ActorKind, capabilityTags: readonly string[]): Actor | null {
@@ -135,26 +201,106 @@ function findActor(actors: readonly Actor[], kind: ActorKind, capabilityTags: re
   return withCapability ?? active[0] ?? null;
 }
 
+function routingRationale(input: {
+  likelyOwner: DecompositionOwner;
+  humanRequired: boolean;
+  manualOnly: boolean;
+  humanJudgment: boolean;
+}): string {
+  if (input.likelyOwner === "human") {
+    return "The decomposition marks this as human-owned because it depends on judgment, access, approval, or manual proof.";
+  }
+  if (input.likelyOwner === "mixed") {
+    return "The decomposition marks this as mixed work, so Aimcub keeps the route human-gated unless you delegate the digital part to an agent.";
+  }
+  if (input.manualOnly) {
+    return "The eval rule requires manual confirmation, so Aimcub recommends a human route.";
+  }
+  if (input.humanJudgment) {
+    return "The contract mentions approval, access, taste, a decision, or physical-world work, so Aimcub recommends a human route.";
+  }
+  if (input.likelyOwner === "agent") {
+    return "The decomposition marks this as agent-owned and the work can be proved with digital evidence.";
+  }
+  return "No non-delegable blocker was found, so Aimcub recommends the agent path for this digital or evidence-backed work.";
+}
+
+export function routingRecommendationForPlanNode(node: PlanNode): PlanNodeRoutingRecommendation {
+  const contract = node.decomposition_contract;
+  const contractRecord = contract ? contract as Record<string, unknown> : null;
+  const likelyOwner = contract?.likely_owner && isDecompositionOwner(contract.likely_owner)
+    ? contract.likely_owner
+    : "either";
+  const manualOnly = hasManualOnlyRule(node.acceptance_rule);
+  const humanJudgment = requiresHumanJudgmentText([
+    node.title,
+    node.description,
+    cleanText(contract?.definition_of_done),
+    cleanText(contract?.eval_signal),
+    requiredEvidenceText(contractRecord),
+  ]);
+  const humanRequired = likelyOwner === "human" || likelyOwner === "mixed" || manualOnly || humanJudgment;
+  return {
+    likelyOwner,
+    recommendedOwner: humanRequired ? "human" : "agent",
+    rationale: routingRationale({ likelyOwner, humanRequired, manualOnly, humanJudgment }),
+    capabilityTags: capabilityTagsForText([
+      node.title,
+      node.description,
+      cleanText(contract?.definition_of_done),
+      requiredEvidenceText(contractRecord),
+    ]),
+  };
+}
+
+function routingRecommendationForMilestone(milestone: Milestone): PlanNodeRoutingRecommendation {
+  const contract = contractOf(milestone);
+  const likelyOwner = contractLikelyOwnerValue(contract);
+  const manualOnly = hasManualOnlyRule(milestone.acceptance_rule);
+  const humanJudgment = requiresHumanJudgment(milestone);
+  const humanRequired = likelyOwner === "human" || likelyOwner === "mixed" || manualOnly || humanJudgment;
+  return {
+    likelyOwner,
+    recommendedOwner: humanRequired ? "human" : "agent",
+    rationale: routingRationale({ likelyOwner, humanRequired, manualOnly, humanJudgment }),
+    capabilityTags: capabilityTagsForMilestone(milestone),
+  };
+}
+
+export function routingOverrideForMilestone(milestone: Pick<Milestone, "metadata">): PlanRoutingOverrideValue | null {
+  const parsed = PlanRoutingOverride.nullable().safeParse(milestone.metadata?.routing_override ?? null);
+  return parsed.success ? parsed.data : null;
+}
+
+function routingOverrideLabel(override: PlanRoutingOverrideValue): string {
+  if (override.owner === "human") return "User override: route this sub-aim to a human.";
+  const agent = override.agent_label || override.agent_id || "the selected local agent";
+  const model = override.model_label || override.model;
+  return `User override: route this sub-aim to ${model ? `${agent} / ${model}` : agent}.`;
+}
+
 export function recommendAssignmentForMilestone(input: {
   milestone: Milestone;
   actors?: readonly Actor[];
 }): RoutedAssignment {
   const actors = input.actors ?? [];
-  const likelyOwner = contractLikelyOwner(input.milestone);
-  const capabilityTags = capabilityTagsForMilestone(input.milestone);
-  const humanRequired = likelyOwner === "human" || hasManualOnlyRule(input.milestone.acceptance_rule) || requiresHumanJudgment(input.milestone);
-  const actorKind: ActorKind = humanRequired ? "human" : "agent";
+  const recommendation = routingRecommendationForMilestone(input.milestone);
+  const override = routingOverrideForMilestone(input.milestone);
+  const actorKind: ActorKind = override?.owner ?? recommendation.recommendedOwner;
+  const capabilityTags = [
+    ...recommendation.capabilityTags,
+    ...(override?.owner === "agent" && override.agent_id ? [`agent:${override.agent_id}`] : []),
+    ...(override?.owner === "agent" && override.model ? [`model:${override.model}`] : []),
+  ];
   const actor = findActor(actors, actorKind, capabilityTags);
-  const reason = humanRequired
-    ? "Routed to a human because the sub-aim depends on judgment, access, approval, or manual proof."
-    : "Routed to an agent because the sub-aim is digital, researchable, or evidence-backed.";
+  const reason = override ? routingOverrideLabel(override) : recommendation.rationale;
   return {
     goalId: input.milestone.goal_id,
     milestoneId: input.milestone.id,
     actorKind,
     actorId: actor?.id ?? null,
     status: "assigned",
-    source: "routing",
+    source: override ? "user_override" : "routing",
     reason,
     capabilityTags,
   };
@@ -168,6 +314,80 @@ export function routeMilestones(input: {
     milestone,
     actors: input.actors,
   }));
+}
+
+function readyAgents(agents: readonly RoutingRuntimeAgentOption[]): RoutingRuntimeAgentOption[] {
+  return agents.filter((agent) => agent.available && agent.authenticated);
+}
+
+function issue(node: PlanNode, code: PlanRoutingValidationIssueCode, message: string): PlanRoutingValidationIssue {
+  return { nodeKey: node.key, title: node.title, code, message };
+}
+
+export function validatePlanRouting(input: {
+  plan: DecompositionOutput;
+  agents?: readonly RoutingRuntimeAgentOption[];
+  allowHuman?: boolean;
+}): PlanRoutingValidation {
+  const agents = input.agents ?? [];
+  const availableAgents = readyAgents(agents);
+  const agentById = new Map(agents.map((agent) => [agent.id, agent]));
+  const issues: PlanRoutingValidationIssue[] = [];
+
+  for (const node of input.plan.nodes) {
+    const recommendation = routingRecommendationForPlanNode(node);
+    const override = node.routing_override ?? null;
+    const owner = override?.owner ?? recommendation.recommendedOwner;
+
+    if (owner === "human") {
+      if (input.allowHuman === false) {
+        issues.push(issue(node, "human_route_unavailable", "Human routing is not available in this runtime."));
+      }
+      if (override && (override.agent_id || override.model)) {
+        issues.push(issue(node, "human_route_has_agent_selection", "Human-owned work cannot keep an agent or model selection."));
+      }
+      continue;
+    }
+
+    if (availableAgents.length === 0) {
+      issues.push(issue(
+        node,
+        "missing_agent_runtime",
+        "No authenticated local CLI agent is available. Choose Human for this sub-aim or set up Codex or Claude CLI.",
+      ));
+      continue;
+    }
+
+    if (!override) continue;
+    if (!override.agent_id) {
+      issues.push(issue(node, "missing_agent_selection", "Choose a local agent for this agent-owned sub-aim."));
+      continue;
+    }
+
+    const selectedAgent = agentById.get(override.agent_id);
+    if (!selectedAgent) {
+      issues.push(issue(node, "unknown_agent", `Selected agent "${override.agent_id}" is not part of the current runtime configuration.`));
+      continue;
+    }
+    if (!selectedAgent.available) {
+      issues.push(issue(node, "agent_unavailable", `${selectedAgent.label} is not installed or is not executable.`));
+      continue;
+    }
+    if (!selectedAgent.authenticated) {
+      issues.push(issue(node, "agent_unauthenticated", `${selectedAgent.label} is installed but not authenticated.`));
+      continue;
+    }
+
+    if (selectedAgent.models.length > 0 && !override.model) {
+      issues.push(issue(node, "missing_agent_model", `Choose a model for ${selectedAgent.label}.`));
+      continue;
+    }
+    if (override.model && selectedAgent.models.length > 0 && !selectedAgent.models.some((model) => model.id === override.model)) {
+      issues.push(issue(node, "unknown_agent_model", `${selectedAgent.label} does not expose model "${override.model}".`));
+    }
+  }
+
+  return { ok: issues.length === 0, issues };
 }
 
 export function decideContextIntakeSession(input: ContextIntakeDecisionInput): Pick<

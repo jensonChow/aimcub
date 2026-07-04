@@ -4,11 +4,17 @@ import {
   AcceptanceRule,
   mergePlanNodes,
   movePlanNode,
+  routingOverrideForMilestone,
+  routingRecommendationForPlanNode,
   splitPlanNode,
   updatePlanNode,
   validateExecutablePlan,
+  validatePlanRouting,
+  type AimIntakeReport,
+  type AimProgressReadModel,
+  type PlanRoutingValidation,
+  type RoutingRuntimeAgentOption,
 } from "@core/domain";
-import type { AimIntakeReport, AimProgressReadModel } from "@core/domain";
 import type { ClarifyAnswer, ClarifyOutput, ClarifyQuestion, ClarifySelectionMode } from "@core/llm";
 import type {
   AcceptanceRule as AcceptanceRuleType,
@@ -18,6 +24,8 @@ import type {
   Goal,
   Milestone,
   PlanNode,
+  PlanRoutingOverride,
+  PlanRoutingOwner,
 } from "@core/types";
 import type {
   ClarifyIpcResult,
@@ -269,6 +277,69 @@ function progressRows(detail: GoalDetail, progress: AimProgressReadModel | null)
     blocked: milestone.status === "blocked",
     next_action: "",
   }));
+}
+
+function routingAgentsFromDetections(agents: readonly LocalAgentDetection[]): RoutingRuntimeAgentOption[] {
+  return agents.map((agent) => ({
+    id: agent.id,
+    label: agent.name,
+    available: agent.available,
+    authenticated: agent.authStatus !== "missing",
+    models: agent.models,
+    unavailableReason: agent.authMessage ?? agent.diagnostics[0] ?? null,
+  }));
+}
+
+function readyRoutingAgents(agents: readonly RoutingRuntimeAgentOption[]): RoutingRuntimeAgentOption[] {
+  return agents.filter((agent) => agent.available && agent.authenticated);
+}
+
+function findRoutingAgent(agents: readonly RoutingRuntimeAgentOption[], id: string | null | undefined): RoutingRuntimeAgentOption | null {
+  return id ? agents.find((agent) => agent.id === id) ?? null : null;
+}
+
+function firstModel(agent: RoutingRuntimeAgentOption | null | undefined): string | null {
+  return agent?.models[0]?.id ?? null;
+}
+
+function modelLabel(agent: RoutingRuntimeAgentOption | null | undefined, modelId: string | null | undefined): string | null {
+  if (!agent || !modelId) return modelId ?? null;
+  return agent.models.find((model) => model.id === modelId)?.label ?? modelId;
+}
+
+function makeRoutingOverride(input: {
+  owner: PlanRoutingOwner;
+  agents: readonly RoutingRuntimeAgentOption[];
+  agentId?: string | null;
+  model?: string | null;
+}): PlanRoutingOverride {
+  if (input.owner === "human") {
+    return {
+      owner: "human",
+      agent_id: null,
+      agent_label: null,
+      run_mode: null,
+      model: null,
+      model_label: null,
+      reason: "User selected the human route.",
+    };
+  }
+  const ready = readyRoutingAgents(input.agents);
+  const agent = findRoutingAgent(ready, input.agentId) ?? ready[0] ?? null;
+  const selectedModel = input.model ?? firstModel(agent);
+  return {
+    owner: "agent",
+    agent_id: agent?.id ?? input.agentId ?? null,
+    agent_label: agent?.label ?? null,
+    run_mode: "local_cli",
+    model: selectedModel,
+    model_label: modelLabel(agent, selectedModel),
+    reason: "User selected the agent route.",
+  };
+}
+
+function formatRoutingValidation(validation: PlanRoutingValidation): string {
+  return validation.issues.map((issue) => `${issue.title}: ${issue.message}`).join("\n");
 }
 
 function evalStateOf(row: ProgressMilestoneRow): EvalState {
@@ -591,6 +662,17 @@ function AimOsApp() {
       setStageOverride("contracts");
       return;
     }
+    const routingValidation = validatePlanRouting({
+      plan,
+      agents: routingAgentsFromDetections(localAgents),
+      allowHuman: true,
+    });
+    if (!routingValidation.ok) {
+      setError(formatRoutingValidation(routingValidation));
+      setStageOverride("contracts");
+      setMode("reviewing");
+      return;
+    }
     setBusy(t("os.busy.save"));
     setError(null);
     try {
@@ -686,6 +768,11 @@ function AimOsApp() {
 
   const activePlan = (finalPlan ?? draft ?? detail?.goal.plan_json ?? null) as DecompositionOutput | null;
   const activePlanValidation = activePlan ? validateExecutablePlan(activePlan) : null;
+  const routingAgents = useMemo(() => routingAgentsFromDetections(localAgents), [localAgents]);
+  const planRoutingValidation = useMemo(
+    () => activePlan ? validatePlanRouting({ plan: activePlan, agents: routingAgents, allowHuman: true }) : null,
+    [activePlan, routingAgents],
+  );
   const completed = progress?.completed_milestones ?? detail?.milestones.filter((m) => m.status === "completed").length ?? 0;
   const total = progress?.total_milestones ?? detail?.milestones.length ?? 0;
   const hasUnsavedAim = aimTitle.trim().length > 0;
@@ -799,6 +886,8 @@ function AimOsApp() {
       saved={Boolean(selected)}
       disabled={Boolean(busy) || activePlanValidation?.ok === false}
       validationErrors={activePlanValidation?.errors ?? []}
+      routingAgents={routingAgents}
+      routingValidation={planRoutingValidation}
       onChange={selected ? undefined : applyPlanEdit}
       onSave={() => void savePlan()}
     />
@@ -1462,6 +1551,8 @@ function PlanPanel(props: {
   saved: boolean;
   disabled: boolean;
   validationErrors: string[];
+  routingAgents: RoutingRuntimeAgentOption[];
+  routingValidation: PlanRoutingValidation | null;
   onChange?: (plan: DecompositionOutput) => void;
   onSave: () => void;
 }) {
@@ -1470,6 +1561,15 @@ function PlanPanel(props: {
   const [ruleDrafts, setRuleDrafts] = useState<Record<string, string>>({});
   const [ruleErrors, setRuleErrors] = useState<Record<string, string>>({});
   const hasRuleErrors = Object.keys(ruleErrors).length > 0;
+  const validation = props.routingValidation ?? validatePlanRouting({ plan: props.plan, agents: props.routingAgents, allowHuman: true });
+  const readyAgents = readyRoutingAgents(props.routingAgents);
+  const issuesByNode = new Map<string, string[]>();
+  for (const issue of validation.issues) {
+    const rows = issuesByNode.get(issue.nodeKey) ?? [];
+    rows.push(issue.message);
+    issuesByNode.set(issue.nodeKey, rows);
+  }
+  const saveDisabled = props.disabled || hasRuleErrors || props.validationErrors.length > 0 || !validation.ok;
 
   useEffect(() => {
     const keys = new Set(props.plan.nodes.map((node) => node.key));
@@ -1548,6 +1648,35 @@ function PlanPanel(props: {
     applyRuleText(node, ruleTextFor(node));
   }
 
+  function applyOverride(node: PlanNode, override: PlanRoutingOverride | null) {
+    apply(updatePlanNode(props.plan, node.key, { routing_override: override }));
+  }
+
+  function chooseOwner(node: PlanNode, owner: PlanRoutingOwner) {
+    applyOverride(node, makeRoutingOverride({ owner, agents: props.routingAgents }));
+  }
+
+  function chooseAgent(node: PlanNode, agentId: string) {
+    const current = node.routing_override;
+    const agent = findRoutingAgent(props.routingAgents, agentId);
+    applyOverride(node, makeRoutingOverride({
+      owner: "agent",
+      agents: props.routingAgents,
+      agentId,
+      model: agent?.models.some((model) => model.id === current?.model) ? current?.model : firstModel(agent),
+    }));
+  }
+
+  function chooseModel(node: PlanNode, model: string) {
+    const currentAgentId = node.routing_override?.agent_id ?? readyAgents[0]?.id ?? null;
+    applyOverride(node, makeRoutingOverride({
+      owner: "agent",
+      agents: props.routingAgents,
+      agentId: currentAgentId,
+      model,
+    }));
+  }
+
   return (
     <section className="od-stage-panel od-plan-editor">
       <div className="od-stage-panel-head">
@@ -1557,11 +1686,12 @@ function PlanPanel(props: {
           <p>{editable ? t("plan.editBody") : t("plan.reviewBody")}</p>
         </div>
         {!props.saved ? (
-          <button className="od-aim-primary" type="button" onClick={props.onSave} disabled={props.disabled || hasRuleErrors}>
+          <button className="od-aim-primary" type="button" onClick={props.onSave} disabled={saveDisabled}>
             {t("os.saveAim")}
           </button>
         ) : null}
       </div>
+
       <div className="od-stage-metrics">
         <StageMetric label={t("os.metricSubAims")} value={String(props.plan.nodes.length)} />
         <StageMetric label={t("os.metricQuality")} value={props.quality ? `${props.quality.grade} · ${props.quality.score}` : "-"} />
@@ -1575,18 +1705,33 @@ function PlanPanel(props: {
         </div>
       ) : null}
 
+      {!validation.ok ? (
+        <div className="od-routing-alert">
+          <strong>{t("routing.validationTitle")}</strong>
+          <span>{validation.issues[0]?.message ?? t("routing.validationBody")}</span>
+        </div>
+      ) : null}
+
       <div className="od-plan-list">
         {props.plan.nodes.map((node, index) => {
           const contract = editableContractForNode(node);
+          const recommendation = routingRecommendationForPlanNode(node);
+          const override = node.routing_override;
+          const owner = override?.owner ?? recommendation.recommendedOwner;
+          const selectedAgent = findRoutingAgent(props.routingAgents, override?.agent_id) ?? readyAgents[0] ?? null;
+          const selectedModel = override?.model ?? firstModel(selectedAgent) ?? "";
+          const nodeIssues = issuesByNode.get(node.key) ?? [];
           return (
-            <article key={node.key} className="od-plan-card">
+            <article key={node.key} className={`od-plan-card${nodeIssues.length ? " has-warning" : ""}`}>
               <div className="od-plan-card-index">{index + 1}</div>
               <div className="od-plan-card-main">
                 <div className="od-plan-card-head">
                   <div className="od-work-title">
                     <strong>{node.title}</strong>
-                    <span className="od-pill blue">{node.acceptance_rule.completion_mode}</span>
-                    <span className="od-pill">{node.decomposition_contract?.likely_owner ?? "either"}</span>
+                    <span className="od-pill">{node.acceptance_rule.completion_mode}</span>
+                    <span className="od-pill blue">{t("routing.likely", { owner: recommendation.likelyOwner })}</span>
+                    <span className="od-pill">{t("routing.recommended", { owner: recommendation.recommendedOwner })}</span>
+                    {override ? <span className="od-pill warn">{t("routing.override")}</span> : null}
                   </div>
                   {editable ? (
                     <div className="od-plan-actions">
@@ -1683,6 +1828,85 @@ function PlanPanel(props: {
                     </div>
                   </>
                 )}
+
+                <div className="od-routing-rationale">
+                  <span>{t("routing.rationale")}</span>
+                  <strong>{recommendation.rationale}</strong>
+                </div>
+
+                <div className="od-routing-controls" aria-label={t("routing.controls")}>
+                  <div className="od-routing-owner" role="group" aria-label={t("routing.owner")}>
+                    <button
+                      type="button"
+                      className={owner === "human" ? "active" : ""}
+                      disabled={!editable || props.disabled}
+                      onClick={() => chooseOwner(node, "human")}
+                    >
+                      {t("os.actorHuman")}
+                    </button>
+                    <button
+                      type="button"
+                      className={owner === "agent" ? "active" : ""}
+                      disabled={!editable || props.disabled}
+                      onClick={() => chooseOwner(node, "agent")}
+                    >
+                      {t("os.actorAgent")}
+                    </button>
+                  </div>
+
+                  {owner === "agent" ? (
+                    <div className="od-routing-selects">
+                      <label>
+                        <span>{t("routing.agent")}</span>
+                        <select
+                          value={selectedAgent?.id ?? ""}
+                          disabled={!editable || props.disabled || readyAgents.length === 0}
+                          onChange={(event) => chooseAgent(node, event.target.value)}
+                        >
+                          {readyAgents.length === 0 ? <option value="">{t("routing.noAgents")}</option> : null}
+                          {readyAgents.map((agent) => (
+                            <option key={agent.id} value={agent.id}>{agent.label}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        <span>{t("routing.model")}</span>
+                        <select
+                          value={selectedModel}
+                          disabled={!editable || props.disabled || !selectedAgent || selectedAgent.models.length === 0}
+                          onChange={(event) => chooseModel(node, event.target.value)}
+                        >
+                          {selectedAgent?.models.length ? selectedAgent.models.map((model) => (
+                            <option key={model.id} value={model.id}>{model.label ?? model.id}</option>
+                          )) : <option value="">{t("routing.noModels")}</option>}
+                        </select>
+                      </label>
+                    </div>
+                  ) : null}
+
+                  {override && editable ? (
+                    <button
+                      className="od-routing-reset"
+                      type="button"
+                      disabled={props.disabled}
+                      onClick={() => applyOverride(node, null)}
+                    >
+                      {t("routing.useRecommendation")}
+                    </button>
+                  ) : null}
+                </div>
+
+                <div className="od-plan-contract-line">
+                  <span>{node.acceptance_rule.completion_mode}</span>
+                  <span>{node.acceptance_rule.clauses.map((clause) => clause.evaluator).join(" + ")}</span>
+                  {override?.owner === "agent" && override.agent_label ? (
+                    <span>{[override.agent_label, override.model_label ?? override.model].filter(Boolean).join(" / ")}</span>
+                  ) : null}
+                </div>
+
+                {nodeIssues.length ? (
+                  <div className="od-routing-issue">{nodeIssues[0]}</div>
+                ) : null}
               </div>
             </article>
           );
@@ -1707,6 +1931,13 @@ function ExecutePanel(props: {
   const humanAssignments = rows.filter((row) => row.assignment?.actor_kind === "human").length;
 
   function actorLabel(row: ProgressMilestoneRow): string {
+    const override = routingOverrideForMilestone(row.milestone);
+    if (override?.owner === "human") return t("os.actorHuman");
+    if (override?.owner === "agent") {
+      const agent = override.agent_label || override.agent_id || t("os.actorAgent");
+      const model = override.model_label || override.model;
+      return model ? `${t("os.actorAgent")} · ${agent} / ${model}` : `${t("os.actorAgent")} · ${agent}`;
+    }
     if (!row.assignment) return t("os.unassigned");
     const kind = row.assignment.actor_kind === "human" ? t("os.actorHuman") : t("os.actorAgent");
     const actor = row.assignment.actor_id
@@ -1789,7 +2020,7 @@ function ExecutePanel(props: {
               <button
                 className="od-aim-secondary"
                 type="button"
-                disabled={props.disabled || row.completed}
+                disabled={props.disabled || row.completed || row.assignment?.actor_kind === "human"}
                 onClick={() => props.onRunAgent(row.milestone)}
               >
                 {t("os.runAgent")}

@@ -279,6 +279,20 @@ export type Milestone = z.infer<typeof Milestone>;
 export const DecompositionOwner = z.enum(["human", "agent", "either", "mixed"]);
 export type DecompositionOwner = z.infer<typeof DecompositionOwner>;
 
+export const PlanRoutingOwner = z.enum(["human", "agent"]);
+export type PlanRoutingOwner = z.infer<typeof PlanRoutingOwner>;
+
+export const PlanRoutingOverride = z.object({
+  owner: PlanRoutingOwner,
+  agent_id: z.string().min(1).nullable().default(null),
+  agent_label: z.string().min(1).nullable().default(null),
+  run_mode: AgentRunMode.nullable().default(null),
+  model: z.string().min(1).nullable().default(null),
+  model_label: z.string().min(1).nullable().default(null),
+  reason: z.string().default("User routing override."),
+});
+export type PlanRoutingOverride = z.infer<typeof PlanRoutingOverride>;
+
 export const DecompositionContextGap = z.object({
   category: ContextCategory,
   question: z.string().min(1),
@@ -309,6 +323,7 @@ export const PlanNode = z.object({
   xp_reward: z.number().int().positive().default(10),
   acceptance_rule: AcceptanceRule,
   decomposition_contract: DecompositionContract.nullable().default(null),
+  routing_override: PlanRoutingOverride.nullable().default(null),
 });
 export type PlanNode = z.infer<typeof PlanNode>;
 

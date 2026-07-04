@@ -129,6 +129,7 @@ export function localDecompose(req: DecomposeRequest): DecompositionOutput {
       xp_reward: XP_BY_EFFORT[effort],
       acceptance_rule: step.rule(),
       decomposition_contract: fallbackContract(step, i),
+      routing_override: null,
     };
   });
 

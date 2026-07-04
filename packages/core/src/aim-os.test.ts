@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { Evidence, Goal, Milestone, MilestoneCompletion, Run, SubAimRelation, ToolTrace } from "@core/types";
+import { DecompositionOutput, type Evidence, type Goal, type Milestone, type MilestoneCompletion, type Run, type SubAimRelation, type ToolTrace } from "@core/types";
 import {
   buildAimProgressReadModel,
   buildHumanTaskHandoff,
@@ -8,6 +8,8 @@ import {
   deriveContextCandidatesFromWork,
   evaluateWithRuntimeReport,
   recommendAssignmentForMilestone,
+  routingRecommendationForPlanNode,
+  validatePlanRouting,
 } from "./aim-os";
 
 const OWNER = "00000000-0000-4000-8000-000000000001";
@@ -119,6 +121,83 @@ describe("Aim OS routing and human handoff", () => {
     expect(handoff.approvalRequired).toBe(true);
     expect(handoff.secretOrAccessRequired).toBe(true);
     expect(handoff.finalConfirmationRequired).toBe(true);
+  });
+
+  it("validates impossible agent routes against the available runtime", () => {
+    const plan = DecompositionOutput.parse({
+      nodes: [{
+        key: "agent-work",
+        title: "Implement CLI",
+        description: "Build the command.",
+        acceptance_rule: {
+          clauses: [{ evaluator: "commit_pattern", auto_verifiable: true, match: { message_pattern: "cli" } }],
+        },
+        decomposition_contract: {
+          why: "Code can be delegated.",
+          definition_of_done: "The command is implemented.",
+          required_evidence: ["Commit with CLI implementation."],
+          likely_owner: "agent",
+          context_gaps: [],
+          eval_signal: "A commit proves the CLI exists.",
+        },
+      }],
+      edges: [],
+    });
+
+    const missingRuntime = validatePlanRouting({ plan, agents: [] });
+    expect(missingRuntime.ok).toBe(false);
+    expect(missingRuntime.issues[0]?.code).toBe("missing_agent_runtime");
+
+    const withHumanOverride = DecompositionOutput.parse({
+      ...plan,
+      nodes: [{ ...plan.nodes[0]!, routing_override: { owner: "human" } }],
+    });
+    expect(validatePlanRouting({ plan: withHumanOverride, agents: [] }).ok).toBe(true);
+  });
+
+  it("requires selected agent models to belong to the current runtime", () => {
+    const plan = DecompositionOutput.parse({
+      nodes: [{
+        key: "agent-work",
+        title: "Implement CLI",
+        acceptance_rule: {
+          clauses: [{ evaluator: "commit_pattern", auto_verifiable: true, match: { message_pattern: "cli" } }],
+        },
+        decomposition_contract: {
+          why: "Code can be delegated.",
+          definition_of_done: "The command is implemented.",
+          required_evidence: ["Commit with CLI implementation."],
+          likely_owner: "agent",
+          context_gaps: [],
+          eval_signal: "A commit proves the CLI exists.",
+        },
+        routing_override: {
+          owner: "agent",
+          agent_id: "codex",
+          agent_label: "Codex CLI",
+          run_mode: "local_cli",
+          model: "missing-model",
+          model_label: "missing-model",
+        },
+      }],
+      edges: [],
+    });
+    const agents = [{
+      id: "codex",
+      label: "Codex CLI",
+      available: true,
+      authenticated: true,
+      models: [{ id: "gpt-5", label: "GPT-5" }],
+    }];
+
+    expect(validatePlanRouting({ plan, agents }).issues[0]?.code).toBe("unknown_agent_model");
+
+    const valid = DecompositionOutput.parse({
+      ...plan,
+      nodes: [{ ...plan.nodes[0]!, routing_override: { ...plan.nodes[0]!.routing_override!, model: "gpt-5" } }],
+    });
+    expect(validatePlanRouting({ plan: valid, agents }).ok).toBe(true);
+    expect(routingRecommendationForPlanNode(valid.nodes[0]!).rationale).toMatch(/agent/i);
   });
 });
 
