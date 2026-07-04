@@ -29,7 +29,7 @@ Branch: `main`
 
 Notes:
 - MCP worker tests intentionally log the expected missing-Supabase opaque-error path while passing.
-- Commit/push status: `main` contains the product-loop merge and this handoff update; push `main` to `origin` before closing the session.
+- Commit/push status: `main` contains the product-loop merge and handoff updates and has been pushed to `origin/main`.
 
 ## Next Session Prompt
 
