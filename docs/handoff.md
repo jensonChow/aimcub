@@ -35,7 +35,7 @@ Notes:
 - `node_modules` was absent in this worktree, so `pnpm install` was required before verification. The sandboxed install hit DNS restrictions and the approved network install succeeded.
 - Turbo emitted non-fatal `IO error: Operation not permitted` warnings while all required tasks exited successfully.
 
-Commit/push status: pending merge commit and push to `origin/main`.
+Commit/push status: merge commit `f7c48d4` pushed to `origin/main`; this handoff status update follows it on `main`.
 
 ## Next Session Prompt
 
