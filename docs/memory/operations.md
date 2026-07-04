@@ -24,9 +24,17 @@ pnpm desktop
 pnpm desktop:dev
 ```
 
-The installed local app is `/Applications/Aimcub.app`. The app has launched successfully through both development and installed-app paths. In development macOS may label the Dock app as `Electron`, but the window title should be `Aimcub`.
+The user-facing local app bundle should live directly in the project root as `Aimcub.app` when the user asks for an openable app folder. It is an ignored local artifact and must not be committed.
 
-Desktop release packaging uses:
+Folder-style Desktop packaging uses:
+
+```bash
+pnpm desktop:pack
+```
+
+This creates `apps/desktop/dist/mac-arm64/Aimcub.app`; copy that bundle to root `Aimcub.app` for the current local handoff. In development macOS may label the Dock app as `Electron`, but the window title should be `Aimcub`.
+
+Desktop release packaging for distributable DMG/zip artifacts uses:
 
 ```bash
 pnpm --filter @app/desktop run dist

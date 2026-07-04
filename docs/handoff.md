@@ -7,6 +7,7 @@ Branch: `main`
 
 - Fixed the root `pnpm desktop:pack` script so it runs the Desktop package script instead of pnpm's built-in pack command.
 - Built an openable macOS app bundle and copied it to the project root at `Aimcub.app`. The bundle is an ignored local artifact and is not committed.
+- Refreshed project memory so `docs/memory/operations.md` and `docs/memory/history.md` match the simplified workspace and root app-bundle handoff.
 - Removed inactive product surfaces from the active workspace: `apps/web`, `apps/ios`, `apps/extension`, and the old `docs/charters/web.md`.
 - Removed unused `packages/ui-tokens`; Desktop token direction now lives in `docs/memory/design-system.md` and current renderer CSS.
 - Replaced broad workspace globs with explicit active packages in `pnpm-workspace.yaml`: Desktop, CLI, MCP, and core packages only.
@@ -39,12 +40,11 @@ Packaging command also passed:
 PATH=/Users/jenson/.local/node/bin:$PATH pnpm desktop:pack
 ```
 
-Commit/push status: this handoff is part of the Desktop packaging script fix commit; use `git log -1` for the final hash after the session commits and pushes.
+Commit/push status: this handoff is part of the memory refresh commit; use `git log -1` for the final hash after the session commits and pushes.
 
 ## Next Session Prompt
 
 ```text
 Continue from the simplified Aimcub workspace. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md. Then load only the module memory relevant to the task.
-
 Treat Desktop, CLI, MCP, and the core packages as the active code hierarchy. Do not reintroduce hosted web, iOS, browser-extension, or cross-platform token packages without a concrete product trigger and matching memory update.
 ```

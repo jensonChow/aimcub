@@ -18,11 +18,11 @@ The local Aim OS direction consolidated context/eval around a shared planning-co
 
 Recent mainline commits that shaped the current memory:
 
+- `55f8e38` - fix desktop packaging shortcut and root `Aimcub.app` local handoff.
+- `80c9447` - simplify active workspace structure.
+- `a7291aa` - add desktop design system memory.
 - `23ebde9` - sync memory docs with local harness direction.
 - `d0e5dad` - reframe v1 around local Aim OS harness.
-- `6f7946a` - update desktop handoff memory.
-- `f5297ca` - simplify desktop app layout.
-- `0b82fc5` - add desktop release packaging.
 
 ## Archived Tool-Substrate Context
 
