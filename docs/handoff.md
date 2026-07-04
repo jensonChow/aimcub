@@ -27,10 +27,11 @@ Branch: `codex/settings-split-view`
   - `git diff --check`
   - `git diff --cached --check`
 - Packaged and refreshed the local desktop app with `pnpm desktop:pack`, then visually verified the running app: the Settings stage uses the far-left primary sidebar for settings categories and the center workspace switches to the selected detail pane.
+- Memory refresh audit passed after the push: root agent files are within budget, Settings memory points to the primary left sidebar behavior, and no stale nested workspace settings-sidebar rule remains.
 
 Notes:
 - MCP worker tests intentionally log the expected missing-Supabase opaque-error path while passing.
-- Commit/push status for this memory refresh is recorded in the final session response and `git log -1`.
+- Commit/push: `ec5ffb6 Use primary sidebar for desktop settings` is pushed to `origin/codex/settings-split-view`.
 
 ## Next Session Prompt
 
