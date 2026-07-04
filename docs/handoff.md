@@ -65,6 +65,7 @@ Last updated: 2026-07-04
 - Local goal creation now materializes routing assignments from decomposition contracts. Agent execution through Desktop creates a `Run`, records low-trust evidence with attribution, finishes the run, and sediments pending context candidates. Manual child-aim decomposition is stored as a first-class sub-aim relation instead of only `metadata`.
 - The current Aim OS model is local-store first. Supabase schema parity is still future work; do not assume hosted Web has these orchestration tables until migrations and API adapters are added.
 - Desktop renderer has been reset from the old debug-heavy 3,500-line panel into a compact Aim OS cockpit MVP. The new first screen centers the actual flow: aim intake, context questions, sub-aim/eval preview, assignment/run/evidence/eval cockpit, context inbox, and runtime settings. It intentionally keeps rough MVP styling and reuses existing IPC instead of adding new product logic in the renderer.
+- Desktop renderer now applies the Open Design cockpit direction through a reusable `CockpitShell`: Apple-like fullscreen desktop chrome, collapsible/resizable aim sidebar, low-weight workflow stage nav, center active-step workspace, and a right audit rail. Context collection now shows the six first-class intake entries from the design source while preserving the existing context-source IPC/config flow.
 - Latest mainline commits to preserve as the current baseline:
   - `873a404` — local Aim OS orchestration model.
   - `793f623` — Desktop UI reset around the Aim OS cockpit.

@@ -15,10 +15,10 @@ import type {
   WebResearchStatus,
 } from "../shared/ipc";
 
+import { CockpitShell, type CockpitStage } from "./CockpitShell";
 import { ContextInbox } from "./ContextInbox";
 import { ContextSourcesPanel } from "./ContextSourcesPanel";
 import { I18nProvider, useI18n } from "./i18n";
-import { LangToggle } from "./LangToggle";
 import { LocalAgentForm } from "./LocalAgentForm";
 import { Notice } from "./Notice";
 import { mergePlanningDebugTraces, PlanningDebugPanel } from "./PlanningDebugPanel";
@@ -29,17 +29,6 @@ import { C, inputStyle, primaryButton, secondaryButton } from "./styles";
 type AppMode = "cockpit" | "contexting" | "drafting" | "answering" | "reviewing" | "settings";
 type ClarifyPhase = "intake" | "postDraft" | null;
 type AnswerMap = Record<string, { labels: string[]; other: string }>;
-
-const shell: CSSProperties = {
-  width: "100%",
-  height: "100vh",
-  minHeight: "100vh",
-  overflow: "hidden",
-  background: "#f6f7f7",
-  color: C.text,
-  fontFamily:
-    'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-};
 
 function shortText(value: string | undefined | null, max = 120): string {
   const cleaned = (value ?? "").replace(/\s+/g, " ").trim();
@@ -204,6 +193,14 @@ function answerText(answer: ClarifyAnswer): string {
   return [selected, answer.other_text ?? ""].filter((part) => part.trim().length > 0).join(selected ? "; " : "");
 }
 
+function cockpitStageFor(mode: AppMode, selected: Goal | null, activePlan: DecompositionOutput | null): CockpitStage {
+  if (mode === "settings") return "settings";
+  if (mode === "contexting" || mode === "answering") return "context";
+  if (mode === "reviewing" || (!selected && activePlan)) return "contracts";
+  if (selected) return "run";
+  return "aim";
+}
+
 export function App() {
   return (
     <I18nProvider>
@@ -241,6 +238,7 @@ function AimOsApp() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [stageOverride, setStageOverride] = useState<CockpitStage | null>(null);
   const planningRunIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -291,6 +289,7 @@ function AimOsApp() {
   async function openGoal(goal: Goal) {
     setSelected(goal);
     setMode("cockpit");
+    setStageOverride("run");
     setError(null);
     setDraft(null);
     setFinalPlan(null);
@@ -312,6 +311,7 @@ function AimOsApp() {
   }
 
   function resetComposer() {
+    setStageOverride("aim");
     setAimTitle("");
     setAimDescription("");
     setParent(null);
@@ -380,6 +380,7 @@ function AimOsApp() {
       if (!options.skipIntakeGate) {
         setBusy(t("os.busy.context"));
         setMode("contexting");
+        setStageOverride("context");
         const intake = await window.aimcub.intake({ title, description: aimDescription.trim() || undefined, clientRunId: runId });
         setPlanResult({ ok: false, output: null, errors: [], intake });
         if (shouldBlockForIntake(intake) && intake.questions.length > 0) {
@@ -394,6 +395,7 @@ function AimOsApp() {
 
       setBusy(t("os.busy.draft"));
       setMode("drafting");
+      setStageOverride("contracts");
       const req = { title, description: descriptionWithContext(), clientRunId: runId };
       const nextDraft = await window.aimcub.draft(req);
       if (!nextDraft.ok || !nextDraft.output) throw new Error(nextDraft.errors.join("; ") || t("os.err.draft"));
@@ -414,9 +416,11 @@ function AimOsApp() {
       setClarifyPhase("postDraft");
       setAnswers({});
       setMode("answering");
+      setStageOverride("context");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setMode("cockpit");
+      setStageOverride("aim");
     } finally {
       setBusy(null);
     }
@@ -456,6 +460,7 @@ function AimOsApp() {
         setPlanningDebugTraces((current) => [...current, refineTrace]);
       }
       setMode("reviewing");
+      setStageOverride("contracts");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -563,6 +568,7 @@ function AimOsApp() {
       "Break this sub-aim into smaller sub-aims with concrete eval rules.",
     ].filter(Boolean).join("\n"));
     setMode("cockpit");
+    setStageOverride("aim");
   }
 
   async function acceptContext(candidate: Memory, content: string, scope: "aim" | "global") {
@@ -578,56 +584,56 @@ function AimOsApp() {
   const activePlan = (finalPlan ?? draft ?? detail?.goal.plan_json ?? null) as DecompositionOutput | null;
   const completed = progress?.completed_milestones ?? detail?.milestones.filter((m) => m.status === "completed").length ?? 0;
   const total = progress?.total_milestones ?? detail?.milestones.length ?? 0;
+  const activeStage = stageOverride ?? cockpitStageFor(mode, selected, activePlan);
+
+  function openCockpitStage(stage: CockpitStage) {
+    setStageOverride(stage);
+    if (stage === "settings") {
+      setShowSettings(true);
+      setMode("settings");
+      return;
+    }
+    setShowSettings(false);
+    if (stage === "context") {
+      setMode("contexting");
+      return;
+    }
+    if (stage === "contracts") {
+      setMode(activePlan ? "reviewing" : "contexting");
+      return;
+    }
+    if (stage === "run" || stage === "eval") {
+      setMode(selected || activePlan ? "reviewing" : "cockpit");
+      return;
+    }
+    setMode("cockpit");
+  }
 
   return (
-    <div style={shell}>
-      <div style={layoutStyle()}>
-        <aside style={sidebarStyle()}>
-          <div style={brandRowStyle()}>
-            <div>
-              <div style={{ fontWeight: 800, fontSize: 18 }}>Aimcub</div>
-              <div style={{ color: C.muted, fontSize: 12 }}>{t("os.tagline")}</div>
-            </div>
-            <LangToggle />
-          </div>
-
-          <button
-            style={{ ...primaryButton(false), width: "100%", marginTop: 8 }}
-            onClick={() => {
-              resetComposer();
-              setMode("cockpit");
-            }}
-          >
-            {t("os.newAim")}
-          </button>
-
-          <div style={{ marginTop: 20, color: C.muted, fontSize: 12, fontWeight: 700 }}>{t("os.savedAims")}</div>
-          <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
-            {goals.length === 0 ? <div style={emptySmallStyle()}>{t("os.noAims")}</div> : null}
-            {goals.map((goal) => (
-              <button
-                key={goal.id}
-                onClick={() => void openGoal(goal)}
-                style={goalButtonStyle(selected?.id === goal.id)}
-              >
-                <span style={{ fontWeight: 700 }}>{shortText(goal.title, 42)}</span>
-                <span style={{ color: C.muted, fontSize: 12 }}>{goal.status}</span>
-              </button>
-            ))}
-          </div>
-
-          <button
-            style={{ ...secondaryButton(), width: "100%", marginTop: 18 }}
-            onClick={() => {
-              setShowSettings((value) => !value);
-              setMode("settings");
-            }}
-          >
-            {provider?.configured ? t("os.settings") : t("os.setupProvider")}
-          </button>
-        </aside>
-
-        <main style={mainStyle()}>
+    <CockpitShell
+      goals={goals}
+      selected={selected}
+      activeStage={activeStage}
+      completed={completed}
+      total={total}
+      progress={progress}
+      provider={provider}
+      webResearch={webResearch}
+      contextSources={contextSources}
+      localAgents={localAgents}
+      pendingContextCount={contextCandidates.length}
+      busy={busy}
+      error={error}
+      onNewAim={() => {
+        resetComposer();
+        setShowSettings(false);
+        setMode("cockpit");
+        setStageOverride("aim");
+      }}
+      onOpenGoal={(goal) => void openGoal(goal)}
+      onStage={openCockpitStage}
+      main={(
+        <>
           {error ? <Notice tone="error">{error}</Notice> : null}
           {busy ? <Notice tone="info">{busy}</Notice> : null}
 
@@ -646,7 +652,7 @@ function AimOsApp() {
 
           <FlowRail mode={mode} hasDraft={Boolean(draft)} hasPlan={Boolean(finalPlan)} saved={Boolean(selected)} />
 
-          {!selected || draft ? (
+          {!selected || draft || mode === "contexting" ? (
             <>
               <ComposerPanel
                 title={aimTitle}
@@ -718,9 +724,10 @@ function AimOsApp() {
               onRefreshAgents={async () => setLocalAgents(await window.aimcub.listLocalAgents())}
             />
           ) : null}
-        </main>
-
-        <aside style={rightRailStyle()}>
+        </>
+      )}
+      inspector={(
+        <>
           <PlanningDebugPanel
             mode={mode}
             busy={busy}
@@ -745,9 +752,9 @@ function AimOsApp() {
             progress={progress}
             contextCount={contextCandidates.length}
           />
-        </aside>
-      </div>
-    </div>
+        </>
+      )}
+    />
   );
 }
 
@@ -1132,59 +1139,6 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function layoutStyle(): CSSProperties {
-  return {
-    display: "grid",
-    gridTemplateColumns: "280px minmax(0, 1fr) 320px",
-    gap: 16,
-    width: "100%",
-    height: "100%",
-    minHeight: 0,
-    padding: 16,
-    boxSizing: "border-box",
-  };
-}
-
-function sidebarStyle(): CSSProperties {
-  return {
-    background: "#fff",
-    border: `1px solid ${C.border}`,
-    borderRadius: 8,
-    padding: 16,
-    height: "100%",
-    minHeight: 0,
-    boxSizing: "border-box",
-    overflow: "auto",
-  };
-}
-
-function mainStyle(): CSSProperties {
-  return {
-    minWidth: 0,
-    minHeight: 0,
-    display: "grid",
-    alignContent: "start",
-    gap: 14,
-    overflowY: "auto",
-    paddingRight: 2,
-  };
-}
-
-function rightRailStyle(): CSSProperties {
-  return {
-    display: "grid",
-    alignContent: "start",
-    gap: 14,
-    height: "100%",
-    minHeight: 0,
-    overflow: "auto",
-  };
-}
-
-function brandRowStyle(): CSSProperties {
-  return { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 12 };
-}
-
 function heroPanelStyle(): CSSProperties {
   return {
     background: "#fff",
@@ -1240,24 +1194,6 @@ function eyebrowStyle(): CSSProperties {
 
 function mutedTextStyle(): CSSProperties {
   return { color: C.muted, fontSize: 13, lineHeight: 1.45, margin: "4px 0 0" };
-}
-
-function goalButtonStyle(active: boolean): CSSProperties {
-  return {
-    display: "grid",
-    gap: 4,
-    textAlign: "left",
-    padding: 12,
-    borderRadius: 8,
-    border: `1px solid ${active ? C.accent : C.border}`,
-    background: active ? C.accentBg : "#fff",
-    color: C.text,
-    cursor: "pointer",
-  };
-}
-
-function emptySmallStyle(): CSSProperties {
-  return { padding: 12, border: `1px dashed ${C.border}`, borderRadius: 8, color: C.muted, fontSize: 13 };
 }
 
 function flowRailStyle(): CSSProperties {

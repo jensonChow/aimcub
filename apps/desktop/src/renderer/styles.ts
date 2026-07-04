@@ -1,14 +1,14 @@
 import type { CSSProperties } from "react";
 
 export const C = {
-  text: "#1f2328",
-  muted: "#6e7781",
-  border: "#d8dee4",
-  accent: "#2f7187",
-  accentBg: "#eef6f8",
+  text: "#1d1d1f",
+  muted: "#6e6e73",
+  border: "#d2d2d7",
+  accent: "#0071e3",
+  accentBg: "#f0f7ff",
   surface: "#ffffff",
-  page: "#fafafa",
-  danger: "#a33b35",
+  page: "#f5f5f7",
+  danger: "#dc2626",
 };
 
 export function card(): CSSProperties {
