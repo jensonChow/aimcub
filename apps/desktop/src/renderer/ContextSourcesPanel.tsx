@@ -2,16 +2,25 @@ import { useEffect, useState, type CSSProperties } from "react";
 
 import type { ContextSourceConfig, ContextSourceStatus } from "../shared/ipc";
 import { useI18n } from "./i18n";
-import { C, inputStyle, primaryButton, secondaryButton } from "./styles";
+import { C, inputStyle, primaryButton } from "./styles";
 
 type OnlineSource = ContextSourceConfig["online"]["sources"][number];
 type OnlineProvider = OnlineSource["provider"];
+type SummaryTone = "" | "blue" | "success" | "warn";
 
 interface ContextSourcesPanelProps {
   status: ContextSourceStatus | null;
   disabled?: boolean;
   compact?: boolean;
   onSaved: (status: ContextSourceStatus) => void;
+}
+
+interface SourceSummaryItem {
+  key: string;
+  label: string;
+  detail: string;
+  status: string;
+  tone: SummaryTone;
 }
 
 const PROVIDERS: OnlineProvider[] = ["notion", "obsidian", "google-drive", "supabase", "database", "url", "other"];
@@ -73,7 +82,9 @@ export function ContextSourcesPanel({ status, disabled = false, compact = false,
   }, [status]);
 
   const localCount = draft.local.filePaths.length + (draft.local.workspaceRoot ? 1 : 0);
-  const onlineEnabled = draft.online.sources.filter((source) => source.enabled).length;
+  const enabledOnlineSources = draft.online.sources.filter((source) => source.enabled);
+  const onlineEnabled = enabledOnlineSources.length;
+  const onlineMissingReferences = enabledOnlineSources.filter((source) => source.reference.trim().length === 0).length;
   const localActive = draft.local.enabled && localCount > 0;
   const onlineActive = draft.online.enabled && onlineEnabled > 0;
   const webActive = draft.research.webEnabled;
@@ -82,42 +93,100 @@ export function ContextSourcesPanel({ status, disabled = false, compact = false,
   const questionnaireActive = draft.questionnaire.enabled;
   const activeSourceCount = [localActive, onlineActive, webActive, deepActive, sessionActive, questionnaireActive]
     .filter(Boolean).length;
+  const hasUnsavedChanges = JSON.stringify(draft) !== JSON.stringify(configFromStatus(status));
+  const onlineNeedsAttention = draft.online.enabled && (onlineEnabled === 0 || onlineMissingReferences > 0);
+  const deepWaiting = draft.research.deepResearch && !deepActive;
+  const intakePaused = !sessionActive && !questionnaireActive;
+  const summaryTone: SummaryTone = activeSourceCount >= 4 && !onlineNeedsAttention ? "success" : "warn";
 
-  const gateRows = [
+  const attentionText = !localActive
+    ? t("context.sources.attention.local")
+    : onlineNeedsAttention
+      ? onlineMissingReferences > 0
+        ? t("context.sources.attention.onlineReference", { n: onlineMissingReferences })
+        : t("context.sources.attention.onlineEmpty")
+      : deepWaiting
+        ? t("context.sources.attention.deepWaiting")
+        : intakePaused
+          ? t("context.sources.attention.intakePaused")
+          : t("context.sources.attention.ready");
+
+  const nextAction = hasUnsavedChanges
+    ? t("context.sources.next.save")
+    : !localActive
+      ? t("context.sources.next.local")
+      : onlineNeedsAttention
+        ? onlineMissingReferences > 0
+          ? t("context.sources.next.reference")
+          : t("context.sources.next.online")
+        : draft.research.deepResearch && !draft.research.webEnabled
+          ? t("context.sources.next.web")
+          : intakePaused
+            ? t("context.sources.next.intake")
+            : t("context.sources.next.plan");
+
+  const sourceSummary: SourceSummaryItem[] = [
     {
-      key: "bundle",
-      label: t("context.gate.contextBundle"),
-      body: t("context.gate.contextBundleBody"),
-      status: activeSourceCount > 0 ? t("context.sources.status.connected") : t("context.sources.status.pending"),
-      tone: activeSourceCount > 0 ? "success" : "warn",
+      key: "local",
+      label: t("context.sources.local"),
+      detail: localActive ? t("context.sources.summary.localReady", { n: localCount }) : t("context.sources.summary.localEmpty"),
+      status: localActive ? t("context.sources.status.connected") : t("context.sources.status.pending"),
+      tone: localActive ? "success" : "warn",
     },
     {
-      key: "research",
-      label: t("context.gate.researchFusion"),
-      body: t("context.gate.researchFusionBody"),
-      status: deepActive ? t("context.sources.status.active") : t("context.sources.status.waiting"),
-      tone: deepActive ? "success" : "warn",
+      key: "online",
+      label: t("context.sources.online"),
+      detail: !draft.online.enabled
+        ? t("context.sources.summary.onlinePaused")
+        : onlineMissingReferences > 0
+          ? t("context.sources.summary.onlineNeedsReference", { n: onlineMissingReferences })
+          : onlineEnabled > 0
+            ? t("context.sources.summary.onlineReady", { n: onlineEnabled })
+            : t("context.sources.summary.onlineEmpty"),
+      status: !draft.online.enabled
+        ? t("context.sources.status.paused")
+        : onlineMissingReferences > 0
+          ? t("context.sources.status.needsReference")
+          : onlineActive
+            ? t("context.sources.status.connected")
+            : t("context.sources.status.pending"),
+      tone: !draft.online.enabled ? "" : onlineMissingReferences > 0 || !onlineActive ? "warn" : "success",
     },
     {
-      key: "gaps",
-      label: t("context.gate.gapQueue"),
-      body: t("context.gate.gapQueueBody"),
-      status: questionnaireActive ? t("context.sources.status.gaps", { n: 2 }) : t("context.sources.status.paused"),
-      tone: questionnaireActive ? "warn" : "",
+      key: "web",
+      label: t("context.sources.web"),
+      detail: webActive ? t("context.sources.summary.webReady") : t("context.sources.summary.webPaused"),
+      status: webActive ? t("context.sources.status.optional") : t("context.sources.status.paused"),
+      tone: webActive ? "blue" : "",
     },
     {
-      key: "scope",
-      label: t("context.gate.scopeGuard"),
-      body: t("context.gate.scopeGuardBody"),
-      status: t("context.sources.status.active"),
-      tone: "",
+      key: "deep",
+      label: t("context.sources.deep"),
+      detail: !draft.research.deepResearch
+        ? t("context.sources.summary.deepPaused")
+        : deepActive
+          ? t("context.sources.summary.deepReady")
+          : t("context.sources.summary.deepWaiting"),
+      status: !draft.research.deepResearch
+        ? t("context.sources.status.paused")
+        : deepActive
+          ? t("context.sources.status.active")
+          : t("context.sources.status.waiting"),
+      tone: !draft.research.deepResearch ? "" : deepActive ? "success" : "warn",
     },
     {
-      key: "subaim",
-      label: t("context.gate.subAimGate"),
-      body: t("context.gate.subAimGateBody"),
-      status: activeSourceCount >= 4 ? t("intake.ready") : t("os.blocked"),
-      tone: activeSourceCount >= 4 ? "success" : "warn",
+      key: "session",
+      label: t("context.sources.conversation"),
+      detail: sessionActive ? t("context.sources.summary.sessionReady") : t("context.sources.summary.sessionPaused"),
+      status: sessionActive ? t("context.sources.status.active") : t("context.sources.status.paused"),
+      tone: sessionActive ? "success" : "",
+    },
+    {
+      key: "questionnaire",
+      label: t("context.sources.questionnaire"),
+      detail: questionnaireActive ? t("context.sources.summary.questionsReady") : t("context.sources.summary.questionsPaused"),
+      status: questionnaireActive ? t("context.sources.status.active") : t("context.sources.status.paused"),
+      tone: questionnaireActive ? "success" : "",
     },
   ];
 
@@ -199,7 +268,7 @@ export function ContextSourcesPanel({ status, disabled = false, compact = false,
   }
 
   return (
-    <section style={panelStyle(compact)}>
+    <section className="od-context-sources-panel" data-compact={compact ? "true" : "false"} style={panelStyle(compact)}>
       <div style={headerStyle()}>
         <div>
           <div style={eyebrowStyle()}>{t("context.sources.title")}</div>
@@ -210,35 +279,57 @@ export function ContextSourcesPanel({ status, disabled = false, compact = false,
         </button>
       </div>
 
-      <div style={summaryGridStyle()}>
-        <Metric label={t("context.sources.local")} value={String(localCount)} />
-        <Metric label={t("context.sources.online")} value={String(onlineEnabled)} />
-        <Metric label={t("context.sources.web")} value={draft.research.webEnabled ? t("context.sources.on") : t("context.sources.off")} />
-        <Metric label={t("context.sources.deep")} value={draft.research.deepResearch ? t("context.sources.on") : t("context.sources.off")} />
-      </div>
-
       {error ? <div style={{ ...mutedTextStyle(), color: C.danger }}>{error}</div> : null}
 
-      <div className="od-card-head">
-        <div>
-          <div style={eyebrowStyle()}>{t("context.sources.title")}</div>
-          <h3 style={{ ...titleStyle(), marginTop: 2 }}>{t("context.sources.summary", { n: activeSourceCount })}</h3>
+      <div className="od-context-source-summary" data-od-id="context-source-summary">
+        <div className="od-context-source-summary-head">
+          <div>
+            <span>{t("context.sources.summaryLabel")}</span>
+            <strong>{t("context.sources.summary", { n: activeSourceCount })}</strong>
+          </div>
+          <span className={`od-pill ${summaryTone}`}>{activeSourceCount}/6</span>
         </div>
-        <span className={`od-pill ${activeSourceCount >= 4 ? "success" : "warn"}`}>
-          {activeSourceCount}/6
-        </span>
+
+        <div className="od-context-next-action">
+          <span>{t("context.sources.attention")}</span>
+          <strong>{attentionText}</strong>
+          <span>{t("context.sources.nextAction")}</span>
+          <strong>{nextAction}</strong>
+        </div>
+
+        <div className="od-context-source-status-list">
+          {sourceSummary.map((item) => (
+            <div className="od-context-source-status" key={item.key}>
+              <div>
+                <strong>{item.label}</strong>
+                <span>{item.detail}</span>
+              </div>
+              <span className={`od-pill ${item.tone}`}>{item.status}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
-      <div className="od-context-entry-grid" data-od-id="context-candidates">
-        <article className="od-context-entry-card" data-state={localActive ? "active" : "disabled"} data-od-id="context-local-files">
-          <div className="od-entry-head">
-            <h3>{t("context.sources.localTitle")}</h3>
+      <div className="od-context-source-controls" data-od-id="context-source-controls">
+        <section className="od-context-control-group">
+          <div className="od-context-control-head">
+            <label className="od-context-main-toggle">
+              <input
+                type="checkbox"
+                checked={draft.local.enabled}
+                disabled={disabled || saving}
+                onChange={(event) => setDraft((current) => ({ ...current, local: { ...current.local, enabled: event.target.checked } }))}
+              />
+              <span>
+                <strong>{t("context.sources.localTitle")}</strong>
+                <small>{t("context.sources.entry.localBody")}</small>
+              </span>
+            </label>
             <span className={`od-pill ${localActive ? "success" : "warn"}`}>
               {localActive ? t("context.sources.status.connected") : t("context.sources.status.pending")}
             </span>
           </div>
-          <p>{t("context.sources.entry.localBody")}</p>
-          <div className="od-context-action-row">
+          <div className="od-context-source-actions">
             <button type="button" disabled={disabled || saving} className="od-chip primary" onClick={() => void pickFolder()}>
               {t("context.sources.pickFolder")}
             </button>
@@ -246,158 +337,28 @@ export function ContextSourcesPanel({ status, disabled = false, compact = false,
               {t("context.sources.pickFiles")}
             </button>
           </div>
-        </article>
-
-        <article className="od-context-entry-card" data-state={onlineActive ? "active" : "disabled"} data-od-id="context-online-folders">
-          <div className="od-entry-head">
-            <h3>{t("context.sources.onlineTitle")}</h3>
-            <span className={`od-pill ${onlineActive ? "success" : "warn"}`}>
-              {onlineActive ? t("context.sources.status.connected") : t("context.sources.status.pending")}
-            </span>
-          </div>
-          <p>{t("context.sources.entry.onlineBody")}</p>
-          <div className="od-context-action-row">
-            <button type="button" disabled={disabled || saving} className="od-chip primary" onClick={addOnlineSource}>
-              {t("context.sources.addOnline")}
-            </button>
-            <button
-              type="button"
+          <label className="od-context-field">
+            <span>{t("context.sources.localFolderLabel")}</span>
+            <input
+              value={draft.local.workspaceRoot ?? ""}
               disabled={disabled || saving}
-              className="od-chip"
-              onClick={() => setDraft((current) => ({ ...current, online: { ...current.online, enabled: !current.online.enabled } }))}
-            >
-              {draft.online.enabled ? t("context.sources.pause") : t("context.sources.enable")}
-            </button>
-          </div>
-        </article>
-
-        <article className="od-context-entry-card" data-state={webActive ? "active" : "disabled"} data-od-id="context-web-search">
-          <div className="od-entry-head">
-            <h3>{t("context.sources.webSearch")}</h3>
-            <span className={`od-pill ${webActive ? "blue" : ""}`}>
-              {webActive ? t("context.sources.status.optional") : t("context.sources.status.paused")}
-            </span>
-          </div>
-          <p>{t("context.sources.entry.webBody")}</p>
-          <div className="od-context-action-row">
-            <button
-              type="button"
-              disabled={disabled || saving}
-              className="od-chip primary"
-              onClick={() => setDraft((current) => ({ ...current, research: { ...current.research, webEnabled: !current.research.webEnabled } }))}
-            >
-              {webActive ? t("context.sources.pause") : t("context.sources.enable")}
-            </button>
-          </div>
-        </article>
-
-        <article className="od-context-entry-card" data-state={deepActive ? "active" : "disabled"} data-od-id="context-deep-research">
-          <div className="od-entry-head">
-            <h3>{t("context.sources.deepResearch")}</h3>
-            <span className={`od-pill ${deepActive ? "success" : "warn"}`}>
-              {deepActive ? t("context.sources.status.active") : t("context.sources.status.waiting")}
-            </span>
-          </div>
-          <p>{t("context.sources.entry.deepBody")}</p>
-          <div className="od-context-action-row">
-            <button
-              type="button"
-              disabled={disabled || saving}
-              className="od-chip primary"
-              onClick={() => setDraft((current) => ({ ...current, research: { ...current.research, deepResearch: !current.research.deepResearch } }))}
-            >
-              {draft.research.deepResearch ? t("context.sources.pause") : t("context.sources.enable")}
-            </button>
-          </div>
-        </article>
-
-        <article className="od-context-entry-card" data-state={sessionActive ? "active" : "disabled"} data-od-id="context-conversation-session">
-          <div className="od-entry-head">
-            <h3>{t("context.sources.conversation")}</h3>
-            <span className={`od-pill ${sessionActive ? "success" : ""}`}>
-              {sessionActive ? t("context.sources.status.active") : t("context.sources.status.paused")}
-            </span>
-          </div>
-          <p>{t("context.sources.entry.sessionBody")}</p>
-          <div className="od-context-action-row">
-            <button
-              type="button"
-              disabled={disabled || saving}
-              className="od-chip primary"
-              onClick={() => setDraft((current) => ({ ...current, userSession: { enabled: !current.userSession.enabled } }))}
-            >
-              {sessionActive ? t("context.sources.pause") : t("context.sources.enable")}
-            </button>
-          </div>
-        </article>
-
-        <article className="od-context-entry-card" data-state={questionnaireActive ? "active" : "disabled"} data-od-id="context-choice-questions">
-          <div className="od-entry-head">
-            <h3>{t("context.sources.questionnaire")}</h3>
-            <span className={`od-pill ${questionnaireActive ? "warn" : ""}`}>
-              {questionnaireActive ? t("context.sources.status.gaps", { n: 2 }) : t("context.sources.status.paused")}
-            </span>
-          </div>
-          <p>{t("context.sources.entry.questionsBody")}</p>
-          <div className="od-context-action-row">
-            <button
-              type="button"
-              disabled={disabled || saving}
-              className="od-chip primary"
-              onClick={() => setDraft((current) => ({ ...current, questionnaire: { enabled: !current.questionnaire.enabled } }))}
-            >
-              {questionnaireActive ? t("context.sources.pause") : t("context.sources.enable")}
-            </button>
-          </div>
-        </article>
-      </div>
-
-      <div className="od-context-table" data-od-id="context-source-table">
-        {gateRows.map((row) => (
-          <div className="od-context-row" key={row.key}>
-            <strong>{row.label}</strong>
-            <span>{row.body}</span>
-            <span className={`od-pill ${row.tone}`}>{row.status}</span>
-          </div>
-        ))}
-      </div>
-
-      <div style={gridStyle()}>
-        <div style={sourceBlockStyle()}>
-          <div style={blockHeaderStyle()}>
-            <label style={toggleLabelStyle()}>
-              <input
-                type="checkbox"
-                checked={draft.local.enabled}
-                onChange={(event) => setDraft((current) => ({ ...current, local: { ...current.local, enabled: event.target.checked } }))}
-              />
-              {t("context.sources.localTitle")}
-            </label>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button type="button" onClick={() => void pickFolder()} style={{ ...secondaryButton(), marginTop: 0 }}>
-                {t("context.sources.pickFolder")}
-              </button>
-              <button type="button" onClick={() => void pickFiles()} style={{ ...secondaryButton(), marginTop: 0 }}>
-                {t("context.sources.pickFiles")}
-              </button>
-            </div>
-          </div>
-          <input
-            value={draft.local.workspaceRoot ?? ""}
-            onChange={(event) => setDraft((current) => ({
-              ...current,
-              local: { ...current.local, workspaceRoot: event.target.value || undefined },
-            }))}
-            placeholder={t("context.sources.folderPlaceholder")}
-            style={inputStyle()}
-          />
-          <div style={listStyle()}>
-            {draft.local.filePaths.length === 0 ? <div style={mutedTextStyle()}>{t("context.sources.noFiles")}</div> : null}
+              onChange={(event) => setDraft((current) => ({
+                ...current,
+                local: { ...current.local, workspaceRoot: event.target.value || undefined },
+              }))}
+              placeholder={t("context.sources.folderPlaceholder")}
+              style={inputStyle()}
+            />
+          </label>
+          <div className="od-context-attached-list">
+            <div className="od-context-list-label">{t("context.sources.localFilesLabel")}</div>
+            {draft.local.filePaths.length === 0 ? <div className="od-empty">{t("context.sources.noFiles")}</div> : null}
             {draft.local.filePaths.map((filePath) => (
-              <div key={filePath} style={pathRowStyle()}>
+              <div key={filePath} className="od-context-path-row">
                 <span>{filePath}</span>
                 <button
                   type="button"
+                  disabled={disabled || saving}
                   onClick={() => setDraft((current) => ({
                     ...current,
                     local: {
@@ -405,35 +366,51 @@ export function ContextSourcesPanel({ status, disabled = false, compact = false,
                       filePaths: current.local.filePaths.filter((path) => path !== filePath),
                     },
                   }))}
-                  style={smallButtonStyle()}
+                  className="od-context-small-button"
                 >
                   {t("context.sources.remove")}
                 </button>
               </div>
             ))}
           </div>
-        </div>
+        </section>
 
-        <div style={sourceBlockStyle()}>
-          <div style={blockHeaderStyle()}>
-            <label style={toggleLabelStyle()}>
+        <section className="od-context-control-group">
+          <div className="od-context-control-head">
+            <label className="od-context-main-toggle">
               <input
                 type="checkbox"
                 checked={draft.online.enabled}
+                disabled={disabled || saving}
                 onChange={(event) => setDraft((current) => ({ ...current, online: { ...current.online, enabled: event.target.checked } }))}
               />
-              {t("context.sources.onlineTitle")}
+              <span>
+                <strong>{t("context.sources.onlineTitle")}</strong>
+                <small>{t("context.sources.entry.onlineBody")}</small>
+              </span>
             </label>
-            <button type="button" onClick={addOnlineSource} style={{ ...secondaryButton(), marginTop: 0 }}>
+            <span className={`od-pill ${onlineActive && onlineMissingReferences === 0 ? "success" : draft.online.enabled ? "warn" : ""}`}>
+              {!draft.online.enabled
+                ? t("context.sources.status.paused")
+                : onlineMissingReferences > 0
+                  ? t("context.sources.status.needsReference")
+                  : onlineActive
+                    ? t("context.sources.status.connected")
+                    : t("context.sources.status.pending")}
+            </span>
+          </div>
+          <div className="od-context-source-actions">
+            <button type="button" disabled={disabled || saving} className="od-chip primary" onClick={addOnlineSource}>
               {t("context.sources.addOnline")}
             </button>
           </div>
-          <div style={listStyle()}>
-            {draft.online.sources.length === 0 ? <div style={mutedTextStyle()}>{t("context.sources.noOnline")}</div> : null}
+          <div className="od-context-online-list">
+            {draft.online.sources.length === 0 ? <div className="od-empty">{t("context.sources.noOnline")}</div> : null}
             {draft.online.sources.map((source) => (
-              <div key={source.id} style={onlineRowStyle()}>
+              <div key={source.id} className="od-context-online-row">
                 <select
                   value={source.provider}
+                  disabled={disabled || saving}
                   onChange={(event) => updateOnlineSource(source.id, { provider: event.target.value as OnlineProvider })}
                   style={selectStyle()}
                 >
@@ -441,78 +418,133 @@ export function ContextSourcesPanel({ status, disabled = false, compact = false,
                 </select>
                 <input
                   value={source.label}
+                  disabled={disabled || saving}
                   onChange={(event) => updateOnlineSource(source.id, { label: event.target.value })}
                   placeholder={t("context.sources.labelPlaceholder")}
                   style={inputStyle()}
                 />
                 <input
                   value={source.reference}
+                  disabled={disabled || saving}
                   onChange={(event) => updateOnlineSource(source.id, { reference: event.target.value })}
                   placeholder={t("context.sources.referencePlaceholder")}
-                  style={{ ...inputStyle(), gridColumn: "1 / -1" }}
+                  style={inputStyle()}
                 />
-                <label style={miniToggleStyle()}>
+                <label className="od-context-inline-toggle">
                   <input
                     type="checkbox"
                     checked={source.enabled}
+                    disabled={disabled || saving}
                     onChange={(event) => updateOnlineSource(source.id, { enabled: event.target.checked })}
                   />
                   {t("context.sources.enabled")}
                 </label>
-                <button type="button" onClick={() => removeOnlineSource(source.id)} style={smallButtonStyle()}>
+                <button
+                  type="button"
+                  disabled={disabled || saving}
+                  onClick={() => removeOnlineSource(source.id)}
+                  className="od-context-small-button"
+                >
                   {t("context.sources.remove")}
                 </button>
               </div>
             ))}
           </div>
-        </div>
-      </div>
+        </section>
 
-      <div style={controlGridStyle()}>
-        <Toggle
-          label={t("context.sources.webSearch")}
-          checked={draft.research.webEnabled}
-          onChange={(checked) => setDraft((current) => ({ ...current, research: { ...current.research, webEnabled: checked } }))}
-        />
-        <Toggle
-          label={t("context.sources.deepResearch")}
-          checked={draft.research.deepResearch}
-          onChange={(checked) => setDraft((current) => ({ ...current, research: { ...current.research, deepResearch: checked } }))}
-        />
-        <Toggle
-          label={t("context.sources.conversation")}
-          checked={draft.userSession.enabled}
-          onChange={(checked) => setDraft((current) => ({ ...current, userSession: { enabled: checked } }))}
-        />
-        <Toggle
-          label={t("context.sources.questionnaire")}
-          checked={draft.questionnaire.enabled}
-          onChange={(checked) => setDraft((current) => ({ ...current, questionnaire: { enabled: checked } }))}
-        />
+        <section className="od-context-control-group">
+          <div className="od-context-control-title">
+            <strong>{t("context.sources.researchTitle")}</strong>
+          </div>
+          <div className="od-context-setting-grid">
+            <label className="od-context-setting-row">
+              <input
+                type="checkbox"
+                checked={draft.research.webEnabled}
+                disabled={disabled || saving}
+                onChange={(event) => setDraft((current) => ({ ...current, research: { ...current.research, webEnabled: event.target.checked } }))}
+              />
+              <span>
+                <strong>{t("context.sources.webSearch")}</strong>
+                <small>{t("context.sources.entry.webBody")}</small>
+              </span>
+              <span className={`od-pill ${webActive ? "blue" : ""}`}>
+                {webActive ? t("context.sources.status.optional") : t("context.sources.status.paused")}
+              </span>
+            </label>
+            <label className="od-context-setting-row">
+              <input
+                type="checkbox"
+                checked={draft.research.deepResearch}
+                disabled={disabled || saving}
+                onChange={(event) => setDraft((current) => ({ ...current, research: { ...current.research, deepResearch: event.target.checked } }))}
+              />
+              <span>
+                <strong>{t("context.sources.deepResearch")}</strong>
+                <small>{t("context.sources.entry.deepBody")}</small>
+              </span>
+              <span className={`od-pill ${deepActive ? "success" : draft.research.deepResearch ? "warn" : ""}`}>
+                {!draft.research.deepResearch
+                  ? t("context.sources.status.paused")
+                  : deepActive
+                    ? t("context.sources.status.active")
+                    : t("context.sources.status.waiting")}
+              </span>
+            </label>
+          </div>
+        </section>
+
+        <section className="od-context-control-group">
+          <div className="od-context-control-title">
+            <strong>{t("context.sources.intakeTitle")}</strong>
+          </div>
+          <div className="od-context-setting-grid">
+            <label className="od-context-setting-row">
+              <input
+                type="checkbox"
+                checked={draft.userSession.enabled}
+                disabled={disabled || saving}
+                onChange={(event) => setDraft((current) => ({ ...current, userSession: { enabled: event.target.checked } }))}
+              />
+              <span>
+                <strong>{t("context.sources.conversation")}</strong>
+                <small>{t("context.sources.entry.sessionBody")}</small>
+              </span>
+              <span className={`od-pill ${sessionActive ? "success" : ""}`}>
+                {sessionActive ? t("context.sources.status.active") : t("context.sources.status.paused")}
+              </span>
+            </label>
+            <label className="od-context-setting-row">
+              <input
+                type="checkbox"
+                checked={draft.questionnaire.enabled}
+                disabled={disabled || saving}
+                onChange={(event) => setDraft((current) => ({ ...current, questionnaire: { enabled: event.target.checked } }))}
+              />
+              <span>
+                <strong>{t("context.sources.questionnaire")}</strong>
+                <small>{t("context.sources.entry.questionsBody")}</small>
+              </span>
+              <span className={`od-pill ${questionnaireActive ? "success" : ""}`}>
+                {questionnaireActive ? t("context.sources.status.active") : t("context.sources.status.paused")}
+              </span>
+            </label>
+          </div>
+        </section>
       </div>
     </section>
   );
 }
 
-function Toggle(props: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
-  return (
-    <label style={toggleCardStyle(props.checked)}>
-      <input type="checkbox" checked={props.checked} onChange={(event) => props.onChange(event.target.checked)} />
-      <span>{props.label}</span>
-    </label>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={metricStyle()}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
-}
-
 function panelStyle(compact: boolean): CSSProperties {
+  if (compact) {
+    return {
+      background: "transparent",
+      border: "0",
+      borderRadius: 0,
+      padding: 0,
+    };
+  }
   return {
     background: "#fff",
     border: `1px solid ${C.border}`,
@@ -533,94 +565,8 @@ function titleStyle(): CSSProperties {
   return { margin: "4px 0 0", fontSize: 18, letterSpacing: 0 };
 }
 
-function summaryGridStyle(): CSSProperties {
-  return { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10, marginBottom: 12 };
-}
-
-function gridStyle(): CSSProperties {
-  return { display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 12 };
-}
-
-function sourceBlockStyle(): CSSProperties {
-  return { border: `1px solid ${C.border}`, borderRadius: 8, padding: 12, minWidth: 0 };
-}
-
-function blockHeaderStyle(): CSSProperties {
-  return { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" };
-}
-
-function toggleLabelStyle(): CSSProperties {
-  return { display: "inline-flex", alignItems: "center", gap: 8, fontWeight: 800 };
-}
-
-function miniToggleStyle(): CSSProperties {
-  return { display: "inline-flex", alignItems: "center", gap: 6, color: C.muted, fontSize: 12 };
-}
-
-function listStyle(): CSSProperties {
-  return { display: "grid", gap: 8, marginTop: 10 };
-}
-
-function pathRowStyle(): CSSProperties {
-  return {
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr) auto",
-    gap: 8,
-    alignItems: "center",
-    color: C.muted,
-    fontSize: 12,
-    overflowWrap: "anywhere",
-  };
-}
-
-function onlineRowStyle(): CSSProperties {
-  return { display: "grid", gridTemplateColumns: "120px minmax(0, 1fr)", gap: 8, alignItems: "center" };
-}
-
 function selectStyle(): CSSProperties {
   return { ...inputStyle(), height: 42 };
-}
-
-function smallButtonStyle(): CSSProperties {
-  return {
-    border: `1px solid ${C.border}`,
-    background: "#fff",
-    borderRadius: 6,
-    padding: "6px 8px",
-    color: C.muted,
-    fontWeight: 750,
-    cursor: "pointer",
-  };
-}
-
-function controlGridStyle(): CSSProperties {
-  return { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10, marginTop: 12 };
-}
-
-function toggleCardStyle(active: boolean): CSSProperties {
-  return {
-    border: `1px solid ${active ? C.accent : C.border}`,
-    borderRadius: 8,
-    background: active ? "#eef6f8" : "#fff",
-    color: active ? C.accent : C.text,
-    padding: "10px 12px",
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 8,
-    fontWeight: 800,
-    minWidth: 0,
-  };
-}
-
-function metricStyle(): CSSProperties {
-  return {
-    border: `1px solid ${C.border}`,
-    borderRadius: 8,
-    padding: 10,
-    background: "#fff",
-    display: "grid",
-    gap: 4,
-  };
 }
 
 function mutedTextStyle(): CSSProperties {
