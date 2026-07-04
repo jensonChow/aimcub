@@ -16,6 +16,13 @@ import type {
 
 import { CockpitShell, type CockpitStage } from "./CockpitShell";
 import { ContextSourcesPanel } from "./ContextSourcesPanel";
+import {
+  deriveAimHelperProfile,
+  hasPlanningRuntime,
+  routeAfterAimSubmit,
+  routeAfterRefresh,
+  type AimHelperProfile,
+} from "./firstRunFlow";
 import { I18nProvider, useI18n } from "./i18n";
 import { LocalAgentForm } from "./LocalAgentForm";
 import { Notice } from "./Notice";
@@ -276,6 +283,7 @@ function AimOsApp() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [stageOverride, setStageOverride] = useState<CockpitStage | null>(null);
+  const [runtimeGuidanceVisible, setRuntimeGuidanceVisible] = useState(false);
   const planningRunIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -292,10 +300,6 @@ function AimOsApp() {
     planningRunIdRef.current = null;
   }
 
-  function hasCliPlanningRuntime(): boolean {
-    return localAgents.some((agent) => agent.available && agent.authStatus !== "missing");
-  }
-
   async function refreshAll() {
     const [nextGoals, nextProvider, nextWeb, nextSources, nextAgents] = await Promise.all([
       window.aimcub.listGoals().catch(() => []),
@@ -309,10 +313,11 @@ function AimOsApp() {
     setWebResearch(nextWeb);
     setContextSources(nextSources);
     setLocalAgents(nextAgents);
-    if (!selected && nextGoals[0]) void openGoal(nextGoals[0]);
-    if (!nextProvider?.configured && !nextAgents.some((agent) => agent.available && agent.authStatus !== "missing")) {
-      setMode("settings");
-      setStageOverride("settings");
+    const route = routeAfterRefresh({ hasSelectedAim: Boolean(selected), hasGoals: nextGoals.length > 0 });
+    if (route.autoOpenFirstGoal && nextGoals[0]) void openGoal(nextGoals[0]);
+    if (route.stageOverride) {
+      setMode("cockpit");
+      setStageOverride(route.stageOverride);
     }
   }
 
@@ -331,6 +336,7 @@ function AimOsApp() {
     setClarifyPhase(null);
     setClarify(null);
     setAnswers({});
+    setRuntimeGuidanceVisible(false);
     setContextNote("");
     const [nextDetail, nextProgress] = await Promise.all([
       window.aimcub.getGoal(goal.id),
@@ -355,6 +361,7 @@ function AimOsApp() {
     setClarifyPhase(null);
     setClarify(null);
     setAnswers({});
+    setRuntimeGuidanceVisible(false);
     setContextNote("");
     setSelected(null);
     setDetail(null);
@@ -397,12 +404,16 @@ function AimOsApp() {
 
   async function startDraft(options: { skipIntakeGate?: boolean } = {}) {
     const title = aimTitle.trim();
-    if (!title) return;
-    if (!provider?.configured && !hasCliPlanningRuntime()) {
-      setMode("settings");
-      setStageOverride("settings");
+    const route = routeAfterAimSubmit({ title, provider, localAgents });
+    if (route === "missing_aim") return;
+    if (route === "show_helper_guidance") {
+      setError(null);
+      setRuntimeGuidanceVisible(true);
+      setMode("cockpit");
+      setStageOverride("aim");
       return;
     }
+    setRuntimeGuidanceVisible(false);
     setError(null);
     setPlanningDebugTraces([]);
     const runId = startPlanningRun();
@@ -599,6 +610,13 @@ function AimOsApp() {
   const total = progress?.total_milestones ?? detail?.milestones.length ?? 0;
   const hasUnsavedAim = aimTitle.trim().length > 0;
   const activeStage = stageOverride ?? cockpitStageFor(mode, selected, activePlan);
+  const planningRuntimeReady = hasPlanningRuntime(provider, localAgents);
+  const activeAimTitle = selected?.title ?? aimTitle.trim();
+  const activeAimDescription = selected?.description ?? aimDescription;
+  const activeAimHelper = useMemo(
+    () => deriveAimHelperProfile({ title: activeAimTitle, description: activeAimDescription }),
+    [activeAimDescription, activeAimTitle],
+  );
 
   function openCockpitStage(stage: CockpitStage) {
     setStageOverride(stage);
@@ -623,6 +641,17 @@ function AimOsApp() {
 
   function startNewAim() {
     resetComposer();
+    setMode("cockpit");
+    setStageOverride("aim");
+  }
+
+  function openSettingsForAim() {
+    setMode("settings");
+    setStageOverride("settings");
+  }
+
+  function returnToAim() {
+    if (planningRuntimeReady) setRuntimeGuidanceVisible(false);
     setMode("cockpit");
     setStageOverride("aim");
   }
@@ -701,6 +730,12 @@ function AimOsApp() {
       onWeb={setWebResearch}
       onContextSources={setContextSources}
       onRefreshAgents={async () => setLocalAgents(await window.aimcub.listLocalAgents())}
+      aimContext={activeAimTitle ? {
+        title: activeAimTitle,
+        profile: activeAimHelper,
+        runtimeReady: planningRuntimeReady,
+      } : null}
+      onReturnToAim={activeAimTitle ? returnToAim : undefined}
     />
   );
 
@@ -786,6 +821,9 @@ function AimOsApp() {
           onTitle={setAimTitle}
           onDescription={setAimDescription}
           onDraft={() => void startDraft()}
+          runtimeGuidance={runtimeGuidanceVisible && !planningRuntimeReady ? activeAimHelper : null}
+          onOpenSettings={openSettingsForAim}
+          onKeepEditing={() => setRuntimeGuidanceVisible(false)}
         />
       )
     );
@@ -869,9 +907,12 @@ function AimIntakePanel(props: {
   parent: { goalId: string; milestoneId: string } | null;
   mode: AppMode;
   disabled: boolean;
+  runtimeGuidance: AimHelperProfile | null;
   onTitle: (value: string) => void;
   onDescription: (value: string) => void;
   onDraft: () => void;
+  onOpenSettings: () => void;
+  onKeepEditing: () => void;
 }) {
   const { t } = useI18n();
   const hasAim = props.title.trim().length > 0;
@@ -920,7 +961,98 @@ function AimIntakePanel(props: {
           {submitting ? t("os.drafting") : t("aimIntake.cta")}
         </button>
       </div>
+
+      {props.runtimeGuidance ? (
+        <AimHelperGuidancePanel
+          title={props.title}
+          profile={props.runtimeGuidance}
+          onOpenSettings={props.onOpenSettings}
+          onKeepEditing={props.onKeepEditing}
+        />
+      ) : null}
     </section>
+  );
+}
+
+function helperCapabilityLabel(profile: AimHelperProfile, t: ReturnType<typeof useI18n>["t"]): string {
+  switch (profile.capability) {
+    case "code_execution":
+      return t("firstRun.capability.code");
+    case "current_research":
+      return t("firstRun.capability.research");
+    case "source_context":
+      return t("firstRun.capability.context");
+    case "general_planning":
+      return t("firstRun.capability.planning");
+  }
+}
+
+function helperPreferenceLabel(profile: AimHelperProfile, t: ReturnType<typeof useI18n>["t"]): string {
+  switch (profile.preferredHelper) {
+    case "local_agent":
+      return t("firstRun.helper.localAgent");
+    case "provider_with_web":
+      return t("firstRun.helper.providerWithWeb");
+    case "provider":
+      return t("firstRun.helper.provider");
+    case "either":
+      return t("firstRun.helper.either");
+  }
+}
+
+function helperReason(profile: AimHelperProfile, t: ReturnType<typeof useI18n>["t"]): string {
+  switch (profile.capability) {
+    case "code_execution":
+      return t("firstRun.reason.code");
+    case "current_research":
+      return t("firstRun.reason.research");
+    case "source_context":
+      return t("firstRun.reason.context");
+    case "general_planning":
+      return t("firstRun.reason.planning");
+  }
+}
+
+function AimHelperGuidancePanel(props: {
+  title: string;
+  profile: AimHelperProfile;
+  onOpenSettings: () => void;
+  onKeepEditing: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <section className="od-first-run-helper">
+      <div className="od-first-run-helper-head">
+        <div>
+          <div className="od-aim-kicker">{t("firstRun.eyebrow")}</div>
+          <h2>{t("firstRun.heading")}</h2>
+          <p>{t("firstRun.body", { aim: shortText(props.title, 120) })}</p>
+        </div>
+      </div>
+      <div className="od-first-run-helper-grid">
+        <HelperFact label={t("firstRun.requiredLabel")} value={t("firstRun.requiredValue")} />
+        <HelperFact label={t("firstRun.capabilityLabel")} value={helperCapabilityLabel(props.profile, t)} />
+        <HelperFact label={t("firstRun.bestHelperLabel")} value={helperPreferenceLabel(props.profile, t)} />
+      </div>
+      <p className="od-first-run-helper-reason">{helperReason(props.profile, t)}</p>
+      <div className="od-aim-intake-actions">
+        <button className="od-aim-primary" type="button" onClick={props.onOpenSettings}>
+          {t("firstRun.openSettings")}
+        </button>
+        <button className="od-aim-secondary" type="button" onClick={props.onKeepEditing}>
+          {t("firstRun.keepEditing")}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function HelperFact(props: { label: string; value: string }) {
+  return (
+    <div className="od-first-run-helper-fact">
+      <span>{props.label}</span>
+      <strong>{props.value}</strong>
+    </div>
   );
 }
 
@@ -1430,10 +1562,16 @@ function SettingsPanel(props: {
   webResearch: WebResearchStatus | null;
   contextSources: ContextSourceStatus | null;
   localAgents: LocalAgentDetection[];
+  aimContext: {
+    title: string;
+    profile: AimHelperProfile;
+    runtimeReady: boolean;
+  } | null;
   onProvider: (status: ProviderStatus) => void;
   onWeb: (status: WebResearchStatus) => void;
   onContextSources: (status: ContextSourceStatus) => void;
   onRefreshAgents: () => Promise<void>;
+  onReturnToAim?: () => void;
 }) {
   const { t } = useI18n();
   const providerReady = Boolean(props.provider?.configured);
@@ -1515,6 +1653,15 @@ function SettingsPanel(props: {
         </div>
       </div>
 
+      {props.aimContext ? (
+        <SettingsAimContextPanel
+          title={props.aimContext.title}
+          profile={props.aimContext.profile}
+          runtimeReady={props.aimContext.runtimeReady}
+          onReturnToAim={props.onReturnToAim}
+        />
+      ) : null}
+
       <div className="od-helper-callout" data-state={planningReady ? "ready" : "blocked"}>
         <span className={`od-pill ${planningReady ? "success" : "warn"}`}>
           {planningReady ? t("settings.status.readyToPlan") : t("os.blocked")}
@@ -1557,6 +1704,34 @@ function SettingsPanel(props: {
       <SettingsHelperSection helper={contextHelper}>
         <ContextSourcesPanel status={props.contextSources} compact onSaved={props.onContextSources} />
       </SettingsHelperSection>
+    </section>
+  );
+}
+
+function SettingsAimContextPanel(props: {
+  title: string;
+  profile: AimHelperProfile;
+  runtimeReady: boolean;
+  onReturnToAim?: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <section className="od-settings-aim-context" data-state={props.runtimeReady ? "ready" : "blocked"}>
+      <div className="od-settings-aim-context-main">
+        <div className="od-aim-kicker">{t("firstRun.settingsEyebrow")}</div>
+        <h3>{shortText(props.title, 140)}</h3>
+        <p>{props.runtimeReady ? t("firstRun.settingsReady") : t("firstRun.settingsBlocked")}</p>
+      </div>
+      <div className="od-first-run-helper-grid">
+        <HelperFact label={t("firstRun.capabilityLabel")} value={helperCapabilityLabel(props.profile, t)} />
+        <HelperFact label={t("firstRun.bestHelperLabel")} value={helperPreferenceLabel(props.profile, t)} />
+      </div>
+      <p className="od-first-run-helper-reason">{helperReason(props.profile, t)}</p>
+      {props.onReturnToAim ? (
+        <button className="od-aim-secondary" type="button" onClick={props.onReturnToAim}>
+          {t("firstRun.returnToAim")}
+        </button>
+      ) : null}
     </section>
   );
 }
