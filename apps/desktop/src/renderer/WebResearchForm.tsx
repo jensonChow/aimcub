@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { WebResearchConfig, WebResearchStatus } from "../shared/ipc";
 
 import { useI18n } from "./i18n";
-import { C, card, inputStyle, labelStyle, linkButton, primaryButton, secondaryButton } from "./styles";
+import { C, inputStyle, labelStyle, linkButton, primaryButton, secondaryButton } from "./styles";
 
 interface WebResearchFormProps {
   status: WebResearchStatus | null;
@@ -64,11 +64,11 @@ export function WebResearchForm({ status, onSaved }: WebResearchFormProps) {
   }
 
   return (
-    <div style={{ ...card(), background: "#fbfaf7" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
+    <div className="od-preference-card">
+      <div className="od-form-head">
         <div>
-          <div style={{ fontWeight: 600, fontSize: 15 }}>{t("wf.title")}</div>
-          <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>{t("wf.blurb")}</div>
+          <div className="od-form-title">{t("wf.title")}</div>
+          <div className="od-form-body">{t("wf.blurb")}</div>
         </div>
         <div style={{ color: status?.configured ? "#2f6f44" : C.muted, fontSize: 12, fontWeight: 700, whiteSpace: "nowrap" }}>
           {status?.configured ? t("wf.ready") : t("wf.notReady")}
@@ -103,7 +103,7 @@ export function WebResearchForm({ status, onSaved }: WebResearchFormProps) {
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+      <div className="od-form-actions">
         <button onClick={testConnection} disabled={!canTest} style={{ ...secondaryButton(), opacity: canTest ? 1 : 0.65 }}>
           {testBusy ? t("wf.testing") : t("wf.test")}
         </button>

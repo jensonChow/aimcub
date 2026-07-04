@@ -1,14 +1,14 @@
 import type { CSSProperties } from "react";
 
 export const C = {
-  text: "#1d1d1f",
-  muted: "#6e6e73",
-  border: "#d2d2d7",
-  accent: "#0071e3",
-  accentBg: "#f0f7ff",
-  surface: "#ffffff",
-  page: "#f5f5f7",
-  danger: "#dc2626",
+  text: "var(--od-fg, #1d1d1f)",
+  muted: "var(--od-muted, #6e6e73)",
+  border: "var(--od-border-soft, #e8e8ed)",
+  accent: "var(--od-accent, #0071e3)",
+  accentBg: "color-mix(in oklab, var(--od-accent, #0071e3), var(--od-bg, #ffffff) 92%)",
+  surface: "var(--od-bg, #ffffff)",
+  page: "var(--od-surface, #f5f5f7)",
+  danger: "var(--od-danger, #dc2626)",
 };
 
 export function card(): CSSProperties {
@@ -16,7 +16,7 @@ export function card(): CSSProperties {
     background: C.surface,
     border: `1px solid ${C.border}`,
     borderRadius: 8,
-    boxShadow: "0 1px 2px rgba(28, 26, 22, 0.035)",
+    boxShadow: "none",
     padding: "16px 18px",
     marginBottom: 12,
   };
@@ -27,15 +27,15 @@ export function labelStyle(): CSSProperties {
 }
 
 export function inputStyle(): CSSProperties {
-  return { width: "100%", boxSizing: "border-box", padding: "10px 12px", border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 14, fontFamily: "inherit", background: C.surface, color: C.text };
+  return { width: "100%", boxSizing: "border-box", minHeight: 40, padding: "9px 11px", border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 14, fontFamily: "inherit", background: C.surface, color: C.text };
 }
 
 export function primaryButton(disabled: boolean): CSSProperties {
-  return { marginTop: 16, padding: "10px 16px", borderRadius: 8, border: "none", background: disabled ? "#aeb8bf" : C.accent, color: "#fff", fontSize: 14, fontWeight: 700, cursor: disabled ? "default" : "pointer", boxShadow: disabled ? "none" : "0 1px 1px rgba(16, 38, 48, 0.16)" };
+  return { marginTop: 16, minHeight: 40, padding: "0 16px", borderRadius: 999, border: "none", background: disabled ? "#aeb8bf" : C.accent, color: "#fff", fontSize: 14, fontWeight: 700, cursor: disabled ? "default" : "pointer", boxShadow: "none" };
 }
 
 export function secondaryButton(): CSSProperties {
-  return { marginTop: 16, padding: "10px 16px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.surface, color: C.text, fontSize: 14, cursor: "pointer" };
+  return { marginTop: 16, minHeight: 40, padding: "0 14px", borderRadius: 999, border: `1px solid ${C.border}`, background: C.surface, color: C.text, fontSize: 14, fontWeight: 650, cursor: "pointer" };
 }
 
 export function optionButton(selected: boolean): CSSProperties {

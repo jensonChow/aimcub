@@ -20,7 +20,7 @@ import {
   providerFormStateForProvider,
   providerOrDefault,
 } from "./providerFormState";
-import { C, card, inputStyle, labelStyle, linkButton, optionButton, primaryButton, secondaryButton } from "./styles";
+import { C, inputStyle, labelStyle, linkButton, optionButton, primaryButton, secondaryButton } from "./styles";
 
 const PROVIDER_OPTIONS = LLM_PROVIDER_CATALOG;
 
@@ -112,15 +112,17 @@ export function ProviderForm({ status, onSaved, onClose }: ProviderFormProps) {
   const selectedModelHelp = providerDef.models.find((item) => item.id === selectedModelId)?.description;
 
   return (
-    <div style={{ ...card(), background: "#fbfaf7" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <div style={{ fontWeight: 600, fontSize: 15 }}>{t("pf.title")}</div>
+    <div className="od-preference-card">
+      <div className="od-form-head">
+        <div>
+          <div className="od-form-title">{t("pf.title")}</div>
+          <div className="od-form-body">{t("pf.blurb")}</div>
+        </div>
         {onClose ? <button onClick={onClose} style={{ ...linkButton() }}>{t("common.close")}</button> : null}
       </div>
-      <div style={{ fontSize: 12, color: C.muted, margin: "4px 0 14px" }}>{t("pf.blurb")}</div>
 
       <label style={labelStyle()}>{t("pf.providerLabel")}</label>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(148px, 1fr))", gap: 8 }}>
+      <div className="od-option-grid">
         {PROVIDER_OPTIONS.map((provider) => (
           <button key={provider.id} onClick={() => selectProvider(provider.id)} style={optionButton(providerKind === provider.id)}>
             <div style={{ fontWeight: 500 }}>{provider.label}</div>
@@ -184,7 +186,7 @@ export function ProviderForm({ status, onSaved, onClose }: ProviderFormProps) {
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+      <div className="od-form-actions">
         <button onClick={testConnection} disabled={!canTest} style={{ ...secondaryButton(), opacity: canTest ? 1 : 0.65 }}>
           {testBusy ? t("pf.testing") : t("pf.testProvider")}
         </button>

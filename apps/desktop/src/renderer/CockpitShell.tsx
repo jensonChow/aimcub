@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import type { Goal } from "@core/types";
 
@@ -8,6 +8,15 @@ import { LangToggle } from "./LangToggle";
 import "./cockpit.css";
 
 export type CockpitStage = "aim" | "context" | "contracts" | "run" | "eval" | "settings";
+
+export interface CockpitCommand {
+  id: string;
+  label: string;
+  detail: string;
+  shortcut?: string;
+  disabled?: boolean;
+  action: () => void;
+}
 
 interface CockpitShellProps {
   goals: Goal[];
@@ -20,6 +29,7 @@ interface CockpitShellProps {
   onStage: (stage: CockpitStage) => void;
   main: ReactNode;
   settingsSidebar?: ReactNode;
+  commands?: CockpitCommand[];
 }
 
 interface StageItem {
@@ -49,10 +59,12 @@ export function CockpitShell({
   onStage,
   main,
   settingsSidebar,
+  commands,
 }: CockpitShellProps) {
   const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "paused">("all");
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const usingSettingsSidebar = activeStage === "settings" && Boolean(settingsSidebar);
 
   const stages = useMemo<StageItem[]>(() => [
@@ -73,11 +85,54 @@ export function CockpitShell({
     })
     .slice(0, 12);
 
+  const commandItems = useMemo<CockpitCommand[]>(() => commands ?? [
+    { id: "new-aim", label: t("command.newAim"), detail: t("command.newAim.detail"), shortcut: "Cmd N", action: onNewAim },
+    { id: "stage-aim", label: t("os.stepAim"), detail: t("command.stageAim.detail"), shortcut: "Cmd 1", action: () => onStage("aim") },
+    { id: "stage-context", label: t("os.stepContext"), detail: t("command.stageContext.detail"), shortcut: "Cmd 2", action: () => onStage("context") },
+    { id: "stage-contracts", label: t("os.stepPlan"), detail: t("command.stagePlan.detail"), shortcut: "Cmd 3", action: () => onStage("contracts") },
+    { id: "stage-run", label: t("os.stepExecute"), detail: t("command.stageRun.detail"), shortcut: "Cmd 4", action: () => onStage("run") },
+    { id: "stage-eval", label: t("os.stepEval"), detail: t("command.stageEval.detail"), shortcut: "Cmd 5", action: () => onStage("eval") },
+    { id: "settings", label: t("os.settings"), detail: t("command.settings.detail"), shortcut: "Cmd ,", action: () => onStage("settings") },
+  ], [commands, onNewAim, onStage, t]);
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (!event.metaKey && !event.ctrlKey) return;
+      const key = event.key.toLowerCase();
+      if (key === "k") {
+        event.preventDefault();
+        setPaletteOpen(true);
+        return;
+      }
+      if (key === "n") {
+        event.preventDefault();
+        onNewAim();
+        return;
+      }
+      if (key === ",") {
+        event.preventDefault();
+        onStage("settings");
+        return;
+      }
+      if (["1", "2", "3", "4", "5"].includes(key)) {
+        event.preventDefault();
+        const stage = ["aim", "context", "contracts", "run", "eval"][Number(key) - 1] as CockpitStage | undefined;
+        if (stage) onStage(stage);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onNewAim, onStage]);
+
   return (
     <div className="od-window" data-od-id="desktop-window">
       <header className="od-titlebar" data-od-id="mac-titlebar">
         <div className="od-titlebar-brand">Aimcub</div>
         <div className="od-titlebar-status">{busy || error || t("cockpit.titlebar.ready")}</div>
+        <button className="od-command-trigger" type="button" onClick={() => setPaletteOpen(true)}>
+          <span>{t("command.open")}</span>
+          <kbd>{t("command.shortcut")}</kbd>
+        </button>
       </header>
 
       <div className={`od-app od-app-stage-${activeStage}`}>
@@ -99,7 +154,8 @@ export function CockpitShell({
           {usingSettingsSidebar ? settingsSidebar : (
             <>
               <button className="od-new-aim" type="button" onClick={onNewAim}>
-                {t("os.newAim")}
+                <span>{t("os.newAim")}</span>
+                <kbd>Cmd N</kbd>
               </button>
 
               <section className="od-aim-browser" aria-label={t("shell.recentAims")}>
@@ -136,16 +192,22 @@ export function CockpitShell({
                       type="button"
                       onClick={() => onOpenGoal(goal)}
                     >
-                      <strong>{shortText(goal.title, 58)}</strong>
-                      <span>{statusLabel(goal)}</span>
+                      <span className="od-aim-row-main">
+                        <strong>{shortText(goal.title, 58)}</strong>
+                        <span>{statusLabel(goal)}</span>
+                      </span>
+                      <span className="od-aim-row-badge" aria-hidden="true" />
                     </button>
                   ))}
                 </div>
               </section>
 
               <button className="od-settings-button" type="button" onClick={() => onStage("settings")}>
-                <span>{t("os.settings")}</span>
-                <span>{t("cockpit.settings.meta")}</span>
+                <span>
+                  <strong>{t("os.settings")}</strong>
+                  <small>{t("cockpit.settings.meta")}</small>
+                </span>
+                <kbd>Cmd ,</kbd>
               </button>
             </>
           )}
@@ -173,6 +235,98 @@ export function CockpitShell({
             {main}
           </section>
         </main>
+      </div>
+      {paletteOpen ? (
+        <CommandPalette
+          commands={commandItems}
+          onClose={() => setPaletteOpen(false)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function CommandPalette(props: { commands: CockpitCommand[]; onClose: () => void }) {
+  const { t } = useI18n();
+  const [query, setQuery] = useState("");
+  const [activeIndex, setActiveIndex] = useState(0);
+  const normalized = query.trim().toLowerCase();
+  const filtered = props.commands.filter((command) => {
+    if (!normalized) return true;
+    return `${command.label} ${command.detail} ${command.shortcut ?? ""}`.toLowerCase().includes(normalized);
+  });
+  const activeCommand = filtered[activeIndex] ?? filtered[0] ?? null;
+
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [normalized]);
+
+  function run(command: CockpitCommand | null) {
+    if (!command || command.disabled) return;
+    props.onClose();
+    command.action();
+  }
+
+  return (
+    <div className="od-command-layer" role="presentation" onMouseDown={props.onClose}>
+      <div
+        className="od-command-palette"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("command.palette")}
+        onMouseDown={(event) => event.stopPropagation()}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            props.onClose();
+            return;
+          }
+          if (event.key === "ArrowDown") {
+            event.preventDefault();
+            setActiveIndex((current) => Math.min(current + 1, Math.max(filtered.length - 1, 0)));
+            return;
+          }
+          if (event.key === "ArrowUp") {
+            event.preventDefault();
+            setActiveIndex((current) => Math.max(current - 1, 0));
+            return;
+          }
+          if (event.key === "Enter") {
+            event.preventDefault();
+            run(activeCommand);
+          }
+        }}
+      >
+        <div className="od-command-search">
+          <input
+            autoFocus
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={t("command.searchPlaceholder")}
+          />
+          <kbd>{t("command.escape")}</kbd>
+        </div>
+        <div className="od-command-list" role="listbox" aria-label={t("command.palette")}>
+          {filtered.length === 0 ? <div className="od-command-empty">{t("command.empty")}</div> : null}
+          {filtered.map((command, index) => (
+            <button
+              key={command.id}
+              type="button"
+              className="od-command-row"
+              data-active={index === activeIndex ? "true" : "false"}
+              disabled={command.disabled}
+              role="option"
+              aria-selected={index === activeIndex}
+              onMouseEnter={() => setActiveIndex(index)}
+              onClick={() => run(command)}
+            >
+              <span>
+                <strong>{command.label}</strong>
+                <small>{command.detail}</small>
+              </span>
+              {command.shortcut ? <kbd>{command.shortcut}</kbd> : null}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

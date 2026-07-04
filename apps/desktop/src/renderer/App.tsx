@@ -2839,7 +2839,6 @@ export function SettingsPanel(props: {
   onRefreshAgents: () => Promise<void>;
   onReturnToAim?: () => void;
 }) {
-  const { t } = useI18n();
   const { activeSection, model } = props;
   const activeHelper = model.navItems.find((item) => item.id === activeSection) ?? model.overviewHelper;
 
@@ -2883,14 +2882,6 @@ export function SettingsPanel(props: {
 
   return (
     <section style={panelStyle()}>
-      <div className="od-helper-intro">
-        <div>
-          <div style={eyebrowStyle()}>{t("settings.eyebrow")}</div>
-          <h2>{t("settings.heading")}</h2>
-          <p>{t("settings.body")}</p>
-        </div>
-      </div>
-
       <div className="od-settings-detail" aria-live="polite" aria-label={activeHelper.title}>
         {detailPane}
       </div>
@@ -3031,7 +3022,7 @@ function SettingsPrimarySidebar(props: {
   return (
     <div className="od-settings-sidebar-content">
       <button className="od-new-aim od-settings-back" type="button" onClick={props.onBack}>
-        {t("settings.backToAims")}
+        <span>{t("settings.backToAims")}</span>
       </button>
 
       <nav className="od-settings-nav" aria-label={t("settings.navigationLabel")}>
@@ -3041,6 +3032,7 @@ function SettingsPrimarySidebar(props: {
             type="button"
             className="od-settings-nav-item"
             data-active={item.id === props.activeSection ? "true" : "false"}
+            data-tone={item.tone || "neutral"}
             aria-current={item.id === props.activeSection ? "page" : undefined}
             onClick={() => props.onSection(item.id)}
           >
@@ -3099,7 +3091,7 @@ function SettingsOverviewPane(props: {
 
       <div className="od-helper-readiness" aria-label={t("settings.readinessLabel")}>
         {props.helpers.map((helper) => (
-          <div className="od-helper-row" key={helper.id}>
+          <div className="od-helper-row" key={helper.id} data-tone={helper.tone || "neutral"}>
             <div className="od-helper-row-main">
               <strong>{helper.title}</strong>
               <span>{helper.body}</span>

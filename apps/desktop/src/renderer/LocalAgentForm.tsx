@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { LocalAgentDetection, LocalAgentId, LocalAgentRunResult } from "../shared/ipc";
 
 import { useI18n } from "./i18n";
-import { C, card, linkButton, secondaryButton } from "./styles";
+import { C, linkButton, secondaryButton } from "./styles";
 
 interface LocalAgentFormProps {
   agents: LocalAgentDetection[] | null;
@@ -55,11 +55,11 @@ export function LocalAgentForm({ agents, onRefresh }: LocalAgentFormProps) {
   }
 
   return (
-    <div style={{ ...card(), background: "#fbfaf7" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline" }}>
+    <div className="od-preference-card">
+      <div className="od-form-head">
         <div>
-          <div style={{ fontWeight: 600, fontSize: 15 }}>{t("laf.title")}</div>
-          <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>{t("laf.blurb")}</div>
+          <div className="od-form-title">{t("laf.title")}</div>
+          <div className="od-form-body">{t("laf.blurb")}</div>
         </div>
         <button onClick={refresh} style={linkButton()}>{refreshing ? t("laf.scanning") : t("laf.rescan")}</button>
       </div>
@@ -75,7 +75,7 @@ export function LocalAgentForm({ agents, onRefresh }: LocalAgentFormProps) {
                 border: `1px solid ${ready ? C.border : "#efd2c9"}`,
                 borderRadius: 8,
                 padding: 12,
-                background: ready ? "#fff" : "#fff8f4",
+                background: ready ? C.surface : "color-mix(in oklab, var(--od-warn, #b7791f), var(--od-bg, #ffffff) 94%)",
                 display: "grid",
                 gap: 8,
               }}

@@ -43,6 +43,7 @@ Reference links:
 - Aim-first: the aim, next action, current stage, context quality, and evidence state are the product. Decorative or avatar-like surfaces must not compete with the aim.
 - Product-first, debug-second: the default Desktop shell must not show model calls, prompt previews, runtime logs, trace streams, or stacked debug panels. Developer diagnostics belong behind an explicit developer surface.
 - One primary task per screen: a view should make one user action obvious. Secondary facts can be visible only when they support that action.
+- Desktop quality bar: Aimcub should feel like a focused desktop workbench, not a web dashboard inside Electron. Prefer stable panes, compact command surfaces, native-feeling shortcuts, complete control states, and strict row/spacing rhythm over page-by-page component stacks.
 - Calm density: Aimcub is an operational desktop tool. Prefer compact, scannable, quiet layouts over marketing-like hero sections, decorative cards, large illustrations, or expressive gradients.
 - Context is a substrate: show context health as concise status, setup controls, and review affordances. Do not turn memory/context into a profile page or a decorative feed.
 - Context source setup must keep one clear summary plus one editable control surface; do not repeat local, online, web, deep research, context-session, or questionnaire controls as separate card, table, and toggle representations. Planning readiness gates may sit under the summary as compact rows when they explain why planning can proceed or what remains blocked.
@@ -55,6 +56,7 @@ Reference links:
 - Default shell: native-feeling titlebar/status strip, left aim sidebar, center workspace. No default right inspector.
 - Sidebar: brand, language toggle, New Aim, aim search/filter, recent aim list, settings entry. Keep it narrow enough to preserve work area, currently around 280 px.
 - Center workspace: workflow step navigation, then the active stage surface. The workspace should sit in a constrained max width so text lines and controls do not stretch across large windows.
+- Command palette: Desktop must provide a Cmd/Ctrl+K command surface for common navigation and actions. Keyboard shortcuts should be real, visible where useful, and not merely decorative labels.
 - Optional inspector: process, context, quality, activity, and debug details may exist as an opt-in overlay, drawer, popover, or developer-mode surface. It must be independently scrollable and cannot displace the primary task by default.
 - Stage model: Aim -> Context -> Plan/Contracts -> Execute -> Eval. Stage navigation may be visible, but each stage must still present a single dominant action.
 - New aim title and description belong to the Aim stage. The Context stage should confirm the captured aim and collect answers, attachments, and sources; it must not show a second title/description composer unless the user explicitly opens child-aim breakdown or an unsaved-aim edit path.
@@ -76,6 +78,7 @@ Reference links:
 - Sidebar width: default 280 px. Avoid widths below 240 px or above 320 px unless a user-resizable sidebar is implemented with stable min/max bounds.
 - Vertical rhythm: 22 to 24 px between major page bands, 12 to 16 px between controls inside a group, 6 to 10 px inside compact repeated items.
 - Lists: use stable row heights and predictable alignment. Aim cards and context rows should not resize dramatically on hover, loading, selection, or locale changes.
+- Sidebar rows should behave like desktop navigation rows: stable 36 to 48 px rhythm, subtle hover, clear selected state, compact status badge or marker, and no card-like stacking unless the row contains genuinely multi-line content.
 - Cards: use cards only for repeated items, forms, modals, and genuinely framed tools. Do not put cards inside cards, and do not turn whole page sections into floating cards.
 - Tables/grids: use explicit grid tracks with `minmax(0, 1fr)` so long text truncates or wraps intentionally.
 - Responsive behavior: start from the smallest viable window and scale up. At narrow widths, collapse the sidebar, wrap stage controls, stack multi-column grids, and preserve all functionality.
@@ -154,6 +157,7 @@ Reference links:
 
 - Every interactive element needs visible hover, active, focus-visible, disabled, selected/current, loading, and error states where applicable.
 - Keyboard focus must remain visible. Current focus token is a 4 px accent-tinted ring; keep or improve it, do not remove it.
+- Core desktop commands should be available through keyboard-first flows. Add command palette entries alongside visible controls when a workflow becomes top-level navigation or a frequent action.
 - Pointer targets should be at least 24 by 24 CSS px, with practical Aimcub targets usually 32 to 44 px.
 - Do not interrupt the user with modal dialogs for recoverable actions. Prefer inline banners, undo, or a review surface.
 - Planning question surfaces must distinguish blocking pre-draft context from optional post-draft refinements. Pre-draft intake should make the blocked next step explicit; post-draft clarification should keep accepting the draft available without implying the user is stuck.

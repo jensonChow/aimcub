@@ -175,6 +175,8 @@ describe("CockpitShell", () => {
     );
 
     expect(html).toContain('data-od-id="left-settings-sidebar"');
+    expect(html).toContain("Commands");
+    expect(html).toContain("Cmd K");
     expect(html).toContain("Settings sections");
     expect(html).toContain("Planning model");
     expect(html).toContain("Settings detail pane");
