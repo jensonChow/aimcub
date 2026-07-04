@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import type { AimIntakeReport, AimProgressReadModel } from "@core/domain";
 import type { ClarifyAnswer, ClarifyOutput, ClarifyQuestion, ClarifySelectionMode } from "@core/llm";
@@ -1150,23 +1150,168 @@ function SettingsPanel(props: {
   onRefreshAgents: () => Promise<void>;
 }) {
   const { t } = useI18n();
+  const providerReady = Boolean(props.provider?.configured);
+  const readyLocalAgents = props.localAgents.filter((agent) => agent.available && agent.authStatus !== "missing");
+  const availableLocalAgents = props.localAgents.filter((agent) => agent.available);
+  const localAgentReady = readyLocalAgents.length > 0;
+  const planningReady = providerReady || localAgentReady;
+  const webResearchReady = Boolean(props.webResearch?.configured);
+  const webResearchEnabled = props.webResearch?.enabled ?? false;
+  const contextSourceCount = activeContextSourceCount(props.contextSources);
+  const contextReady = contextSourceCount >= 4;
+  const contextHasAnySource = contextSourceCount > 0;
+  const providerRuntime = [props.provider?.provider, props.provider?.model].filter(Boolean).join(" / ");
+
+  const providerHelper = {
+    title: t("settings.helper.provider.title"),
+    body: t("settings.helper.provider.body"),
+    status: providerReady ? t("intake.ready") : localAgentReady ? t("context.sources.status.optional") : t("os.blocked"),
+    tone: providerReady ? "success" : localAgentReady ? "" : "warn",
+    next: providerReady
+      ? t("settings.provider.next.ready", { provider: providerRuntime || t("settings.provider.saved") })
+      : localAgentReady
+        ? t("settings.provider.next.optional")
+        : t("settings.provider.next.blocked"),
+  } satisfies SettingsHelper;
+
+  const localAgentHelper = {
+    title: t("settings.helper.local.title"),
+    body: t("settings.helper.local.body"),
+    status: localAgentReady ? t("intake.ready") : providerReady ? t("context.sources.status.optional") : t("os.blocked"),
+    tone: localAgentReady ? "success" : providerReady ? "" : "warn",
+    next: localAgentReady
+      ? t("settings.local.next.ready", { n: readyLocalAgents.length })
+      : availableLocalAgents.length > 0
+        ? t("settings.local.next.auth")
+        : t("settings.local.next.install"),
+  } satisfies SettingsHelper;
+
+  const webResearchHelper = {
+    title: t("settings.helper.web.title"),
+    body: t("settings.helper.web.body"),
+    status: webResearchReady ? t("intake.ready") : webResearchEnabled ? t("os.blocked") : t("context.sources.status.optional"),
+    tone: webResearchReady ? "success" : webResearchEnabled ? "warn" : "",
+    next: webResearchReady
+      ? t("settings.web.next.ready")
+      : webResearchEnabled
+        ? t("settings.web.next.blocked")
+        : t("settings.web.next.optional"),
+  } satisfies SettingsHelper;
+
+  const contextHelper = {
+    title: t("settings.helper.context.title"),
+    body: t("settings.helper.context.body"),
+    status: contextReady ? t("intake.ready") : contextHasAnySource ? t("settings.status.partial") : t("os.blocked"),
+    tone: contextReady ? "success" : "warn",
+    next: contextReady
+      ? t("settings.context.next.ready")
+      : contextHasAnySource
+        ? t("settings.context.next.partial")
+        : t("settings.context.next.blocked"),
+  } satisfies SettingsHelper;
+
+  const helpers = [providerHelper, localAgentHelper, webResearchHelper, contextHelper];
+  const overallNext = !planningReady
+    ? t("settings.overall.next.runtime")
+    : !contextReady
+      ? t("settings.overall.next.context")
+      : !webResearchReady
+        ? t("settings.overall.next.web")
+        : t("settings.overall.next.aim");
+
   return (
     <section style={panelStyle()}>
-      <div style={sectionHeaderStyle()}>
+      <div className="od-helper-intro">
         <div>
-          <div style={eyebrowStyle()}>{t("os.runtime")}</div>
-          <h2 style={sectionTitleStyle()}>{t("os.settingsHeading")}</h2>
+          <div style={eyebrowStyle()}>{t("settings.eyebrow")}</div>
+          <h2>{t("settings.heading")}</h2>
+          <p>{t("settings.body")}</p>
         </div>
       </div>
-      <ProviderForm status={props.provider} onSaved={props.onProvider} onClose={() => {}} />
-      <div style={{ height: 12 }} />
-      <WebResearchForm status={props.webResearch} onSaved={props.onWeb} />
-      <div style={{ height: 12 }} />
-      <ContextSourcesPanel status={props.contextSources} compact onSaved={props.onContextSources} />
-      <div style={{ height: 12 }} />
-      <LocalAgentForm agents={props.localAgents} onRefresh={props.onRefreshAgents} />
+
+      <div className="od-helper-callout" data-state={planningReady ? "ready" : "blocked"}>
+        <span className={`od-pill ${planningReady ? "success" : "warn"}`}>
+          {planningReady ? t("settings.status.readyToPlan") : t("os.blocked")}
+        </span>
+        <div>
+          <span>{t("settings.nextAction")}</span>
+          <strong>{overallNext}</strong>
+        </div>
+        <p>{t("settings.intakeNote")}</p>
+      </div>
+
+      <div className="od-helper-readiness" aria-label={t("settings.readinessLabel")}>
+        {helpers.map((helper) => (
+          <div className="od-helper-row" key={helper.title}>
+            <div className="od-helper-row-main">
+              <strong>{helper.title}</strong>
+              <span>{helper.body}</span>
+            </div>
+            <span className={`od-pill ${helper.tone}`}>{helper.status}</span>
+            <div className="od-helper-row-next">
+              <span>{t("settings.nextAction")}</span>
+              <strong>{helper.next}</strong>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <SettingsHelperSection helper={providerHelper}>
+        <ProviderForm status={props.provider} onSaved={props.onProvider} onClose={() => {}} />
+      </SettingsHelperSection>
+
+      <SettingsHelperSection helper={localAgentHelper}>
+        <LocalAgentForm agents={props.localAgents} onRefresh={props.onRefreshAgents} />
+      </SettingsHelperSection>
+
+      <SettingsHelperSection helper={webResearchHelper}>
+        <WebResearchForm status={props.webResearch} onSaved={props.onWeb} />
+      </SettingsHelperSection>
+
+      <SettingsHelperSection helper={contextHelper}>
+        <ContextSourcesPanel status={props.contextSources} compact onSaved={props.onContextSources} />
+      </SettingsHelperSection>
     </section>
   );
+}
+
+type SettingsHelperTone = "success" | "warn" | "blue" | "";
+
+interface SettingsHelper {
+  title: string;
+  body: string;
+  status: string;
+  tone: SettingsHelperTone;
+  next: string;
+}
+
+function SettingsHelperSection(props: { helper: SettingsHelper; children: ReactNode }) {
+  return (
+    <section className="od-helper-section">
+      <div className="od-helper-section-head">
+        <div>
+          <h3>{props.helper.title}</h3>
+          <p>{props.helper.body}</p>
+        </div>
+        <div className="od-helper-section-status">
+          <span className={`od-pill ${props.helper.tone}`}>{props.helper.status}</span>
+          <span>{props.helper.next}</span>
+        </div>
+      </div>
+      {props.children}
+    </section>
+  );
+}
+
+function activeContextSourceCount(status: ContextSourceStatus | null): number {
+  if (!status) return 0;
+  const localActive = status.local.configured;
+  const onlineActive = status.online.enabled && status.online.enabledCount > 0;
+  const webActive = status.research.webEnabled;
+  const deepActive = status.research.deepResearch && webActive && localActive;
+  const sessionActive = status.userSession.enabled;
+  const questionnaireActive = status.questionnaire.enabled;
+  return [localActive, onlineActive, webActive, deepActive, sessionActive, questionnaireActive].filter(Boolean).length;
 }
 
 function ProgressDonut({ done, total }: { done: number; total: number }) {
