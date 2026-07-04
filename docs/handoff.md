@@ -1,25 +1,21 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-04
-Branch: `main`
+Branch: `codex/simplify-context-sources`
 
 ## Current Session
 
-- Fixed the root `pnpm desktop:pack` script so it runs the Desktop package script instead of pnpm's built-in pack command.
-- Built an openable macOS app bundle and copied it to the project root at `Aimcub.app`. The bundle is an ignored local artifact and is not committed.
-- Refreshed project memory so `docs/memory/operations.md` and `docs/memory/history.md` match the simplified workspace and root app-bundle handoff.
-- Removed inactive product surfaces from the active workspace: `apps/web`, `apps/ios`, `apps/extension`, and the old `docs/charters/web.md`.
-- Removed unused `packages/ui-tokens`; Desktop token direction now lives in `docs/memory/design-system.md` and current renderer CSS.
-- Replaced broad workspace globs with explicit active packages in `pnpm-workspace.yaml`: Desktop, CLI, MCP, and core packages only.
-- Updated root/docs memory to state that v1 is Desktop-first local Aim OS, with hosted web/iOS/extension deferred until a real product trigger.
-- Cleaned local ignored remnants for the removed surfaces, including old Vercel metadata and local package caches.
+- Simplified the Desktop context source configuration panel into one read-only summary plus one editable control surface.
+- Removed the repeated context source entry-card grid, gate table, metric strip, and duplicated toggle grid from `ContextSourcesPanel`.
+- Preserved existing controls and saved config shape for local folder, local files, online references, web search, deep research, context session, questionnaire, and save.
+- Kept compact Settings mode from adding another framed panel, while normal Context stage still renders the panel as a standalone surface.
+- Added durable design memory that context source setup must not repeat the same controls as separate cards, tables, and toggles.
 
 ## Current State
 
-- Active app surfaces are `apps/desktop`, `apps/cli`, and `apps/mcp`.
-- Active packages are `packages/core`, `packages/types`, `packages/store`, `packages/llm`, `packages/api`, and `packages/db`.
-- `pnpm desktop:pack` produces the local folder-style app bundle under `apps/desktop/dist/mac-arm64/Aimcub.app`; copy it to root `Aimcub.app` when the user wants the app directly inside the project folder.
-- Hosted Supabase remains the online source of truth for MCP evidence and the future platform; the hosted web app should not be reintroduced until sync/collaboration needs it.
+- Active app surfaces remain `apps/desktop`, `apps/cli`, and `apps/mcp`.
+- Desktop context collection remains local-store first through `context-sources.json`; no planning/runtime behavior was changed.
+- The context source summary now calls out active sources, attention state, and a single next action before the editable form.
 
 ## Verification
 
@@ -34,17 +30,13 @@ PATH=/Users/jenson/.local/node/bin:$PATH pnpm core:purity
 git diff --check
 ```
 
-Packaging command also passed:
+Notes: Turbo printed a non-blocking cache/output IO warning during build, test, typecheck, and lint, but all tasks completed successfully.
 
-```bash
-PATH=/Users/jenson/.local/node/bin:$PATH pnpm desktop:pack
-```
-
-Commit/push status: this handoff is part of the memory refresh commit; use `git log -1` for the final hash after the session commits and pushes.
+Commit/push status: this handoff is part of the context source simplification commit; use `git log -1` for the final hash after commit and push.
 
 ## Next Session Prompt
 
 ```text
-Continue from the simplified Aimcub workspace. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md. Then load only the module memory relevant to the task.
-Treat Desktop, CLI, MCP, and the core packages as the active code hierarchy. Do not reintroduce hosted web, iOS, browser-extension, or cross-platform token packages without a concrete product trigger and matching memory update.
+Continue from branch codex/simplify-context-sources. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md, then load only the module memory relevant to the task.
+Desktop is still the primary local Aim OS surface. Keep context collection product-first: one clear summary, one edit surface, and no repeated controls for the same source setting.
 ```
