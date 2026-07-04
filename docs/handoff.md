@@ -2,13 +2,30 @@
 
 Last updated: 2026-07-04
 
+## Latest Desktop Handoff
+
+- Latest pushed commit: `f5297ca` (`Simplify desktop app layout`) on `main`.
+- The installed local app is `/Applications/Aimcub.app`; it was rebuilt from the repo and launched from `/Applications`, not from the development `dist/mac-arm64` preview path.
+- Desktop release packaging was added in `0b82fc5` with `pnpm --filter @app/desktop run dist`, producing `apps/desktop/dist/Aimcub-0.0.0-arm64.dmg` and `.zip` when run outside the sandbox because macOS `hdiutil` is required.
+- Local desktop data is not in memory. The current local store is `~/.aimcub/store.json`; on this handoff it was about 529 KB. Provider and context-source settings live next to it under `~/.aimcub/`.
+- The user rejected the prior desktop UI direction as unclear and over-stacked. Do not add more rails, debug cards, runtime strips, or status boxes to the default view.
+- The current desktop shell was simplified from a three-column debug cockpit into a two-column product layout:
+  - left sidebar: brand, language toggle, New Aim, search/filter, aim list, settings;
+  - center: lightweight workflow step pills plus the active workspace;
+  - no right inspector/debug rail in the default product shell.
+- Selecting an existing aim now opens the Aim overview first instead of jumping directly into Run details. Existing aims no longer show an empty composer on the Context stage.
+- Debug trace remains useful for development, but it should not be a default product surface. Future work should store only bounded debug summaries by default, with full trace capture behind an explicit developer/debug mode.
+- Local store compaction is not implemented. If the store grows, the intended compact behavior is: back up `store.json`, remove or truncate long debug traces and rejected/obsolete context candidates, preserve goals, milestones, evidence, accepted context, assignments, runs, and eval state.
+- Current verification command prefix from this machine: `PATH=/Users/jenson/.local/node/bin:$PATH pnpm <command>`. The old `/private/tmp/aimcub-pnpm9-bin` note below is historical and should not be preferred in this workspace.
+- Full verification passed after `f5297ca`: `pnpm build`, `pnpm test`, `pnpm typecheck`, `pnpm lint`, and `pnpm core:purity` with the `/Users/jenson/.local/node/bin` PATH prefix.
+
 ## Product Memory
 
 - Aimcub is an aim-management layer, not a task-list shell. The product manages aims across humans and agents, then accrues durable context and personalized eval from real work.
 - Aimcub is intended to be open source as a local-first planning and agent-management product. The license is still TBD; do not add a license file until the business/community boundary is explicit.
 - Brand boundary: the local planning architecture and agent-management loop are open source; multi-user collaboration, team routing, sync, managed infrastructure, and the broader aim platform are online products.
 - Desktop is now the primary product surface for agent orchestration. CLI remains important for setup, scripting, debugging, and automation, but new orchestration UX should land in Desktop first.
-- Desktop must function as a debug cockpit while the product is still being shaped. During aim setup and context collection, users need to see the live planning timeline, model calls, tool/context activity, generated questions, and structured planning artifacts before the final plan exists.
+- Desktop must be product-first, not debug-first. Debug details such as model calls, tool traces, prompt previews, and runtime internals should be opt-in developer surfaces, not default layout columns.
 - The current user rejects command-wall UX. Any shell surface should still answer "what can I do next?" rather than "what commands exist?", but it should not pull focus away from the Desktop cockpit.
 - Aimcub's first local planning tools should be first-party built-in runtime tools, following the Claude Code pattern: `Read` / `Write` / `Edit` / `Grep` / `Glob`-style primitives are owned by the harness and permission system. MCP is the external connector/plugin boundary, not the foundation for core local context tools.
 - First-time use must include setup. If provider config is incomplete and the terminal is interactive, `aimcub` should guide into setup; if non-interactive, it should print scriptable setup commands and exit cleanly.
@@ -54,8 +71,7 @@ Last updated: 2026-07-04
 - Clarify/decompose has been strengthened but is still not enough. It now asks more baseline context questions and routes more digital work to agents, but it is still mostly prompt-only. The next missing layer is a first-party planning tool substrate that lets the model inspect local context, search/read files, use memory, and optionally research the web before decomposing an aim.
 - Desktop pre-draft intake now has a model pass: deterministic `reviewAimIntake` gaps are internal signals only, Desktop first collects memory/local/web tool context, then calls `generateAimIntakeQuestions` to produce the user-facing questions/options. Do not surface template prompts like "Ask for..." directly to users; if research/local context is unavailable, the model should ask for enabling or attaching that context instead of pretending it has facts.
 - Context collection is now a first-class Desktop setup layer: `context-sources.json` records linked local folders, explicit local files, online connector references such as Notion/Obsidian/databases/URLs, Web/deep-research preference, the dedicated context session toggle, and choice-question toggle. Planning consumes this before decomposition through `context.linked_sources`, `local.read`, optional `web.search`/`web.fetch`, `context.distill`, and structured user questions. Connector references are treated as locations/access gaps until a runtime can actually read them.
-- Desktop planning debug now exposes the pre-draft/context phase as first-class state: live timeline events, model run status, prompt/system previews, usage/duration when available, tool observations/failures, context distillation, intake/clarify questions and answers, structured rationale, decomposition contracts, review actions, and context gaps. It must show auditable rationale and plan artifacts without exposing hidden chain-of-thought.
-- The middle Desktop panel and right runtime/debug panel must remain independently scrollable; users need to inspect content outside the first viewport while a planning run is still in progress.
+- Desktop planning debug exists in code but should not be mounted as a default right rail. If needed again, expose it behind an explicit developer/debug toggle with bounded summaries and independent scrolling.
 - The first unified built-in tool contract substrate now lives in `packages/llm/src/tool-contract.ts` and is exported from `@core/llm`. It defines contracts, permissions, structured observations, normalized errors, handler types, and a registry for `local.*`, `memory.*`, `web.*`, and `context.*` planning tools. Runtime handlers and Desktop permission UI are still next.
 - Desktop now has a first pass of the local CLI agent harness in `apps/desktop/src/main/local-agents.ts`, following the OpenDesign-style local adapter pattern: registry definitions for Codex and Claude, executable detection via explicit env overrides/PATH/common install paths, version/auth/model probes, command construction, stdin prompt delivery, and JSONL/stream-json event normalization into Aimcub events.
 - This local CLI harness is an Aimcub runtime layer, not MCP. Aimcub should continue to own aim decomposition, context, permissions, evidence, and eval, but local CLIs such as `codex exec --json` and `claude -p` are now also valid planning runtimes when no API provider is configured; API providers remain the preferred metered path when configured.
@@ -65,7 +81,7 @@ Last updated: 2026-07-04
 - Local goal creation now materializes routing assignments from decomposition contracts. Agent execution through Desktop creates a `Run`, records low-trust evidence with attribution, finishes the run, and sediments pending context candidates. Manual child-aim decomposition is stored as a first-class sub-aim relation instead of only `metadata`.
 - The current Aim OS model is local-store first. Supabase schema parity is still future work; do not assume hosted Web has these orchestration tables until migrations and API adapters are added.
 - Desktop renderer has been reset from the old debug-heavy 3,500-line panel into a compact Aim OS cockpit MVP. The new first screen centers the actual flow: aim intake, context questions, sub-aim/eval preview, assignment/run/evidence/eval cockpit, context inbox, and runtime settings. It intentionally keeps rough MVP styling and reuses existing IPC instead of adding new product logic in the renderer.
-- Desktop renderer now applies the Open Design cockpit direction through a reusable `CockpitShell`: Apple-like fullscreen desktop chrome, collapsible/resizable aim sidebar, low-weight workflow stage nav, center active-step workspace, and a right audit rail. Context collection now shows the six first-class intake entries from the design source while preserving the existing context-source IPC/config flow.
+- Desktop renderer now uses a simplified `CockpitShell`: Apple-like fullscreen desktop chrome, fixed aim sidebar, lightweight workflow step pills, and a center active-step workspace. The previous collapsible/resizable sidebar and right audit rail were removed from the default product shell because they made the interface feel stacked and unclear.
 - Latest mainline commits to preserve as the current baseline:
   - `873a404` — local Aim OS orchestration model.
   - `793f623` — Desktop UI reset around the Aim OS cockpit.
@@ -75,20 +91,20 @@ Last updated: 2026-07-04
   - `e00d479` — broaden real-world planning context.
   - `98f9785` — ground intake questions in model context.
   - `bd379de` — add first-class context collection sources.
-- The Desktop app was launched successfully after the UI reset with `PATH=/private/tmp/aimcub-pnpm9-bin:$PATH pnpm desktop`. A later local test launch also succeeded by running Electron against `apps/desktop/out/renderer/index.html`; in development macOS may still show the app name as `Electron`, but the window title should be `Aimcub`.
+- The Desktop app has launched successfully through both development and installed-app paths. In development macOS may still show the app name as `Electron`, but the window title should be `Aimcub`; prefer the `/Users/jenson/.local/node/bin` pnpm path noted below.
 
 ## Verification Notes
 
 - The project declares `pnpm@9.15.0`, but the Codex runtime's bare `pnpm` may resolve to pnpm 11.7.0 and misread the legacy `package.json` `pnpm.overrides` field.
-- Use this prefix when running full gates from Codex:
-  `PATH=/private/tmp/aimcub-pnpm9-bin:$PATH pnpm <command>`
-- Use the same PATH prefix when launching Desktop from Codex. Running `/private/tmp/aimcub-pnpm9-bin/pnpm desktop` without the PATH prefix can still fail because the root script invokes a nested bare `pnpm`, which may resolve to pnpm 11 and abort with `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`.
+- Use this prefix when running full gates from Codex on this machine:
+  `PATH=/Users/jenson/.local/node/bin:$PATH pnpm <command>`
+- Historical note: older sessions used `/private/tmp/aimcub-pnpm9-bin`; prefer `/Users/jenson/.local/node/bin` now.
 - Verified after the v1b wrap-up:
-  - `PATH=/private/tmp/aimcub-pnpm9-bin:$PATH pnpm build`
-  - `PATH=/private/tmp/aimcub-pnpm9-bin:$PATH pnpm test`
-  - `PATH=/private/tmp/aimcub-pnpm9-bin:$PATH pnpm typecheck`
-  - `PATH=/private/tmp/aimcub-pnpm9-bin:$PATH pnpm lint`
-  - `PATH=/private/tmp/aimcub-pnpm9-bin:$PATH pnpm core:purity`
+  - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
+  - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
+  - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck`
+  - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm lint`
+  - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm core:purity`
   - `git diff --check`
 - CLI smoke checks:
   - `AIMCUB_HOME=/private/tmp/aimcub-cli-smoke-first-run node apps/cli/dist/index.js`
@@ -109,6 +125,36 @@ Last updated: 2026-07-04
 ## Next Session Goal Prompt
 
 Copy this prompt into the next coding session:
+
+```text
+/goal Continue the Desktop product-design cleanup from the simplified two-column shell. The user explicitly rejected the previous UI as unclear and over-stacked, so do not add more rails, debug cards, runtime strips, or status boxes to the default view.
+
+Context:
+- Latest pushed baseline: `f5297ca` on `main`.
+- Installed app path: `/Applications/Aimcub.app`.
+- Local store: `~/.aimcub/store.json`; it is not memory-only.
+- The default Desktop shell now has: left aim sidebar, lightweight workflow step pills, center active workspace, no right inspector rail.
+- Existing Aim selection should open Aim overview first, not Run details.
+- Existing Aim Context stage should not show an empty composer.
+- Full verification passed after the shell simplification with:
+  `PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
+  `PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
+  `PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck`
+  `PATH=/Users/jenson/.local/node/bin:$PATH pnpm lint`
+  `PATH=/Users/jenson/.local/node/bin:$PATH pnpm core:purity`
+
+Work next:
+1. Continue screen-by-screen product cleanup, starting with the Aim overview and Context collection screens.
+2. Keep one primary task per screen. Avoid stacking unrelated status/debug/runtime panels.
+3. If debug trace is needed, make it opt-in developer mode and store bounded summaries by default.
+4. Consider a future local-store compact command, but do not prioritize it unless store growth becomes visible.
+5. Keep code/comments/identifiers/docs in English; only zh locale values should be Chinese.
+6. After repository changes, run the required verification gates, commit, and push.
+```
+
+## Archived Tool-Substrate Prompt
+
+Historical prompt from an earlier direction; do not use it as the default next-session goal unless the user explicitly pivots back to built-in planning tools.
 
 ```text
 /goal Build Aimcub's first batch of first-party built-in planning tools for Desktop-first aim decomposition. Do not implement these as MCP. MCP remains the external connector/plugin boundary; the core local context tools must be owned by the Aimcub runtime and permission model.
