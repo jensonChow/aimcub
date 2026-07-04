@@ -234,6 +234,15 @@ export type {
   ResearchBriefSource,
 } from "./planning-tool-context";
 export {
+  generateAimIntakeQuestions,
+} from "./intake";
+export type {
+  AimIntakeQuestionGenerationResult,
+  AimIntakeQuestionGenerationValidation,
+  AimIntakeToolSignal,
+  GenerateAimIntakeQuestionsInput,
+} from "./intake";
+export {
   BraveWebSearchClient,
   createWebResearchRuntime,
   createWebResearchRuntimeFromEnv,

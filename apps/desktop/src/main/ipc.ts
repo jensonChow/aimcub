@@ -63,7 +63,7 @@ import {
   type WebResearchStatus,
   type WebResearchTestResult,
 } from "../shared/ipc";
-import { researchEvidenceForReview, runClarify, runDraft, runRefine, type PlanningModelRunLiveEvent } from "./planner";
+import { researchEvidenceForReview, runClarify, runDraft, runIntakeQuestions, runRefine, type PlanningModelRunLiveEvent } from "./planner";
 import { aimStore } from "./store";
 import { buildGateway, getProviderStatus, setProviderConfig, testProviderConfig } from "./gateway";
 import { collectDesktopPlanningContext, type DesktopPlanningContext } from "./tools";
@@ -202,6 +202,13 @@ function planningContextSummary(context: DesktopPlanningContext): PlanningLiveSu
   };
 }
 
+function intakeToolSignals(context: DesktopPlanningContext) {
+  return context.toolObservationEvents.map((event) => ({
+    toolName: event.toolName,
+    summary: event.observation.summary,
+  }));
+}
+
 function emitPlanningLiveEvent(
   event: IpcMainInvokeEvent,
   runId: string,
@@ -296,14 +303,60 @@ async function decompositionStrategy(
 }
 
 export function registerIpc(): void {
-  ipcMain.handle(IPC.intake, async (_e, req: DraftRequest) =>
-    buildAimIntakeReport({
-      title: req.title,
-      description: req.description,
-      planning: await planningContext(req),
-      lineageLearning: await contextLineageLearning(),
-    }),
-  );
+  ipcMain.handle(IPC.intake, async (event, req: DraftRequest) => {
+    const runId = planningRunId(req);
+    emitPlanningLiveEvent(event, runId, { type: "planning.started", stage: "intake" });
+    try {
+      emitPlanningLiveEvent(event, runId, { type: "context.started", stage: "intake" });
+      const selectedContext = await planningContext(req);
+      const toolsTrace = planningToolTrace(selectedContext);
+      emitPlanningLiveEvent(event, runId, {
+        type: "context.completed",
+        stage: "intake",
+        planningContext: selectedContext.report,
+        planningTools: toolsTrace,
+        summary: planningContextSummary(selectedContext),
+      });
+      const intake = buildAimIntakeReport({
+        title: req.title,
+        description: req.description,
+        planning: selectedContext,
+        lineageLearning: await contextLineageLearning(),
+      });
+      const generated = await runIntakeQuestions(
+        buildGateway(),
+        {
+          title: req.title,
+          description: req.description,
+          intake,
+          memories: selectedContext.memories,
+          research: selectedContext.research,
+          researchRequired: selectedContext.researchRequired,
+          toolSignals: intakeToolSignals(selectedContext),
+        },
+        modelRunHooks(event, runId),
+      );
+      if (!generated.ok || !generated.intake) {
+        emitPlanningLiveEvent(event, runId, {
+          type: "planning.failed",
+          stage: "intake",
+          error: generated.errors.join("; "),
+          summary: { errorCount: generated.errors.length },
+        });
+        throw new Error(generated.errors.join("; ") || "Failed to generate intake questions.");
+      }
+      emitPlanningLiveEvent(event, runId, {
+        type: "intake.completed",
+        stage: "intake",
+        intake: generated.intake,
+        summary: { questionCount: generated.intake.questions.length },
+      });
+      return generated.intake;
+    } catch (err) {
+      emitPlanningFailure(event, runId, "intake", err);
+      throw err;
+    }
+  });
 
   ipcMain.handle(IPC.draft, async (event, req: DraftRequest) => {
     const runId = planningRunId(req);

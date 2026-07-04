@@ -13,8 +13,9 @@ import {
   type LlmResponse,
   type LlmUsage,
 } from "@core/llm";
+import { reviewAimIntake } from "@core/domain";
 
-import { runClarify, runDraft, runRefine, type PlanningModelRunLiveEvent } from "./planner";
+import { runClarify, runDraft, runIntakeQuestions, runRefine, type PlanningModelRunLiveEvent } from "./planner";
 import { materialize } from "./materialize";
 
 /**
@@ -41,6 +42,21 @@ const CLARIFY_OUTPUT = {
     },
   ],
   assumptions: [{ statement: "Assumed GitHub + CI.", default_value: "github" }],
+};
+
+const INTAKE_OUTPUT = {
+  questions: [
+    {
+      source_question_id: "intake_1",
+      question: "Do you already have the Apple Developer access needed to distribute the tarot app?",
+      why_high_impact: "This decides whether access setup blocks implementation.",
+      selection_mode: "single",
+      options: [
+        { label: "Yes", tradeoff: "Planning can continue to product/build work." },
+        { label: "No", tradeoff: "Planning must add an access prerequisite first." },
+      ],
+    },
+  ],
 };
 
 /**
@@ -111,6 +127,49 @@ describe("desktop planner · no provider configured (no templates)", () => {
     const r = await runRefine(null, aim.title, aim.description, draft, [], []);
     expect(r.ok).toBe(false);
     expect(r.output).toBeNull();
+  });
+});
+
+describe("desktop planner · intake question generation", () => {
+  it("uses the model and emits intake-stage model run hooks before showing questions", async () => {
+    const calls: Array<LlmRequest & { schema?: unknown }> = [];
+    const gateway: LlmGateway = {
+      async complete(): Promise<LlmResponse<string>> {
+        return { output: "", usage: USAGE };
+      },
+      async completeStructured<T>(req: LlmRequest & { schema: unknown }): Promise<LlmResponse<T>> {
+        calls.push(req);
+        return { output: INTAKE_OUTPUT as T, usage: USAGE };
+      },
+    };
+    const events: PlanningModelRunLiveEvent[] = [];
+    const intake = reviewAimIntake({
+      title: "Develop a tarot app",
+      memories: [],
+      selectedContext: [],
+    });
+
+    const result = await runIntakeQuestions(gateway, {
+      title: "Develop a tarot app",
+      intake,
+      researchRequired: true,
+      toolSignals: [{ toolName: "memory.search", summary: "No relevant memory found." }],
+    }, { onModelRun: (event) => events.push(event) });
+
+    expect(result.ok).toBe(true);
+    expect(result.intake?.questions[0]).toMatchObject({
+      prompt: expect.stringContaining("Apple Developer access"),
+      selectionMode: "single",
+    });
+    expect(calls[0]!.task).toBe("classify");
+    expect(calls[0]!.prompt).toContain("No relevant memory found");
+    expect(result.debugTrace?.stage).toBe("intake");
+    expect(result.debugTrace?.modelRuns[0]).toMatchObject({
+      stage: "intake",
+      task: "classify",
+      status: "ok",
+    });
+    expect(events.map((event) => event.type)).toEqual(["model.started", "model.completed"]);
   });
 });
 

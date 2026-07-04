@@ -187,7 +187,7 @@ describe("reviewAimIntake", () => {
         category: "capability",
         priority: "high",
         reason: "domain_expertise_and_source_material_missing",
-        prompt: expect.stringContaining("tarot experience"),
+        prompt: expect.stringContaining("tarot knowledge"),
       }),
       expect.objectContaining({
         category: "project_fact",

@@ -424,7 +424,7 @@ export function planQualityRetryOf(g: Goal): PlanResult["qualityRetry"] | null {
 export function planningDebugTraceOf(g: Goal): PlanningDebugTrace | null {
   const trace = g.metadata?.planning_debug_trace as Partial<PlanningDebugTrace> | undefined;
   if (!trace || trace.version !== 1 || !Array.isArray(trace.modelRuns)) return null;
-  if (trace.stage !== "planning" && trace.stage !== "draft" && trace.stage !== "clarify" && trace.stage !== "refine") {
+  if (trace.stage !== "planning" && trace.stage !== "intake" && trace.stage !== "draft" && trace.stage !== "clarify" && trace.stage !== "refine") {
     return null;
   }
   return {

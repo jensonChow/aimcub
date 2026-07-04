@@ -456,6 +456,7 @@ export const STRINGS = {
   "debug.event.modelStarted": { en: "Model call started", zh: "模型调用已开始" },
   "debug.event.modelCompleted": { en: "Model call completed", zh: "模型调用已完成" },
   "debug.event.modelFailed": { en: "Model call failed", zh: "模型调用失败" },
+  "debug.event.intakeCompleted": { en: "Intake questions generated", zh: "上下文问题已生成" },
   "debug.event.draftCompleted": { en: "Draft plan completed", zh: "初版计划已完成" },
   "debug.event.clarifyStarted": { en: "Clarification pass started", zh: "澄清阶段已开始" },
   "debug.event.clarifyCompleted": { en: "Clarification pass completed", zh: "澄清阶段已完成" },

@@ -170,7 +170,7 @@ function intakeToClarifyOutput(intake: AimIntakeReport, zh: boolean): ClarifyOut
     questions: intake.questions.map((question): ClarifyQuestion => ({
       id: `intake_${question.id}`,
       question: question.prompt,
-      why_high_impact: question.reason,
+      why_high_impact: question.whyHighImpact ?? question.reason,
       kind: intakeQuestionKind(question.category),
       source_dimension: intakeQuestionDimension(question.category),
       why_asked: [{
@@ -184,8 +184,8 @@ function intakeToClarifyOutput(intake: AimIntakeReport, zh: boolean): ClarifyOut
       }],
       capture: question.capture,
       allow_other: true,
-      selection_mode: intakeQuestionSelectionMode(question.category),
-      options: intakeOptions(question.category, zh),
+      selection_mode: question.selectionMode ?? intakeQuestionSelectionMode(question.category),
+      options: question.options?.length ? question.options : intakeOptions(question.category, zh),
     })),
     assumptions: [],
   };
@@ -369,11 +369,13 @@ function AimOsApp() {
       return;
     }
     setError(null);
+    setPlanningDebugTraces([]);
+    const runId = startPlanningRun();
     try {
       if (!options.skipIntakeGate) {
         setBusy(t("os.busy.context"));
         setMode("contexting");
-        const intake = await window.aimcub.intake({ title, description: aimDescription.trim() || undefined });
+        const intake = await window.aimcub.intake({ title, description: aimDescription.trim() || undefined, clientRunId: runId });
         setPlanResult({ ok: false, output: null, errors: [], intake });
         if (shouldBlockForIntake(intake) && intake.questions.length > 0) {
           const intakeOutput = intakeToClarifyOutput(intake, hasCjkText(`${title}\n${aimDescription}`));
@@ -387,8 +389,6 @@ function AimOsApp() {
 
       setBusy(t("os.busy.draft"));
       setMode("drafting");
-      setPlanningDebugTraces([]);
-      const runId = startPlanningRun();
       const req = { title, description: descriptionWithContext(), clientRunId: runId };
       const nextDraft = await window.aimcub.draft(req);
       if (!nextDraft.ok || !nextDraft.output) throw new Error(nextDraft.errors.join("; ") || t("os.err.draft"));

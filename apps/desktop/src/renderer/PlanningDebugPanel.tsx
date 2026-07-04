@@ -269,6 +269,7 @@ function liveEventTitle(event: PlanningLiveEvent, t: T): string {
     case "model.started": return t("debug.event.modelStarted");
     case "model.completed": return t("debug.event.modelCompleted");
     case "model.failed": return t("debug.event.modelFailed");
+    case "intake.completed": return t("debug.event.intakeCompleted");
     case "draft.completed": return t("debug.event.draftCompleted");
     case "clarify.started": return t("debug.event.clarifyStarted");
     case "clarify.completed": return t("debug.event.clarifyCompleted");

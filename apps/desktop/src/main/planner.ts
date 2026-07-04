@@ -12,12 +12,14 @@ import {
   clarify,
   buildRefinedDescription,
   clarifyAnswersToMemories,
+  generateAimIntakeQuestions,
   type LlmGateway,
   type ClarifyAnswer,
   type ClarifyLearningReport,
   type ClarifyQuestion,
   type DecomposeWithQualityResult,
   type AimOutputLanguage,
+  type AimIntakeToolSignal,
   type LlmRequest,
   type LlmResponse,
   type PlanningMemory,
@@ -45,6 +47,13 @@ export type PlanningModelRunLiveEvent =
 
 export interface PlanningDebugHooks {
   onModelRun?: (event: PlanningModelRunLiveEvent) => void;
+}
+
+export interface IntakeQuestionResult {
+  ok: boolean;
+  intake: AimIntakeReport | null;
+  errors: string[];
+  debugTrace?: PlanningDebugTrace | null;
 }
 
 function createDebugTrace(stage: PlanningRunStage, startedAtMs: number, modelRuns: PlanningModelRunTrace[]): PlanningDebugTrace {
@@ -193,6 +202,64 @@ export function researchEvidenceForReview(research: ResearchBrief | null | undef
     };
   }
   return required ? { required: true, sourceCount: 0, fetchedSourceCount: 0, searchResultCount: 0 } : null;
+}
+
+export async function runIntakeQuestions(
+  gateway: LlmGateway | null,
+  input: {
+    title: string;
+    description?: string;
+    intake: AimIntakeReport;
+    memories?: readonly PlanningMemory[];
+    research?: ResearchBrief | null;
+    researchRequired?: boolean;
+    toolSignals?: readonly AimIntakeToolSignal[];
+  },
+  hooks?: PlanningDebugHooks,
+): Promise<IntakeQuestionResult> {
+  const startedAtMs = Date.now();
+  if (!gateway) {
+    return {
+      ok: false,
+      intake: null,
+      errors: [NO_PROVIDER],
+      debugTrace: createDebugTrace("intake", startedAtMs, []),
+    };
+  }
+  if (input.intake.questions.length === 0) {
+    return {
+      ok: true,
+      intake: input.intake,
+      errors: [],
+      debugTrace: createDebugTrace("intake", startedAtMs, []),
+    };
+  }
+  const traced = tracedGateway(gateway, "intake", hooks);
+  const result = await generateAimIntakeQuestions(traced.gateway, {
+    title: input.title,
+    description: input.description,
+    intake: input.intake,
+    memories: input.memories,
+    research: input.research,
+    researchRequired: input.researchRequired,
+    toolSignals: input.toolSignals,
+    maxQuestions: input.intake.questions.length,
+  });
+  const debugTrace = createDebugTrace("intake", startedAtMs, traced.modelRuns);
+  if (!result.validation.ok || !result.report) {
+    return {
+      ok: false,
+      intake: null,
+      errors: result.validation.errors,
+      debugTrace,
+    };
+  }
+  return {
+    ok: true,
+    intake: result.report,
+    errors: [],
+    debugTrace,
+  };
 }
 
 function answerMemoriesForRefine(

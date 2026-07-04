@@ -95,7 +95,7 @@ export interface ClarifyIpcResult {
   planningTools?: PlanningToolIpcTrace | null;
 }
 
-export type PlanningRunStage = "draft" | "clarify" | "refine";
+export type PlanningRunStage = "intake" | "draft" | "clarify" | "refine";
 export type PlanningDebugTraceStage = PlanningRunStage | "planning";
 
 export interface PlanningModelRunTrace {
@@ -150,6 +150,7 @@ export type PlanningLiveEventType =
   | "model.started"
   | "model.completed"
   | "model.failed"
+  | "intake.completed"
   | "draft.completed"
   | "clarify.started"
   | "clarify.completed"

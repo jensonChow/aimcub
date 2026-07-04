@@ -119,6 +119,9 @@ export interface AimIntakeQuestion {
   source: AimIntakeQuestionSource;
   reason: string;
   prompt: string;
+  whyHighImpact?: string;
+  selectionMode?: "single" | "multiple";
+  options?: AimIntakeQuestionOption[];
   capture?: ContextCaptureContract;
   gapSource?: PlanContextGapSource;
   nodeKey?: string;
@@ -126,6 +129,11 @@ export interface AimIntakeQuestion {
   roiScore?: number;
   roiSignals?: PlanContextGapRoiSignal[];
   issueCodes?: PlanQualityIssueCode[];
+}
+
+export interface AimIntakeQuestionOption {
+  label: string;
+  tradeoff: string;
 }
 
 export interface AimIntakeSelectedContextRow {
@@ -201,17 +209,17 @@ function contextCategory(row: { content: string; category?: string | null; kind?
 function categoryPrompt(category: ContextCategory): string {
   switch (category) {
     case "eval_signal":
-      return "Ask what would make this aim count as genuinely complete in the real world, and what evidence, proof, or final human confirmation would show it worked.";
+      return "What would make this aim count as genuinely complete in the real world, and what proof or final confirmation would show it worked?";
     case "constraint":
-      return "Ask for non-negotiable real-world constraints such as required accounts, permissions, platform/store rules, privacy, budget, deadlines, legal/policy limits, or quality bars.";
+      return "Which required accounts, permissions, platform/store rules, privacy limits, budget, deadline, legal/policy constraints, or quality bars are non-negotiable?";
     case "procedure":
-      return "Ask whether there is an existing workflow, checklist, command, artifact, source material, review path, or approval process this aim should follow.";
+      return "Which existing workflow, checklist, command, artifact, source material, review path, or approval process should this aim follow?";
     case "capability":
-      return "Ask what human expertise, domain experience, access, authority, or agent capability is available, only if routing would change the plan.";
+      return "What human expertise, domain experience, access, authority, or agent capability is available and would change who should do the work?";
     case "preference":
-      return "Ask for stable preferences that should shape audience, scope, interaction style, tone, or default tradeoffs.";
+      return "Which stable preferences should shape the audience, scope, interaction style, tone, or default tradeoffs?";
     case "project_fact":
-      return "Ask for the target user/scenario, desired outcome, distribution surface, current state, and known environment facts before decomposing.";
+      return "Who is the target user, what scenario are they in, what outcome should exist, where will it be distributed, and what current state facts matter?";
   }
 }
 
@@ -817,7 +825,7 @@ function realWorldContextQuestions(input: ReviewAimIntakeInput): Omit<AimIntakeQ
       priority: "high",
       source: "aim_text",
       reason: "domain_expertise_and_source_material_missing",
-      prompt: "What domain experience, taste, source material, or external expert should shape this aim? For a tarot app, include the user's tarot experience, deck/interpretation style, and what should not be invented by the agent.",
+      prompt: "What tarot knowledge, deck or interpretation source material, personal taste, or external expert input should shape this app, and which parts require human judgment instead of agent invention?",
       roiScore: 54,
       roiSignals: ["high_priority", "capability", "missing_context"],
     });
