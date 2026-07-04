@@ -819,6 +819,32 @@ describe("createJsonFileStore · evidence and confirmations", () => {
     expect((await store.listMemories()).map((memory) => memory.id)).not.toContain(candidates[0]!.id);
   });
 
+  it("includes accepted aim context in the completion recap", async () => {
+    const store = freshStore();
+    const { goal, milestones } = await store.createGoal({ title: "Manual proof", plan: MANUAL_PLAN });
+
+    await store.confirmMilestone({
+      goalId: goal.id,
+      milestoneId: milestones[0]!.id,
+      summary: "Confirmed release approval.",
+    });
+    const candidates = await store.sedimentContextFromGoal(goal.id);
+    const accepted = await store.acceptMemoryCandidate({
+      id: candidates[0]!.id,
+      content: "Eval signal: Release approval is complete when the user confirms it.",
+      goalId: goal.id,
+    });
+    const progress = await store.getAimProgress(goal.id);
+
+    expect(accepted?.status).toBe("active");
+    expect(progress?.completion_recap?.complete).toBe(true);
+    expect(progress?.completion_recap?.learned_context).toContainEqual(expect.objectContaining({
+      id: accepted!.id,
+      status: "active",
+      scope: "aim",
+    }));
+  });
+
   it("manual sub-aim decomposition creates a relation that the cockpit can roll up", async () => {
     const store = freshStore();
     const { goal: parent, milestones: parentMilestones } = await store.createGoal({

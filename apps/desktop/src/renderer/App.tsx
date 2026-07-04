@@ -44,6 +44,7 @@ import type {
 } from "../shared/ipc";
 
 import { CockpitShell, type CockpitStage } from "./CockpitShell";
+import { hasCompletionRecap, stageForOpenedAim } from "./completionRecap";
 import { buildContextCandidateAcceptRequest, ContextInbox, type ContextInboxScope } from "./ContextInbox";
 import { ContextSourcesPanel } from "./ContextSourcesPanel";
 import { buildContextBundleReview, type ContextBundleReview, type ContextReviewItem } from "./contextReview";
@@ -54,7 +55,7 @@ import {
   routeAfterRefresh,
   type AimHelperProfile,
 } from "./firstRunFlow";
-import { I18nProvider, useI18n } from "./i18n";
+import { I18nProvider, useI18n, type I18n } from "./i18n";
 import {
   aimIntakeOf,
   contextCategoryLabel,
@@ -450,6 +451,23 @@ function evalToneClass(state: EvalState): string {
   return "";
 }
 
+function evalLabel(t: I18n["t"], state: EvalState): string {
+  switch (state) {
+    case "passed":
+      return t("os.evalStatus.passed");
+    case "failed":
+      return t("os.evalStatus.failed");
+    case "needs_human":
+      return t("os.evalStatus.needsHuman");
+    case "unsupported":
+      return t("os.evalStatus.unsupported");
+    case "error":
+      return t("os.evalStatus.error");
+    case "pending":
+      return t("os.evalStatus.pending");
+  }
+}
+
 function shortId(value: string): string {
   return value.length <= 8 ? value : value.slice(0, 8);
 }
@@ -613,7 +631,6 @@ function AimOsApp() {
   async function openGoal(goal: Goal) {
     setSelected(goal);
     setMode("cockpit");
-    setStageOverride("aim");
     setError(null);
     setDraft(null);
     setFinalPlan(null);
@@ -639,6 +656,7 @@ function AimOsApp() {
     ]);
     setDetail(nextDetail);
     setProgress(nextProgress);
+    setStageOverride(stageForOpenedAim(nextProgress));
   }
 
   function resetComposer() {
@@ -885,6 +903,10 @@ function AimOsApp() {
       const nextProgress = await window.aimcub.getAimProgress(selected.id);
       setDetail(nextDetail);
       setProgress(nextProgress);
+      if (hasCompletionRecap(nextProgress)) {
+        setMode("reviewing");
+        setStageOverride("eval");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -949,6 +971,7 @@ function AimOsApp() {
   );
   const completed = progress?.completed_milestones ?? detail?.milestones.filter((m) => m.status === "completed").length ?? 0;
   const total = progress?.total_milestones ?? detail?.milestones.length ?? 0;
+  const aimComplete = hasCompletionRecap(progress) || (total > 0 && completed === total);
   const hasUnsavedAim = aimTitle.trim().length > 0;
   const activeStage = stageOverride ?? cockpitStageFor(mode, selected, activePlan);
   const planningRuntimeReady = hasPlanningRuntime(provider, localAgents);
@@ -1186,7 +1209,9 @@ function AimOsApp() {
           progress={progress}
           completed={completed}
           total={total}
+          complete={aimComplete}
           onContext={() => openCockpitStage("context")}
+          onRecap={() => openCockpitStage("eval")}
           onNewAim={startNewAim}
         />
       ) : (
@@ -1327,12 +1352,14 @@ function AimOverviewPanel(props: {
   progress: AimProgressReadModel | null;
   completed: number;
   total: number;
+  complete: boolean;
   onContext: () => void;
+  onRecap: () => void;
   onNewAim: () => void;
 }) {
   const { t } = useI18n();
   const completion = pct(props.completed, props.total);
-  const nextAction = props.progress?.next_action || t("shell.noNextAction");
+  const nextAction = props.complete ? t("completion.nextAction") : props.progress?.next_action || t("shell.noNextAction");
   const summary = props.goal.description?.trim() || nextAction;
   return (
     <section className="od-aim-overview">
@@ -1354,18 +1381,18 @@ function AimOverviewPanel(props: {
         <div>
           <span>{t("shell.nextAction")}</span>
           <strong>{shortText(nextAction, 120)}</strong>
-          <small>{t("aimIntake.contextGate")}</small>
+          <small>{props.complete ? t("completion.reuseShort") : t("aimIntake.contextGate")}</small>
         </div>
       </div>
 
       <div className="od-aim-intake-footer">
-        <p>{t("aimIntake.currentHint")}</p>
+        <p>{props.complete ? t("completion.overviewHint") : t("aimIntake.currentHint")}</p>
         <div className="od-aim-intake-actions">
           <button className="od-aim-secondary" type="button" onClick={props.onNewAim}>
             {t("os.newAim")}
           </button>
-          <button className="od-aim-primary" type="button" onClick={props.onContext}>
-            {t("aimIntake.cta")}
+          <button className="od-aim-primary" type="button" onClick={props.complete ? props.onRecap : props.onContext}>
+            {props.complete ? t("completion.reviewRecap") : t("aimIntake.cta")}
           </button>
         </div>
       </div>
@@ -2502,6 +2529,147 @@ function EvidenceReviewList(props: {
   );
 }
 
+function CompletionRecapPanel(props: {
+  progress: AimProgressReadModel;
+}) {
+  const { t } = useI18n();
+  const recap = props.progress.completion_recap;
+  if (!recap) return null;
+  const completedCount = recap.completed_sub_aims.length;
+  const evidenceCount = recap.passing_evidence.length;
+  const contextCount = recap.learned_context.length;
+  const futureReuse = contextCount > 0
+    ? t("completion.futureReuseBody")
+    : t("completion.futureReuseEmptyBody");
+
+  return (
+    <section className="od-stage-panel od-completion-recap">
+      <div className="od-stage-panel-head">
+        <div>
+          <div className="od-stage-kicker">{t("completion.eyebrow")}</div>
+          <h2>{t("completion.heading")}</h2>
+          <p>{recap.final_outcome}</p>
+        </div>
+      </div>
+
+      <div className="od-stage-metrics" aria-label={t("completion.heading")}>
+        <StageMetric label={t("completion.metricSubAims")} value={String(completedCount)} />
+        <StageMetric label={t("completion.metricEvidence")} value={String(evidenceCount)} />
+        <StageMetric label={t("completion.metricContext")} value={String(contextCount)} />
+      </div>
+
+      <div className="od-recap-section">
+        <div className="od-card-head">
+          <h3>{t("completion.subAimsTitle")}</h3>
+          <span className="od-pill success">{t("completion.complete")}</span>
+        </div>
+        <div className="od-work-list">
+          {recap.completed_sub_aims.map((item) => (
+            <article key={item.milestone_id} className="od-work-card od-recap-subaim is-complete">
+              <div className="od-work-card-main">
+                <div className="od-work-title">
+                  <strong>{item.title}</strong>
+                  <span className="od-pill success">{item.eval_status ? evalLabel(t, item.eval_status) : t("completion.complete")}</span>
+                  {item.decided_by ? <span className="od-pill">{item.decided_by}</span> : null}
+                </div>
+                <p>{shortText(item.outcome, 220)}</p>
+                <div className="od-work-note">
+                  <strong>{t("completion.evidenceIds")}</strong>
+                  <span>{item.evidence_ids.length ? item.evidence_ids.map(shortId).join(", ") : t("completion.noEvidenceIds")}</span>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+
+      <div className="od-recap-grid">
+        <div className="od-recap-section">
+          <div className="od-card-head">
+            <h3>{t("completion.evidenceTitle")}</h3>
+            <span className="od-pill">{String(evidenceCount)}</span>
+          </div>
+          {recap.passing_evidence.length === 0 ? (
+            <div className="od-empty-inline">{recap.evidence_empty_reason}</div>
+          ) : (
+            <div className="od-recap-list">
+              {recap.passing_evidence.map((item) => (
+                <div key={item.id} className="od-recap-row">
+                  <div>
+                    <strong>{shortText(item.summary || item.kind, 130)}</strong>
+                    <span>{[item.kind, shortId(item.id), t("os.evalTrust", { n: formatTrust(item.trust_score) })].join(" · ")}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="od-recap-section">
+          <div className="od-card-head">
+            <h3>{t("completion.evalTitle")}</h3>
+            <span className="od-pill">{String(recap.eval_results.length)}</span>
+          </div>
+          {recap.eval_results.length === 0 ? (
+            <div className="od-empty-inline">{t("completion.noEvalResults")}</div>
+          ) : (
+            <div className="od-recap-list">
+              {recap.eval_results.map((result, index) => (
+                <div key={`${result.milestone_id}-${result.evaluator}-${index}`} className="od-recap-row">
+                  <div>
+                    <strong>{result.evaluator}</strong>
+                    <span>
+                      {[
+                        evalLabel(t, result.status),
+                        t("os.evalMatchedCount", { n: result.matched_evidence_ids.length }),
+                        t("os.evalTrust", { n: formatTrust(result.trust_score) }),
+                      ].join(" · ")}
+                    </span>
+                  </div>
+                  <p>{result.explanation}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="od-recap-section">
+        <div className="od-card-head">
+          <h3>{t("completion.contextTitle")}</h3>
+          <span className="od-pill">{String(contextCount)}</span>
+        </div>
+        {recap.learned_context.length === 0 ? (
+          <div className="od-empty-inline">{recap.context_empty_reason}</div>
+        ) : (
+          <div className="od-recap-list">
+            {recap.learned_context.map((item) => (
+              <div key={item.id} className="od-recap-row">
+                <div>
+                  <strong>{shortText(item.content, 150)}</strong>
+                  <span>
+                    {[
+                      item.status === "pending" ? t("completion.contextPending") : t("completion.contextAccepted"),
+                      item.scope,
+                      item.category,
+                      formatTrust(item.confidence),
+                    ].join(" · ")}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="od-recap-reuse">
+        <span>{t("completion.futureReuseTitle")}</span>
+        <strong>{futureReuse}</strong>
+      </div>
+    </section>
+  );
+}
+
 function EvalPanel(props: {
   detail: GoalDetail;
   progress: AimProgressReadModel | null;
@@ -2510,6 +2678,9 @@ function EvalPanel(props: {
   onRejectContextCandidate: (candidate: Memory) => void;
 }) {
   const { t } = useI18n();
+  if (props.progress?.completion_recap?.complete) {
+    return <CompletionRecapPanel progress={props.progress} />;
+  }
   const rows = progressRows(props.detail, props.progress);
   const evidenceTotal = rows.reduce((sum, row) => sum + row.evidence_count, 0);
   const evaluatorResults = rows.flatMap((row) => row.evaluator_results);
@@ -2517,23 +2688,6 @@ function EvalPanel(props: {
   const pendingCandidates = props.progress?.context_candidates.filter((candidate) => candidate.status === "pending") ?? [];
   const evidenceReviewItems = rows.flatMap((row) => row.evidence).filter((item) => item.status !== "matched").length;
   const reviewItems = evaluatorResults.filter((result) => result.status !== "passed").length + evidenceReviewItems + pendingCandidates.length;
-
-  function evalLabel(state: EvalState): string {
-    switch (state) {
-      case "passed":
-        return t("os.evalStatus.passed");
-      case "failed":
-        return t("os.evalStatus.failed");
-      case "needs_human":
-        return t("os.evalStatus.needsHuman");
-      case "unsupported":
-        return t("os.evalStatus.unsupported");
-      case "error":
-        return t("os.evalStatus.error");
-      case "pending":
-        return t("os.evalStatus.pending");
-    }
-  }
 
   return (
     <section className="od-stage-panel od-eval-panel">
@@ -2561,7 +2715,7 @@ function EvalPanel(props: {
                 <div className="od-work-card-head">
                   <div className="od-work-title">
                     <strong>{row.milestone.title}</strong>
-                    <span className={`od-pill ${evalToneClass(state)}`}>{evalLabel(state)}</span>
+                    <span className={`od-pill ${evalToneClass(state)}`}>{evalLabel(t, state)}</span>
                     <span className="od-pill">{t("os.evidenceCount", { n: row.evidence_count })}</span>
                     <span className="od-pill">{t("os.evalTrust", { n: formatTrust(row.eval_review.trust_score) })}</span>
                   </div>
@@ -2600,7 +2754,7 @@ function EvalPanel(props: {
                       <div key={`${result.evaluator}-${index}`} className="od-evaluator-row">
                         <div className="od-evaluator-head">
                           <strong>{`#${index + 1} ${result.evaluator}`}</strong>
-                          <span className={`od-pill ${evalToneClass(result.status)}`}>{evalLabel(result.status)}</span>
+                          <span className={`od-pill ${evalToneClass(result.status)}`}>{evalLabel(t, result.status)}</span>
                         </div>
                         <p>{result.explanation || result.failure_reason || t("os.noEval")}</p>
                         <small>

@@ -39,3 +39,5 @@ Desktop binds runtime handlers for memory, local, context, and web planning path
 Aim OS orchestration has a durable local model in `@core/types`, `@core/domain`, and `@core/store`: actors, assignments, runs, run events, tool traces, context intake sessions, sub-aim relations, evidence attribution, evaluator runtime reports, and `AimProgressReadModel`.
 
 Local goal creation materializes routing assignments from decomposition contracts. Manual child-aim decomposition is stored as a first-class sub-aim relation instead of only metadata.
+
+`AimProgressReadModel` includes a derived completion recap only after all milestones are complete. The recap maps completed sub-aims, matching evidence summaries, passed evaluator rows, and pending or accepted context memory without storing separate aim-completion state.

@@ -18,6 +18,8 @@ The default desktop shell is a simplified two-column product layout:
 
 Selecting an existing aim should open Aim overview first instead of jumping directly into Run details. Existing aims should not show an empty composer on the Context stage.
 
+Completed aims are the exception to the overview default: if `AimProgressReadModel.completion_recap.complete` is true, Desktop should open the Eval stage and show the completion recap.
+
 The renderer was reset from the old debug-heavy cockpit into a compact Aim OS cockpit MVP. It should keep one primary task per screen and avoid stacking unrelated status/debug/runtime panels.
 
 ## Design System

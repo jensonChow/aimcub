@@ -1841,6 +1841,9 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
       const contextCandidates = store.memories.filter((memory) =>
         memory.status === "pending" && (memory.goal_id === null || memory.goal_id === goalId),
       );
+      const acceptedContext = store.memories.filter((memory) =>
+        memory.status === "active" && memory.goal_id === goalId,
+      );
       return buildAimProgressReadModel({
         goal,
         milestones,
@@ -1855,6 +1858,7 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
         evidence: store.evidence.filter((row) => row.goal_id === goalId),
         completions: store.completions.filter((completion) => milestoneIds.has(completion.milestone_id)),
         contextCandidates,
+        acceptedContext,
       });
     },
 
