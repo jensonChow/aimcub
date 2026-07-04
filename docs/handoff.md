@@ -5,6 +5,8 @@ Branch: `main`
 
 ## Current Session
 
+- Reviewed the preserved `stash@{0}` from `pre-integration-main-staged-cleanup` and selectively integrated the part that still fit the current product loop.
+- Added compact Context Source planning gates to the current `ContextSourcesPanel` instead of applying the old stash version, which would have reintroduced duplicate context cards/tables/toggles and reverted newer Execute/Eval/Settings work.
 - Integrated the eight completed Desktop product-loop feature branches into `codex/product-loop-integration`, then merged that integration branch into `main`.
 - Merged `codex/aim-first-onboarding`, `codex/context-bundle-review`, `codex/plan-editing-tools`, `codex/sub-aim-routing-overrides`, `codex/manual-evidence-proof-flow`, `codex/evidence-eval-review`, `codex/context-inbox-ui`, and `codex/completion-recap`.
 - Resolved the main integration seams so pre-save plan editing and routing overrides share one editable plan, Execute uses structured proof submission, Eval uses evidence review rows plus Context Inbox, and completed aims route to the factual recap.
@@ -12,12 +14,13 @@ Branch: `main`
 ## Current State
 
 - `main` now supports the full local Aim OS loop: aim-first onboarding, context bundle review, editable sub-aim/eval plan, explicit human/agent/model routing, manual proof evidence, evidence/eval review, Context Inbox accept/reject/edit, and completion recap.
-- Existing uncommitted staged changes from `main` were preserved in `stash@{0}` as `pre-integration-main-staged-cleanup` before this integration branch was created.
-- The preserved stash was inspected after integration. It changes older Desktop renderer/settings/workspace configuration and would revert parts of the integrated product loop, so it remains unapplied for separate review instead of being folded into `main`.
+- Context Sources now shows planning readiness gates for the context bundle, research fusion, gap intake, scope guard, and sub-aim readiness while keeping one summary plus one edit surface.
+- Existing uncommitted staged changes from `main` were preserved in `stash@{0}` as `pre-integration-main-staged-cleanup` before the integration branch was created.
+- The preserved stash has now been content-reviewed. Its viable context-source gate intent is integrated; the remaining older renderer/settings/workspace configuration still stays unapplied because it would revert parts of the integrated product loop.
 
 ## Verification
 
-- Final verification passed on the integration branch before merging to `main`, then passed again on `main` after the merge:
+- Final verification passed on the integration branch before merging to `main`, then passed again on `main` after the merge and after the stash-review integration:
   - `pnpm build`
   - `pnpm test`
   - `pnpm typecheck`

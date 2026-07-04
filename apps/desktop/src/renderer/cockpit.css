@@ -2553,6 +2553,42 @@ select:focus-visible {
   line-height: 1.35;
 }
 
+.od-context-gate-list {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-md);
+  background: var(--od-bg);
+}
+
+.od-context-gate-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(120px, 0.45fr) minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  border-top: 1px solid var(--od-border-soft);
+  padding: 10px 12px;
+}
+
+.od-context-gate-row:first-child {
+  border-top: 0;
+}
+
+.od-context-gate-row strong {
+  color: var(--od-fg);
+  font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.od-context-gate-row span:nth-child(2) {
+  min-width: 0;
+  color: var(--od-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .od-context-source-controls {
   display: grid;
   gap: 18px;
@@ -2759,6 +2795,7 @@ select:focus-visible {
   .od-context-source-status-list,
   .od-context-setting-grid,
   .od-context-source-status,
+  .od-context-gate-row,
   .od-context-next-action,
   .od-context-online-row,
   .od-context-setting-row,

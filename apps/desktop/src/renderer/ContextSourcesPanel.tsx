@@ -23,6 +23,14 @@ interface SourceSummaryItem {
   tone: SummaryTone;
 }
 
+interface ContextGateRow {
+  key: string;
+  label: string;
+  body: string;
+  status: string;
+  tone: SummaryTone;
+}
+
 const PROVIDERS: OnlineProvider[] = ["notion", "obsidian", "google-drive", "supabase", "database", "url", "other"];
 
 function emptyConfig(): ContextSourceConfig {
@@ -97,6 +105,7 @@ export function ContextSourcesPanel({ status, disabled = false, compact = false,
   const onlineNeedsAttention = draft.online.enabled && (onlineEnabled === 0 || onlineMissingReferences > 0);
   const deepWaiting = draft.research.deepResearch && !deepActive;
   const intakePaused = !sessionActive && !questionnaireActive;
+  const intakeActive = sessionActive || questionnaireActive;
   const summaryTone: SummaryTone = activeSourceCount >= 4 && !onlineNeedsAttention ? "success" : "warn";
 
   const attentionText = !localActive
@@ -187,6 +196,48 @@ export function ContextSourcesPanel({ status, disabled = false, compact = false,
       detail: questionnaireActive ? t("context.sources.summary.questionsReady") : t("context.sources.summary.questionsPaused"),
       status: questionnaireActive ? t("context.sources.status.active") : t("context.sources.status.paused"),
       tone: questionnaireActive ? "success" : "",
+    },
+  ];
+
+  const gateRows: ContextGateRow[] = [
+    {
+      key: "bundle",
+      label: t("context.gate.contextBundle"),
+      body: t("context.gate.contextBundleBody"),
+      status: activeSourceCount > 0 ? t("context.sources.status.connected") : t("context.sources.status.pending"),
+      tone: activeSourceCount > 0 ? "success" : "warn",
+    },
+    {
+      key: "research",
+      label: t("context.gate.researchFusion"),
+      body: t("context.gate.researchFusionBody"),
+      status: !draft.research.deepResearch
+        ? t("context.sources.status.paused")
+        : deepActive
+          ? t("context.sources.status.active")
+          : t("context.sources.status.waiting"),
+      tone: !draft.research.deepResearch ? "" : deepActive ? "success" : "warn",
+    },
+    {
+      key: "gaps",
+      label: t("context.gate.gapQueue"),
+      body: t("context.gate.gapQueueBody"),
+      status: intakeActive ? t("context.sources.status.active") : t("context.sources.status.paused"),
+      tone: intakeActive ? "blue" : "",
+    },
+    {
+      key: "scope",
+      label: t("context.gate.scopeGuard"),
+      body: t("context.gate.scopeGuardBody"),
+      status: t("context.sources.status.active"),
+      tone: "blue",
+    },
+    {
+      key: "subaim",
+      label: t("context.gate.subAimGate"),
+      body: t("context.gate.subAimGateBody"),
+      status: activeSourceCount >= 4 && !onlineNeedsAttention ? t("intake.ready") : t("context.sources.status.waiting"),
+      tone: activeSourceCount >= 4 && !onlineNeedsAttention ? "success" : "warn",
     },
   ];
 
@@ -305,6 +356,16 @@ export function ContextSourcesPanel({ status, disabled = false, compact = false,
                 <span>{item.detail}</span>
               </div>
               <span className={`od-pill ${item.tone}`}>{item.status}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="od-context-gate-list" data-od-id="context-source-gates">
+          {gateRows.map((row) => (
+            <div className="od-context-gate-row" key={row.key}>
+              <strong>{row.label}</strong>
+              <span>{row.body}</span>
+              <span className={`od-pill ${row.tone}`}>{row.status}</span>
             </div>
           ))}
         </div>
