@@ -27,6 +27,7 @@ Aimcub is a universal aim-management layer: it holds the aim, routes work across
 ## Loading Order
 - Always read `docs/handoff.md` for the current transfer state.
 - Read `docs/memory/README.md`, then only the module memories relevant to the task.
+- For frontend or visual design work, load and update `docs/memory/design-system.md` with new user design requirements.
 - Use `docs/vision.md` and `docs/v1-spec.md` for full product direction and current v1 scope.
 
 ## Commands

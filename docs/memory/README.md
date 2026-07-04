@@ -24,6 +24,7 @@ This directory is the durable project-memory layer. `AGENTS.md` is the compact r
 | `product.md` | Work affects positioning, roadmap, routing philosophy, context/eval behavior, or product copy. |
 | `architecture.md` | Work affects core packages, storage, evidence, Supabase, local store, tool contracts, or data flow. |
 | `desktop.md` | Work affects the Electron app, local Aim OS cockpit, provider setup, context collection UI, or local agent harness. |
+| `design-system.md` | Work affects frontend design, Desktop UI, visual language, layout, typography, spacing, color, controls, or interaction details. |
 | `operations.md` | Work affects verification, release, packaging, local machine assumptions, or session handoff process. |
 | `history.md` | You need legacy v0/H1/H2/v1a context or archived decisions before changing old surfaces. |
 
@@ -31,5 +32,6 @@ This directory is the durable project-memory layer. `AGENTS.md` is the compact r
 
 - Prefer concise, dated durable facts over full transcripts.
 - Do not duplicate the same memory across multiple files; link to the owning file instead.
+- When the user gives any frontend or visual-design requirement, update `design-system.md`.
 - Remove obsolete details when the source module changes.
 - Keep handoff prompts short enough that the next session can act without re-reading historical noise.

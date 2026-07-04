@@ -1,5 +1,7 @@
 # Desktop GUI Research Memo
 
+Status: historical. Current Desktop visual and interaction decisions are owned by `docs/memory/design-system.md` and `docs/memory/desktop.md`. If this memo conflicts with those memory files, the memory files win.
+
 This memo records the information architecture behind the first Aim OS desktop shell. The goal is not to copy another agent UI, but to make Aimcub's own primitive clear: an Aim is the primary object, and process, context, quality, and evidence are supporting layers.
 
 ## Source Scan
