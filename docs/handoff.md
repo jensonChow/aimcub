@@ -10,15 +10,16 @@ Branch: `codex/product-loop-integration`
 - Merged `codex/context-bundle-review`, resolving conflicts by keeping aim-first helper guidance and adding the default context bundle review surface.
 - Merged `codex/plan-editing-tools`.
 - Merged `codex/sub-aim-routing-overrides`, resolving conflicts so pre-save plan editing and per-sub-aim routing overrides share the same editable plan.
+- Merged `codex/manual-evidence-proof-flow`, resolving conflicts so Execute keeps routing-aware rows and Confirm opens structured proof submission.
 
 ## Current State
 
-- Desktop should keep aim-first onboarding, default context bundle review, editable plan transforms, and explicit human/agent/model routing overrides before save.
+- Desktop should keep aim-first onboarding, default context bundle review, editable plan transforms, explicit human/agent/model routing overrides, and structured manual proof submission before manual evidence is recorded.
 - Existing uncommitted staged changes from `main` were preserved in `stash@{0}` as `pre-integration-main-staged-cleanup` before this integration branch was created.
 
 ## Verification
 
-Not yet run for the integration branch.
+- `pnpm typecheck` passed after the routing merge; full integration verification is still pending.
 
 ## Next Session Prompt
 

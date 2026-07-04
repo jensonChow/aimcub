@@ -141,7 +141,7 @@ Stored (shared ~/.aimcub store — the desktop app sees these too):
   aimcub ls [--json]                                   List saved aims
   aimcub show <id> [--json]                            Show a saved aim + milestones
   aimcub board <id> [--json]                           Show progress + evidence counts
-  aimcub confirm <id> <milestone> [--summary "..."]     Append manual confirmation evidence
+  aimcub confirm <id> <milestone> --summary "..."       Append manual confirmation evidence
   aimcub evidence add <id> [opts] [--json]              Append local evidence, then evaluate
   aimcub evidence ls <id> [--json]                      List local evidence for an aim
   aimcub memories ls [--json]                           List saved context memories
@@ -777,6 +777,13 @@ async function runBoard(idPrefix: string, json: boolean): Promise<void> {
   out(formatBoard(got.goal, got.milestones, evidence));
 }
 
+function requiredEvidenceForMilestone(milestone: Milestone): string[] {
+  const contract = milestone.metadata?.decomposition_contract;
+  if (!contract || typeof contract !== "object" || Array.isArray(contract)) return [];
+  const required = (contract as Record<string, unknown>).required_evidence;
+  return Array.isArray(required) ? required.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
+}
+
 async function runConfirm(
   idPrefix: string,
   milestoneRef: string | undefined,
@@ -786,7 +793,17 @@ async function runConfirm(
   if (!milestoneRef) throw new UserError("Missing milestone. Usage: aimcub confirm <aim-id> <milestone>");
   const got = await getGoalOrThrow(idPrefix);
   const milestone = resolveMilestoneRef(milestoneRef, got.milestones);
-  const result = await store.confirmMilestone({ goalId: got.goal.id, milestoneId: milestone.id, summary });
+  const proofNote = summary?.trim();
+  if (!proofNote) {
+    throw new UserError('Missing proof summary. Usage: aimcub confirm <aim-id> <milestone> --summary "what you verified"');
+  }
+  const requiredEvidence = requiredEvidenceForMilestone(milestone).map((text) => ({ text, satisfied: true }));
+  const result = await store.confirmMilestone({
+    goalId: got.goal.id,
+    milestoneId: milestone.id,
+    proofNote,
+    requiredEvidence,
+  });
   if (!result) throw new UserError(`Could not confirm milestone ${milestone.id}.`);
   const memoryCandidates =
     result.evidence && !result.alreadyCompleted

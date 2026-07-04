@@ -233,6 +233,22 @@ export const Evidence = z.object({
 });
 export type Evidence = z.infer<typeof Evidence>;
 
+export const ManualEvidenceRequiredItem = z.object({
+  text: z.string().min(1),
+  satisfied: z.boolean().default(false),
+});
+export type ManualEvidenceRequiredItem = z.infer<typeof ManualEvidenceRequiredItem>;
+
+export const ManualEvidencePayload = z.object({
+  confirmed: z.literal(true).default(true),
+  milestone_id: z.string().uuid(),
+  proof_note: z.string().min(1).optional(),
+  urls: z.array(z.string().url()).default([]),
+  file_paths: z.array(z.string().min(1)).default([]),
+  required_evidence: z.array(ManualEvidenceRequiredItem).default([]),
+});
+export type ManualEvidencePayload = z.infer<typeof ManualEvidencePayload>;
+
 // ──────────────────────────────────────────────────────────────────────────
 // Goal / Milestone / Plan (decomposition)
 // ──────────────────────────────────────────────────────────────────────────
@@ -547,6 +563,7 @@ export const AimProgressMilestoneRead = z.object({
   latest_run: Run.nullable().default(null),
   child_relations: z.array(SubAimRelation).default([]),
   evaluator_results: z.array(EvaluatorRuntimeResult).default([]),
+  evidence: z.array(Evidence).default([]),
   evidence_count: z.number().int().nonnegative().default(0),
   completed: z.boolean().default(false),
   blocked: z.boolean().default(false),

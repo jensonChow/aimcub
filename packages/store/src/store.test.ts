@@ -728,13 +728,71 @@ describe("createJsonFileStore · evidence and confirmations", () => {
     const store = freshStore();
     const { goal, milestones } = await store.createGoal({ title: "Build a CLI todo app", plan: PLAN });
 
-    const result = await store.confirmMilestone({ goalId: goal.id, milestoneId: milestones[1]!.id });
+    const result = await store.confirmMilestone({
+      goalId: goal.id,
+      milestoneId: milestones[1]!.id,
+      proofNote: "Verified implementation with a passing CI run.",
+    });
     expect(result).not.toBeNull();
     expect(result!.evidence?.kind).toBe("manual_check");
     expect(result!.completion?.decided_by).toBe("user_confirm");
 
     const got = await store.getGoal(goal.id);
     expect(got!.milestones[1]!.status).toBe("completed");
+  });
+
+  it("manual proof stores note, URLs, file references, and required evidence mapping", async () => {
+    const store = freshStore();
+    const { goal, milestones } = await store.createGoal({ title: "Manual proof", plan: MANUAL_PLAN });
+
+    const result = await store.confirmMilestone({
+      goalId: goal.id,
+      milestoneId: milestones[0]!.id,
+      proofNote: "Reviewed the release approval in the signed note.",
+      urls: ["https://example.com/approval"],
+      filePaths: ["/tmp/approval-note.pdf"],
+      requiredEvidence: [{ text: "Approval note.", satisfied: true }],
+    });
+    const progress = await store.getAimProgress(goal.id);
+
+    expect(result!.evidence?.payload).toMatchObject({
+      confirmed: true,
+      milestone_id: milestones[0]!.id,
+      proof_note: "Reviewed the release approval in the signed note.",
+      urls: ["https://example.com/approval"],
+      file_paths: ["/tmp/approval-note.pdf"],
+      required_evidence: [{ text: "Approval note.", satisfied: true }],
+    });
+    expect(progress?.milestones[0]?.evidence[0]?.id).toBe(result!.evidence?.id);
+    expect(progress?.milestones[0]?.evaluator_results[0]?.matched_evidence_ids).toContain(result!.evidence?.id);
+  });
+
+  it("validates manual proof before appending evidence", async () => {
+    const store = freshStore();
+    const { goal, milestones } = await store.createGoal({ title: "Manual proof", plan: MANUAL_PLAN });
+    const milestoneId = milestones[0]!.id;
+
+    await expect(store.confirmMilestone({ goalId: goal.id, milestoneId })).rejects.toThrow(/note, URL, or file/i);
+    await expect(store.confirmMilestone({
+      goalId: goal.id,
+      milestoneId,
+      proofNote: "Reviewed the approval.",
+      urls: ["not-a-url"],
+      requiredEvidence: [{ text: "Approval note.", satisfied: true }],
+    })).rejects.toThrow(/URL is invalid/i);
+    await expect(store.confirmMilestone({
+      goalId: goal.id,
+      milestoneId,
+      proofNote: "Reviewed the approval.",
+      requiredEvidence: [{ text: "Approval note.", satisfied: false }],
+    })).rejects.toThrow(/at least one required evidence/i);
+    await expect(store.confirmMilestone({
+      goalId: goal.id,
+      milestoneId,
+      proofNote: "Reviewed the approval.",
+      requiredEvidence: [{ text: "Different evidence.", satisfied: true }],
+    })).rejects.toThrow(/does not belong/i);
+    expect(await store.listEvidence(goal.id)).toHaveLength(0);
   });
 
   it("human proof sedimentation creates pending durable context", async () => {
@@ -744,7 +802,10 @@ describe("createJsonFileStore · evidence and confirmations", () => {
     await store.confirmMilestone({
       goalId: goal.id,
       milestoneId: milestones[0]!.id,
-      summary: "Confirmed release approval.",
+      proofNote: "Confirmed release approval.",
+      urls: ["https://example.com/release-approval"],
+      filePaths: ["/tmp/release-approval.txt"],
+      requiredEvidence: [{ text: "Approval note.", satisfied: true }],
     });
     const candidates = await store.sedimentContextFromGoal(goal.id);
 
@@ -765,7 +826,12 @@ describe("createJsonFileStore · evidence and confirmations", () => {
       parentMilestoneId: parentMilestones[0]!.id,
     });
 
-    await store.confirmMilestone({ goalId: child.id, milestoneId: childMilestones[0]!.id });
+    await store.confirmMilestone({
+      goalId: child.id,
+      milestoneId: childMilestones[0]!.id,
+      proofNote: "Child aim proof was reviewed.",
+      requiredEvidence: [{ text: "Approval note.", satisfied: true }],
+    });
     const relations = await store.listSubAimRelations(parent.id);
     const progress = await store.getAimProgress(parent.id);
 

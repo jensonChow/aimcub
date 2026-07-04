@@ -1765,6 +1765,215 @@ select:focus-visible {
   color: var(--od-danger);
 }
 
+.od-proof-form {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid var(--od-border-soft);
+  padding-top: 14px;
+}
+
+.od-proof-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.od-proof-head > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.od-proof-head strong {
+  color: var(--od-fg);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.od-proof-head span {
+  color: var(--od-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.od-proof-field {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  color: var(--od-fg);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.od-proof-field textarea {
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+  border: 1px solid var(--od-border);
+  border-radius: var(--od-radius-sm);
+  background: var(--od-bg);
+  color: var(--od-fg);
+  padding: 10px 12px;
+  font: inherit;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.od-proof-file-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.od-proof-file-actions small {
+  color: var(--od-muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.od-proof-file-list {
+  display: grid;
+  gap: 6px;
+}
+
+.od-proof-file-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-sm);
+  padding: 8px 10px;
+}
+
+.od-proof-file-row span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--od-muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.od-proof-file-row button {
+  min-height: 30px;
+  border: 1px solid var(--od-border);
+  border-radius: var(--od-radius-sm);
+  background: var(--od-surface-warm);
+  color: var(--od-fg);
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.od-proof-required {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.od-proof-required legend {
+  color: var(--od-fg);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+  padding: 0 0 6px;
+}
+
+.od-proof-required-list {
+  display: grid;
+  gap: 6px;
+}
+
+.od-proof-check-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  color: var(--od-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.od-proof-check-row input {
+  width: 16px;
+  height: 16px;
+  margin: 1px 0 0;
+}
+
+.od-proof-validation {
+  border: 1px solid color-mix(in oklab, var(--od-warning), var(--od-bg) 68%);
+  border-radius: var(--od-radius-sm);
+  background: color-mix(in oklab, var(--od-warning), var(--od-bg) 94%);
+  color: var(--od-warning);
+  padding: 9px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.od-proof-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.od-evidence-list {
+  display: grid;
+  gap: 8px;
+}
+
+.od-evidence-list-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.od-evidence-list-head strong,
+.od-evidence-list-head span {
+  color: var(--od-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.od-evidence-row {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-sm);
+  background: var(--od-surface-warm);
+  padding: 10px;
+}
+
+.od-evidence-row strong {
+  color: var(--od-fg);
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 650;
+}
+
+.od-evidence-row span {
+  overflow: hidden;
+  color: var(--od-muted);
+  font-size: 12px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .od-evaluator-list {
   display: grid;
   gap: 8px;
@@ -2267,7 +2476,9 @@ select:focus-visible {
     justify-content: stretch;
   }
 
-  .od-work-actions .od-aim-secondary {
+  .od-work-actions .od-aim-secondary,
+  .od-proof-actions .od-aim-primary,
+  .od-proof-actions .od-aim-secondary {
     width: 100%;
   }
 
@@ -2277,6 +2488,16 @@ select:focus-visible {
 
   .od-plan-actions button {
     flex: 1 1 120px;
+  }
+
+  .od-proof-head,
+  .od-proof-file-actions,
+  .od-proof-actions {
+    display: grid;
+  }
+
+  .od-proof-file-row {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .od-workspace {

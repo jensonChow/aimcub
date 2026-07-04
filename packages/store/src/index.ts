@@ -32,7 +32,7 @@ import {
 } from "@core/domain";
 // DecompositionOutput is imported as a VALUE (the Zod schema) so the store can re-validate
 // the SHAPE of any plan it is asked to persist — the gatekeeper for untrusted input.
-import { AcceptanceRule, DecompositionOutput } from "@core/types";
+import { AcceptanceRule, DecompositionOutput, ManualEvidencePayload } from "@core/types";
 import type {
   ContextCategory,
   Actor,
@@ -53,6 +53,7 @@ import type {
   Milestone,
   MilestoneCompletion,
   MilestoneStatus,
+  ManualEvidenceRequiredItem,
   PlanNode,
   Run,
   RunEvent,
@@ -151,6 +152,10 @@ export interface ConfirmMilestoneInput {
   milestoneId: string;
   ownerId?: string;
   summary?: string;
+  proofNote?: string;
+  urls?: string[];
+  filePaths?: string[];
+  requiredEvidence?: ManualEvidenceRequiredItem[];
 }
 
 export interface ConfirmMilestoneResult {
@@ -839,6 +844,112 @@ function canUserConfirm(rule: ReturnType<typeof AcceptanceRule.parse>): boolean 
   );
 }
 
+function normalizeProofText(value: string | undefined): string {
+  return normalizeMemoryContent(value ?? "");
+}
+
+function uniqueCleanStrings(values: readonly string[] | undefined): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const value of values ?? []) {
+    const cleaned = normalizeProofText(value);
+    if (!cleaned || seen.has(cleaned)) continue;
+    seen.add(cleaned);
+    out.push(cleaned);
+  }
+  return out;
+}
+
+function normalizeProofUrls(values: readonly string[] | undefined): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const value of uniqueCleanStrings(values)) {
+    let parsed: URL;
+    try {
+      parsed = new URL(value);
+    } catch {
+      throw new Error(`Manual proof URL is invalid: ${value}`);
+    }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      throw new Error("Manual proof URLs must start with http:// or https://.");
+    }
+    const normalized = parsed.toString();
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    out.push(normalized);
+  }
+  return out;
+}
+
+function requiredEvidenceForMilestone(milestone: Milestone): string[] {
+  const contract = milestone.metadata?.decomposition_contract;
+  if (!contract || typeof contract !== "object" || Array.isArray(contract)) return [];
+  const required = (contract as Record<string, unknown>).required_evidence;
+  return Array.isArray(required) ? uniqueCleanStrings(required.filter((item): item is string => typeof item === "string")) : [];
+}
+
+function evidenceItemKey(value: string): string {
+  return normalizeProofText(value).toLowerCase();
+}
+
+function normalizeRequiredEvidenceSelection(
+  milestone: Milestone,
+  selected: readonly ManualEvidenceRequiredItem[] | undefined,
+): ManualEvidenceRequiredItem[] {
+  const required = requiredEvidenceForMilestone(milestone);
+  if (required.length === 0) return [];
+  const known = new Map(required.map((item) => [evidenceItemKey(item), item]));
+  const selectedByKey = new Map<string, boolean>();
+  for (const item of selected ?? []) {
+    const text = normalizeProofText(item.text);
+    const key = evidenceItemKey(text);
+    if (!known.has(key)) {
+      throw new Error(`Required evidence item does not belong to this milestone: ${text || "(blank)"}`);
+    }
+    selectedByKey.set(key, item.satisfied === true);
+  }
+  const normalized = required.map((text) => ({
+    text,
+    satisfied: selectedByKey.get(evidenceItemKey(text)) ?? false,
+  }));
+  if (!normalized.some((item) => item.satisfied)) {
+    throw new Error("Manual proof must check at least one required evidence item.");
+  }
+  return normalized;
+}
+
+function proofSummary(input: ConfirmMilestoneInput, milestone: Milestone, proofNote: string, urls: readonly string[], filePaths: readonly string[]): string {
+  const explicit = normalizeProofText(input.summary);
+  if (explicit) return explicit;
+  const basis = proofNote || urls[0] || filePaths[0] || milestone.title;
+  return `Manual proof for ${milestone.title}: ${basis.length > 140 ? `${basis.slice(0, 139).trim()}...` : basis}`;
+}
+
+function normalizeManualEvidence(input: ConfirmMilestoneInput, milestone: Milestone): {
+  summary: string;
+  payload: Record<string, unknown>;
+} {
+  const proofNote = normalizeProofText(input.proofNote ?? input.summary);
+  const urls = normalizeProofUrls(input.urls);
+  const filePaths = uniqueCleanStrings(input.filePaths);
+  if (!proofNote && urls.length === 0 && filePaths.length === 0) {
+    throw new Error("Manual proof requires a note, URL, or file reference.");
+  }
+  const requiredEvidence = normalizeRequiredEvidenceSelection(milestone, input.requiredEvidence);
+  const payload = ManualEvidencePayload.parse({
+    confirmed: true,
+    milestone_id: milestone.id,
+    ...(proofNote ? { proof_note: proofNote } : {}),
+    urls,
+    file_paths: filePaths,
+    required_evidence: requiredEvidence,
+  });
+  return {
+    summary: proofSummary(input, milestone, proofNote, urls, filePaths),
+    payload,
+  };
+}
+
 function insertCompletion(
   store: LocalStore,
   milestone: Milestone,
@@ -1237,6 +1348,7 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
       }
 
       const now = new Date().toISOString();
+      const manualEvidence = normalizeManualEvidence(input, milestone);
       const evidence: Evidence = {
         id: randomUUID(),
         owner_id: input.ownerId ?? milestone.owner_id,
@@ -1246,8 +1358,8 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
         kind: "manual_check",
         source_event_id: null,
         occurred_at: now,
-        summary: input.summary ?? `Confirmed: ${milestone.title}`,
-        payload: { confirmed: true, milestone_id: milestone.id },
+        summary: manualEvidence.summary,
+        payload: manualEvidence.payload,
         trust_score: 1,
         created_at: now,
       };

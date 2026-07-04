@@ -693,6 +693,10 @@ export function registerIpc(): void {
       goalId: req.goalId,
       milestoneId: req.milestoneId,
       summary: req.summary,
+      proofNote: req.proofNote,
+      urls: req.urls,
+      filePaths: req.filePaths,
+      requiredEvidence: req.requiredEvidence,
     });
     await aimStore.sedimentContextFromGoal(req.goalId);
     return goalDetail(req.goalId);
