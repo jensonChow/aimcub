@@ -12,7 +12,7 @@
     "desktop": "pnpm --filter @app/desktop dev",
     "desktop:dev": "pnpm --filter @app/desktop dev",
     "desktop:build": "pnpm --filter @app/desktop build",
-    "desktop:pack": "pnpm --filter @app/desktop pack",
+    "desktop:pack": "pnpm --filter @app/desktop run pack",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",
