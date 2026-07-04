@@ -1,22 +1,23 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-04
-Branch: `codex/product-loop-integration`
+Branch: `main`
 
 ## Current Session
 
-- Integrated the eight completed Desktop product-loop feature branches into `codex/product-loop-integration`.
+- Integrated the eight completed Desktop product-loop feature branches into `codex/product-loop-integration`, then merged that integration branch into `main`.
 - Merged `codex/aim-first-onboarding`, `codex/context-bundle-review`, `codex/plan-editing-tools`, `codex/sub-aim-routing-overrides`, `codex/manual-evidence-proof-flow`, `codex/evidence-eval-review`, `codex/context-inbox-ui`, and `codex/completion-recap`.
 - Resolved the main integration seams so pre-save plan editing and routing overrides share one editable plan, Execute uses structured proof submission, Eval uses evidence review rows plus Context Inbox, and completed aims route to the factual recap.
 
 ## Current State
 
-- Desktop should now support the full local Aim OS loop: aim-first onboarding, context bundle review, editable sub-aim/eval plan, explicit human/agent/model routing, manual proof evidence, evidence/eval review, Context Inbox accept/reject/edit, and completion recap.
+- `main` now supports the full local Aim OS loop: aim-first onboarding, context bundle review, editable sub-aim/eval plan, explicit human/agent/model routing, manual proof evidence, evidence/eval review, Context Inbox accept/reject/edit, and completion recap.
 - Existing uncommitted staged changes from `main` were preserved in `stash@{0}` as `pre-integration-main-staged-cleanup` before this integration branch was created.
+- The preserved stash was inspected after integration. It changes older Desktop renderer/settings/workspace configuration and would revert parts of the integrated product loop, so it remains unapplied for separate review instead of being folded into `main`.
 
 ## Verification
 
-- Final verification passed:
+- Final verification passed on the integration branch before merging to `main`, then passed again on `main` after the merge:
   - `pnpm build`
   - `pnpm test`
   - `pnpm typecheck`
@@ -28,10 +29,10 @@ Branch: `codex/product-loop-integration`
 
 Notes:
 - MCP worker tests intentionally log the expected missing-Supabase opaque-error path while passing.
-- The branch still needs to be pushed to `origin` after final commit.
+- Commit/push status: `main` contains the product-loop merge and this handoff update; push `main` to `origin` before closing the session.
 
 ## Next Session Prompt
 
 ```text
-Continue from codex/product-loop-integration. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md, then load only task-relevant module memory. Preserve the integrated Aim OS loop across Aim, Context, Plan/Contracts, Execute, Eval, Context Inbox, and Completion Recap. If changes are made, update docs/handoff.md and run the full required verification command set.
+Continue from main. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md, then load only task-relevant module memory. Preserve the integrated Aim OS loop across Aim, Context, Plan/Contracts, Execute, Eval, Context Inbox, and Completion Recap. Do not apply stash@{0} blindly; inspect it against the current product loop first. If changes are made, update docs/handoff.md and run the full required verification command set.
 ```
