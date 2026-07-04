@@ -1,7 +1,7 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-04
-Branch: `codex/settings-split-view`
+Branch: `main`
 
 ## Current Session
 
@@ -9,16 +9,17 @@ Branch: `codex/settings-split-view`
 - Removed the nested workspace settings navigation that left the aim list visible beside a second settings sidebar.
 - Added renderer tests that verify SettingsPanel renders only detail content and CockpitShell replaces the primary left sidebar on the Settings stage.
 - Promoted the primary-sidebar Settings split-view requirement into durable Desktop and design-system memory.
+- Fast-forward merged `codex/settings-split-view` into `main`.
 
 ## Current State
 
-- `codex/settings-split-view` supports the local Aim OS loop from `main` plus the corrected primary-sidebar Settings surface.
+- `main` supports the local Aim OS loop plus the corrected primary-sidebar Settings surface.
 - Settings keeps helper setup product-focused: the primary left sidebar owns Overview, Planning model, Local CLI agents, Web research, and Context sources navigation; the center workspace owns the selected detail pane.
 - Context Sources still has one setup summary, compact planning readiness gates, and one editable control surface. The gates cover context bundle, research fusion, gap intake, scope guard, and sub-aim readiness.
 
 ## Verification
 
-- Verification passed for the corrected Settings split-view change:
+- Verification passed for the main merge and corrected Settings split-view change:
   - `pnpm build`
   - `pnpm test`
   - `pnpm typecheck`
@@ -31,10 +32,10 @@ Branch: `codex/settings-split-view`
 
 Notes:
 - MCP worker tests intentionally log the expected missing-Supabase opaque-error path while passing.
-- Commit/push: `ec5ffb6 Use primary sidebar for desktop settings` is pushed to `origin/codex/settings-split-view`.
+- Commit/push: the Settings sidebar work has been merged to `main`; use `git log -1` for the exact pushed tip after this handoff update.
 
 ## Next Session Prompt
 
 ```text
-Continue from `codex/settings-split-view`. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md, then load only task-relevant module memory. Preserve the Settings split view: the primary left app sidebar becomes settings category navigation, and the center workspace shows one selected detail pane. Preserve the Context Sources rule: one summary, compact planning readiness gates, and one editable control surface. If changes are made, update docs/handoff.md and run the full required verification command set.
+Continue from `main`. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md, then load only task-relevant module memory. Preserve the Settings split view: the primary left app sidebar becomes settings category navigation, and the center workspace shows one selected detail pane. Preserve the Context Sources rule: one summary, compact planning readiness gates, and one editable control surface. If changes are made, update docs/handoff.md and run the full required verification command set.
 ```
