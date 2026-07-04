@@ -1,50 +1,44 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-04
-Branch: `main`
+Branch: `codex/separate-execute-eval-stages`
 
 ## Current Session
 
-- Fixed the root `pnpm desktop:pack` script so it runs the Desktop package script instead of pnpm's built-in pack command.
-- Built an openable macOS app bundle and copied it to the project root at `Aimcub.app`. The bundle is an ignored local artifact and is not committed.
-- Refreshed project memory so `docs/memory/operations.md` and `docs/memory/history.md` match the simplified workspace and root app-bundle handoff.
-- Removed inactive product surfaces from the active workspace: `apps/web`, `apps/ios`, `apps/extension`, and the old `docs/charters/web.md`.
-- Removed unused `packages/ui-tokens`; Desktop token direction now lives in `docs/memory/design-system.md` and current renderer CSS.
-- Replaced broad workspace globs with explicit active packages in `pnpm-workspace.yaml`: Desktop, CLI, MCP, and core packages only.
-- Updated root/docs memory to state that v1 is Desktop-first local Aim OS, with hosted web/iOS/extension deferred until a real product trigger.
-- Cleaned local ignored remnants for the removed surfaces, including old Vercel metadata and local package caches.
+- Split Desktop Execute and Eval into separate stage surfaces instead of sharing one execution panel.
+- Execute now focuses on assignment ownership, latest run state, next work, run-agent action, human proof confirmation, and child breakdown.
+- Eval now focuses on evidence totals, rule mode, matched evidence IDs from the read model, evaluator status, trust/explanation, human-review flags, and pending context candidates from progress.
+- Kept debug traces out of the default stage views.
+- Added Desktop CSS for the new stage cards, metrics, evaluator rows, responsive stacking, and disabled action states.
+- Updated Desktop i18n strings for the new Execute/Eval labels in English and Chinese.
+- Recorded the durable Execute/Eval stage distinction in `docs/memory/design-system.md`.
+- Moved the existing pnpm React overrides from deprecated `package.json#pnpm` config to `pnpm-workspace.yaml` for pnpm 11, and added explicit native build approvals plus noninteractive module-purge config so the required pnpm commands run in Codex.
 
 ## Current State
 
-- Active app surfaces are `apps/desktop`, `apps/cli`, and `apps/mcp`.
-- Active packages are `packages/core`, `packages/types`, `packages/store`, `packages/llm`, `packages/api`, and `packages/db`.
-- `pnpm desktop:pack` produces the local folder-style app bundle under `apps/desktop/dist/mac-arm64/Aimcub.app`; copy it to root `Aimcub.app` when the user wants the app directly inside the project folder.
-- Hosted Supabase remains the online source of truth for MCP evidence and the future platform; the hosted web app should not be reintroduced until sync/collaboration needs it.
+- Active app surfaces remain `apps/desktop`, `apps/cli`, and `apps/mcp`.
+- Active packages remain `packages/core`, `packages/types`, `packages/store`, `packages/llm`, `packages/api`, and `packages/db`.
+- Desktop stage model is Aim -> Context -> Sub-aims -> Execute -> Eval, with Execute answering who/what should do next work and Eval answering what evidence exists, whether rules are satisfied, and what needs review.
+- Hosted Supabase remains the online source of truth for MCP evidence and the future platform.
 
 ## Verification
 
 Passed for this session:
 
 ```bash
-PATH=/Users/jenson/.local/node/bin:$PATH pnpm build
-PATH=/Users/jenson/.local/node/bin:$PATH pnpm test
-PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck
-PATH=/Users/jenson/.local/node/bin:$PATH pnpm lint
-PATH=/Users/jenson/.local/node/bin:$PATH pnpm core:purity
+pnpm build && pnpm test && pnpm typecheck && pnpm lint && pnpm core:purity
 git diff --check
 ```
 
-Packaging command also passed:
+Visual verification also passed with a temporary IPC-mocked renderer harness served on `127.0.0.1`: desktop and 700 px narrow Execute/Eval views had no horizontal overflow; Execute showed owner/action controls; Eval showed evaluator/evidence review without execution action buttons.
 
-```bash
-PATH=/Users/jenson/.local/node/bin:$PATH pnpm desktop:pack
-```
+## Commit / Push
 
-Commit/push status: this handoff is part of the memory refresh commit; use `git log -1` for the final hash after the session commits and pushes.
+This handoff is part of the Execute/Eval split commit. Use `git log -1` and `git status --short --branch` for the final local and remote state.
 
 ## Next Session Prompt
 
 ```text
-Continue from the simplified Aimcub workspace. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md. Then load only the module memory relevant to the task.
-Treat Desktop, CLI, MCP, and the core packages as the active code hierarchy. Do not reintroduce hosted web, iOS, browser-extension, or cross-platform token packages without a concrete product trigger and matching memory update.
+Continue from the Desktop Execute/Eval split. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md. Then load only the module memory relevant to the task.
+Treat Desktop, CLI, MCP, and the core packages as the active code hierarchy. Keep Execute focused on next work ownership/actions and Eval focused on evidence/rule review.
 ```

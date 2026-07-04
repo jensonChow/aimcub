@@ -55,6 +55,7 @@ Reference links:
 - Center workspace: workflow step navigation, then the active stage surface. The workspace should sit in a constrained max width so text lines and controls do not stretch across large windows.
 - Optional inspector: process, context, quality, activity, and debug details may exist as an opt-in overlay, drawer, popover, or developer-mode surface. It must be independently scrollable and cannot displace the primary task by default.
 - Stage model: Aim -> Context -> Plan/Contracts -> Execute -> Eval. Stage navigation may be visible, but each stage must still present a single dominant action.
+- Execute and Eval are distinct stages. Execute answers "Who/what should do the next work?" with assignments, agent run, human proof, and child-breakdown actions. Eval answers "What evidence exists, did it satisfy the rule, and what needs review?" with evidence counts/details, evaluator status, trust/explanation, and pending context candidates when present.
 - Existing aims open to Aim overview first. Do not jump users into Run details or show an empty composer on the Context stage.
 - Settings are a utility surface. Keep provider setup, local CLI agent detection, web research settings, and context sources clear and thin unless they become the user's current task.
 

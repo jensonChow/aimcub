@@ -27,6 +27,8 @@ import { C, inputStyle, primaryButton, secondaryButton } from "./styles";
 type AppMode = "cockpit" | "contexting" | "drafting" | "answering" | "reviewing" | "settings";
 type ClarifyPhase = "intake" | "postDraft" | null;
 type AnswerMap = Record<string, { labels: string[]; other: string }>;
+type ProgressMilestoneRow = AimProgressReadModel["milestones"][number];
+type EvalState = "passed" | "failed" | "needs_human" | "unsupported" | "error" | "pending";
 
 function shortText(value: string | undefined | null, max = 120): string {
   const cleaned = (value ?? "").replace(/\s+/g, " ").trim();
@@ -197,6 +199,46 @@ function cockpitStageFor(mode: AppMode, selected: Goal | null, activePlan: Decom
   if (mode === "reviewing" || (!selected && activePlan)) return "contracts";
   if (selected) return "run";
   return "aim";
+}
+
+function progressRows(detail: GoalDetail, progress: AimProgressReadModel | null): ProgressMilestoneRow[] {
+  return progress?.milestones ?? detail.milestones.map((milestone): ProgressMilestoneRow => ({
+    milestone,
+    assignment: null,
+    latest_run: null,
+    child_relations: [],
+    evaluator_results: [],
+    evidence_count: 0,
+    completed: milestone.status === "completed",
+    blocked: milestone.status === "blocked",
+    next_action: "",
+  }));
+}
+
+function evalStateOf(row: ProgressMilestoneRow): EvalState {
+  const statuses = row.evaluator_results.map((result) => result.status);
+  if (statuses.includes("error")) return "error";
+  if (statuses.includes("needs_human")) return "needs_human";
+  if (statuses.includes("unsupported")) return "unsupported";
+  if (statuses.includes("failed")) return "failed";
+  if (statuses.length > 0 && statuses.every((status) => status === "passed")) return "passed";
+  if (row.completed) return "passed";
+  return "pending";
+}
+
+function evalToneClass(state: EvalState): string {
+  if (state === "passed") return "success";
+  if (state === "failed" || state === "error") return "danger";
+  if (state === "needs_human" || state === "unsupported") return "warn";
+  return "";
+}
+
+function shortId(value: string): string {
+  return value.length <= 8 ? value : value.slice(0, 8);
+}
+
+function formatTrust(value: number): string {
+  return `${Math.round(value * 100)}%`;
 }
 
 export function App() {
@@ -630,14 +672,21 @@ function AimOsApp() {
     />
   ) : null;
 
-  const executionPanel = selected && detail ? (
-    <ExecutionPanel
+  const executePanel = selected && detail ? (
+    <ExecutePanel
       detail={detail}
       progress={progress}
       disabled={Boolean(busy)}
       onRunAgent={(milestone) => void runAgent(milestone)}
       onConfirm={(milestone) => void confirmMilestone(milestone)}
       onBreakDown={breakDown}
+    />
+  ) : null;
+
+  const evalPanel = selected && detail ? (
+    <EvalPanel
+      detail={detail}
+      progress={progress}
     />
   ) : null;
 
@@ -676,10 +725,21 @@ function AimOsApp() {
         />
       );
     }
-    if (activeStage === "run" || activeStage === "eval") {
-      return executionPanel ?? planPanel ?? (
+    if (activeStage === "run") {
+      return executePanel ?? planPanel ?? (
         <LockedStagePanel
-          eyebrow={activeStage === "eval" ? t("os.stepEval") : t("os.stepExecute")}
+          eyebrow={t("os.stepExecute")}
+          title={t("cockpit.runLockedTitle")}
+          body={t("cockpit.runLockedBody")}
+          action={t("os.stepAim")}
+          onAction={() => openCockpitStage("aim")}
+        />
+      );
+    }
+    if (activeStage === "eval") {
+      return evalPanel ?? planPanel ?? (
+        <LockedStagePanel
+          eyebrow={t("os.stepEval")}
           title={t("cockpit.runLockedTitle")}
           body={t("cockpit.runLockedBody")}
           action={t("os.stepAim")}
@@ -1054,7 +1114,7 @@ function PlanPanel(props: {
   );
 }
 
-function ExecutionPanel(props: {
+function ExecutePanel(props: {
   detail: GoalDetail;
   progress: AimProgressReadModel | null;
   disabled: boolean;
@@ -1063,79 +1123,251 @@ function ExecutionPanel(props: {
   onBreakDown: (milestone: Milestone) => void;
 }) {
   const { t } = useI18n();
-  const rows = props.progress?.milestones ?? props.detail.milestones.map((milestone) => ({
-    milestone,
-    assignment: null,
-    latest_run: null,
-    child_relations: [],
-    evaluator_results: [],
-    evidence_count: 0,
-    completed: milestone.status === "completed",
-    blocked: milestone.status === "blocked",
-    next_action: "",
-  }));
+  const rows = progressRows(props.detail, props.progress);
+  const openRows = rows.filter((row) => !row.completed);
+  const agentAssignments = rows.filter((row) => row.assignment?.actor_kind === "agent").length;
+  const humanAssignments = rows.filter((row) => row.assignment?.actor_kind === "human").length;
+
+  function actorLabel(row: ProgressMilestoneRow): string {
+    if (!row.assignment) return t("os.unassigned");
+    const kind = row.assignment.actor_kind === "human" ? t("os.actorHuman") : t("os.actorAgent");
+    const actor = row.assignment.actor_id
+      ? props.progress?.actors.find((item) => item.id === row.assignment?.actor_id)
+      : null;
+    return actor?.display_name ? `${kind} · ${actor.display_name}` : kind;
+  }
+
+  function assignmentMeta(row: ProgressMilestoneRow): string {
+    if (!row.assignment) return t("os.noAssignment");
+    return [row.assignment.status, row.assignment.source].filter(Boolean).join(" · ");
+  }
+
+  function latestRunSummary(row: ProgressMilestoneRow): string {
+    if (!row.latest_run) return t("os.notStarted");
+    return shortText(row.latest_run.summary || row.latest_run.error || t("os.noRun"), 160);
+  }
+
   return (
-    <section style={panelStyle()}>
-      <div style={sectionHeaderStyle()}>
+    <section className="od-stage-panel">
+      <div className="od-stage-panel-head">
         <div>
-          <div style={eyebrowStyle()}>{t("os.stepExecute")}</div>
-          <h2 style={sectionTitleStyle()}>{t("os.executeHeading")}</h2>
+          <div className="od-stage-kicker">{t("os.stepExecute")}</div>
+          <h2>{t("os.executeHeading")}</h2>
+          <p>{t("os.executeBody")}</p>
         </div>
-        <div style={{ color: C.muted, fontSize: 13 }}>{props.progress?.next_action}</div>
       </div>
-      <div style={{ display: "grid", gap: 10 }}>
+
+      <div className="od-stage-metrics" aria-label={t("os.executeHeading")}>
+        <StageMetric label={t("os.activeWork")} value={String(openRows.length)} />
+        <StageMetric label={t("os.agentAssignments")} value={String(agentAssignments)} />
+        <StageMetric label={t("os.humanAssignments")} value={String(humanAssignments)} />
+      </div>
+
+      <div className="od-work-list">
         {rows.map((row) => (
-          <div key={row.milestone.id} style={executionCardStyle(row.completed)}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <article key={row.milestone.id} className={`od-work-card${row.completed ? " is-complete" : ""}`}>
+            <div className="od-work-card-main">
+              <div className="od-work-card-head">
+                <div className="od-work-title">
                   <strong>{row.milestone.title}</strong>
-                  <span style={badgeStyle(row.completed ? "#eef8ef" : "#f2f3f4", row.completed ? "#2f7d45" : C.muted)}>
+                  <span className={`od-pill ${row.completed ? "success" : row.blocked ? "danger" : ""}`}>
                     {row.completed ? t("os.done") : row.milestone.status}
                   </span>
-                  <span style={badgeStyle("#f4f0e6", "#7b5b12")}>{row.assignment?.actor_kind ?? "unassigned"}</span>
+                  <span className="od-pill blue">{actorLabel(row)}</span>
                 </div>
-                <div style={mutedTextStyle()}>{shortText(row.milestone.description, 180)}</div>
-                <div style={contractLineStyle()}>
-                  <span>{t("os.evidenceCount", { n: row.evidence_count })}</span>
-                  <span>{row.latest_run?.status ?? t("os.noRun")}</span>
-                  <span>{row.evaluator_results.map((result) => `${result.evaluator}:${result.status}`).join(" · ") || t("os.noEval")}</span>
-                </div>
-                {row.child_relations.length ? (
-                  <div style={{ color: C.accent, fontSize: 12, marginTop: 6 }}>
-                    {t("os.childAims", { n: row.child_relations.length })} · {row.child_relations.map((item) => item.status).join(", ")}
-                  </div>
-                ) : null}
-                <div style={{ color: C.muted, fontSize: 12, marginTop: 6 }}>{row.next_action}</div>
               </div>
-              <div style={{ display: "flex", gap: 8, alignItems: "flex-start", flexWrap: "wrap", justifyContent: "flex-end" }}>
-                <button
-                  disabled={props.disabled || row.completed}
-                  onClick={() => props.onRunAgent(row.milestone)}
-                  style={{ ...secondaryButton(), marginTop: 0 }}
-                >
-                  {t("os.runAgent")}
-                </button>
-                <button
-                  disabled={props.disabled || row.completed}
-                  onClick={() => props.onConfirm(row.milestone)}
-                  style={{ ...secondaryButton(), marginTop: 0 }}
-                >
-                  {t("os.confirm")}
-                </button>
-                <button
-                  disabled={props.disabled || row.completed}
-                  onClick={() => props.onBreakDown(row.milestone)}
-                  style={{ ...secondaryButton(), marginTop: 0 }}
-                >
-                  {t("os.breakDown")}
-                </button>
+
+              {row.milestone.description ? <p>{shortText(row.milestone.description, 220)}</p> : null}
+
+              <div className="od-work-detail-grid">
+                <div>
+                  <span>{t("os.assignment")}</span>
+                  <strong>{actorLabel(row)}</strong>
+                  <small>{assignmentMeta(row)}</small>
+                </div>
+                <div>
+                  <span>{t("os.latestRun")}</span>
+                  <strong>{row.latest_run?.status ?? t("os.noRun")}</strong>
+                  <small>{latestRunSummary(row)}</small>
+                </div>
+              </div>
+
+              {row.assignment?.reason ? <div className="od-work-note">{shortText(row.assignment.reason, 220)}</div> : null}
+
+              {row.child_relations.length ? (
+                <div className="od-work-note">
+                  <strong>{t("os.childBreakdown", { n: row.child_relations.length })}</strong>
+                  <span>{row.child_relations.map((item) => item.status).join(", ")}</span>
+                </div>
+              ) : null}
+
+              <div className="od-next-work">
+                <span>{t("os.nextWork")}</span>
+                <strong>{row.next_action || t("shell.noNextAction")}</strong>
               </div>
             </div>
-          </div>
+
+            <div className="od-work-actions">
+              <button
+                className="od-aim-secondary"
+                type="button"
+                disabled={props.disabled || row.completed}
+                onClick={() => props.onRunAgent(row.milestone)}
+              >
+                {t("os.runAgent")}
+              </button>
+              <button
+                className="od-aim-secondary"
+                type="button"
+                disabled={props.disabled || row.completed}
+                onClick={() => props.onConfirm(row.milestone)}
+              >
+                {t("os.confirmProof")}
+              </button>
+              <button
+                className="od-aim-secondary"
+                type="button"
+                disabled={props.disabled || row.completed}
+                onClick={() => props.onBreakDown(row.milestone)}
+              >
+                {t("os.breakDown")}
+              </button>
+            </div>
+          </article>
         ))}
       </div>
     </section>
+  );
+}
+
+function EvalPanel(props: {
+  detail: GoalDetail;
+  progress: AimProgressReadModel | null;
+}) {
+  const { t } = useI18n();
+  const rows = progressRows(props.detail, props.progress);
+  const evidenceTotal = rows.reduce((sum, row) => sum + row.evidence_count, 0);
+  const evaluatorResults = rows.flatMap((row) => row.evaluator_results);
+  const satisfiedRows = rows.filter((row) => evalStateOf(row) === "passed").length;
+  const pendingCandidates = props.progress?.context_candidates.filter((candidate) => candidate.status === "pending") ?? [];
+  const reviewItems = evaluatorResults.filter((result) => result.status !== "passed").length + pendingCandidates.length;
+
+  function evalLabel(state: EvalState): string {
+    switch (state) {
+      case "passed":
+        return t("os.evalStatus.passed");
+      case "failed":
+        return t("os.evalStatus.failed");
+      case "needs_human":
+        return t("os.evalStatus.needsHuman");
+      case "unsupported":
+        return t("os.evalStatus.unsupported");
+      case "error":
+        return t("os.evalStatus.error");
+      case "pending":
+        return t("os.evalStatus.pending");
+    }
+  }
+
+  return (
+    <section className="od-stage-panel od-eval-panel">
+      <div className="od-stage-panel-head">
+        <div>
+          <div className="od-stage-kicker">{t("os.stepEval")}</div>
+          <h2>{t("os.evalHeading")}</h2>
+          <p>{t("os.evalBody")}</p>
+        </div>
+      </div>
+
+      <div className="od-stage-metrics" aria-label={t("os.evalHeading")}>
+        <StageMetric label={t("os.evalEvidenceTotal")} value={String(evidenceTotal)} />
+        <StageMetric label={t("os.evalSatisfied")} value={`${satisfiedRows}/${rows.length}`} />
+        <StageMetric label={t("os.evalNeedsReview")} value={String(reviewItems)} />
+      </div>
+
+      <div className="od-work-list">
+        {rows.map((row) => {
+          const state = evalStateOf(row);
+          const matchedIds = [...new Set(row.evaluator_results.flatMap((result) => result.matched_evidence_ids))];
+          return (
+            <article key={row.milestone.id} className={`od-work-card od-eval-card${row.completed ? " is-complete" : ""}`}>
+              <div className="od-work-card-main">
+                <div className="od-work-card-head">
+                  <div className="od-work-title">
+                    <strong>{row.milestone.title}</strong>
+                    <span className={`od-pill ${evalToneClass(state)}`}>{evalLabel(state)}</span>
+                    <span className="od-pill">{t("os.evidenceCount", { n: row.evidence_count })}</span>
+                  </div>
+                </div>
+
+                <div className="od-work-detail-grid">
+                  <div>
+                    <span>{t("os.evalRule")}</span>
+                    <strong>{row.milestone.acceptance_rule.logic}</strong>
+                    <small>{row.milestone.acceptance_rule.completion_mode}</small>
+                  </div>
+                  <div>
+                    <span>{t("os.evalMatchedEvidence")}</span>
+                    <strong>{String(matchedIds.length)}</strong>
+                    <small>{matchedIds.length ? matchedIds.slice(0, 4).map(shortId).join(", ") : t("os.evalNoMatchedEvidence")}</small>
+                  </div>
+                </div>
+
+                <div className="od-evaluator-list">
+                  {row.evaluator_results.length === 0 ? (
+                    <div className="od-empty-inline">{t("os.evalNoResults")}</div>
+                  ) : row.evaluator_results.map((result, index) => (
+                    <div key={`${result.evaluator}-${index}`} className="od-evaluator-row">
+                      <div className="od-evaluator-head">
+                        <strong>{result.evaluator}</strong>
+                        <span className={`od-pill ${evalToneClass(result.status)}`}>{evalLabel(result.status)}</span>
+                      </div>
+                      <p>{result.explanation || result.failure_reason || t("os.noEval")}</p>
+                      <small>
+                        {t("os.evalTrust", { n: formatTrust(result.trust_score) })}
+                        {" · "}
+                        {t("os.evalMatchedCount", { n: result.matched_evidence_ids.length })}
+                        {result.requires_human_confirmation ? ` · ${t("os.evalHumanConfirmation")}` : ""}
+                      </small>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+
+      <div className="od-eval-context">
+        <div className="od-card-head">
+          <h3>{t("os.evalPendingCandidates")}</h3>
+          <span className="od-pill">{String(pendingCandidates.length)}</span>
+        </div>
+        {pendingCandidates.length === 0 ? (
+          <div className="od-empty-inline">{t("os.evalNoPendingCandidates")}</div>
+        ) : (
+          <div className="od-eval-context-list">
+            {pendingCandidates.slice(0, 6).map((candidate) => (
+              <div key={candidate.id} className="od-eval-candidate">
+                <strong>{shortText(candidate.content, 160)}</strong>
+                <span>
+                  {[candidate.category, candidate.source, formatTrust(candidate.confidence)].filter(Boolean).join(" · ")}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function StageMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="od-stage-metric">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
   );
 }
 
@@ -1276,15 +1508,6 @@ function nodeCardStyle(): CSSProperties {
     gridTemplateColumns: "32px minmax(0, 1fr)",
     gap: 12,
     background: "#fff",
-  };
-}
-
-function executionCardStyle(done: boolean): CSSProperties {
-  return {
-    border: `1px solid ${done ? "#b7dfc0" : C.border}`,
-    borderRadius: 8,
-    padding: 14,
-    background: done ? "#fbfffb" : "#fff",
   };
 }
 
