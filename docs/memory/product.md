@@ -31,6 +31,8 @@ The product loop is: user enters an aim -> Aim OS collects context -> Aim OS cre
 
 Context collection is a core local harness capability. It should gather enough context to improve decomposition, acceptance rules, routing, and future reuse without becoming a profile editor.
 
+Planning should make context provenance reviewable by default: show what context was used, what was skipped or unread, what permissions/setup blocked access, and what unresolved questions could still change decomposition.
+
 Durable/global context must be separated from aim-local context. Long-lived preferences, constraints, eval signals, and capability facts become memory candidates. Short-lived facts stay scoped to the current aim.
 
 Consumer and life aims need real-world context, not only developer/product assumptions. Planning should ask about domain constraints, distribution, access, budget, timeline, skill, taste, legal/IP, audience, and whether the user wants to learn or delegate.

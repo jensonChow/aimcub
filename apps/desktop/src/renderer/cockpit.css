@@ -994,6 +994,104 @@ select:focus-visible {
   gap: 14px;
 }
 
+.od-context-review {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--od-border-soft);
+}
+
+.od-context-review-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.od-card-head,
+.od-context-review-item-head {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.od-card-head h3 {
+  min-width: 0;
+  margin: 0;
+  color: var(--od-fg);
+  font-size: 14px;
+  line-height: 1.35;
+  font-weight: 750;
+}
+
+.od-context-review-bucket {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-sm);
+  background: var(--od-surface-warm);
+  padding: 12px;
+}
+
+.od-context-review-list {
+  display: grid;
+  gap: 0;
+}
+
+.od-context-review-item {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  padding: 10px 0 10px 10px;
+  border-top: 1px solid var(--od-border-soft);
+  border-left: 3px solid transparent;
+}
+
+.od-context-review-item:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.od-context-review-item.success {
+  border-left-color: var(--od-success);
+}
+
+.od-context-review-item.warn {
+  border-left-color: var(--od-warn);
+}
+
+.od-context-review-item.danger {
+  border-left-color: var(--od-danger);
+}
+
+.od-context-review-item-head strong {
+  min-width: 0;
+  color: var(--od-fg);
+  font-size: 13px;
+  line-height: 1.35;
+  font-weight: 750;
+}
+
+.od-context-review-item p,
+.od-context-review-item small,
+.od-context-review-more {
+  margin: 0;
+  color: var(--od-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.od-context-review-more {
+  padding-top: 8px;
+  border-top: 1px solid var(--od-border-soft);
+  font-weight: 650;
+}
+
 .od-stage-panel-head {
   display: flex;
   justify-content: space-between;
@@ -1643,6 +1741,7 @@ select:focus-visible {
   .od-context-next-action,
   .od-context-online-row,
   .od-context-setting-row,
+  .od-context-review-grid,
   .od-stage-metrics,
   .od-work-card,
   .od-work-detail-grid {
