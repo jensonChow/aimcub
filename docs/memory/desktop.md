@@ -32,6 +32,8 @@ Desktop context collection is a first-class setup layer. `context-sources.json` 
 
 Planning consumes context before decomposition through `context.linked_sources`, `local.read`, optional `web.search`/`web.fetch`, `context.distill`, and structured user questions. Connector references are locations or access gaps until a runtime can actually read them.
 
+Context Sources shows one setup summary, compact planning readiness gates, and one editable control surface. The gates cover context bundle, research fusion, gap intake, scope guard, and sub-aim readiness; they should explain planning readiness without duplicating the local/online/web/deep/session/questionnaire controls as separate cards or tables.
+
 The Context and Sub-aims stages show a default context bundle review before/inside planning. It classifies used context, skipped/unread context, permission/setup gaps, and unresolved decomposition risks from planning context reports, tool traces, intake questions, review gaps, and plan contract gaps.
 
 User-facing intake questions should come from `generateAimIntakeQuestions` grounded in available context. Do not surface template prompts like "Ask for..." directly to users.
