@@ -7,11 +7,12 @@ Branch: `codex/product-loop-integration`
 
 - Integration in progress for the eight completed Desktop product-loop feature branches.
 - Merged `codex/aim-first-onboarding`.
-- Merging `codex/context-bundle-review`; conflicts resolved by keeping aim-first helper guidance and adding the default context bundle review surface.
+- Merged `codex/context-bundle-review`, resolving conflicts by keeping aim-first helper guidance and adding the default context bundle review surface.
+- Merged `codex/plan-editing-tools`; code merged cleanly and this handoff was normalized for the integration branch.
 
 ## Current State
 
-- Desktop should keep the aim-first first-run journey and the default context review before/inside planning.
+- Desktop should keep aim-first onboarding, default context bundle review, and editable plan transforms before save.
 - Existing uncommitted staged changes from `main` were preserved in `stash@{0}` as `pre-integration-main-staged-cleanup` before this integration branch was created.
 
 ## Verification

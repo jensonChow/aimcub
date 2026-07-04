@@ -1,8 +1,24 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
+import {
+  AcceptanceRule,
+  mergePlanNodes,
+  movePlanNode,
+  splitPlanNode,
+  updatePlanNode,
+  validateExecutablePlan,
+} from "@core/domain";
 import type { AimIntakeReport, AimProgressReadModel } from "@core/domain";
 import type { ClarifyAnswer, ClarifyOutput, ClarifyQuestion, ClarifySelectionMode } from "@core/llm";
-import type { ContextCategory, DecompositionOutput, Goal, Milestone } from "@core/types";
+import type {
+  AcceptanceRule as AcceptanceRuleType,
+  ContextCategory,
+  DecompositionContract,
+  DecompositionOutput,
+  Goal,
+  Milestone,
+  PlanNode,
+} from "@core/types";
 import type {
   ClarifyIpcResult,
   ContextSourceStatus,
@@ -59,6 +75,30 @@ function pct(done: number, total: number): number {
 function planNodeForMilestone(plan: DecompositionOutput | null | undefined, milestone: Milestone) {
   const key = typeof milestone.metadata?.plan_key === "string" ? milestone.metadata.plan_key : null;
   return plan?.nodes.find((node) => node.key === key) ?? plan?.nodes.find((node) => node.title === milestone.title) ?? null;
+}
+
+function formatAcceptanceRule(rule: AcceptanceRuleType): string {
+  return JSON.stringify(rule, null, 2);
+}
+
+function defaultContractForNode(node: PlanNode): DecompositionContract {
+  return {
+    why: "This sub-aim supports the aim.",
+    definition_of_done: node.description.trim() || node.title,
+    required_evidence: ["Evidence that the sub-aim is complete."],
+    likely_owner: "either",
+    context_gaps: [],
+    eval_signal: "Evidence confirms the sub-aim is complete.",
+  };
+}
+
+function editableContractForNode(node: PlanNode): DecompositionContract {
+  return node.decomposition_contract ?? defaultContractForNode(node);
+}
+
+function evidenceLines(value: string): string[] {
+  const lines = value.split(/\r?\n/g).map((line) => line.trim()).filter(Boolean);
+  return lines.length > 0 ? lines : ["Evidence that the sub-aim is complete."];
 }
 
 function createPlanningRunId(): string {
@@ -544,6 +584,13 @@ function AimOsApp() {
   async function savePlan() {
     const plan = finalPlan ?? draft;
     if (!plan) return;
+    const validation = validateExecutablePlan(plan);
+    if (!validation.ok) {
+      setError(t("plan.validationFailed", { errors: validation.errors.join("; ") }));
+      setMode("reviewing");
+      setStageOverride("contracts");
+      return;
+    }
     setBusy(t("os.busy.save"));
     setError(null);
     try {
@@ -638,6 +685,7 @@ function AimOsApp() {
   }
 
   const activePlan = (finalPlan ?? draft ?? detail?.goal.plan_json ?? null) as DecompositionOutput | null;
+  const activePlanValidation = activePlan ? validateExecutablePlan(activePlan) : null;
   const completed = progress?.completed_milestones ?? detail?.milestones.filter((m) => m.status === "completed").length ?? 0;
   const total = progress?.total_milestones ?? detail?.milestones.length ?? 0;
   const hasUnsavedAim = aimTitle.trim().length > 0;
@@ -664,6 +712,11 @@ function AimOsApp() {
     plan: activePlan,
     answeredQuestionIds: [...builtIntakeAnswers, ...builtAnswers].map((answer) => answer.question_id),
   }), [activePlan, builtAnswers, builtIntakeAnswers, currentIntake, currentPlanningContext, currentPlanningTools, currentReview]);
+
+  function applyPlanEdit(nextPlan: DecompositionOutput) {
+    setFinalPlan(nextPlan);
+    setPlanResult((current) => (current ? { ...current, output: nextPlan } : current));
+  }
 
   function openCockpitStage(stage: CockpitStage) {
     setStageOverride(stage);
@@ -744,7 +797,9 @@ function AimOsApp() {
       quality={planResult?.quality ?? null}
       review={planResult?.review ?? null}
       saved={Boolean(selected)}
-      disabled={Boolean(busy)}
+      disabled={Boolean(busy) || activePlanValidation?.ok === false}
+      validationErrors={activePlanValidation?.errors ?? []}
+      onChange={selected ? undefined : applyPlanEdit}
       onSave={() => void savePlan()}
     />
   ) : null;
@@ -1406,42 +1461,232 @@ function PlanPanel(props: {
   review: PlanResult["review"] | null;
   saved: boolean;
   disabled: boolean;
+  validationErrors: string[];
+  onChange?: (plan: DecompositionOutput) => void;
   onSave: () => void;
 }) {
   const { t } = useI18n();
+  const editable = !props.saved && Boolean(props.onChange);
+  const [ruleDrafts, setRuleDrafts] = useState<Record<string, string>>({});
+  const [ruleErrors, setRuleErrors] = useState<Record<string, string>>({});
+  const hasRuleErrors = Object.keys(ruleErrors).length > 0;
+
+  useEffect(() => {
+    const keys = new Set(props.plan.nodes.map((node) => node.key));
+    setRuleDrafts((current) => {
+      const next: Record<string, string> = {};
+      for (const node of props.plan.nodes) {
+        next[node.key] = current[node.key] ?? formatAcceptanceRule(node.acceptance_rule);
+      }
+      return next;
+    });
+    setRuleErrors((current) => {
+      const next: Record<string, string> = {};
+      for (const [key, value] of Object.entries(current)) {
+        if (keys.has(key)) next[key] = value;
+      }
+      return next;
+    });
+  }, [props.plan.nodes]);
+
+  function apply(nextPlan: DecompositionOutput) {
+    props.onChange?.(nextPlan);
+  }
+
+  function applyStructureEdit(nextPlan: DecompositionOutput) {
+    setRuleDrafts({});
+    setRuleErrors({});
+    apply(nextPlan);
+  }
+
+  function updateNode(node: PlanNode, patch: Parameters<typeof updatePlanNode>[2]) {
+    apply(updatePlanNode(props.plan, node.key, patch));
+  }
+
+  function updateContract(node: PlanNode, patch: Partial<DecompositionContract>) {
+    updateNode(node, {
+      decomposition_contract: {
+        ...editableContractForNode(node),
+        ...patch,
+      },
+    });
+  }
+
+  function ruleTextFor(node: PlanNode): string {
+    return ruleDrafts[node.key] ?? formatAcceptanceRule(node.acceptance_rule);
+  }
+
+  function parseRuleText(text: string): AcceptanceRuleType | string {
+    let value: unknown;
+    try {
+      value = JSON.parse(text);
+    } catch (err) {
+      return err instanceof Error ? err.message : String(err);
+    }
+    const parsed = AcceptanceRule.safeParse(value);
+    if (!parsed.success) {
+      return parsed.error.issues.map((issue) => `${issue.path.join(".") || "rule"}: ${issue.message}`).join("; ");
+    }
+    return parsed.data;
+  }
+
+  function applyRuleText(node: PlanNode, text: string) {
+    const parsed = parseRuleText(text);
+    if (typeof parsed === "string") {
+      setRuleErrors((current) => ({ ...current, [node.key]: t("plan.ruleInvalid", { error: parsed }) }));
+      return;
+    }
+    setRuleErrors((current) => {
+      const next = { ...current };
+      delete next[node.key];
+      return next;
+    });
+    updateNode(node, { acceptance_rule: parsed });
+  }
+
+  function commitRule(node: PlanNode) {
+    applyRuleText(node, ruleTextFor(node));
+  }
+
   return (
-    <section style={panelStyle()}>
-      <div style={sectionHeaderStyle()}>
+    <section className="od-stage-panel od-plan-editor">
+      <div className="od-stage-panel-head">
         <div>
-          <div style={eyebrowStyle()}>{t("os.stepPlan")}</div>
-          <h2 style={sectionTitleStyle()}>{t("os.planHeading")}</h2>
+          <div className="od-stage-kicker">{t("os.stepPlan")}</div>
+          <h2>{t("os.planHeading")}</h2>
+          <p>{editable ? t("plan.editBody") : t("plan.reviewBody")}</p>
         </div>
         {!props.saved ? (
-          <button onClick={props.onSave} disabled={props.disabled} style={{ ...primaryButton(props.disabled), marginTop: 0 }}>
+          <button className="od-aim-primary" type="button" onClick={props.onSave} disabled={props.disabled || hasRuleErrors}>
             {t("os.saveAim")}
           </button>
         ) : null}
       </div>
-      <div style={scoreRowStyle()}>
-        <Metric label={t("os.metricSubAims")} value={String(props.plan.nodes.length)} />
-        <Metric label={t("os.metricQuality")} value={props.quality ? `${props.quality.grade} · ${props.quality.score}` : "-"} />
-        <Metric label={t("os.metricActions")} value={String(props.review?.actions.length ?? 0)} />
+      <div className="od-stage-metrics">
+        <StageMetric label={t("os.metricSubAims")} value={String(props.plan.nodes.length)} />
+        <StageMetric label={t("os.metricQuality")} value={props.quality ? `${props.quality.grade} · ${props.quality.score}` : "-"} />
+        <StageMetric label={t("os.metricActions")} value={String(props.review?.actions.length ?? 0)} />
       </div>
-      <div style={{ display: "grid", gap: 10, marginTop: 14 }}>
-        {props.plan.nodes.map((node, index) => (
-          <div key={node.key} style={nodeCardStyle()}>
-            <div style={{ ...badgeStyle("#eef6f8", C.accent) }}>{index + 1}</div>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontWeight: 800 }}>{node.title}</div>
-              <div style={mutedTextStyle()}>{shortText(node.description, 180)}</div>
-              <div style={contractLineStyle()}>
-                <span>{node.decomposition_contract?.likely_owner ?? "either"}</span>
-                <span>{node.acceptance_rule.completion_mode}</span>
-                <span>{node.acceptance_rule.clauses.map((clause) => clause.evaluator).join(" + ")}</span>
+
+      {props.validationErrors.length > 0 ? (
+        <div className="od-plan-validation" role="status">
+          <strong>{t("plan.validationIssues")}</strong>
+          <span>{props.validationErrors.join("; ")}</span>
+        </div>
+      ) : null}
+
+      <div className="od-plan-list">
+        {props.plan.nodes.map((node, index) => {
+          const contract = editableContractForNode(node);
+          return (
+            <article key={node.key} className="od-plan-card">
+              <div className="od-plan-card-index">{index + 1}</div>
+              <div className="od-plan-card-main">
+                <div className="od-plan-card-head">
+                  <div className="od-work-title">
+                    <strong>{node.title}</strong>
+                    <span className="od-pill blue">{node.acceptance_rule.completion_mode}</span>
+                    <span className="od-pill">{node.decomposition_contract?.likely_owner ?? "either"}</span>
+                  </div>
+                  {editable ? (
+                    <div className="od-plan-actions">
+                      <button type="button" onClick={() => applyStructureEdit(movePlanNode(props.plan, node.key, index - 1))} disabled={index === 0}>
+                        {t("plan.moveUp")}
+                      </button>
+                      <button type="button" onClick={() => applyStructureEdit(movePlanNode(props.plan, node.key, index + 1))} disabled={index >= props.plan.nodes.length - 1}>
+                        {t("plan.moveDown")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => applyStructureEdit(mergePlanNodes(props.plan, props.plan.nodes[index - 1]!.key, node.key))}
+                        disabled={index === 0}
+                      >
+                        {t("plan.mergeUp")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => applyStructureEdit(mergePlanNodes(props.plan, node.key, props.plan.nodes[index + 1]!.key))}
+                        disabled={index >= props.plan.nodes.length - 1}
+                      >
+                        {t("plan.mergeDown")}
+                      </button>
+                      <button type="button" onClick={() => applyStructureEdit(splitPlanNode(props.plan, node.key))} disabled={props.plan.nodes.length >= 15}>
+                        {t("plan.split")}
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+
+                {editable ? (
+                  <div className="od-plan-edit-grid">
+                    <label className="od-plan-field">
+                      <span>{t("subAim.title")}</span>
+                      <input value={node.title} onChange={(event) => updateNode(node, { title: event.target.value })} />
+                    </label>
+                    <label className="od-plan-field">
+                      <span>{t("subAim.body")}</span>
+                      <textarea
+                        value={node.description}
+                        onChange={(event) => updateNode(node, { description: event.target.value })}
+                        rows={3}
+                      />
+                    </label>
+                    <label className="od-plan-field">
+                      <span>{t("plan.contractDone")}</span>
+                      <textarea
+                        value={contract.definition_of_done}
+                        onChange={(event) => updateContract(node, { definition_of_done: event.target.value })}
+                        rows={2}
+                      />
+                    </label>
+                    <label className="od-plan-field">
+                      <span>{t("plan.contractEvidence")}</span>
+                      <textarea
+                        value={contract.required_evidence.join("\n")}
+                        onChange={(event) => updateContract(node, { required_evidence: evidenceLines(event.target.value) })}
+                        rows={2}
+                      />
+                    </label>
+                    <label className="od-plan-field od-plan-field-wide">
+                      <span>{t("plan.contractEval")}</span>
+                      <input value={contract.eval_signal} onChange={(event) => updateContract(node, { eval_signal: event.target.value })} />
+                    </label>
+                    <div className="od-plan-field od-plan-field-wide">
+                      <div className="od-plan-field-head">
+                        <span>{t("plan.acceptanceRule")}</span>
+                        <button type="button" onClick={() => commitRule(node)}>
+                          {t("plan.applyRule")}
+                        </button>
+                      </div>
+                      <textarea
+                        aria-label={t("plan.acceptanceRule")}
+                        className="od-plan-rule-input"
+                        value={ruleTextFor(node)}
+                        onBlur={() => commitRule(node)}
+                        onChange={(event) => {
+                          const text = event.target.value;
+                          setRuleDrafts((current) => ({ ...current, [node.key]: text }));
+                          applyRuleText(node, text);
+                        }}
+                        rows={8}
+                        spellCheck={false}
+                      />
+                      {ruleErrors[node.key] ? <small className="od-plan-error">{ruleErrors[node.key]}</small> : null}
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {node.description ? <p>{shortText(node.description, 220)}</p> : null}
+                    <div className="od-work-note">
+                      <strong>{t("plan.contractEval")}</strong>
+                      <span>{node.decomposition_contract?.eval_signal ?? node.acceptance_rule.clauses.map((clause) => clause.evaluator).join(" + ")}</span>
+                    </div>
+                  </>
+                )}
               </div>
-            </div>
-          </div>
-        ))}
+            </article>
+          );
+        })}
       </div>
     </section>
   );
@@ -1936,15 +2181,6 @@ function ProgressDonut({ done, total }: { done: number; total: number }) {
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={metricStyle()}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
-}
-
 function panelStyle(): CSSProperties {
   return {
     background: "#fff",
@@ -2002,44 +2238,6 @@ function choiceStyle(active: boolean): CSSProperties {
     textAlign: "left",
     color: C.text,
     cursor: "pointer",
-  };
-}
-
-function scoreRowStyle(): CSSProperties {
-  return { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 };
-}
-
-function metricStyle(): CSSProperties {
-  return {
-    border: `1px solid ${C.border}`,
-    borderRadius: 8,
-    padding: "10px 12px",
-    background: "#fff",
-    display: "grid",
-    gap: 4,
-  };
-}
-
-function nodeCardStyle(): CSSProperties {
-  return {
-    border: `1px solid ${C.border}`,
-    borderRadius: 8,
-    padding: 12,
-    display: "grid",
-    gridTemplateColumns: "32px minmax(0, 1fr)",
-    gap: 12,
-    background: "#fff",
-  };
-}
-
-function contractLineStyle(): CSSProperties {
-  return {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: 8,
-    color: C.muted,
-    fontSize: 12,
-    marginTop: 8,
   };
 }
 
