@@ -10,11 +10,12 @@ decomposes it, ingests real evidence of progress, and judges completion
 automatically. As you (and your agents) work, a durable context forms — your
 "résumé in the new era."
 
-**Core positioning**: a coding agent (Claude Code, etc.) is just one of many
-"evidence emitters," reporting in via MCP; git/CI webhooks are another class of
-emitter. The MCP server is the human/agent connection point. The developer
-scenario is simply the first subset to light up. The desktop app is now the fixed
-local entry for planning and provider/model setup. See [`docs/vision.md`](docs/vision.md)
+**Core positioning**: Aimcub is being built first as a local **Aim OS agent
+harness**. Coding agents such as Codex and Claude Code are local runtimes inside
+that harness; MCP, GitHub, and CI are evidence/extension channels. The online
+product is the multiplayer Aim platform and future Aim Share network. The
+desktop app is the fixed local entry for planning, context, provider/model setup,
+agent orchestration, evidence, and eval. See [`docs/vision.md`](docs/vision.md)
 for the full direction.
 
 ## Open-source posture
@@ -24,11 +25,11 @@ orchestration product. The local desktop loop and shared `@core` packages should
 remain usable, inspectable, and hackable without relying on a closed hosted
 service.
 
-The brand boundary is: **open local planning architecture, online aim platform**.
-The local product should own planning, agent management, provider configuration,
-context capture, and eval transparency. The online product should own multi-user
-collaboration, cross-device sync, team permissions, managed infrastructure, and
-the future aim-sharing platform.
+The brand boundary is: **open-source local Aim OS agent harness, online Aim
+platform**. The local product should own planning, local agent management,
+provider configuration, context capture, evidence, and eval transparency. The
+online product should own multi-user collaboration, cross-device sync, team
+permissions, managed infrastructure, and the future Aim Share platform.
 
 Hosted Supabase-backed surfaces can add networked value, but the core
 aim/context/eval architecture should stay transparent. License choice is
@@ -36,7 +37,7 @@ intentionally TBD before public release.
 
 ## Architecture principles
 
-- **The backend's single source of truth = Supabase** (Postgres + Auth + RLS + Realtime + Storage).
+- **The hosted backend's single source of truth = Supabase** (Postgres + Auth + RLS + Realtime + Storage).
 - **Evidence is append-only + idempotent**; milestone completion is derived from the evidence stream via `evaluate()`, never written directly.
 - **`@core/*` is the single logic source for all clients** (pure TS, zero platform dependencies, unit-testable). Each app shell handles only I/O, rendering, and platform bridging.
 - Lean-first: a jobs table + pg_cron (not pgmq), linear milestones (not a DAG), a single-table memory (no vectors). Complexity is added back only when a trigger condition demands it.
@@ -52,8 +53,8 @@ packages/
   llm/         @core/llm         Claude gateway (model routing + metering) + goal decomposition
   ui-tokens/   @ui/tokens        design tokens
 apps/
-  desktop/    Electron desktop app           — fixed local entry
-  web/         Next.js @ Vercel              — active
+  desktop/    Electron desktop app           — active local Aim OS harness
+  web/         Next.js @ Vercel              — hosted evidence/platform surface
   mcp/         MCP server (Streamable HTTP)  — active
   ios/         Expo RN                       — v2 (placeholder)
   extension/   Chrome MV3                    — v3 (placeholder)
@@ -63,9 +64,9 @@ apps/
 
 | Surface | Where | Notes |
 |---|---|---|
-| Web app | [aimcub.com](https://aimcub.com) | Next.js @ Vercel; email+password auth; milestones light up via Realtime |
+| Web app | [aimcub.com](https://aimcub.com) | Next.js @ Vercel; email+password auth; hosted evidence spine and future platform surface |
 | MCP server | `https://mcp.aimcub.com` | Cloudflare Workers; OAuth 2.1 resource server (Supabase AS, Path A); RFC 9728 metadata at `/.well-known/oauth-protected-resource` |
-| Database | Supabase `gtasruxwmcsxicyujlfu` (us-west-1) | migrations 0001-0011; RLS verified (users cannot forge milestones) |
+| Database | Supabase `gtasruxwmcsxicyujlfu` (us-west-1) | migrations 0001-0013; RLS verified (users cannot forge milestones) |
 | Evidence ingest | Edge Functions `ingest` (emitter tokens) + `github-webhook` (HMAC) | both feed the same idempotent `handleIngest` pipeline |
 | Judging | Edge Function `jobs-worker`, pg_cron every minute | `claim_jobs` batch → `evaluate()` → auto-completion; goal-level evidence fans out across open milestones |
 | Passive evidence | GitHub App [Aimcub](https://github.com/apps/aimcub) | push / workflow_run events; secrets in Vault |
@@ -108,9 +109,9 @@ example `AIMCUB_LIVE_DEEPSEEK_MODEL=deepseek-v4-flash`.
 
 ## Roadmap (with falsifiable gates)
 
-- **v0** ✅ Foundation: monorepo + `@core` + Supabase schema. DoD = core imported by both web and mcp + zero-dependency build passes.
-- **v1a** ✅ H1 (frictionless automatic evidence): set a goal on the web → decompose → MCP/GitHub evidence → milestones **light up automatically**.
-- **v1b** H2 (the value is context + eval), **go/no-go gate**: completing aims accrues a per-person context + a personalized eval signal worth paying for.
-- **v2** team aim-management (per-person context routing); **v3** aim-sharing platform (cross-org — a "paid GitHub for goals"). Calendar is a time-management component throughout.
+- **v0** ✅ Foundation: monorepo + `@core` + Supabase evidence spine. DoD = core imported by both web and mcp + zero-dependency build passes.
+- **v1** Local Aim OS agent harness: Desktop-first aim intake, context gathering, decomposition, routing, local agent runs, evidence, eval, and context inbox. The old v1a/v1b labels are now validation history, not the active roadmap.
+- **v2** Online multiplayer Aim platform: Supabase parity for local Aim OS entities, sync, teams, permissions, and per-person context routing.
+- **v3** Aim Share: cross-org aim sharing and a paid network for goals, specialized context, and capability signals. Calendar remains a time-management component throughout.
 
-See [`docs/vision.md`](docs/vision.md) for the full direction and the four pillars (humans-as-agents · memory + eval · context-as-product · personalized eval).
+See [`docs/vision.md`](docs/vision.md) for the full direction and [`docs/v1-spec.md`](docs/v1-spec.md) for the current local harness plan.

@@ -29,9 +29,10 @@ A universal **aim-management** layer for the harness era. Humans and agents are 
 `pnpm install` · `pnpm build` · `pnpm test` · `pnpm typecheck` · `pnpm lint` · `pnpm core:purity`
 
 ## Roadmap (falsifiable gates)
-- **v0** ✅ foundation: monorepo + `@core` kernel + Supabase schema.
-- **v1a** ✅ H1 (frictionless auto-evidence): Web sets goal → decompose → MCP/GitHub evidence → milestone auto-lights.
-- **v1b** — H2 (the value is context + eval), **go/no-go gate**: completing aims accrues a per-person context + a personalized eval signal worth paying for.
-- **v2** team aim-management (per-person context routing) · **v3** aim-sharing platform (cross-org, a "paid GitHub for goals"). Calendar is a time-management component throughout; iOS/extension shells come online as the surfaces demand.
+- **v0** ✅ foundation: monorepo + `@core` kernel + Supabase evidence spine.
+- **v1** — current: open-source local Aim OS agent harness. Desktop-first aim intake → context gathering → decomposition/eval contracts → human/agent routing → local agent runs/manual proof → evidence/eval → context inbox/reuse.
+- **H1/H2 legacy gates** — H1 auto-evidence and H2 context/eval are validation history and infrastructure inside v1, not the active phase split.
+- **v2** online multiplayer Aim platform: sync, teams, permissions, per-person context routing, managed infrastructure.
+- **v3** Aim Share: cross-org, a paid GitHub-for-goals network for aims, context, and capability signals. Calendar remains a time-management component throughout.
 
 Vision: `docs/vision.md`

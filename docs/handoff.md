@@ -4,7 +4,7 @@ Last updated: 2026-07-04
 
 ## Latest Desktop Handoff
 
-- Latest pushed commit: `f5297ca` (`Simplify desktop app layout`) on `main`.
+- Latest pushed baseline before the current direction update: `6f7946a` (`Update desktop handoff memory`) on `main`.
 - The installed local app is `/Applications/Aimcub.app`; it was rebuilt from the repo and launched from `/Applications`, not from the development `dist/mac-arm64` preview path.
 - Desktop release packaging was added in `0b82fc5` with `pnpm --filter @app/desktop run dist`, producing `apps/desktop/dist/Aimcub-0.0.0-arm64.dmg` and `.zip` when run outside the sandbox because macOS `hdiutil` is required.
 - Local desktop data is not in memory. The current local store is `~/.aimcub/store.json`; on this handoff it was about 529 KB. Provider and context-source settings live next to it under `~/.aimcub/`.
@@ -17,20 +17,22 @@ Last updated: 2026-07-04
 - Debug trace remains useful for development, but it should not be a default product surface. Future work should store only bounded debug summaries by default, with full trace capture behind an explicit developer/debug mode.
 - Local store compaction is not implemented. If the store grows, the intended compact behavior is: back up `store.json`, remove or truncate long debug traces and rejected/obsolete context candidates, preserve goals, milestones, evidence, accepted context, assignments, runs, and eval state.
 - Current verification command prefix from this machine: `PATH=/Users/jenson/.local/node/bin:$PATH pnpm <command>`. The old `/private/tmp/aimcub-pnpm9-bin` note below is historical and should not be preferred in this workspace.
-- Full verification passed after `f5297ca`: `pnpm build`, `pnpm test`, `pnpm typecheck`, `pnpm lint`, and `pnpm core:purity` with the `/Users/jenson/.local/node/bin` PATH prefix.
+- Full verification passed for the current direction update: `pnpm build`, `pnpm test`, `pnpm typecheck`, `pnpm lint`, and `pnpm core:purity` with the `/Users/jenson/.local/node/bin` PATH prefix.
 
 ## Product Memory
 
 - Aimcub is an aim-management layer, not a task-list shell. The product manages aims across humans and agents, then accrues durable context and personalized eval from real work.
-- Aimcub is intended to be open source as a local-first planning and agent-management product. The license is still TBD; do not add a license file until the business/community boundary is explicit.
-- Brand boundary: the local planning architecture and agent-management loop are open source; multi-user collaboration, team routing, sync, managed infrastructure, and the broader aim platform are online products.
-- Desktop is now the primary product surface for agent orchestration. CLI remains important for setup, scripting, debugging, and automation, but new orchestration UX should land in Desktop first.
+- Aimcub's end state is a two-layer product: an open-source local Aim OS agent harness plus an online Aim platform for multiplayer collaboration, sync, teams, managed infrastructure, and Aim Share.
+- Aimcub is intended to be open source as the local Aim OS agent harness. The license is still TBD; do not add a license file until the business/community boundary is explicit.
+- Brand boundary: the local Aim OS agent harness is open source; multi-user collaboration, team routing, sync, managed infrastructure, and Aim Share are online platform products.
+- Desktop is now the primary product surface for the local agent harness. CLI remains important for setup, scripting, debugging, and automation, but new orchestration UX should land in Desktop first.
 - Desktop must be product-first, not debug-first. Debug details such as model calls, tool traces, prompt previews, and runtime internals should be opt-in developer surfaces, not default layout columns.
 - The current user rejects command-wall UX. Any shell surface should still answer "what can I do next?" rather than "what commands exist?", but it should not pull focus away from the Desktop cockpit.
 - Aimcub's first local planning tools should be first-party built-in runtime tools, following the Claude Code pattern: `Read` / `Write` / `Edit` / `Grep` / `Glob`-style primitives are owned by the harness and permission system. MCP is the external connector/plugin boundary, not the foundation for core local context tools.
 - First-time use must include setup. If provider config is incomplete and the terminal is interactive, `aimcub` should guide into setup; if non-interactive, it should print scriptable setup commands and exit cleanly.
 - Keep scriptability: existing commands, JSON output, stdin input, and automation flows must remain stable while the human-facing top layer gets simpler.
-- Context collection is the v1b center of gravity. Aim decomposition should gather just enough user context to improve decomposition, acceptance rules, and future reuse without becoming a profile editor.
+- The old v1a/v1b split is no longer the active roadmap. Treat H1 auto-evidence and H2 context/eval as validation history and infrastructure inside the current v1: the local Aim OS agent harness.
+- Context collection is a core local harness capability. Aim decomposition should gather just enough user context to improve decomposition, acceptance rules, and future reuse without becoming a profile editor.
 - Context collection must distinguish durable/global context from aim-local context. Long-lived preferences, constraints, eval signals, and capability facts should become memory candidates; short-lived facts should stay scoped to the current aim.
 - Consumer/life/product aims require real-world context, not only developer-style product/platform assumptions. For example, a tarot app plan should ask about Apple developer account access, App Store/distribution path, the user's tarot experience, deck/art/IP/licensing, content voice, target audience, budget/timeline, monetization, and whether the user wants to learn or delegate.
 - The context inbox is a review queue for candidate memory/eval/context signals, not the primary debug surface. Candidate text should be editable before acceptance, and the UI must make clear whether acceptance stores it as global durable context or current-aim context.
@@ -39,13 +41,14 @@ Last updated: 2026-07-04
 
 ## Current Implementation State
 
-- Wrap-up branch: `codex/v1b-context-eval-wrapup`.
-- The v1b context/eval slice has been consolidated around a shared planning-context workflow in
+- Active plan document: `docs/v1-spec.md`, now reframed as "Local Aim OS Agent Harness." The old v1a/v1b labels are not the primary roadmap.
+- Historical wrap-up branch: `codex/v1b-context-eval-wrapup`.
+- The context/eval slice has been consolidated around a shared planning-context workflow in
   `packages/llm/src/context-workflow.ts`. CLI and Desktop now use the same store-port helpers
   for planning context selection, aim intake, clarify/capture/lineage/decomposition learning,
   decomposition strategy, and review/assumption context candidates.
 - `packages/llm/src/context-workflow.test.ts` covers the extracted store-port workflow.
-- Core v1b modules now cover context profile/health, pending context capture, context lineage,
+- Core context/eval modules now cover context profile/health, pending context capture, context lineage,
   aim intake, plan quality, aim learning, and decomposition learning.
 - The local store supports active/pending/deprioritized/deleted memories plus scope-aware
   candidate acceptance, rejection, archiving, and deprioritization.
@@ -57,7 +60,7 @@ Last updated: 2026-07-04
   - configured provider -> prints a compact "Aim cockpit" with provider, aim count, pending context count, store path, and next actions.
 - `aimcub setup` completion copy now points users at `aimcub new`, `aimcub clarify --save`, and `aimcub help` instead of a one-off `plan` demo.
 - `docs/v1-spec.md` should treat CLI onboarding as part of the context/eval product surface, not just help text.
-- The broad v1b context/eval work has been committed together after structural cleanup. Future work
+- The broad context/eval work has been committed together after structural cleanup. Future work
   should avoid growing `apps/cli/src/index.ts` and `apps/desktop/src/renderer/App.tsx` further; split
   new command/UI surfaces into focused modules first.
 - Desktop renderer cleanup has started. Shared renderer primitives now live in
@@ -68,18 +71,18 @@ Last updated: 2026-07-04
 - Desktop now enforces a single app instance in `apps/desktop/src/main/index.ts`. In development macOS may still label the Dock app as `Electron`, but duplicate launches should focus the existing window instead of opening another Aimcub window. When manually cleaning old dev runs, quit `Electron` as well as `Aimcub`.
 - Desktop model-provider work now supports provider selection beyond Anthropic/OpenAI, including OpenAI-compatible providers such as DeepSeek, MiniMax, Z.ai, Gemini compatibility, Qwen/DashScope, and custom endpoints.
 - Recent DeepSeek fixes disabled unsupported structured-output assumptions for custom/OpenAI-compatible paths and added request-shaping for DeepSeek-style JSON responses. If providers fail, surface the model/provider error quickly instead of leaving Desktop stuck on "starting initial plan".
-- Clarify/decompose has been strengthened but is still not enough. It now asks more baseline context questions and routes more digital work to agents, but it is still mostly prompt-only. The next missing layer is a first-party planning tool substrate that lets the model inspect local context, search/read files, use memory, and optionally research the web before decomposing an aim.
+- Clarify/decompose has been strengthened but is still not enough. It now asks more baseline context questions, routes more digital work to agents, and uses first-party planning tools for memory/local/web/context signals before decomposition. The next missing layer is execution-side evidence capture, permission UX, and tighter agent run feedback.
 - Desktop pre-draft intake now has a model pass: deterministic `reviewAimIntake` gaps are internal signals only, Desktop first collects memory/local/web tool context, then calls `generateAimIntakeQuestions` to produce the user-facing questions/options. Do not surface template prompts like "Ask for..." directly to users; if research/local context is unavailable, the model should ask for enabling or attaching that context instead of pretending it has facts.
 - Context collection is now a first-class Desktop setup layer: `context-sources.json` records linked local folders, explicit local files, online connector references such as Notion/Obsidian/databases/URLs, Web/deep-research preference, the dedicated context session toggle, and choice-question toggle. Planning consumes this before decomposition through `context.linked_sources`, `local.read`, optional `web.search`/`web.fetch`, `context.distill`, and structured user questions. Connector references are treated as locations/access gaps until a runtime can actually read them.
 - Desktop planning debug exists in code but should not be mounted as a default right rail. If needed again, expose it behind an explicit developer/debug toggle with bounded summaries and independent scrolling.
-- The first unified built-in tool contract substrate now lives in `packages/llm/src/tool-contract.ts` and is exported from `@core/llm`. It defines contracts, permissions, structured observations, normalized errors, handler types, and a registry for `local.*`, `memory.*`, `web.*`, and `context.*` planning tools. Runtime handlers and Desktop permission UI are still next.
+- The first unified built-in tool contract substrate now lives in `packages/llm/src/tool-contract.ts` and is exported from `@core/llm`. It defines contracts, permissions, structured observations, normalized errors, handler types, and a registry for `local.*`, `memory.*`, `web.*`, and `context.*` planning tools. Desktop has runtime handlers for memory/local/context/web planning paths; permission UX and execution-side evidence capture are still next.
 - Desktop now has a first pass of the local CLI agent harness in `apps/desktop/src/main/local-agents.ts`, following the OpenDesign-style local adapter pattern: registry definitions for Codex and Claude, executable detection via explicit env overrides/PATH/common install paths, version/auth/model probes, command construction, stdin prompt delivery, and JSONL/stream-json event normalization into Aimcub events.
 - This local CLI harness is an Aimcub runtime layer, not MCP. Aimcub should continue to own aim decomposition, context, permissions, evidence, and eval, but local CLIs such as `codex exec --json` and `claude -p` are now also valid planning runtimes when no API provider is configured; API providers remain the preferred metered path when configured.
 - Desktop settings now includes a minimal "Local CLI agents" panel that lists detected Codex/Claude CLIs and can run an explicit read-only smoke test. Keep this panel thin until the runtime is connected to milestone execution and evidence capture.
 - Saved Desktop aims now expose the first usable sub-aim loop: each saved sub-aim shows its persisted milestone status and can be handed to a local CLI agent, manually confirmed as done through the store's eval path, or used as the seed for a new child aim when the user wants to break it down further. Agent runs are recorded as evidence but do not auto-complete milestones; completion remains governed by eval/manual confirmation.
 - Aim OS orchestration now has a first durable local model in `@core/types`, `@core/domain`, and `@core/store`: actors, assignments, runs, run events, tool traces, context intake sessions, sub-aim relations, evidence attribution, evaluator runtime reports, and an `AimProgressReadModel`.
 - Local goal creation now materializes routing assignments from decomposition contracts. Agent execution through Desktop creates a `Run`, records low-trust evidence with attribution, finishes the run, and sediments pending context candidates. Manual child-aim decomposition is stored as a first-class sub-aim relation instead of only `metadata`.
-- The current Aim OS model is local-store first. Supabase schema parity is still future work; do not assume hosted Web has these orchestration tables until migrations and API adapters are added.
+- The current Aim OS model is local-store first. Supabase schema parity is an online-platform task; do not assume hosted Web has these orchestration tables until migrations and API adapters are added.
 - Desktop renderer has been reset from the old debug-heavy 3,500-line panel into a compact Aim OS cockpit MVP. The new first screen centers the actual flow: aim intake, context questions, sub-aim/eval preview, assignment/run/evidence/eval cockpit, context inbox, and runtime settings. It intentionally keeps rough MVP styling and reuses existing IPC instead of adding new product logic in the renderer.
 - Desktop renderer now uses a simplified `CockpitShell`: Apple-like fullscreen desktop chrome, fixed aim sidebar, lightweight workflow step pills, and a center active-step workspace. The previous collapsible/resizable sidebar and right audit rail were removed from the default product shell because they made the interface feel stacked and unclear.
 - Latest mainline commits to preserve as the current baseline:
@@ -99,7 +102,7 @@ Last updated: 2026-07-04
 - Use this prefix when running full gates from Codex on this machine:
   `PATH=/Users/jenson/.local/node/bin:$PATH pnpm <command>`
 - Historical note: older sessions used `/private/tmp/aimcub-pnpm9-bin`; prefer `/Users/jenson/.local/node/bin` now.
-- Verified after the v1b wrap-up:
+- Verified for the current direction update:
   - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
   - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
   - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck`
@@ -113,30 +116,32 @@ Last updated: 2026-07-04
 ## Recommended Next Work
 
 - Continue Desktop-first: split the aim creation/refinement and plan review panels out of `App.tsx`, then design the local orchestration cockpit around aims, agents, evidence, context, and eval.
-- Implement Desktop runtime handlers for the first-party built-in planning tools and wire them into pre-decomposition context gathering. Start with read/context tools, not execution tools.
+- Continue the local Aim OS harness: improve the sub-aim execution loop, local agent run history, evidence attribution, context inbox, and eval visibility.
+- First-party planning tool runtime handlers exist for memory/local/context/web paths; next work is permission UX, clearer user-facing activity, and execution-side evidence capture.
 - Turn the Desktop home screen into a more useful cockpit: show the most recent active aim, pending context review, and the single best next action.
 - Keep CLI work incremental: split help into layers, preserve scriptability, and add command-dispatch smoke tests before adding more verbs.
 - Before a public open-source release, choose the license, add `CONTRIBUTING.md` and `SECURITY.md`, audit secrets/env examples, and separate public local-first docs from hosted online-platform deployment notes.
 - Keep refining aim decomposition around context capture: ask fewer but higher-value questions, prefer eval signals, and show why a question changes the plan.
 - Improve research depth for open-ended aims. The planner should proactively identify domain, legal/access, distribution, skill, budget, taste, and operational constraints before locking the decomposition, especially for non-developer aims where the best questions are not obvious from code/product structure alone.
 - Next local-agent work: persist per-agent model/reasoning selection, improve milestone-level agent prompts with workspace selection, add a real run queue tied to milestones, capture file/tool events as append-only evidence, and add cancellation/resume only after the one-shot execution path is reliable.
-- Next Aim OS work: deepen the new Desktop cockpit around `getAimProgress`, add Supabase migrations/API parity for actors/assignments/runs/sub-aim relations/evidence attribution, and replace the current one-shot local agent runner with a queue that can stream run events and artifacts.
+- Next Aim OS work: deepen the new Desktop cockpit around `getAimProgress`, replace the current one-shot local agent runner with a queue that can stream run events and artifacts, and defer Supabase migrations/API parity for actors/assignments/runs/sub-aim relations/evidence attribution until the online collaboration platform needs sync.
 
 ## Next Session Goal Prompt
 
 Copy this prompt into the next coding session:
 
 ```text
-/goal Continue the Desktop product-design cleanup from the simplified two-column shell. The user explicitly rejected the previous UI as unclear and over-stacked, so do not add more rails, debug cards, runtime strips, or status boxes to the default view.
+/goal Continue the local Aim OS agent harness product cleanup from the simplified two-column Desktop shell. The user explicitly rejected the previous UI as unclear and over-stacked, so do not add more rails, debug cards, runtime strips, or status boxes to the default view.
 
 Context:
-- Latest pushed baseline: `f5297ca` on `main`.
+- Latest pushed baseline before the direction update: `6f7946a` on `main`.
 - Installed app path: `/Applications/Aimcub.app`.
 - Local store: `~/.aimcub/store.json`; it is not memory-only.
 - The default Desktop shell now has: left aim sidebar, lightweight workflow step pills, center active workspace, no right inspector rail.
+- Current v1 product frame: Aimcub is building the open-source local Aim OS agent harness first. The online multiplayer Aim platform and Aim Share are later platform layers.
 - Existing Aim selection should open Aim overview first, not Run details.
 - Existing Aim Context stage should not show an empty composer.
-- Full verification passed after the shell simplification with:
+- Full verification passed for the current direction update with:
   `PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
   `PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
   `PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck`

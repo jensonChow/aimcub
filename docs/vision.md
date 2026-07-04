@@ -31,11 +31,12 @@ logic.
 
 The brand strategy is deliberately split:
 
-- **Open local planning architecture.** Desktop, local storage, provider setup,
-  agent management, context capture, and eval transparency are the trust anchor.
-- **Online aim platform.** Multi-user collaboration, team routing, cross-device
-  sync, permissioned sharing, managed agent infrastructure, and the future
-  aim-sharing network require hosted surfaces.
+- **Open-source local Aim OS agent harness.** Desktop, local storage, provider
+  setup, first-party local tools, local agent management, context capture,
+  evidence attribution, and eval transparency are the trust anchor.
+- **Online Aim platform.** Multi-user collaboration, team routing, cross-device
+  sync, permissioned sharing, managed infrastructure, and the future Aim Share
+  network require hosted surfaces.
 
 The license is intentionally undecided until the business/community boundary is
 explicit.
@@ -77,32 +78,30 @@ clear.
 
 ## Product forms (staged)
 
-1. **Personal aim management.** You treat yourself as an agent, collaborate with
-   other agents, treat the real world as context, and let the system auto-judge the
-   human/agent boundary — some work to you, some to the agents. This should be
-   fully credible in the open-source local product.
-2. **Team aim management.** Many people + agents; each person has a context; aims
-   are dispatched and handled according to that context. This is primarily an
-   online collaboration product because identity, permissions, sync, and routing
-   are networked concerns.
-3. **Aim-sharing platform.** Break the boundaries of the organization — everything
-   is aim-first. A person with deeply specialized context can be shared across many
-   aims. Think a closed, paid GitHub for goals — but mind where GitHub falls short:
-   GitHub organizes the **what**, aimcub organizes the **why**. GitHub is a
-   last-era product — too coarse, and neither beautiful nor approachable enough in
-   its GUI to carry this. The sharing surface has to be why-first, not just another
-   what-tracker.
-4. **Context as value.** As a person completes aim after aim on the platform, their
-   context accretes; the system routes different aims to them on the strength of
-   that context, and that generates value.
+1. **Local Aim OS agent harness.** You treat yourself as an agent, collaborate
+   with local coding/research agents, treat the real world as context, and let
+   the system route sub-aims to the right human/agent path. This must be fully
+   credible as an open-source local product.
+2. **Online multiplayer Aim platform.** Many people + agents; each person has a
+   context; aims are shared, synced, permissioned, and dispatched according to
+   that context. This is primarily an online product because identity,
+   permissions, sync, and team routing are networked concerns.
+3. **Aim Share.** Break the boundaries of the organization — everything is
+   aim-first. A person with deeply specialized context can be shared across many
+   aims. Think a closed, paid GitHub for goals — but mind where GitHub falls
+   short: GitHub organizes the **what**, aimcub organizes the **why**. The
+   sharing surface has to be why-first, not just another what-tracker.
+4. **Context as value.** As a person completes aim after aim in the harness and
+   on the platform, their context accretes; the system routes different aims to
+   them on the strength of that context, and that generates value.
 
 **Calendar** is a component of all of this: aim management is, at bottom, time
 management — the calendar is how you manage the time you spend solving problems.
 
-## What exists today (the spine that survived the pivot)
+## What exists today
 
-The aim-management spine is already built and live; only the old emotional shell
-was removed.
+The hosted evidence spine is already built and live, and the local Aim OS agent
+harness is now the active product surface. The old emotional shell was removed.
 
 - **Goals → decomposition → milestones.** A goal is set in natural language and
   decomposed (Claude structured output, deterministic local fallback) into a flat
@@ -115,11 +114,23 @@ was removed.
   milestone (anti-spoofing trust floor). Milestone completion is **derived state**,
   recomputable from the evidence stream — never written directly.
 - **Memory.** A single `memories` table (no vectors yet) — the substrate for the
-  memory pillar. `extract_memory` is the reserved job type that will populate it.
+  memory pillar. The local store already supports active, pending,
+  deprioritized, and deleted memories with typed categories.
+- **Local Aim OS model.** The local store now carries actors, assignments, runs,
+  run events, tool traces, sub-aim relations, evidence attribution, context
+  intake sessions, and an Aim progress read model.
+- **First-party planning tools.** Local memory, file/context, linked-source, web
+  research, context distillation, and user-question tools are Aimcub runtime
+  tools, not MCP primitives.
+- **Local CLI agent harness.** Desktop can detect local Codex/Claude CLIs, run a
+  sub-aim through a read-only local adapter, record low-trust evidence, and keep
+  completion governed by eval/manual confirmation.
 - **MCP server.** The human/agent connection point: OAuth 2.1 resource server,
   `report_evidence` / `goal_status` / `list_milestones`. This is central, not
   peripheral — it is how agents plug into an aim.
-- **Supabase** is the single source of truth; jobs + pg_cron run the judge.
+- **Supabase hosted spine.** Supabase is the source of truth for hosted web/MCP
+  evidence surfaces; jobs + pg_cron run the judge there. Supabase parity for the
+  newer local Aim OS orchestration entities comes with the online platform.
 
 ## Removed in the pivot (the abandoned "emotional shell")
 
@@ -131,18 +142,20 @@ pet-voice **persona**. Migration `0011` dropped the `pets` / `collectibles` /
 **kept**, reframed as a neutral effort/contribution signal that feeds progress and
 will feed eval weighting — it is no longer "pet XP".
 
-## What's next (to design, not yet built)
+## What's next
 
-The four pillars point at the work that isn't here yet, in roughly this order:
+The current build is the local Aim OS agent harness. The next work is:
 
-- **Context**: accrue a durable, per-person context from the evidence + completion
-  stream — the "résumé" that forms by working.
-- **Personalized eval**: turn that context into a per-person/per-org benchmark
-  rather than a generic one.
-- **Human/agent routing**: auto-judge which slices of an aim go to a person vs. an
-  agent, and dispatch accordingly.
+- **Local run loop**: replace one-shot local agent execution with a durable queue,
+  streamed run events, structured artifacts, retries, and clear user control.
+- **Context + personalized eval**: make accepted context and eval signals visibly
+  improve later decomposition and acceptance rules.
+- **Desktop product clarity**: keep the default cockpit focused on the aim loop;
+  put debug traces behind explicit developer mode.
+- **Hosted parity when needed**: add Supabase schema/API parity for local Aim OS
+  entities when sync, teams, or hosted collaboration require it.
+- **Online platform**: team/multiplayer aims, cross-device sync, permissions,
+  managed infrastructure, and Aim Share.
 - **Calendar**: time-management surface over aims.
-- **Team / sharing**: multi-actor aims; context shared across organizational lines.
 
-These are deliberately left open here — this document fixes the *direction*, not
-the detailed build plan.
+See `docs/v1-spec.md` for the active local harness plan.
