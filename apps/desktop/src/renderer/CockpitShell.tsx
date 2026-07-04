@@ -67,6 +67,7 @@ export function CockpitShell({
   const [paletteOpen, setPaletteOpen] = useState(false);
   const usingSettingsSidebar = activeStage === "settings" && Boolean(settingsSidebar);
   const hasGoals = goals.length > 0;
+  const firstRunAim = activeStage === "aim" && !selected && !hasGoals;
 
   const stages = useMemo<StageItem[]>(() => [
     { stage: "aim", index: "1", title: t("os.stepAim") },
@@ -128,15 +129,14 @@ export function CockpitShell({
   return (
     <div className="od-window" data-od-id="desktop-window">
       <header className="od-titlebar" data-od-id="mac-titlebar">
-        <div className="od-titlebar-brand">Aimcub</div>
-        <div className="od-titlebar-status">{busy || error || t("cockpit.titlebar.ready")}</div>
+        <div className="od-titlebar-status">{busy || error || ""}</div>
         <button className="od-command-trigger" type="button" onClick={() => setPaletteOpen(true)}>
           <span>{t("command.open")}</span>
           <kbd>{t("command.shortcut")}</kbd>
         </button>
       </header>
 
-      <div className={`od-app od-app-stage-${activeStage}`}>
+      <div className={`od-app od-app-stage-${activeStage}`} data-empty-aim={firstRunAim ? "true" : "false"}>
         <aside
           className="od-sidebar"
           data-mode={usingSettingsSidebar ? "settings" : "aims"}

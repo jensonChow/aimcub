@@ -1,6 +1,6 @@
 # Aimcub Handoff
 
-Last updated: 2026-07-04
+Last updated: 2026-07-05
 Branch: `main`
 
 ## Current Session
@@ -10,13 +10,14 @@ Branch: `main`
 - Hid workflow step navigation on the unsaved Aim stage so process machinery appears only after it helps the next action.
 - Lightened the empty sidebar: search and filters now appear only after aim history exists, and the no-aims state is a compact Recent aims placeholder instead of a large dashed card.
 - Tightened first-run copy to avoid exposing internal workflow terms such as Context and Sub-aim contracts before the user has entered an aim.
+- Followed up on the user's "still messy" feedback by reducing first-run chrome: removed idle titlebar status text, removed the "New Aim" eyebrow from the main intake surface, narrowed the sidebar, shortened copy, reduced composer height, and removed the heavy automatic focus ring.
 - Promoted the first-run command-composer requirement into `docs/memory/design-system.md`.
 
 ## Current State
 
 - `main` supports the local Aim OS loop plus the primary-sidebar Settings surface, command palette navigation, and the command-composer first-run Aim screen.
 - Settings keeps helper setup product-focused: the primary left sidebar owns Overview, Planning model, Local CLI agents, Web research, and Context sources navigation; the center workspace owns the selected detail pane.
-- The visual system now has stronger shell-level rules for stable sidebar rows, real command shortcuts, preference-style helper forms, and command-composer empty states, but a deeper pane/artifact system is still future work.
+- The visual system now has stronger shell-level rules for stable sidebar rows, real command shortcuts, preference-style helper forms, quiet first-run chrome, and command-composer empty states, but a deeper pane/artifact system is still future work.
 - Context Sources still has one setup summary, compact planning readiness gates, and one editable control surface. The gates cover context bundle, research fusion, gap intake, scope guard, and sub-aim readiness.
 
 ## Verification
@@ -34,8 +35,8 @@ Branch: `main`
 
 Notes:
 - MCP worker tests intentionally log the expected missing-Supabase opaque-error path while passing.
-- Browser screenshot verification was not run in this session because the renderer entry depends on Electron preload IPC; opening the HTML directly in a browser would not represent the real app.
-- Commit/push: pending until this handoff update is committed and pushed.
+- Real app visual verification was run with Computer Use against `/Users/jenson/Desktop/Aimcub/Aimcub.app` after `pnpm desktop:pack` and copying `apps/desktop/dist/mac-arm64/Aimcub.app` to the project-root bundle.
+- Commit/push: completed for this session.
 
 ## Next Session Prompt
 

@@ -1438,7 +1438,7 @@ function AimIntakePanel(props: {
     <section className={props.parent ? "od-aim-intake od-aim-intake-child" : "od-aim-intake"}>
       <div className="od-aim-intake-head">
         <div>
-          <div className="od-aim-kicker">{props.parent ? t("os.subAimMode") : t("aimIntake.workbenchKicker")}</div>
+          {props.parent ? <div className="od-aim-kicker">{t("os.subAimMode")}</div> : null}
           <h1>{intakeTitle}</h1>
           <p>{intakeBody}</p>
         </div>
@@ -1452,7 +1452,6 @@ function AimIntakePanel(props: {
           onChange={(event) => props.onTitle(event.target.value)}
           placeholder={t("aimIntake.composerPlaceholder")}
           aria-label={t("aimIntake.titleLabel")}
-          autoFocus
         />
         <textarea
           id="aim-context"

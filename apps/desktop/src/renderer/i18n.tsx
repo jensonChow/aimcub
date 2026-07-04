@@ -29,7 +29,7 @@ export const STRINGS = {
   "shell.noSearchResults": { en: "No matching aims.", zh: "没有匹配的目标。" },
   "shell.noSearchResultsBody": { en: "Try another search or filter.", zh: "换个关键词或筛选条件。" },
   "shell.noAimsTitle": { en: "No aims yet", zh: "还没有 Aim" },
-  "shell.noAimsBody": { en: "Your aim history will appear here.", zh: "完成输入后，历史会显示在这里。" },
+  "shell.noAimsBody": { en: "Saved aims appear here.", zh: "保存后会显示在这里。" },
   "shell.recentAims": { en: "Recent aims", zh: "近期目标" },
   "shell.planningLayers": { en: "Planning layers", zh: "规划视图" },
   "shell.pendingContext_one": { en: "{n} pending context item", zh: "{n} 条待处理上下文" },
@@ -90,7 +90,7 @@ export const STRINGS = {
   "mvp.flow.refine": { en: "Refine", zh: "优化" },
   "mvp.flow.save": { en: "Save", zh: "保存" },
 
-  "os.tagline": { en: "Local workbench", zh: "本地工作台" },
+  "os.tagline": { en: "Workbench", zh: "工作台" },
   "os.newAim": { en: "New aim", zh: "新目标" },
   "os.savedAims": { en: "Saved aims", zh: "已保存目标" },
   "os.noAims": { en: "No saved aims yet.", zh: "还没有保存的目标。" },
@@ -130,10 +130,7 @@ export const STRINGS = {
   },
   "aimIntake.workbenchKicker": { en: "New aim", zh: "新 Aim" },
   "aimIntake.workbenchTitle": { en: "What should Aimcub move forward?", zh: "今天想推进什么？" },
-  "aimIntake.workbenchBody": {
-    en: "Start with one outcome. Details, context, and checks come next.",
-    zh: "先写一个结果。细节、上下文和验收会在后面补齐。",
-  },
+  "aimIntake.workbenchBody": { en: "Name the outcome. Aimcub will ask for context next.", zh: "先写结果，下一步再补上下文。" },
   "aimIntake.subAimBody": {
     en: "Use this child aim as the next planning target and add the evidence needed to prove completion.",
     zh: "把这个子目标作为下一层规划目标，并补充判断完成所需的证据。",
@@ -141,14 +138,11 @@ export const STRINGS = {
   "aimIntake.titleLabel": { en: "Aim", zh: "Aim" },
   "aimIntake.contextLabel": { en: "Evidence and constraints", zh: "证据与约束" },
   "aimIntake.composerPlaceholder": { en: "Name the outcome you want", zh: "写下你想达成的结果" },
-  "aimIntake.contextPlaceholder": {
-    en: "Add constraints, source material, workspace notes, or what done should look like.",
-    zh: "补充约束、材料、工作区说明，或完成后应是什么样子。",
-  },
+  "aimIntake.contextPlaceholder": { en: "Optional constraints, source material, or done criteria.", zh: "可选：约束、材料或完成标准。" },
   "aimIntake.empty": { en: "Empty aim", zh: "空 Aim" },
   "aimIntake.ready": { en: "Ready for context", zh: "可进入 Context" },
-  "aimIntake.emptyHint": { en: "Aim not saved yet", zh: "Aim 尚未保存" },
-  "aimIntake.readyHint": { en: "Ready to continue", zh: "可以继续" },
+  "aimIntake.emptyHint": { en: "Start with the outcome", zh: "先写结果" },
+  "aimIntake.readyHint": { en: "Ready", zh: "就绪" },
   "aimIntake.optional": { en: "optional", zh: "可选" },
   "aimIntake.unsaved": { en: "New aim is not saved yet.", zh: "新 Aim 尚未保存。" },
   "aimIntake.contextGate": {
@@ -366,7 +360,7 @@ export const STRINGS = {
   "os.pendingContext": { en: "Pending context", zh: "待处理上下文" },
   "os.blocked": { en: "Blocked", zh: "阻塞" },
 
-  "cockpit.titlebar.ready": { en: "local-first cockpit ready", zh: "本地优先工作台已就绪" },
+  "cockpit.titlebar.ready": { en: "Ready", zh: "就绪" },
   "cockpit.stage.aim": { en: "intake", zh: "输入目标" },
   "cockpit.stage.context": { en: "session + trace", zh: "会话 + 轨迹" },
   "cockpit.stage.contracts": { en: "sub-aim + eval", zh: "子目标 + 评估" },
