@@ -128,6 +128,29 @@ kbd {
   -webkit-app-region: drag;
 }
 
+.od-traffic-light-backdrop {
+  position: fixed;
+  z-index: 700;
+  top: 8px;
+  left: 8px;
+  width: 68px;
+  height: 32px;
+  border: 1px solid color-mix(in oklab, var(--od-fg), transparent 94%);
+  border-radius: 16px;
+  background: color-mix(in oklab, var(--od-fg), transparent 92%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+
+.od-app[data-window-focused="false"][data-window-traffic-lights="true"] .od-traffic-light-backdrop {
+  opacity: 1;
+}
+
+.od-app[data-window-fullscreen="true"] .od-traffic-light-backdrop {
+  opacity: 0;
+}
+
 .od-sidebar-hover-zone {
   display: contents;
 }

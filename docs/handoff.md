@@ -5,9 +5,9 @@ Branch: `main`
 
 ## Current Session
 
-- Adjusted the non-settings sidebar toggle for macOS fullscreen: normal window mode keeps the toggle immediately after the traffic lights, while fullscreen moves it left into the now-empty traffic-light-safe space.
-- Added typed window chrome IPC (`getWindowChromeState` plus a fullscreen state event) from main to preload to renderer, then used `data-window-fullscreen` to drive the CSS variable for the toggle and drag strip positions.
-- Added renderer regression coverage for the fullscreen-only toggle offset and updated `docs/memory/design-system.md` with the durable fullscreen placement rule.
+- Fixed inactive macOS traffic-light visibility: when Aimcub loses focus, the native traffic lights now sit over a subtle non-interactive backing surface instead of disappearing into the light app surface.
+- Extended typed window chrome state with `focused` and `trafficLightsVisible`, and broadcast focus/blur changes from the main process so renderer chrome can distinguish focused, inactive, and fullscreen states.
+- Added renderer regression coverage for inactive traffic-light backing behavior and updated `docs/memory/design-system.md` with the durable inactive-window chrome rule.
 
 ## Current State
 
@@ -15,12 +15,13 @@ Branch: `main`
 - Settings still lock the primary sidebar open and omit the normal Aim workspace sidebar toggle, peek rail, and `Aimcub / Workbench` brand header.
 - The sidebar toggle contract remains: manual click/keyboard toggle wins over hover/focus peek; fresh hover reveal still works from the button and left-edge rail; transient peek does not resize the workspace.
 - In normal macOS window mode, the sidebar toggle keeps its existing 76 px left offset after traffic lights. In fullscreen, the renderer receives fullscreen state and moves the toggle to 16 px left, with the drag strip starting after the shifted control.
+- Native macOS traffic lights remain visible when the app is inactive through a renderer backing surface that hides while focused or fullscreen and does not intercept clicks.
 - The root packaged app at `/Users/jenson/Desktop/Aimcub/Aimcub.app` was refreshed from `pnpm desktop:pack`.
 
 ## Verification
 
 - Passed:
-  - Electron CDP fullscreen position check against the built app: normal window toggle left `76`, fullscreen state `true`, fullscreen toggle left `16`, fullscreen drag strip left `56`.
+  - Electron CDP inactive chrome check against the built app: inactive state `focused=false`, `trafficLights=true`, backdrop `opacity=1`, `pointer-events=none`; focused state `focused=true`, backdrop `opacity=0`.
   - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop test`
   - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop typecheck`
   - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop lint`
@@ -35,7 +36,7 @@ Branch: `main`
 
 Notes:
 - MCP worker tests may log the expected missing-Supabase opaque-error path while passing.
-- Root `Aimcub.app` and `apps/desktop/dist/mac-arm64/Aimcub.app` both have `app.asar` timestamp `Jul 5 21:08:52 2026`.
+- Root `Aimcub.app` and `apps/desktop/dist/mac-arm64/Aimcub.app` both have `app.asar` timestamp `Jul 5 21:20:06 2026`.
 - Commit/push status: committed and pushed directly on `main`; no separate branch merge was needed.
 
 ## Next Session Prompt

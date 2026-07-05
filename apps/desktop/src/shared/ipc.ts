@@ -399,6 +399,8 @@ export interface RunMilestoneAgentResult {
 
 export interface WindowChromeState {
   fullscreen: boolean;
+  focused: boolean;
+  trafficLightsVisible: boolean;
 }
 
 /** The typed surface exposed on `window.aimcub` by the preload bridge. */

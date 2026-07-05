@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import type { Goal } from "@core/types";
 
+import type { WindowChromeState } from "../shared/ipc";
 import { useI18n, type Lang } from "./i18n";
 
 import "./cockpit.css";
@@ -12,6 +13,11 @@ const USER_MENU_ID = "od-sidebar-user-menu";
 const LANGUAGE_MENU_ID = "od-sidebar-language-menu";
 const SIDEBAR_REVEAL_DELAY_MS = 180;
 const SIDEBAR_CLOSE_DELAY_MS = 180;
+const DEFAULT_WINDOW_CHROME_STATE: WindowChromeState = {
+  fullscreen: false,
+  focused: true,
+  trafficLightsVisible: true,
+};
 
 export interface CockpitCommand {
   id: string;
@@ -71,7 +77,7 @@ export function CockpitShell({
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [sidebarPinned, setSidebarPinned] = useState(() => !prefersCollapsedSidebar());
   const [sidebarPeeking, setSidebarPeeking] = useState(false);
-  const [windowFullscreen, setWindowFullscreen] = useState(false);
+  const [windowChrome, setWindowChrome] = useState<WindowChromeState>(DEFAULT_WINDOW_CHROME_STATE);
   const sidebarHoverZoneRef = useRef<HTMLDivElement | null>(null);
   const sidebarRef = useRef<HTMLElement | null>(null);
   const revealSidebarTimer = useRef<number | null>(null);
@@ -220,11 +226,11 @@ export function CockpitShell({
   useEffect(() => {
     let active = true;
     window.aimcub?.getWindowChromeState().then((state) => {
-      if (active) setWindowFullscreen(state.fullscreen);
+      if (active) setWindowChrome(state);
     }).catch(() => {});
 
     const unsubscribe = window.aimcub?.onWindowChromeState((state) => {
-      setWindowFullscreen(state.fullscreen);
+      setWindowChrome(state);
     });
     return () => {
       active = false;
@@ -299,9 +305,12 @@ export function CockpitShell({
         className={`od-app od-app-stage-${activeStage}`}
         data-empty-aim={firstRunAim ? "true" : "false"}
         data-sidebar-state={sidebarState}
-        data-window-fullscreen={windowFullscreen ? "true" : "false"}
+        data-window-fullscreen={windowChrome.fullscreen ? "true" : "false"}
+        data-window-focused={windowChrome.focused ? "true" : "false"}
+        data-window-traffic-lights={windowChrome.trafficLightsVisible ? "true" : "false"}
       >
         <div className="od-window-drag-strip" aria-hidden="true" data-od-id="window-drag-strip" />
+        <div className="od-traffic-light-backdrop" aria-hidden="true" data-od-id="traffic-light-backdrop" />
         {usingSettingsSidebar ? null : (
           <div className="od-sidebar-hover-zone" data-od-id="sidebar-hover-zone" ref={sidebarHoverZoneRef}>
             <div

@@ -348,9 +348,15 @@ async function decompositionStrategy(
 }
 
 export function registerIpc(): void {
-  ipcMain.handle(IPC.getWindowChromeState, (event) => ({
-    fullscreen: Boolean(BrowserWindow.fromWebContents(event.sender)?.isFullScreen()),
-  }));
+  ipcMain.handle(IPC.getWindowChromeState, (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const fullscreen = Boolean(win?.isFullScreen());
+    return {
+      fullscreen,
+      focused: Boolean(win?.isFocused()),
+      trafficLightsVisible: process.platform === "darwin" && !fullscreen,
+    };
+  });
 
   ipcMain.handle(IPC.intake, async (event, req: DraftRequest) => {
     const runId = planningRunId(req);
