@@ -10,10 +10,12 @@ Branch: `main`
 - Updated Desktop shell tests to prevent reintroducing `setWindowButtonVisibility(!win.isFullScreen())`.
 - Updated `docs/memory/desktop.md` and `docs/memory/design-system.md` with the corrected fullscreen traffic-light rule.
 - Refreshed root `Aimcub.app` from the latest Electron 43 folder-style Desktop build.
+- Ran a post-merge memory-refresh audit and updated this handoff to reflect final Git status.
 
 ## Current State
 
-- The focused branch for this work is `codex-fullscreen-traffic-lights`; it contains only the fullscreen traffic-light fix and related docs/tests.
+- Commit `a45f951` was pushed on `codex-fullscreen-traffic-lights`, fast-forward merged into `main`, and pushed to `origin/main`.
+- This memory-refresh follow-up is docs-only and was prepared directly on `main`; no separate branch merge is needed.
 - Root `Aimcub.app`, `apps/desktop/out`, and `apps/desktop/dist` were refreshed locally and remain ignored build artifacts.
 - Native macOS behavior still needs user-facing visual confirmation in the real fullscreen hover-titlebar interaction, but the packaged main-process code now keeps native window buttons visible.
 
@@ -21,6 +23,8 @@ Branch: `main`
 
 Passed:
 
+- `python3 /Users/jenson/.codex/skills/memory-refresh/scripts/audit_project_memory.py /Users/jenson/Desktop/Aimcub`
+- `wc -l AGENTS.md CLAUDE.md docs/handoff.md`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop test -- App.test.tsx`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
