@@ -16,7 +16,7 @@ Branch: `main`
 ## Current State
 
 - `main` keeps the simplified Desktop shell: no full-width titlebar, left sidebar, center workspace, command-composer first-run Aim screen, and settings split-view.
-- Real packaged Electron inspection of `/Users/jenson/Desktop/Aimcub/Aimcub.app` confirmed the top-left sidebar toggle collapses and expands the sidebar. Accessibility state changed from `收起侧栏` / value `1` to `展开侧栏` / value `0`, then back again.
+- Real packaged Electron inspection of `/Users/jenson/Desktop/Aimcub/Aimcub.app` confirmed the top-left sidebar toggle collapses and expands the sidebar. Accessibility state changed from "Collapse sidebar" / value `1` to "Expand sidebar" / value `0`, then back again.
 - Chrome DevTools Protocol hit-testing confirmed `document.elementFromPoint(22, 120)` resolves to `data-od-id="sidebar-peek-trigger"`, and dispatching a real mouse move at that point changes `.od-app.dataset.sidebarState` to `peek`.
 - A packaged-app screenshot after that CDP hover showed the overlay sidebar revealed over the workspace, matching the requested hover-reveal behavior.
 - During verification, old running app processes had to be terminated before copying the rebuilt bundle; copying over a still-running app can leave stale renderer state in the old process.
