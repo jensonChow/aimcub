@@ -11,6 +11,7 @@ Branch: `main`
 - Removed the sidebar-wide `no-drag` override so the sidebar header drag region is not nested under a parent no-drag region.
 - Added a focused renderer regression test for the stable drag strip and toggle no-drag contract.
 - Updated `docs/memory/design-system.md` and `docs/memory/desktop.md` with the durable drag-region stability requirement.
+- Ran the `memory-refresh` audit after the drag-region fix commit; root memory files remain within the 50-line budget and no root-memory expansion was needed.
 
 ## Current State
 
@@ -42,7 +43,7 @@ Branch: `main`
 
 Notes:
 - MCP worker tests still log the expected missing-Supabase opaque-error path while passing.
-- Commit/push status: this drag-region fix is included in the latest session commit and should be pushed with the session closeout.
+- Commit/push status: drag-region fix commit `0a7cbff` is local on `main`; this memory-refresh closeout should be committed and pushed with the session closeout.
 
 ## Next Session Prompt
 
