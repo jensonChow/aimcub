@@ -16,11 +16,12 @@ Branch: `main`
 - Fixed collapsed layout so the main workbench remains centered/full-width while the sidebar is hidden.
 - Hardened the toggle click path by making pointer down switch immediately from a fixed top-layer button while preserving accessibility click support.
 - Updated Desktop/design memory with the new collapsible-sidebar behavior.
+- After that commit, the user manually reported that the toggle still cannot be used. Treat the sidebar toggle as unresolved despite passing local automated/accessibility-style checks.
 
 ## Current State
 
 - `main` supports the local Aim OS loop plus the primary-sidebar Settings surface, keyboard command palette navigation, and the command-composer first-run Aim screen.
-- The primary sidebar now has a top-left toggle: click toggles pinned/collapsed, and hover/focus while collapsed reveals a temporary overlay peek sidebar without resizing the workspace.
+- The primary sidebar has an attempted top-left toggle implementation for pinned/collapsed/peek states, but manual click usability is currently unresolved and must be debugged before further sidebar polish.
 - Settings keeps helper setup product-focused: the primary left sidebar owns Overview, Planning model, Local CLI agents, Web research, and Context sources navigation; the center workspace owns the selected detail pane.
 - The visual system now has stronger shell-level rules for no visible full-width top titlebar, collapsible/peek sidebars, stable sidebar rows, real command shortcuts, preference-style helper forms, quiet first-run chrome, and command-composer empty states, but a deeper pane/artifact system is still future work.
 - Operations memory now explicitly says visible Desktop UI changes require `pnpm desktop:pack`, copying `apps/desktop/dist/mac-arm64/Aimcub.app` to root `Aimcub.app`, restarting/opening that exact bundle, and inspecting the real window.
@@ -44,11 +45,12 @@ Branch: `main`
 
 Notes:
 - MCP worker tests intentionally log the expected missing-Supabase opaque-error path while passing.
-- Real app visual verification confirmed the old top titlebar and top-right command trigger are absent, and confirmed sidebar click collapse/expand in the rebuilt app.
+- Real app visual verification confirmed the old top titlebar and top-right command trigger are absent. Computer Use/accessibility-style clicks toggled the sidebar, but the user subsequently reported normal manual clicking still fails.
 - Commit: completed for the sidebar-toggle changes. Push is pending explicit user approval because the environment previously blocked pushing to an unverified external remote.
+- Open risk: sidebar toggle manual pointer hit testing is not resolved. Next work must reproduce with real pointer input, inspect Electron draggable/titlebar regions and z-index/hit target behavior, and avoid claiming success until the user can click the control.
 
 ## Next Session Prompt
 
 ```text
-Continue from `main`. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md, then load only task-relevant module memory. Preserve the desktop-quality direction: no visible full-width top titlebar, Claude Desktop-style sidebar toggle with pinned/collapsed/peek states, stable workbench shell, command-composer first-run Aim stage, real command shortcuts, compact sidebar rows, preference-style Settings detail panes, and reduced card noise. Preserve the Settings split view: the primary left app sidebar becomes settings category navigation, and the center workspace shows one selected detail pane. Preserve the Context Sources rule: one summary, compact planning readiness gates, and one editable control surface. If changes are made, update docs/handoff.md and run the full required verification command set.
+Continue from `main`. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md, then load only task-relevant module memory. First fix the unresolved Desktop sidebar toggle: the code has pinned/collapsed/peek state, but the user reports normal manual clicking still fails despite Computer Use/accessibility clicks toggling it. Reproduce with real pointer input, inspect Electron draggable/titlebar regions and z-index/hit target behavior, and do not claim success until the user can click the control. Preserve the no-visible-full-width-titlebar direction, stable workbench shell, command-composer first-run Aim stage, Settings split view, Context Sources one-summary/one-control rule, and full required verification gates.
 ```
