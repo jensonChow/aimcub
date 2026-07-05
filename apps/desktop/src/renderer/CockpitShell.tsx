@@ -2,13 +2,14 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import type { Goal } from "@core/types";
 
-import { useI18n } from "./i18n";
-import { LangToggle } from "./LangToggle";
+import { useI18n, type Lang } from "./i18n";
 
 import "./cockpit.css";
 
 export type CockpitStage = "aim" | "context" | "contracts" | "run" | "eval" | "settings";
 type SidebarState = "pinned" | "collapsed" | "peek";
+const USER_MENU_ID = "od-sidebar-user-menu";
+const LANGUAGE_MENU_ID = "od-sidebar-language-menu";
 
 export interface CockpitCommand {
   id: string;
@@ -324,9 +325,6 @@ export function CockpitShell({
               <h1>Aimcub</h1>
               <p>{t("os.tagline")}</p>
             </div>
-            <div className="od-sidebar-head-actions">
-              <LangToggle />
-            </div>
           </div>
 
           {usingSettingsSidebar ? settingsSidebar : (
@@ -389,15 +387,10 @@ export function CockpitShell({
                 </div>
               </section>
 
-              <button className="od-settings-button" type="button" onClick={() => onStage("settings")}>
-                <span>
-                  <strong>{t("os.settings")}</strong>
-                  <small>{t("cockpit.settings.meta")}</small>
-                </span>
-                <kbd>Cmd ,</kbd>
-              </button>
             </>
           )}
+
+          <SidebarUserMenu onSettings={() => onStage("settings")} />
         </aside>
 
         <main className={`od-main od-main-${activeStage}`} data-od-id="main-delivery-workbench">
@@ -438,6 +431,270 @@ function SidebarToggleIcon() {
     <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
       <rect x="3.5" y="3.5" width="13" height="13" rx="2" />
       <path d="M8 4v12" />
+    </svg>
+  );
+}
+
+function SidebarUserMenu(props: { onSettings: () => void }) {
+  const { lang, setLang, t } = useI18n();
+  const [open, setOpen] = useState(false);
+  const [languageOpen, setLanguageOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const firstItemRef = useRef<HTMLButtonElement | null>(null);
+  const focusFirstItemOnOpen = useRef(false);
+  const languageOptions = [
+    { lang: "en", label: t("userMenu.languageEnglish") },
+    { lang: "zh", label: t("userMenu.languageChinese") },
+  ] satisfies Array<{ lang: Lang; label: string }>;
+
+  function closeMenu(focusTrigger = false) {
+    focusFirstItemOnOpen.current = false;
+    setOpen(false);
+    setLanguageOpen(false);
+    if (focusTrigger) {
+      window.requestAnimationFrame(() => triggerRef.current?.focus());
+    }
+  }
+
+  function openMenu(focusFirstItem = false) {
+    focusFirstItemOnOpen.current = focusFirstItem;
+    setOpen(true);
+  }
+
+  function toggleMenu() {
+    if (open) {
+      closeMenu();
+      return;
+    }
+    openMenu(true);
+  }
+
+  function focusMenuItem(offset: number) {
+    const panel = panelRef.current;
+    if (!panel) return;
+    const items = Array.from(panel.querySelectorAll<HTMLButtonElement>("button:not(:disabled)"));
+    if (items.length === 0) return;
+    const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
+    const baseIndex = currentIndex >= 0 ? currentIndex : 0;
+    const nextIndex = (baseIndex + offset + items.length) % items.length;
+    items[nextIndex]?.focus();
+  }
+
+  function focusMenuEdge(edge: "first" | "last") {
+    const panel = panelRef.current;
+    if (!panel) return;
+    const items = Array.from(panel.querySelectorAll<HTMLButtonElement>("button:not(:disabled)"));
+    const item = edge === "first" ? items[0] : items[items.length - 1];
+    item?.focus();
+  }
+
+  function chooseLanguage(nextLang: Lang) {
+    setLang(nextLang);
+    closeMenu(true);
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    if (!focusFirstItemOnOpen.current) return;
+    const frame = window.requestAnimationFrame(() => {
+      firstItemRef.current?.focus();
+      focusFirstItemOnOpen.current = false;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function onPointerDown(event: PointerEvent) {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (rootRef.current?.contains(target)) return;
+      closeMenu();
+    }
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      closeMenu(true);
+    }
+
+    document.addEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown, true);
+      document.removeEventListener("keydown", onKeyDown, true);
+    };
+  }, [open]);
+
+  return (
+    <div className="od-user-menu-anchor" ref={rootRef} data-od-id="sidebar-user-menu">
+      {open ? (
+        <div
+          className="od-user-menu-popover"
+          id={USER_MENU_ID}
+          ref={panelRef}
+          role="menu"
+          aria-label={t("userMenu.menuLabel")}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowDown") {
+              event.preventDefault();
+              focusMenuItem(1);
+              return;
+            }
+            if (event.key === "ArrowUp") {
+              event.preventDefault();
+              focusMenuItem(-1);
+              return;
+            }
+            if (event.key === "Home") {
+              event.preventDefault();
+              focusMenuEdge("first");
+              return;
+            }
+            if (event.key === "End") {
+              event.preventDefault();
+              focusMenuEdge("last");
+              return;
+            }
+            if (event.key === "ArrowRight" && document.activeElement instanceof HTMLElement && document.activeElement.dataset.menuAction === "language") {
+              event.preventDefault();
+              setLanguageOpen(true);
+              return;
+            }
+            if (event.key === "ArrowLeft" && languageOpen) {
+              event.preventDefault();
+              setLanguageOpen(false);
+            }
+          }}
+        >
+          <div className="od-user-menu-header" role="presentation">
+            <span className="od-user-avatar" aria-hidden="true">A</span>
+            <span>
+              <strong>{t("userMenu.accountName")}</strong>
+              <small>{t("userMenu.accountMeta")}</small>
+            </span>
+          </div>
+
+          <button
+            className="od-user-menu-item"
+            ref={firstItemRef}
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              closeMenu();
+              props.onSettings();
+            }}
+          >
+            <SettingsIcon />
+            <span>{t("userMenu.settings")}</span>
+            <kbd>Cmd ,</kbd>
+          </button>
+
+          <div className="od-user-menu-separator" role="separator" />
+
+          <button
+            className="od-user-menu-item"
+            type="button"
+            role="menuitem"
+            aria-haspopup="menu"
+            aria-expanded={languageOpen}
+            aria-controls={LANGUAGE_MENU_ID}
+            data-menu-action="language"
+            onClick={() => setLanguageOpen((current) => !current)}
+          >
+            <GlobeIcon />
+            <span>{t("userMenu.language")}</span>
+            <ChevronRightIcon />
+          </button>
+
+          {languageOpen ? (
+            <div className="od-user-language-menu" id={LANGUAGE_MENU_ID} role="menu" aria-label={t("userMenu.languageMenu")}>
+              {languageOptions.map((option) => (
+                <button
+                  key={option.lang}
+                  className="od-user-menu-item od-user-language-option"
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={lang === option.lang}
+                  onClick={() => chooseLanguage(option.lang)}
+                >
+                  <CheckIcon visible={lang === option.lang} />
+                  <span>{option.label}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      <button
+        className="od-user-menu-trigger"
+        ref={triggerRef}
+        type="button"
+        aria-label={t("userMenu.triggerLabel")}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={USER_MENU_ID}
+        data-od-id="sidebar-user-menu-trigger"
+        onClick={toggleMenu}
+        onKeyDown={(event) => {
+          if (event.key !== "Enter" && event.key !== " " && event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+          event.preventDefault();
+          openMenu(true);
+        }}
+      >
+        <span className="od-user-avatar" aria-hidden="true">A</span>
+        <span className="od-user-trigger-copy">
+          <strong>{t("userMenu.accountName")}</strong>
+          <small>{t("userMenu.accountMeta")}</small>
+        </span>
+        <ChevronDownIcon />
+      </button>
+    </div>
+  );
+}
+
+function SettingsIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
+      <path d="M8.9 3.2h2.2l.4 1.8c.4.1.8.3 1.2.5l1.6-1 1.5 1.5-1 1.6c.2.4.4.8.5 1.2l1.8.4v2.2l-1.8.4c-.1.4-.3.8-.5 1.2l1 1.6-1.5 1.5-1.6-1c-.4.2-.8.4-1.2.5l-.4 1.8H8.9l-.4-1.8c-.4-.1-.8-.3-1.2-.5l-1.6 1-1.5-1.5 1-1.6c-.2-.4-.4-.8-.5-1.2l-1.8-.4V9.1l1.8-.4c.1-.4.3-.8.5-1.2l-1-1.6 1.5-1.5 1.6 1c.4-.2.8-.4 1.2-.5l.4-1.8Z" />
+      <circle cx="10" cy="10" r="2.3" />
+    </svg>
+  );
+}
+
+function GlobeIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
+      <circle cx="10" cy="10" r="7" />
+      <path d="M3.5 10h13M10 3c1.8 2 2.7 4.3 2.7 7s-.9 5-2.7 7M10 3C8.2 5 7.3 7.3 7.3 10s.9 5 2.7 7" />
+    </svg>
+  );
+}
+
+function ChevronRightIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
+      <path d="m8 5 5 5-5 5" />
+    </svg>
+  );
+}
+
+function ChevronDownIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
+      <path d="m5 8 5 5 5-5" />
+    </svg>
+  );
+}
+
+function CheckIcon(props: { visible: boolean }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false" data-visible={props.visible ? "true" : "false"}>
+      <path d="m4.5 10.5 3.2 3.2 7.8-8" />
     </svg>
   );
 }

@@ -56,7 +56,8 @@ Reference links:
 ## Desktop Information Architecture
 
 - Default shell: no visible top titlebar/status strip, left aim sidebar, center workspace. macOS window controls may sit in the sidebar-safe top area, but the app must not reserve a full-width bar above the workbench. No default right inspector.
-- Sidebar: brand, language toggle, New Aim, aim search/filter, recent aim list, settings entry. Keep it narrow enough to preserve work area, currently around 280 px.
+- Sidebar: brand, New Aim, aim search/filter, recent aim list, and footer user menu trigger. Keep it narrow enough to preserve work area, currently around 280 px.
+- Sidebar footer user menu: the lower-left account/user trigger opens an account-style popover menu. Put Settings and Language inside this menu; do not scatter these global controls across the sidebar header and footer.
 - Sidebar toggle: provide a Claude Desktop-like icon button as part of the top-left titlebar control cluster, immediately after the macOS traffic lights with an 8 px gap. It must support three states: pinned sidebar, collapsed sidebar, and peek sidebar. Clicking toggles pinned/collapsed; hovering the button or the 32 px left-edge reveal rail while collapsed reveals a temporary overlay sidebar without resizing the workspace.
 - Center workspace: workflow step navigation, then the active stage surface. The workspace should sit in a constrained max width so text lines and controls do not stretch across large windows.
 - New/empty Aim stage: hide workflow step navigation until there is an Aim or the user moves into later stages. The first surface should be a centered command-composer workbench with a concise title, one outcome input, optional supporting context, and one primary continue action.

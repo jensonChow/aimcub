@@ -158,6 +158,28 @@ describe("SettingsPanel", () => {
 });
 
 describe("CockpitShell", () => {
+  it("renders a sidebar footer user menu trigger", () => {
+    const html = renderToStaticMarkup(
+      <I18nProvider>
+        <CockpitShell
+          goals={[]}
+          selected={null}
+          activeStage="aim"
+          onNewAim={noop}
+          onOpenGoal={noop}
+          onStage={noop}
+          main={<div>New aim</div>}
+        />
+      </I18nProvider>,
+    );
+
+    expect(html).toContain('data-od-id="sidebar-user-menu-trigger"');
+    expect(html).toContain('aria-haspopup="menu"');
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain("Local user");
+    expect(html).toContain("Aimcub workspace");
+  });
+
   it("replaces the primary left sidebar with settings navigation on settings stage", () => {
     const html = renderToStaticMarkup(
       <I18nProvider>
@@ -184,6 +206,7 @@ describe("CockpitShell", () => {
     expect(html).toContain("Settings sections");
     expect(html).toContain("Planning model");
     expect(html).toContain("Settings detail pane");
+    expect(html).toContain('data-od-id="sidebar-user-menu-trigger"');
     expect(html).not.toContain("Search aims");
     expect(html).not.toContain("Aim OS workflow");
   });
@@ -207,6 +230,7 @@ describe("CockpitShell", () => {
     expect(html).toContain('data-od-id="window-drag-strip"');
     expect(css).toMatch(/\.od-window-drag-strip\s*{[^}]*app-region:\s*drag;[^}]*-webkit-app-region:\s*drag;/s);
     expect(css).toMatch(/\.od-sidebar-toggle\s*{[^}]*app-region:\s*no-drag;[^}]*-webkit-app-region:\s*no-drag;/s);
+    expect(css).toMatch(/\.od-user-menu-anchor,\s*\.od-user-menu-anchor \*\s*{[^}]*app-region:\s*no-drag;[^}]*-webkit-app-region:\s*no-drag;/s);
   });
 
   it("keeps the peek sidebar visible until its collapse animation finishes", () => {
