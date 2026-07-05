@@ -173,6 +173,10 @@ describe("CockpitShell", () => {
     );
 
     expect(html).toContain('data-od-id="left-settings-sidebar"');
+    expect(html).toContain('data-od-id="sidebar-toggle"');
+    expect(html).toContain('data-sidebar-state="pinned"');
+    expect(html).toContain('aria-label="Collapse sidebar"');
+    expect(html).toContain('aria-expanded="true"');
     expect(html).not.toContain('data-od-id="mac-titlebar"');
     expect(html).toContain("Settings sections");
     expect(html).toContain("Planning model");

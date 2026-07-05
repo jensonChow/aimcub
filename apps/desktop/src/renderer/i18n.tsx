@@ -61,6 +61,8 @@ export const STRINGS = {
   "shell.noNextAction": { en: "No next action yet", zh: "暂无下一步" },
   "shell.pending": { en: "Pending", zh: "待处理" },
   "shell.processLivesInInspector": { en: "Open Process in the sidebar to follow the detailed planning trace.", zh: "在左侧打开「过程」即可跟踪详细拆分轨迹。" },
+  "sidebar.collapse": { en: "Collapse sidebar", zh: "收起侧栏" },
+  "sidebar.expand": { en: "Expand sidebar", zh: "展开侧栏" },
 
   "chat.new": { en: "New aim", zh: "新目标" },
   "chat.home": { en: "Aims", zh: "目标" },

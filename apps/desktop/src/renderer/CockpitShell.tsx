@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import type { Goal } from "@core/types";
 
@@ -8,6 +8,7 @@ import { LangToggle } from "./LangToggle";
 import "./cockpit.css";
 
 export type CockpitStage = "aim" | "context" | "contracts" | "run" | "eval" | "settings";
+type SidebarState = "pinned" | "collapsed" | "peek";
 
 export interface CockpitCommand {
   id: string;
@@ -61,9 +62,17 @@ export function CockpitShell({
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "paused">("all");
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [sidebarPinned, setSidebarPinned] = useState(true);
+  const [sidebarPeeking, setSidebarPeeking] = useState(false);
+  const revealSidebarTimer = useRef<number | null>(null);
+  const hideSidebarTimer = useRef<number | null>(null);
+  const pointerToggleHandled = useRef(false);
   const usingSettingsSidebar = activeStage === "settings" && Boolean(settingsSidebar);
   const hasGoals = goals.length > 0;
   const firstRunAim = activeStage === "aim" && !selected && !hasGoals;
+  const sidebarState: SidebarState = sidebarPinned ? "pinned" : sidebarPeeking ? "peek" : "collapsed";
+  const sidebarVisible = sidebarState !== "collapsed";
+  const sidebarToggleLabel = sidebarPinned ? t("sidebar.collapse") : t("sidebar.expand");
 
   const stages = useMemo<StageItem[]>(() => [
     { stage: "aim", index: "1", title: t("os.stepAim") },
@@ -92,6 +101,90 @@ export function CockpitShell({
     { id: "stage-eval", label: t("os.stepEval"), detail: t("command.stageEval.detail"), shortcut: "Cmd 5", action: () => onStage("eval") },
     { id: "settings", label: t("os.settings"), detail: t("command.settings.detail"), shortcut: "Cmd ,", action: () => onStage("settings") },
   ], [commands, onNewAim, onStage, t]);
+
+  function clearSidebarRevealTimer() {
+    if (revealSidebarTimer.current === null) return;
+    window.clearTimeout(revealSidebarTimer.current);
+    revealSidebarTimer.current = null;
+  }
+
+  function clearSidebarHideTimer() {
+    if (hideSidebarTimer.current === null) return;
+    window.clearTimeout(hideSidebarTimer.current);
+    hideSidebarTimer.current = null;
+  }
+
+  function clearSidebarTimers() {
+    clearSidebarRevealTimer();
+    clearSidebarHideTimer();
+  }
+
+  function revealSidebarAfterHover() {
+    if (sidebarPinned) return;
+    clearSidebarHideTimer();
+    if (sidebarPeeking) return;
+    clearSidebarRevealTimer();
+    revealSidebarTimer.current = window.setTimeout(() => {
+      setSidebarPeeking(true);
+      revealSidebarTimer.current = null;
+    }, 180);
+  }
+
+  function keepSidebarPeekOpen() {
+    if (sidebarPinned) return;
+    clearSidebarTimers();
+    setSidebarPeeking(true);
+  }
+
+  function scheduleSidebarPeekClose() {
+    if (sidebarPinned) return;
+    clearSidebarRevealTimer();
+    clearSidebarHideTimer();
+    hideSidebarTimer.current = window.setTimeout(() => {
+      setSidebarPeeking(false);
+      hideSidebarTimer.current = null;
+    }, 180);
+  }
+
+  function toggleSidebarPin() {
+    clearSidebarTimers();
+    setSidebarPeeking(false);
+    setSidebarPinned((current) => !current);
+  }
+
+  function onSidebarTogglePointerDown(event: React.PointerEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    pointerToggleHandled.current = true;
+    toggleSidebarPin();
+    window.setTimeout(() => {
+      pointerToggleHandled.current = false;
+    }, 750);
+  }
+
+  function onSidebarToggleClick(event: React.MouseEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (pointerToggleHandled.current) {
+      pointerToggleHandled.current = false;
+      return;
+    }
+    toggleSidebarPin();
+  }
+
+  function onSidebarToggleKeyDown(event: React.KeyboardEvent<HTMLButtonElement>) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    event.stopPropagation();
+    toggleSidebarPin();
+  }
+
+  useEffect(() => {
+    return () => {
+      if (revealSidebarTimer.current !== null) window.clearTimeout(revealSidebarTimer.current);
+      if (hideSidebarTimer.current !== null) window.clearTimeout(hideSidebarTimer.current);
+    };
+  }, []);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -124,11 +217,37 @@ export function CockpitShell({
 
   return (
     <div className="od-window" data-od-id="desktop-window">
-      <div className={`od-app od-app-stage-${activeStage}`} data-empty-aim={firstRunAim ? "true" : "false"}>
+      <div
+        className={`od-app od-app-stage-${activeStage}`}
+        data-empty-aim={firstRunAim ? "true" : "false"}
+        data-sidebar-state={sidebarState}
+      >
+        <button
+          className="od-sidebar-toggle"
+          type="button"
+          aria-label={sidebarToggleLabel}
+          aria-expanded={sidebarVisible}
+          aria-pressed={sidebarPinned}
+          title={sidebarToggleLabel}
+          data-state={sidebarState}
+          data-od-id="sidebar-toggle"
+          onClick={onSidebarToggleClick}
+          onPointerDown={onSidebarTogglePointerDown}
+          onKeyDown={onSidebarToggleKeyDown}
+          onPointerEnter={revealSidebarAfterHover}
+          onPointerLeave={scheduleSidebarPeekClose}
+          onFocus={keepSidebarPeekOpen}
+          onBlur={scheduleSidebarPeekClose}
+        >
+          <SidebarToggleIcon />
+        </button>
         <aside
           className="od-sidebar"
           data-mode={usingSettingsSidebar ? "settings" : "aims"}
           data-od-id={usingSettingsSidebar ? "left-settings-sidebar" : "left-aim-sidebar"}
+          aria-hidden={sidebarVisible ? undefined : true}
+          onPointerEnter={keepSidebarPeekOpen}
+          onPointerLeave={scheduleSidebarPeekClose}
         >
           <div className="od-sidebar-head">
             <div>
@@ -241,6 +360,15 @@ export function CockpitShell({
         />
       ) : null}
     </div>
+  );
+}
+
+function SidebarToggleIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
+      <rect x="3.5" y="3.5" width="13" height="13" rx="2" />
+      <path d="M8 4v12" />
+    </svg>
   );
 }
 
