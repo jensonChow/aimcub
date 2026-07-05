@@ -15,6 +15,7 @@ const SIDEBAR_REVEAL_DELAY_MS = 180;
 const SIDEBAR_CLOSE_DELAY_MS = 180;
 const DEFAULT_WINDOW_CHROME_STATE: WindowChromeState = {
   fullscreen: false,
+  colorScheme: "light",
 };
 
 export interface CockpitCommand {
@@ -303,6 +304,7 @@ export function CockpitShell({
         className={`od-app od-app-stage-${activeStage}`}
         data-empty-aim={firstRunAim ? "true" : "false"}
         data-sidebar-state={sidebarState}
+        data-system-appearance={windowChrome.colorScheme}
         data-window-fullscreen={windowChrome.fullscreen ? "true" : "false"}
       >
         <div className="od-window-drag-strip" aria-hidden="true" data-od-id="window-drag-strip" />

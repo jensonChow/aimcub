@@ -607,7 +607,7 @@ function panelStyle(compact: boolean): CSSProperties {
     };
   }
   return {
-    background: "#fff",
+    background: C.surface,
     border: `1px solid ${C.border}`,
     borderRadius: 8,
     padding: compact ? 14 : 18,

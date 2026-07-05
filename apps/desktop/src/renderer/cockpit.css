@@ -1,4 +1,5 @@
 :root {
+  color-scheme: light;
   --od-bg: #ffffff;
   --od-surface: #f5f5f7;
   --od-surface-warm: #fbfbfd;
@@ -13,11 +14,93 @@
   --od-success: #16a34a;
   --od-warn: #b7791f;
   --od-danger: #dc2626;
+  --od-accent-hover: #0077ed;
+  --od-success-fg: #1a7f4b;
+  --od-warn-fg: #8a6517;
+  --od-disabled-bg: #aeb8bf;
+  --od-disabled-fg: #ffffff;
+  --od-scrollbar-thumb: rgba(31, 35, 40, 0.28);
+  --od-hit-region: rgba(255, 255, 255, 0.001);
+  --od-overlay-backdrop: rgba(245, 245, 247, 0.58);
+  --od-popover-bg: rgba(255, 255, 255, 0.96);
+  --od-shadow-peek: 20px 0 48px rgba(0, 0, 0, 0.12);
+  --od-shadow-popover: 0 18px 48px rgba(0, 0, 0, 0.14), 0 3px 14px rgba(0, 0, 0, 0.08);
+  --od-shadow-composer: 0 10px 26px rgba(0, 0, 0, 0.035);
+  --od-shadow-composer-focus: 0 10px 26px rgba(0, 0, 0, 0.04);
+  --od-shadow-command: 0 24px 70px rgba(0, 0, 0, 0.18);
   --od-radius-sm: 8px;
   --od-radius-md: 12px;
   --od-radius-lg: 16px;
   --od-radius-pill: 980px;
   --od-focus: 0 0 0 4px color-mix(in oklab, var(--od-accent), transparent 68%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --od-bg: #1c1c1e;
+    --od-surface: #2c2c2e;
+    --od-surface-warm: #242426;
+    --od-fg: #f5f5f7;
+    --od-fg-2: #e5e5ea;
+    --od-muted: #c7c7cc;
+    --od-meta: #a1a1a6;
+    --od-border: #4a4a4f;
+    --od-border-soft: #38383d;
+    --od-accent: #0a84ff;
+    --od-accent-on: #ffffff;
+    --od-success: #32d74b;
+    --od-warn: #ffd60a;
+    --od-danger: #ff453a;
+    --od-accent-hover: #409cff;
+    --od-success-fg: #32d74b;
+    --od-warn-fg: #ffd60a;
+    --od-disabled-bg: #4a4a4f;
+    --od-disabled-fg: #a1a1a6;
+    --od-scrollbar-thumb: rgba(235, 235, 245, 0.28);
+    --od-hit-region: rgba(0, 0, 0, 0.001);
+    --od-overlay-backdrop: rgba(28, 28, 30, 0.72);
+    --od-popover-bg: rgba(36, 36, 38, 0.96);
+    --od-shadow-peek: 20px 0 48px rgba(0, 0, 0, 0.38);
+    --od-shadow-popover: 0 18px 48px rgba(0, 0, 0, 0.42), 0 3px 14px rgba(0, 0, 0, 0.3);
+    --od-shadow-composer: 0 10px 26px rgba(0, 0, 0, 0.22);
+    --od-shadow-composer-focus: 0 10px 26px rgba(0, 0, 0, 0.26);
+    --od-shadow-command: 0 24px 70px rgba(0, 0, 0, 0.5);
+    --od-focus: 0 0 0 4px color-mix(in oklab, var(--od-accent), transparent 56%);
+  }
+}
+
+:root:has(.od-app[data-system-appearance="dark"]) {
+  color-scheme: dark;
+  --od-bg: #1c1c1e;
+  --od-surface: #2c2c2e;
+  --od-surface-warm: #242426;
+  --od-fg: #f5f5f7;
+  --od-fg-2: #e5e5ea;
+  --od-muted: #c7c7cc;
+  --od-meta: #a1a1a6;
+  --od-border: #4a4a4f;
+  --od-border-soft: #38383d;
+  --od-accent: #0a84ff;
+  --od-accent-on: #ffffff;
+  --od-success: #32d74b;
+  --od-warn: #ffd60a;
+  --od-danger: #ff453a;
+  --od-accent-hover: #409cff;
+  --od-success-fg: #32d74b;
+  --od-warn-fg: #ffd60a;
+  --od-disabled-bg: #4a4a4f;
+  --od-disabled-fg: #a1a1a6;
+  --od-scrollbar-thumb: rgba(235, 235, 245, 0.28);
+  --od-hit-region: rgba(0, 0, 0, 0.001);
+  --od-overlay-backdrop: rgba(28, 28, 30, 0.72);
+  --od-popover-bg: rgba(36, 36, 38, 0.96);
+  --od-shadow-peek: 20px 0 48px rgba(0, 0, 0, 0.38);
+  --od-shadow-popover: 0 18px 48px rgba(0, 0, 0, 0.42), 0 3px 14px rgba(0, 0, 0, 0.3);
+  --od-shadow-composer: 0 10px 26px rgba(0, 0, 0, 0.22);
+  --od-shadow-composer-focus: 0 10px 26px rgba(0, 0, 0, 0.26);
+  --od-shadow-command: 0 24px 70px rgba(0, 0, 0, 0.5);
+  --od-focus: 0 0 0 4px color-mix(in oklab, var(--od-accent), transparent 56%);
 }
 
 * {
@@ -41,6 +124,13 @@ select {
 
 button {
   border: 0;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--od-scrollbar-thumb);
+  background-clip: content-box;
+  border: 3px solid transparent;
+  border-radius: 999px;
 }
 
 button:focus-visible,
@@ -125,7 +215,7 @@ kbd {
   right: 0;
   left: calc(var(--titlebar-toggle-left) + var(--titlebar-toggle-size) + 8px);
   height: 24px;
-  background: rgba(255, 255, 255, 0.001);
+  background: var(--od-hit-region);
   user-select: none;
   app-region: drag;
   -webkit-app-region: drag;
@@ -142,7 +232,7 @@ kbd {
   bottom: 0;
   left: 0;
   width: 32px;
-  background: rgba(255, 255, 255, 0.001);
+  background: var(--od-hit-region);
   pointer-events: none;
 }
 
@@ -239,7 +329,7 @@ kbd {
   visibility: visible;
   transform: translateX(0);
   opacity: 1;
-  box-shadow: 20px 0 48px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--od-shadow-peek);
 }
 
 .od-sidebar-head,
@@ -580,7 +670,7 @@ kbd {
 }
 
 .od-chip.primary:hover {
-  background: #0077ed;
+  background: var(--od-accent-hover);
 }
 
 .od-chip:disabled:hover {
@@ -732,7 +822,7 @@ kbd {
   border: 1px solid var(--od-border);
   border-radius: var(--od-radius-md);
   background: color-mix(in oklab, var(--od-bg), var(--od-surface-warm) 18%);
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.14), 0 3px 14px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--od-shadow-popover);
 }
 
 .od-user-menu-header {
@@ -1509,14 +1599,14 @@ kbd {
   border: 1px solid color-mix(in oklab, var(--od-border), var(--od-border-soft) 35%);
   border-radius: var(--od-radius-md);
   background: var(--od-surface-warm);
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.035);
+  box-shadow: var(--od-shadow-composer);
   transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
 }
 
 .od-aim-composer:focus-within {
   border-color: color-mix(in oklab, var(--od-accent), var(--od-border) 35%);
   background: var(--od-bg);
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--od-shadow-composer-focus);
 }
 
 .od-aim-composer-footer {
@@ -1669,12 +1759,12 @@ kbd {
 }
 
 .od-aim-primary:hover:not(:disabled) {
-  background: #0077ed;
+  background: var(--od-accent-hover);
 }
 
 .od-aim-primary:disabled {
-  background: color-mix(in oklab, var(--od-fg), var(--od-bg) 78%);
-  color: color-mix(in oklab, var(--od-bg), var(--od-fg) 8%);
+  background: var(--od-disabled-bg);
+  color: var(--od-disabled-fg);
   cursor: default;
   opacity: 0.72;
 }
@@ -3434,7 +3524,7 @@ kbd {
   display: grid;
   place-items: start center;
   padding-top: 72px;
-  background: rgba(245, 245, 247, 0.58);
+  background: var(--od-overlay-backdrop);
   backdrop-filter: blur(14px);
 }
 
@@ -3443,8 +3533,8 @@ kbd {
   overflow: hidden;
   border: 1px solid color-mix(in oklab, var(--od-border), var(--od-bg) 28%);
   border-radius: var(--od-radius-md);
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.18);
+  background: var(--od-popover-bg);
+  box-shadow: var(--od-shadow-command);
 }
 
 .od-command-search {

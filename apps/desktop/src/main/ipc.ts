@@ -4,7 +4,7 @@
  * aims). Clarifying answers are folded into dimension-aware `user_stated` memories — the
  * first concrete writes toward the memory pillar.
  */
-import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from "electron";
+import { BrowserWindow, ipcMain, nativeTheme, type IpcMainInvokeEvent } from "electron";
 
 import type { Goal, Milestone } from "@core/types";
 import type { NewMemory } from "@core/store";
@@ -352,6 +352,7 @@ export function registerIpc(): void {
     const win = BrowserWindow.fromWebContents(event.sender);
     return {
       fullscreen: Boolean(win?.isFullScreen()),
+      colorScheme: nativeTheme.shouldUseDarkColors ? "dark" : "light",
     };
   });
 

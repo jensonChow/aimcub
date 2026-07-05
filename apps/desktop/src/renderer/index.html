@@ -8,12 +8,13 @@
       html,
       body,
       #root {
+        color-scheme: light dark;
         width: 100%;
         height: 100%;
         margin: 0;
         overflow: hidden;
         overscroll-behavior: none;
-        background: #fafafa;
+        background: #ffffff;
       }
 
       #root {
@@ -49,6 +50,19 @@
         background-clip: content-box;
         border: 3px solid transparent;
         border-radius: 999px;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        html,
+        body,
+        #root {
+          background: #1c1c1e;
+        }
+
+        ::-webkit-scrollbar-thumb {
+          background: rgba(235, 235, 245, 0.28);
+          background-clip: content-box;
+        }
       }
     </style>
   </head>

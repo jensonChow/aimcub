@@ -3,12 +3,26 @@ import type { CSSProperties } from "react";
 export const C = {
   text: "var(--od-fg, #1d1d1f)",
   muted: "var(--od-muted, #6e6e73)",
+  meta: "var(--od-meta, #86868b)",
   border: "var(--od-border-soft, #e8e8ed)",
+  borderStrong: "var(--od-border, #d2d2d7)",
   accent: "var(--od-accent, #0071e3)",
+  accentOn: "var(--od-accent-on, #ffffff)",
   accentBg: "color-mix(in oklab, var(--od-accent, #0071e3), var(--od-bg, #ffffff) 92%)",
+  accentHover: "var(--od-accent-hover, #0077ed)",
   surface: "var(--od-bg, #ffffff)",
   page: "var(--od-surface, #f5f5f7)",
+  surfaceWarm: "var(--od-surface-warm, #fbfbfd)",
+  disabledBg: "var(--od-disabled-bg, #aeb8bf)",
+  disabledText: "var(--od-disabled-fg, #ffffff)",
+  success: "var(--od-success-fg, #1a7f4b)",
+  successBg: "color-mix(in oklab, var(--od-success, #16a34a), var(--od-bg, #ffffff) 94%)",
+  warn: "var(--od-warn-fg, #8a6517)",
+  warnBg: "color-mix(in oklab, var(--od-warn, #b7791f), var(--od-bg, #ffffff) 94%)",
+  warnBorder: "color-mix(in oklab, var(--od-warn, #b7791f), var(--od-bg, #ffffff) 72%)",
   danger: "var(--od-danger, #dc2626)",
+  dangerBg: "color-mix(in oklab, var(--od-danger, #dc2626), var(--od-bg, #ffffff) 94%)",
+  dangerBorder: "color-mix(in oklab, var(--od-danger, #dc2626), var(--od-bg, #ffffff) 76%)",
 };
 
 export function card(): CSSProperties {
@@ -31,7 +45,7 @@ export function inputStyle(): CSSProperties {
 }
 
 export function primaryButton(disabled: boolean): CSSProperties {
-  return { marginTop: 16, minHeight: 40, padding: "0 16px", borderRadius: 999, border: "none", background: disabled ? "#aeb8bf" : C.accent, color: "#fff", fontSize: 14, fontWeight: 700, cursor: disabled ? "default" : "pointer", boxShadow: "none" };
+  return { marginTop: 16, minHeight: 40, padding: "0 16px", borderRadius: 999, border: "none", background: disabled ? C.disabledBg : C.accent, color: disabled ? C.disabledText : C.accentOn, fontSize: 14, fontWeight: 700, cursor: disabled ? "default" : "pointer", boxShadow: "none" };
 }
 
 export function secondaryButton(): CSSProperties {
@@ -39,11 +53,11 @@ export function secondaryButton(): CSSProperties {
 }
 
 export function optionButton(selected: boolean): CSSProperties {
-  return { flex: 1, textAlign: "left", padding: "10px 12px", borderRadius: 8, border: `1px solid ${selected ? C.accent : C.border}`, background: selected ? C.accentBg : "#fff", color: C.text, cursor: "pointer" };
+  return { flex: 1, textAlign: "left", padding: "10px 12px", borderRadius: 8, border: `1px solid ${selected ? C.accent : C.border}`, background: selected ? C.accentBg : C.surface, color: C.text, cursor: "pointer" };
 }
 
 export function scopeButton(selected: boolean): CSSProperties {
-  return { padding: "6px 10px", borderRadius: 8, border: `1px solid ${selected ? C.accent : C.border}`, background: selected ? C.accentBg : "#fff", color: selected ? C.accent : C.muted, fontSize: 12, cursor: "pointer" };
+  return { padding: "6px 10px", borderRadius: 8, border: `1px solid ${selected ? C.accent : C.border}`, background: selected ? C.accentBg : C.surface, color: selected ? C.accent : C.muted, fontSize: 12, cursor: "pointer" };
 }
 
 export function chipButton(): CSSProperties {

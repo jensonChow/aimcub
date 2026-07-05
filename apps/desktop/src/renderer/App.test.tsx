@@ -231,6 +231,7 @@ describe("CockpitShell", () => {
 
     expect(html).toContain('data-od-id="window-drag-strip"');
     expect(html).toContain('data-window-fullscreen="false"');
+    expect(html).toContain('data-system-appearance="light"');
     expect(html).not.toContain('data-od-id="traffic-light-inactive-dots"');
     expect(html).not.toContain("data-window-focused");
     expect(html).not.toContain("data-window-traffic-lights");
@@ -251,6 +252,28 @@ describe("CockpitShell", () => {
     expect(main).toContain('win.webContents.on("zoom-changed", () => scheduleNativeMacWindowChrome(win))');
     expect(css).not.toContain("od-traffic-light-inactive-dots");
     expect(css).not.toContain("--traffic-light-size");
+  });
+
+  it("follows the native system appearance for dark mode", () => {
+    const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
+    const html = readFileSync(new URL("./index.html", import.meta.url), "utf8");
+    const main = readFileSync(new URL("../main/index.ts", import.meta.url), "utf8");
+    const ipc = readFileSync(new URL("../main/ipc.ts", import.meta.url), "utf8");
+
+    expect(main).toContain('nativeTheme.themeSource = "system"');
+    expect(main).toContain('const DARK_WINDOW_BACKGROUND = "#1c1c1e"');
+    expect(main).toContain("win.setBackgroundColor(nativeWindowBackgroundColor())");
+    expect(main).toContain('nativeTheme.on("updated"');
+    expect(main).toContain("colorScheme: systemColorScheme()");
+    expect(ipc).toContain('colorScheme: nativeTheme.shouldUseDarkColors ? "dark" : "light"');
+    expect(css).toContain("@media (prefers-color-scheme: dark)");
+    expect(css).toContain(':root:has(.od-app[data-system-appearance="dark"])');
+    expect(css).toContain("color-scheme: dark;");
+    expect(css).toContain("--od-bg: #1c1c1e;");
+    expect(css).toContain("--od-popover-bg: rgba(36, 36, 38, 0.96);");
+    expect(html).toContain("color-scheme: light dark;");
+    expect(html).toContain("@media (prefers-color-scheme: dark)");
+    expect(html).not.toContain("background: #fafafa;");
   });
 
   it("moves the sidebar toggle left in fullscreen without hiding native titlebar traffic lights", () => {

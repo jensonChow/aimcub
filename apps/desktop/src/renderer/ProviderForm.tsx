@@ -181,7 +181,7 @@ export function ProviderForm({ status, onSaved, onClose }: ProviderFormProps) {
 
       {formError && <div style={{ color: C.danger, fontSize: 13, marginTop: 10 }}>{formError}</div>}
       {testResult && (
-        <div style={{ color: testResult.ok ? "#2f6f44" : C.danger, fontSize: 13, marginTop: 10 }}>
+        <div style={{ color: testResult.ok ? C.success : C.danger, fontSize: 13, marginTop: 10 }}>
           {testResult.message}
         </div>
       )}

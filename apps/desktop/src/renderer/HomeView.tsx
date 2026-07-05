@@ -98,7 +98,7 @@ export function ContextProfilePanel({ report }: { report: ContextProfileReport |
           {t("context.profileScore", { score: report.coverageScore })}
         </span>
       </div>
-      <div style={{ ...card(), background: "#fbfaf7" }}>
+      <div style={{ ...card(), background: C.surfaceWarm }}>
         <div style={{ display: "grid", gap: 8 }}>
           {report.rows.slice(0, 6).map((row) => (
             <div
@@ -140,7 +140,7 @@ export function ContextLearningPanel({ report }: { report: ClarifyLearningReport
           {t("context.learningCounts", { answered: report.total_answered, impacted: report.total_impacted })}
         </span>
       </div>
-      <div style={{ ...card(), background: "#f7fbf8" }}>
+      <div style={{ ...card(), background: C.successBg }}>
         <div style={{ display: "grid", gap: 8 }}>
           {rows.map((row) => (
             <div
@@ -182,7 +182,7 @@ export function ContextLineageLearningPanel({ report }: { report: ContextLineage
           })}
         </span>
       </div>
-      <div style={{ ...card(), background: "#f7fbfb" }}>
+      <div style={{ ...card(), background: C.accentBg }}>
         <div style={{ display: "grid", gap: 10 }}>
           {rows.map((row, index) => {
             const source = row.gapSource?.replace("_", "-") ?? row.source.replace("_", "-");
@@ -234,7 +234,7 @@ export function DecompositionLearningPanel({ report }: { report: DecompositionLe
           })}
         </span>
       </div>
-      <div style={{ ...card(), background: "#f8faf6" }}>
+      <div style={{ ...card(), background: C.surfaceWarm }}>
         <div style={{ display: "grid", gap: 10 }}>
           {rows.map((row, index) => {
             const context = row.acceptedContextCount || row.rejectedContextCount || row.deprioritizedContextCount
@@ -290,7 +290,7 @@ export function ContextHealthPanel({
     const traced = rows.filter((row) => row.selectedCount + row.ignoredCount > 0).length;
     return (
       <section style={{ marginBottom: 18 }}>
-        <div style={{ ...card(), background: "#f7fbf8", color: "#1a7f4b", fontSize: 13 }}>
+        <div style={{ ...card(), background: C.successBg, color: C.success, fontSize: 13 }}>
           {t("context.healthClean", { traced, total: rows.length })}
         </div>
       </section>
@@ -306,7 +306,7 @@ export function ContextHealthPanel({
         </span>
       </div>
       {actionable.slice(0, 5).map((row) => (
-        <div key={row.memoryId} style={{ ...card(), background: "#fffaf1" }}>
+        <div key={row.memoryId} style={{ ...card(), background: C.warnBg }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline" }}>
             <div style={{ color: C.muted, fontSize: 12 }}>
               {row.category} · {contextHealthActionLabel(row.action, t)}
@@ -326,7 +326,7 @@ export function ContextHealthPanel({
             </button>
             <button
               onClick={() => onArchive(row.memoryId)}
-              style={{ ...secondaryButton(), marginTop: 0, color: C.danger, borderColor: "#e7c9c9" }}
+              style={{ ...secondaryButton(), marginTop: 0, color: C.danger, borderColor: C.dangerBorder }}
             >
               {t("context.health.archive")}
             </button>

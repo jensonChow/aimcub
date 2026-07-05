@@ -12,8 +12,8 @@ export function LangToggle() {
           style={{
             padding: "5px 10px",
             border: "none",
-            background: lang === l ? C.accent : "#fff",
-            color: lang === l ? "#fff" : C.muted,
+            background: lang === l ? C.accent : C.surface,
+            color: lang === l ? C.accentOn : C.muted,
             fontSize: 12,
             cursor: "pointer",
           }}

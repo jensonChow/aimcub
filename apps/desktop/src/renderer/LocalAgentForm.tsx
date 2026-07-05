@@ -72,10 +72,10 @@ export function LocalAgentForm({ agents, onRefresh }: LocalAgentFormProps) {
             <div
               key={agent.id}
               style={{
-                border: `1px solid ${ready ? C.border : "#efd2c9"}`,
+                border: `1px solid ${ready ? C.border : C.warnBorder}`,
                 borderRadius: 8,
                 padding: 12,
-                background: ready ? C.surface : "color-mix(in oklab, var(--od-warn, #b7791f), var(--od-bg, #ffffff) 94%)",
+                background: ready ? C.surface : C.warnBg,
                 display: "grid",
                 gap: 8,
               }}
@@ -107,7 +107,7 @@ export function LocalAgentForm({ agents, onRefresh }: LocalAgentFormProps) {
                 <div style={{ color: C.danger, fontSize: 12 }}>{agent.authMessage}</div>
               )}
               {test?.result && (
-                <div style={{ color: test.result.ok ? "#2f6f44" : C.danger, fontSize: 12 }}>
+                <div style={{ color: test.result.ok ? C.success : C.danger, fontSize: 12 }}>
                   {test.result.ok ? t("laf.testOk", { ms: test.result.durationMs }) : test.result.error ?? t("laf.testFailed")}
                 </div>
               )}

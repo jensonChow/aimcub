@@ -5,39 +5,39 @@ Branch: `main`
 
 ## Current Session
 
-- Fixed macOS fullscreen window chrome so Aimcub no longer hides native traffic lights from the revealed system fullscreen titlebar.
-- Kept the existing fullscreen product-page layout behavior: the sidebar toggle still moves left into the traffic-light-safe area when the app reports fullscreen.
-- Updated Desktop shell tests to prevent reintroducing `setWindowButtonVisibility(!win.isFullScreen())`.
-- Updated `docs/memory/desktop.md` and `docs/memory/design-system.md` with the corrected fullscreen traffic-light rule.
+- Added native macOS light/dark appearance support for Desktop.
+- Main process now follows Electron `nativeTheme.themeSource = "system"`, applies matching BrowserWindow background colors, and emits `colorScheme` with window chrome state.
+- Renderer now exposes `data-system-appearance`, supports dark tokens through both `prefers-color-scheme: dark` and native appearance state, and removes legacy light-only inline style values from visible Desktop surfaces.
+- Updated Desktop shell tests to lock native theme behavior, dark tokens, and no renderer-drawn traffic-light substitutes.
+- Updated `docs/memory/design-system.md` and `docs/memory/desktop.md` with the macOS system appearance rule.
 - Refreshed root `Aimcub.app` from the latest Electron 43 folder-style Desktop build.
-- Ran a post-merge memory-refresh audit and updated this handoff to reflect final Git status.
 
 ## Current State
 
-- Commit `a45f951` was pushed on `codex-fullscreen-traffic-lights`, fast-forward merged into `main`, and pushed to `origin/main`.
-- This memory-refresh follow-up is docs-only and was prepared directly on `main`; no separate branch merge is needed.
+- Work was prepared directly on `main`; no separate feature branch merge is needed.
+- `main` started one local commit ahead of `origin/main` (`d0c80ca`, docs-only handoff refresh from the prior session). Push the final `main` state after committing this session.
 - Root `Aimcub.app`, `apps/desktop/out`, and `apps/desktop/dist` were refreshed locally and remain ignored build artifacts.
-- Native macOS behavior still needs user-facing visual confirmation in the real fullscreen hover-titlebar interaction, but the packaged main-process code now keeps native window buttons visible.
+- Visual verification forced Electron nativeTheme light and dark states and checked narrow dark layout. The only console warning was Electron's expected dev/unpackaged CSP warning.
 
 ## Verification
 
 Passed:
 
-- `python3 /Users/jenson/.codex/skills/memory-refresh/scripts/audit_project_memory.py /Users/jenson/Desktop/Aimcub`
-- `wc -l AGENTS.md CLAUDE.md docs/handoff.md`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop test -- App.test.tsx`
+- `PATH=/Users/jenson/.local/node/bin:$PATH node /private/tmp/aimcub-electron-theme-verify.mjs`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm lint`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm core:purity`
 - `git diff --check`
-- `ELECTRON_BUILDER_CACHE=/private/tmp/aimcub-electron-builder-cache COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop exec electron-builder --mac --dir --config.electronDownload.cache=/private/tmp/aimcub-electron-cache`
+- `ELECTRON_BUILDER_CACHE=/private/tmp/aimcub-electron-builder-cache COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm desktop:pack`
 - `ditto apps/desktop/dist/mac-arm64/Aimcub.app Aimcub.app`
 
 Notes:
 
 - MCP worker tests may log the expected missing-Supabase opaque-error path while passing.
+- Electron visual verification requires launching a local GUI process outside the filesystem sandbox.
 
 ## Next Session Prompt
 

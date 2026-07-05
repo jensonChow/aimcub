@@ -397,8 +397,11 @@ export interface RunMilestoneAgentResult {
   error: string | null;
 }
 
+export type SystemColorScheme = "light" | "dark";
+
 export interface WindowChromeState {
   fullscreen: boolean;
+  colorScheme: SystemColorScheme;
 }
 
 /** The typed surface exposed on `window.aimcub` by the preload bridge. */

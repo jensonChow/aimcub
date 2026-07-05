@@ -70,7 +70,7 @@ export function WebResearchForm({ status, onSaved }: WebResearchFormProps) {
           <div className="od-form-title">{t("wf.title")}</div>
           <div className="od-form-body">{t("wf.blurb")}</div>
         </div>
-        <div style={{ color: status?.configured ? "#2f6f44" : C.muted, fontSize: 12, fontWeight: 700, whiteSpace: "nowrap" }}>
+        <div style={{ color: status?.configured ? C.success : C.muted, fontSize: 12, fontWeight: 700, whiteSpace: "nowrap" }}>
           {status?.configured ? t("wf.ready") : t("wf.notReady")}
         </div>
       </div>
@@ -98,7 +98,7 @@ export function WebResearchForm({ status, onSaved }: WebResearchFormProps) {
       </label>
 
       {message && (
-        <div style={{ color: message.ok ? "#2f6f44" : C.danger, fontSize: 13, marginTop: 10 }}>
+        <div style={{ color: message.ok ? C.success : C.danger, fontSize: 13, marginTop: 10 }}>
           {message.text}
         </div>
       )}

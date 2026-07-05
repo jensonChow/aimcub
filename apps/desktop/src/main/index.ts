@@ -1,4 +1,4 @@
-import { app, BrowserWindow, type Point } from "electron";
+import { app, BrowserWindow, nativeTheme, type Point } from "electron";
 import { join } from "node:path";
 
 import { registerIpc } from "./ipc";
@@ -8,12 +8,23 @@ import { loadWebResearchConfig } from "./web-research-settings";
 import { IPC, type WindowChromeState } from "../shared/ipc";
 
 app.setName("Aimcub");
+nativeTheme.themeSource = "system";
 
 let mainWindow: BrowserWindow | null = null;
 
 const MAC_TRAFFIC_LIGHT_X = 16;
 const MAC_TRAFFIC_LIGHT_ROW_HEIGHT = 46;
 const MAC_TRAFFIC_LIGHT_BUTTON_SIZE = 14;
+const LIGHT_WINDOW_BACKGROUND = "#ffffff";
+const DARK_WINDOW_BACKGROUND = "#1c1c1e";
+
+function systemColorScheme(): WindowChromeState["colorScheme"] {
+  return nativeTheme.shouldUseDarkColors ? "dark" : "light";
+}
+
+function nativeWindowBackgroundColor(): string {
+  return systemColorScheme() === "dark" ? DARK_WINDOW_BACKGROUND : LIGHT_WINDOW_BACKGROUND;
+}
 
 function nativeTrafficLightPosition(zoomFactor = 1): Point {
   const safeZoomFactor = Number.isFinite(zoomFactor) && zoomFactor > 0 ? zoomFactor : 1;
@@ -29,6 +40,11 @@ function applyNativeMacWindowChrome(win: BrowserWindow): void {
   win.setWindowButtonPosition(nativeTrafficLightPosition(win.webContents.getZoomFactor()));
 }
 
+function applyNativeSystemAppearance(win: BrowserWindow): void {
+  if (win.isDestroyed()) return;
+  win.setBackgroundColor(nativeWindowBackgroundColor());
+}
+
 function scheduleNativeMacWindowChrome(win: BrowserWindow): void {
   if (process.platform !== "darwin") return;
   setTimeout(() => applyNativeMacWindowChrome(win), 0);
@@ -37,6 +53,7 @@ function scheduleNativeMacWindowChrome(win: BrowserWindow): void {
 function windowChromeState(win: BrowserWindow): WindowChromeState {
   return {
     fullscreen: win.isFullScreen(),
+    colorScheme: systemColorScheme(),
   };
 }
 
@@ -53,7 +70,7 @@ function createWindow(): void {
     minHeight: 720,
     show: false,
     title: "Aimcub",
-    backgroundColor: "#fafafa",
+    backgroundColor: nativeWindowBackgroundColor(),
     titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
     trafficLightPosition: process.platform === "darwin" ? nativeTrafficLightPosition() : undefined,
     webPreferences: {
@@ -63,11 +80,13 @@ function createWindow(): void {
   });
 
   mainWindow = win;
+  applyNativeSystemAppearance(win);
   applyNativeMacWindowChrome(win);
   win.on("closed", () => {
     if (mainWindow === win) mainWindow = null;
   });
   win.on("ready-to-show", () => {
+    applyNativeSystemAppearance(win);
     applyNativeMacWindowChrome(win);
     win.show();
   });
@@ -119,6 +138,12 @@ app.whenReady().then(() => {
   loadContextSourceConfig();
   registerIpc();
   createWindow();
+  nativeTheme.on("updated", () => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      applyNativeSystemAppearance(win);
+      sendWindowChromeState(win);
+    }
+  });
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });

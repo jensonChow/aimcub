@@ -121,7 +121,7 @@ Reference links:
 
 ## Color, Surfaces, and Materials
 
-- Default Desktop theme is light. Dark mode can be added later, but every token must support high contrast and system preference.
+- Desktop supports light and dark appearances and must follow the macOS system appearance by default. Use Electron `nativeTheme` and CSS `prefers-color-scheme`/`data-system-appearance` tokens; do not add an in-app theme switch until there is a concrete product reason.
 - Current desktop palette:
   - Background: `#ffffff`
   - Surface: `#f5f5f7`
@@ -136,6 +136,20 @@ Reference links:
   - Success: `#16a34a`
   - Warning: `#b7791f`
   - Danger: `#dc2626`
+- Current dark desktop palette:
+  - Background: `#1c1c1e`
+  - Surface: `#2c2c2e`
+  - Warm surface: `#242426`
+  - Text: `#f5f5f7`
+  - Secondary text: `#e5e5ea`
+  - Muted text: `#c7c7cc`
+  - Meta text: `#a1a1a6`
+  - Border: `#4a4a4f`
+  - Soft border: `#38383d`
+  - Accent: `#0a84ff`
+  - Success: `#32d74b`
+  - Warning: `#ffd60a`
+  - Danger: `#ff453a`
 - Use accent for primary actions, current step indicators, focused progress, and selected command emphasis. Do not flood whole panels with accent color.
 - Semantic states must not rely on color alone. Pair color with label text, icon, position, or shape.
 - Borders should do most separation work. Shadows are rare and shallow, reserved for overlays, popovers, floating restore controls, or modal-like layers.
@@ -196,6 +210,7 @@ Reference links:
 ## Electron Desktop Engineering Details
 
 - Renderer should stay isolated from Node. Use preload and typed IPC for allowed operations.
+- Desktop window appearance should stay native-system-first: main process sets `nativeTheme.themeSource = "system"`, applies a matching `BrowserWindow` background color, and emits the current `colorScheme` with window chrome state. Renderer dark tokens must respond to both `prefers-color-scheme: dark` and `data-system-appearance="dark"` so native theme changes are reflected without local UI preferences.
 - Do not load remote content with Node integration. Prefer local packaged UI and trusted HTTPS resources only when needed.
 - Validate IPC senders for privileged operations such as file access, agent execution, provider settings, and external opening.
 - Keep or add a restrictive Content Security Policy for renderer HTML.

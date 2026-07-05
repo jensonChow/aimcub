@@ -252,12 +252,12 @@ function mergedModelRuns(
 
 function modelRunColor(run: PlanningLiveModelRun): string {
   if (run.status === "running") return C.accent;
-  return run.status === "ok" ? "#1a7f4b" : C.danger;
+  return run.status === "ok" ? C.success : C.danger;
 }
 
 function liveEventColor(event: PlanningLiveEvent): string {
   if (event.type === "planning.failed" || event.type === "model.failed") return C.danger;
-  if (event.type.endsWith(".completed")) return "#1a7f4b";
+  if (event.type.endsWith(".completed")) return C.success;
   return C.accent;
 }
 
@@ -615,7 +615,7 @@ function toolLabel(toolName: string, t: T): string {
 
 function panelStyle(): CSSProperties {
   return {
-    background: "#fff",
+    background: C.surface,
     border: `1px solid ${C.border}`,
     borderRadius: 8,
     padding: 16,
@@ -679,7 +679,7 @@ function metaLineStyle(): CSSProperties {
 
 function previewBlockStyle(): CSSProperties {
   return {
-    background: "#f6f7f7",
+    background: C.page,
     border: `1px solid ${C.border}`,
     borderRadius: 6,
     padding: 8,
@@ -702,7 +702,7 @@ function compactBlockStyle(): CSSProperties {
 function pillStyle(color: string): CSSProperties {
   return {
     color,
-    background: "#f6f7f7",
+    background: C.page,
     border: `1px solid ${C.border}`,
     borderRadius: 999,
     padding: "2px 7px",

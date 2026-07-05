@@ -1710,7 +1710,7 @@ function ClarifyPanel(props: {
             <div key={question.id} style={questionStyle()}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline" }}>
                 <div style={{ fontWeight: 750 }}>{question.question}</div>
-                <span style={badgeStyle("#f6f7f7", C.muted)}>{t(multi ? "os.multiSelect" : "os.singleSelect")}</span>
+                <span style={badgeStyle(C.page, C.muted)}>{t(multi ? "os.multiSelect" : "os.singleSelect")}</span>
               </div>
               <div style={{ color: C.muted, fontSize: 13, marginTop: 4 }}>{question.why_high_impact}</div>
               <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
@@ -3307,7 +3307,7 @@ function ProgressDonut({ done, total }: { done: number; total: number }) {
 
 function panelStyle(): CSSProperties {
   return {
-    background: "#fff",
+    background: C.surface,
     border: "none",
     borderRadius: 0,
     padding: 0,
@@ -3347,14 +3347,14 @@ function questionStyle(): CSSProperties {
     border: `1px solid ${C.border}`,
     borderRadius: 8,
     padding: 14,
-    background: "#fbfbfb",
+    background: C.surfaceWarm,
   };
 }
 
 function choiceStyle(active: boolean): CSSProperties {
   return {
     border: `1px solid ${active ? C.accent : C.border}`,
-    background: active ? C.accentBg : "#fff",
+    background: active ? C.accentBg : C.surface,
     borderRadius: 8,
     padding: 12,
     display: "grid",
@@ -3389,7 +3389,7 @@ function donutStyle(value: number): CSSProperties {
     width: 96,
     height: 96,
     borderRadius: "50%",
-    background: `conic-gradient(${C.accent} ${value * 3.6}deg, #e7eaed 0deg)`,
+    background: `conic-gradient(${C.accent} ${value * 3.6}deg, ${C.border} 0deg)`,
     display: "grid",
     placeItems: "center",
   };
@@ -3400,7 +3400,7 @@ function donutInnerStyle(): CSSProperties {
     width: 70,
     height: 70,
     borderRadius: "50%",
-    background: "#fff",
+    background: C.surface,
     display: "grid",
     placeItems: "center",
     alignContent: "center",

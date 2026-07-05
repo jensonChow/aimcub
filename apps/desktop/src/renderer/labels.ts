@@ -206,8 +206,8 @@ export function captureContractLabel(capture: ContextCaptureContract, t: T): str
 
 export function qualityTone(grade: PlanQualityDimensionReport["grade"]): string {
   if (grade === "fail") return C.danger;
-  if (grade === "warn") return "#8a6517";
-  return "#1a7f4b";
+  if (grade === "warn") return C.warn;
+  return C.success;
 }
 
 export function dimensionLabel(dimension: PlanQualityDimensionReport["dimension"], t: T): string {
@@ -276,11 +276,11 @@ export function aimLearningStatusMark(status: AimLearningReport["rows"][number][
 export function aimLearningStatusColor(status: AimLearningReport["rows"][number]["status"]): string {
   switch (status) {
     case "learned":
-      return "#1a7f4b";
+      return C.success;
     case "pending":
       return C.accent;
     case "gap":
-      return "#8a6517";
+      return C.warn;
   }
 }
 
@@ -343,9 +343,9 @@ export function fulfillmentStatusColor(status: ContextCaptureFulfillmentReport["
   switch (status) {
     case "captured_and_impacted":
     case "captured":
-      return "#1a7f4b";
+      return C.success;
     case "answered_without_memory":
-      return "#8a6517";
+      return C.warn;
     case "unanswered":
       return C.muted;
   }
