@@ -243,7 +243,7 @@ describe("CockpitShell", () => {
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
     const main = readFileSync(new URL("../main/index.ts", import.meta.url), "utf8");
 
-    expect(main).toContain('titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default"');
+    expect(main).toContain('titleBarStyle: process.platform === "darwin" ? "hidden" : "default"');
     expect(main).toContain("trafficLightPosition: process.platform === \"darwin\" ? { x: 16, y: 16 } : undefined");
     expect(css).not.toContain("od-traffic-light-inactive-dots");
     expect(css).not.toContain("--traffic-light-size");
