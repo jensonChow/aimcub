@@ -1127,6 +1127,7 @@ function AimOsApp() {
       localAgents={localAgents}
       model={settingsModel}
       activeSection={settingsSection}
+      onSection={setSettingsSection}
       onProvider={setProvider}
       onWeb={setWebResearch}
       onContextSources={setContextSources}
@@ -2820,6 +2821,7 @@ export function SettingsPanel(props: {
   localAgents: LocalAgentDetection[];
   model: SettingsModel;
   activeSection: SettingsSectionId;
+  onSection: (section: SettingsSectionId) => void;
   aimContext: {
     title: string;
     profile: AimHelperProfile;
@@ -2844,6 +2846,7 @@ export function SettingsPanel(props: {
         overallNext={model.overallNext}
         aimContext={props.aimContext}
         onReturnToAim={props.onReturnToAim}
+        onSection={props.onSection}
       />
     );
   } else if (activeSection === "provider") {
@@ -3011,14 +3014,33 @@ function SettingsPrimarySidebar(props: {
   onBack: () => void;
 }) {
   const { t } = useI18n();
+  const [query, setQuery] = useState("");
+  const normalizedQuery = query.trim().toLowerCase();
+  const visibleItems = props.model.navItems.filter((item) => {
+    if (!normalizedQuery) return true;
+    return `${item.title} ${item.body}`.toLowerCase().includes(normalizedQuery);
+  });
+
   return (
     <div className="od-settings-sidebar-content">
-      <button className="od-new-aim od-settings-back" type="button" onClick={props.onBack}>
+      <button className="od-settings-back" type="button" onClick={props.onBack}>
+        <SettingsBackIcon />
         <span>{t("settings.backToAims")}</span>
       </button>
 
+      <label className="od-settings-search">
+        <span>{t("settings.searchLabel")}</span>
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder={t("settings.searchPlaceholder")}
+        />
+      </label>
+
       <nav className="od-settings-nav" aria-label={t("settings.navigationLabel")}>
-        {props.model.navItems.map((item) => (
+        <div className="od-settings-nav-section">{t("settings.group.aim")}</div>
+        {visibleItems.length === 0 ? <div className="od-settings-nav-empty">{t("settings.searchEmpty")}</div> : null}
+        {visibleItems.map((item) => (
           <button
             key={item.id}
             type="button"
@@ -3028,19 +3050,69 @@ function SettingsPrimarySidebar(props: {
             aria-current={item.id === props.activeSection ? "page" : undefined}
             onClick={() => props.onSection(item.id)}
           >
-            <span className="od-settings-nav-title">
-              <strong>{item.title}</strong>
-              <span className={`od-pill ${item.tone}`}>{item.status}</span>
-            </span>
-            <span className="od-settings-nav-body">{item.body}</span>
-            <span className="od-settings-nav-next">
-              <span>{t("settings.nextAction")}</span>
-              <strong>{item.next}</strong>
-            </span>
+            <SettingsNavIcon section={item.id} />
+            <span className="od-settings-nav-label">{item.title}</span>
+            <span className={`od-settings-nav-dot ${item.tone}`} title={item.status} aria-label={item.status} />
           </button>
         ))}
       </nav>
     </div>
+  );
+}
+
+function SettingsBackIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
+      <path d="M12.5 5.5 8 10l4.5 4.5" />
+      <path d="M8.5 10H16" />
+    </svg>
+  );
+}
+
+function SettingsNavIcon(props: { section: SettingsSectionId }) {
+  const pathBySection: Record<SettingsSectionId, ReactNode> = {
+    overview: (
+      <>
+        <circle cx="7" cy="7" r="2.5" />
+        <circle cx="13" cy="7" r="2.5" />
+        <path d="M4.5 13.5h11" />
+      </>
+    ),
+    provider: (
+      <>
+        <path d="M4.5 5.5h11v9h-11z" />
+        <path d="M7.5 8.5h5" />
+        <path d="M7.5 11.5h3" />
+      </>
+    ),
+    local: (
+      <>
+        <path d="M4 6.5h12v7H4z" />
+        <path d="M7 16h6" />
+        <path d="M10 13.5V16" />
+      </>
+    ),
+    web: (
+      <>
+        <circle cx="10" cy="10" r="5.5" />
+        <path d="M4.5 10h11" />
+        <path d="M10 4.5c1.5 1.6 2.2 3.4 2.2 5.5s-.7 3.9-2.2 5.5" />
+        <path d="M10 4.5C8.5 6.1 7.8 7.9 7.8 10s.7 3.9 2.2 5.5" />
+      </>
+    ),
+    context: (
+      <>
+        <path d="M5 5.5h10v9H5z" />
+        <path d="M7.5 8h5" />
+        <path d="M7.5 11h4" />
+      </>
+    ),
+  };
+
+  return (
+    <svg className="od-settings-nav-icon" aria-hidden="true" viewBox="0 0 20 20" focusable="false">
+      {pathBySection[props.section]}
+    </svg>
   );
 }
 
@@ -3055,11 +3127,13 @@ function SettingsOverviewPane(props: {
     runtimeReady: boolean;
   } | null;
   onReturnToAim?: () => void;
+  onSection: (section: SettingsSectionId) => void;
 }) {
   const { t } = useI18n();
+  const planningStatus = props.planningReady ? t("settings.status.readyToPlan") : t("os.blocked");
   return (
     <section className="od-settings-pane">
-      <SettingsPaneHeader helper={props.helper} />
+      <SettingsPaneHeader title={props.helper.title} body={props.helper.body} />
 
       {props.aimContext ? (
         <SettingsAimContextPanel
@@ -3070,32 +3144,29 @@ function SettingsOverviewPane(props: {
         />
       ) : null}
 
-      <div className="od-helper-callout" data-state={props.planningReady ? "ready" : "blocked"}>
-        <span className={`od-pill ${props.planningReady ? "success" : "warn"}`}>
-          {props.planningReady ? t("settings.status.readyToPlan") : t("os.blocked")}
-        </span>
-        <div>
-          <span>{t("settings.nextAction")}</span>
-          <strong>{props.overallNext}</strong>
-        </div>
-        <p>{t("settings.intakeNote")}</p>
-      </div>
-
-      <div className="od-helper-readiness" aria-label={t("settings.readinessLabel")}>
+      <SettingsRowSection title={t("settings.section.aim")} body={t("settings.section.aimBody")}>
+        <SettingsRow
+          title={t("settings.row.planningStatus")}
+          body={t("settings.intakeNote")}
+          detail={props.overallNext}
+          status={planningStatus}
+          tone={props.planningReady ? "success" : "warn"}
+          actionLabel={props.onReturnToAim ? t("settings.action.openAim") : undefined}
+          onAction={props.onReturnToAim}
+        />
         {props.helpers.map((helper) => (
-          <div className="od-helper-row" key={helper.id} data-tone={helper.tone || "neutral"}>
-            <div className="od-helper-row-main">
-              <strong>{helper.title}</strong>
-              <span>{helper.body}</span>
-            </div>
-            <span className={`od-pill ${helper.tone}`}>{helper.status}</span>
-            <div className="od-helper-row-next">
-              <span>{t("settings.nextAction")}</span>
-              <strong>{helper.next}</strong>
-            </div>
-          </div>
+          <SettingsRow
+            key={helper.id}
+            title={helper.title}
+            body={helper.body}
+            detail={helper.next}
+            status={helper.status}
+            tone={helper.tone}
+            actionLabel={settingsActionLabel(helper.id, t)}
+            onAction={() => props.onSection(helper.id)}
+          />
         ))}
-      </div>
+      </SettingsRowSection>
     </section>
   );
 }
@@ -3103,7 +3174,7 @@ function SettingsOverviewPane(props: {
 function SettingsDetailPane(props: { helper: SettingsHelper; children: ReactNode }) {
   return (
     <section className="od-settings-pane">
-      <SettingsPaneHeader helper={props.helper} />
+      <SettingsPaneHeader title={props.helper.title} body={props.helper.body} />
       <div className="od-settings-pane-body">
         {props.children}
       </div>
@@ -3111,21 +3182,62 @@ function SettingsDetailPane(props: { helper: SettingsHelper; children: ReactNode
   );
 }
 
-function SettingsPaneHeader(props: { helper: SettingsHelper }) {
-  const { t } = useI18n();
+function SettingsPaneHeader(props: { title: string; body: string }) {
   return (
     <header className="od-settings-pane-head">
       <div>
-        <h3>{props.helper.title}</h3>
-        <p>{props.helper.body}</p>
-      </div>
-      <div className="od-settings-pane-status">
-        <span className={`od-pill ${props.helper.tone}`}>{props.helper.status}</span>
-        <span>{t("settings.nextAction")}</span>
-        <strong>{props.helper.next}</strong>
+        <h3>{props.title}</h3>
+        <p>{props.body}</p>
       </div>
     </header>
   );
+}
+
+function SettingsRowSection(props: { title: string; body?: string; children: ReactNode }) {
+  return (
+    <section className="od-settings-row-section">
+      <div className="od-settings-row-section-head">
+        <h4>{props.title}</h4>
+        {props.body ? <p>{props.body}</p> : null}
+      </div>
+      <div className="od-settings-row-list">
+        {props.children}
+      </div>
+    </section>
+  );
+}
+
+function SettingsRow(props: {
+  title: string;
+  body: string;
+  detail?: string;
+  status?: string;
+  tone?: SettingsHelperTone;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <div className="od-settings-row">
+      <div className="od-settings-row-copy">
+        <strong>{props.title}</strong>
+        <span>{props.body}</span>
+        {props.detail ? <small>{props.detail}</small> : null}
+      </div>
+      <div className="od-settings-row-control">
+        {props.status ? <span className={`od-settings-status-pill ${props.tone || ""}`}>{props.status}</span> : null}
+        {props.actionLabel && props.onAction ? (
+          <button className="od-settings-row-button" type="button" onClick={props.onAction}>
+            {props.actionLabel}
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function settingsActionLabel(section: SettingsSectionId, t: I18n["t"]): string {
+  if (section === "local") return t("settings.action.manage");
+  return t("settings.action.configure");
 }
 
 function SettingsAimContextPanel(props: {
@@ -3136,22 +3248,23 @@ function SettingsAimContextPanel(props: {
 }) {
   const { t } = useI18n();
   return (
-    <section className="od-settings-aim-context" data-state={props.runtimeReady ? "ready" : "blocked"}>
-      <div className="od-settings-aim-context-main">
-        <div className="od-aim-kicker">{t("firstRun.settingsEyebrow")}</div>
-        <h3>{shortText(props.title, 140)}</h3>
-        <p>{props.runtimeReady ? t("firstRun.settingsReady") : t("firstRun.settingsBlocked")}</p>
+    <section className="od-settings-current-aim" data-state={props.runtimeReady ? "ready" : "blocked"}>
+      <div className="od-settings-current-aim-copy">
+        <span>{t("firstRun.settingsEyebrow")}</span>
+        <strong>{shortText(props.title, 140)}</strong>
+        <small>{helperReason(props.profile, t)}</small>
       </div>
-      <div className="od-first-run-helper-grid">
-        <HelperFact label={t("firstRun.capabilityLabel")} value={helperCapabilityLabel(props.profile, t)} />
-        <HelperFact label={t("firstRun.bestHelperLabel")} value={helperPreferenceLabel(props.profile, t)} />
+      <div className="od-settings-current-aim-control">
+        <span className="od-settings-status-pill">{helperPreferenceLabel(props.profile, t)}</span>
+        <span className={`od-settings-status-pill ${props.runtimeReady ? "success" : "warn"}`}>
+          {props.runtimeReady ? t("settings.status.readyToPlan") : t("os.blocked")}
+        </span>
+        {props.onReturnToAim ? (
+          <button className="od-settings-row-button" type="button" onClick={props.onReturnToAim}>
+            {t("firstRun.returnToAim")}
+          </button>
+        ) : null}
       </div>
-      <p className="od-first-run-helper-reason">{helperReason(props.profile, t)}</p>
-      {props.onReturnToAim ? (
-        <button className="od-aim-secondary" type="button" onClick={props.onReturnToAim}>
-          {t("firstRun.returnToAim")}
-        </button>
-      ) : null}
     </section>
   );
 }

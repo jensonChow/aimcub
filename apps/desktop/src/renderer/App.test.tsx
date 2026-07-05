@@ -140,6 +140,7 @@ describe("SettingsPanel", () => {
           localAgents={[]}
           model={model}
           activeSection="overview"
+          onSection={noop}
           aimContext={null}
           onProvider={noop}
           onWeb={noop}
@@ -150,7 +151,8 @@ describe("SettingsPanel", () => {
     );
 
     expect(html).toContain("Overview");
-    expect(html).toContain("Helper readiness");
+    expect(html).toContain("Planning status");
+    expect(html).toContain("Configure");
     expect(html).not.toContain("Settings sections");
     expect(html).not.toContain("API key");
     expect(html).not.toContain("Rescan");
