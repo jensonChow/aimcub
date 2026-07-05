@@ -5,34 +5,30 @@ Branch: `main`
 
 ## Current Session
 
-- Fixed the collapsed sidebar hover-reveal exit animation: pointer leave now lets the sidebar transform/fade finish before `visibility: hidden` applies.
-- Kept peek/pinned sidebar entry immediate by clearing the delayed visibility transition for visible sidebar states.
-- Added a renderer CSS regression test for the sidebar peek collapse animation contract.
-- Updated `docs/memory/design-system.md` with the durable rule that hover-revealed overlays need symmetric enter and exit motion.
+- Updated `AGENTS.md` non-negotiables so every repo-changing session must run the full verification suite, refresh the root `Aimcub.app` from `pnpm desktop:pack`, commit, push, and merge completed branch work into `main` unless the user explicitly opts out.
+- This follows the user's request to make the project-root app bundle refresh part of the mandatory closeout workflow.
 
 ## Current State
 
 - `main` keeps the simplified Desktop shell: no full-width visible titlebar, left sidebar, center workspace, command-composer first-run Aim screen, and settings split-view.
 - The sidebar toggle contract remains: manual click/keyboard toggle wins over hover/focus peek; fresh hover reveal still works from the button and left-edge rail; transient peek does not resize the workspace.
-- The root packaged app at `/Users/jenson/Desktop/Aimcub/Aimcub.app` was not refreshed in this session; verification used the current source build and Electron dev renderer.
+- The root packaged app at `/Users/jenson/Desktop/Aimcub/Aimcub.app` must be refreshed before ending any future repo-changing session.
 
 ## Verification
 
 - Passed:
-  - `pnpm --filter @app/desktop test`
-  - `pnpm --filter @app/desktop typecheck`
-  - `pnpm --filter @app/desktop lint`
-  - `pnpm --filter @app/desktop build`
   - `pnpm build && pnpm test && pnpm typecheck && pnpm lint && pnpm core:purity`
-- Current-source Electron dev window rendered at `localhost:5173` and the Desktop shell loaded correctly through Computer Use.
+  - `pnpm desktop:pack`
+  - copy `apps/desktop/dist/mac-arm64/Aimcub.app` to root `Aimcub.app`
+  - `git diff --check`
 
 Notes:
-- MCP worker tests still log the expected missing-Supabase opaque-error path while passing.
-- Playwright's bundled Chromium is not installed locally, and direct Playwright Electron launch failed in the Node REPL environment; the exit-animation behavior is covered by the CSS regression test plus current-source renderer smoke check.
-- Commit/push status: this closeout should be committed and pushed after the handoff update.
+- MCP worker tests may log the expected missing-Supabase opaque-error path while passing.
+- Because this session edits docs only, the app bundle refresh is procedural rather than code-visible, but it was still completed under the new root rule.
+- Commit/push status: this closeout should be committed and pushed after the handoff update. Work happened directly on `main`, so no separate branch merge is needed.
 
 ## Next Session Prompt
 
 ```text
-Continue from `main`. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md, then load only task-relevant module memory. For Desktop shell work, preserve the top-left sidebar toggle contract: manual click/keyboard toggle wins over hover/focus peek, fresh hover reveal still works from the button and left-edge rail, Electron draggable regions must not cover the toggle/reveal hit targets, window drag hit areas must stay stable across focus/activation cycles, and hover-revealed overlays must animate both entry and exit instead of disappearing instantly on pointer leave.
+Continue from `main`. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md, then load only task-relevant module memory. For every repo-changing session, run the full verification suite, refresh root `Aimcub.app` from `pnpm desktop:pack`, commit, push, and merge completed branch work into `main` unless the user explicitly opts out.
 ```
