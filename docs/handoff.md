@@ -5,9 +5,9 @@ Branch: `main`
 
 ## Current Session
 
-- Refined Desktop settings shell so entering Settings locks the category sidebar open and removes the normal Aim workspace sidebar toggle, peek rail, and `Aimcub / Workbench` brand header.
-- Kept the Settings back control, settings search, category navigation, and lower-left account menu.
-- Updated `docs/memory/design-system.md` with the durable settings locked-sidebar rule.
+- Ran `memory-refresh` after commit `b51fd55`.
+- Reconciled `docs/memory/desktop.md` with the current Settings shell contract: Settings locks the category sidebar open and omits the normal Aim workspace sidebar toggle, peek rail, and `Aimcub / Workbench` brand header.
+- Confirmed `docs/memory/design-system.md` already owns the detailed control-panel and locked-settings-sidebar visual rules.
 
 ## Current State
 
@@ -33,8 +33,8 @@ Branch: `main`
 
 Notes:
 - MCP worker tests may log the expected missing-Supabase opaque-error path while passing.
-- Root `Aimcub.app` and `apps/desktop/dist/mac-arm64/Aimcub.app` both have `app.asar` timestamp `Jul 5 20:28 2026`.
-- Commit/push status: settings sidebar chrome refinement is committed locally on `main` and pushed to `origin/main`. Work happened directly on `main`, so no separate branch merge is needed.
+- Root `Aimcub.app` and `apps/desktop/dist/mac-arm64/Aimcub.app` both have `app.asar` timestamp `Jul 5 20:40 2026`.
+- Commit/push status: memory-refresh closeout is committed locally on `main` and pushed to `origin/main`. Work happened directly on `main`, so no separate branch merge is needed.
 
 ## Next Session Prompt
 
