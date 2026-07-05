@@ -230,7 +230,7 @@ describe("CockpitShell", () => {
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
 
     expect(html).toContain('data-od-id="window-drag-strip"');
-    expect(html).toContain('data-od-id="traffic-light-backdrop"');
+    expect(html).toContain('data-od-id="traffic-light-inactive-dots"');
     expect(html).toContain('data-window-fullscreen="false"');
     expect(html).toContain('data-window-focused="true"');
     expect(html).toContain('data-window-traffic-lights="true"');
@@ -242,13 +242,16 @@ describe("CockpitShell", () => {
   it("keeps inactive macOS traffic lights visible without intercepting them", () => {
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
 
-    expect(css).toMatch(/\.od-traffic-light-backdrop\s*{[^}]*opacity:\s*0;/s);
-    expect(css).toMatch(/\.od-traffic-light-backdrop\s*{[^}]*pointer-events:\s*none;/s);
+    expect(css).toMatch(/\.od-traffic-light-inactive-dots\s*{[^}]*opacity:\s*0;/s);
+    expect(css).toMatch(/\.od-traffic-light-inactive-dots\s*{[^}]*pointer-events:\s*none;/s);
     expect(css).toMatch(
-      /\.od-app\[data-window-focused="false"\]\[data-window-traffic-lights="true"\] \.od-traffic-light-backdrop\s*{[^}]*opacity:\s*1;/s,
+      /\.od-traffic-light-inactive-dots span\s*{[^}]*width:\s*14px;[^}]*height:\s*14px;[^}]*border-radius:\s*50%;[^}]*background:\s*#c9c9cf;/s,
     );
     expect(css).toMatch(
-      /\.od-app\[data-window-fullscreen="true"\] \.od-traffic-light-backdrop\s*{[^}]*opacity:\s*0;/s,
+      /\.od-app\[data-window-focused="false"\]\[data-window-traffic-lights="true"\] \.od-traffic-light-inactive-dots\s*{[^}]*opacity:\s*1;/s,
+    );
+    expect(css).toMatch(
+      /\.od-app\[data-window-fullscreen="true"\] \.od-traffic-light-inactive-dots\s*{[^}]*opacity:\s*0;/s,
     );
   });
 
