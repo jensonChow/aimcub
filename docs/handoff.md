@@ -5,9 +5,9 @@ Branch: `main`
 
 ## Current Session
 
-- Replaced the inactive macOS traffic-light capsule backing with Claude/Codex-style inactive dots: three separate same-color neutral gray circles aligned to the native controls.
-- Kept the inactive dots non-interactive and hidden while focused or fullscreen, preserving native traffic-light clicks and the fullscreen toggle offset behavior.
-- Updated renderer regression coverage and `docs/memory/design-system.md` so inactive traffic lights use dots rather than a pill/capsule backing surface.
+- Ran the `memory-refresh` audit after `4c6e4a0 Use inactive traffic light dots` and reconciled the Desktop memory state against the latest sidebar/titlebar chrome commits.
+- Promoted the long-lived normal-window, fullscreen, and inactive traffic-light behavior into `docs/memory/desktop.md`; `docs/memory/design-system.md` remains the owner for detailed visual rules.
+- No product code changed in this refresh; the repo change is limited to memory and handoff documentation.
 
 ## Current State
 
@@ -21,11 +21,8 @@ Branch: `main`
 ## Verification
 
 - Passed:
-  - Electron CDP inactive chrome check against the built app: inactive state `focused=false`, `trafficLights=true`, dots `opacity=1`, `pointer-events=none`, three 14 px dots at x `16`, `37`, and `58` with neutral gray fill/border.
-  - Captured and inspected `/private/tmp/aimcub-inactive-dots.png` to confirm the inactive chrome is three dots, not a capsule.
-  - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop test`
-  - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop typecheck`
-  - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop lint`
+  - `python3 /Users/jenson/.codex/skills/memory-refresh/scripts/audit_project_memory.py /Users/jenson/Desktop/Aimcub`
+  - Root memory line counts: `AGENTS.md` 34 lines, `CLAUDE.md` 34 lines.
   - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
   - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
   - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck`
@@ -37,7 +34,7 @@ Branch: `main`
 
 Notes:
 - MCP worker tests may log the expected missing-Supabase opaque-error path while passing.
-- Root `Aimcub.app` and `apps/desktop/dist/mac-arm64/Aimcub.app` both have `app.asar` timestamp `Jul 5 21:30:14 2026`.
+- Root `Aimcub.app` was refreshed from `apps/desktop/dist/mac-arm64/Aimcub.app` during this memory-refresh session.
 - Commit/push status: committed and pushed directly on `main`; no separate branch merge was needed.
 
 ## Next Session Prompt
