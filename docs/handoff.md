@@ -5,20 +5,18 @@ Branch: `main`
 
 ## Current Session
 
-- Continued the Desktop product-polish pass after the user compared the current first-run screen against Claude's desktop quality bar.
-- Reworked the empty Aim stage from a large form/wizard surface into a centered command-composer workbench with one outcome input, optional supporting context, and a quieter Continue action.
-- Hid workflow step navigation on the unsaved Aim stage so process machinery appears only after it helps the next action.
-- Lightened the empty sidebar: search and filters now appear only after aim history exists, and the no-aims state is a compact Recent aims placeholder instead of a large dashed card.
-- Tightened first-run copy to avoid exposing internal workflow terms such as Context and Sub-aim contracts before the user has entered an aim.
-- Followed up on the user's "still messy" feedback by reducing first-run chrome: removed idle titlebar status text, removed the "New Aim" eyebrow from the main intake surface, narrowed the sidebar, shortened copy, reduced composer height, and removed the heavy automatic focus ring.
-- Promoted the first-run command-composer requirement into `docs/memory/design-system.md`.
-- Ran the `memory-refresh` audit and reconciled durable Desktop/Operations memory with the current first-run shell and local app packaging workflow.
+- Started a Desktop UI polish session from the user's request to remove the top title bar.
+- Removed the visible full-width `CockpitShell` titlebar, including the top-right command trigger, while preserving the keyboard-first command palette behavior.
+- Let the Desktop layout fill the full window height and moved macOS traffic lights into sidebar-safe space.
+- Updated the settings-shell render test so the absence of the old titlebar is asserted.
+- Promoted the no-visible-top-titlebar rule into `docs/memory/design-system.md` and `docs/memory/desktop.md`.
+- Rebuilt and copied the local `Aimcub.app`, then restarted and visually inspected the real app window.
 
 ## Current State
 
-- `main` supports the local Aim OS loop plus the primary-sidebar Settings surface, command palette navigation, and the command-composer first-run Aim screen.
+- `main` supports the local Aim OS loop plus the primary-sidebar Settings surface, keyboard command palette navigation, and the command-composer first-run Aim screen.
 - Settings keeps helper setup product-focused: the primary left sidebar owns Overview, Planning model, Local CLI agents, Web research, and Context sources navigation; the center workspace owns the selected detail pane.
-- The visual system now has stronger shell-level rules for stable sidebar rows, real command shortcuts, preference-style helper forms, quiet first-run chrome, and command-composer empty states, but a deeper pane/artifact system is still future work.
+- The visual system now has stronger shell-level rules for no visible full-width top titlebar, stable sidebar rows, real command shortcuts, preference-style helper forms, quiet first-run chrome, and command-composer empty states, but a deeper pane/artifact system is still future work.
 - Operations memory now explicitly says visible Desktop UI changes require `pnpm desktop:pack`, copying `apps/desktop/dist/mac-arm64/Aimcub.app` to root `Aimcub.app`, restarting/opening that exact bundle, and inspecting the real window.
 - Context Sources still has one setup summary, compact planning readiness gates, and one editable control surface. The gates cover context bundle, research fusion, gap intake, scope guard, and sub-aim readiness.
 
@@ -31,17 +29,20 @@ Branch: `main`
   - `pnpm lint`
   - `pnpm core:purity`
   - `git diff --check`
-- Additional desktop package checks passed before the full run:
+- Additional desktop checks passed before the full run:
   - `pnpm --filter @app/desktop typecheck`
   - `pnpm --filter @app/desktop test`
+  - `pnpm desktop:pack`
+  - copied `apps/desktop/dist/mac-arm64/Aimcub.app` to root `Aimcub.app`
+  - restarted and inspected `/Users/jenson/Desktop/Aimcub/Aimcub.app`
 
 Notes:
 - MCP worker tests intentionally log the expected missing-Supabase opaque-error path while passing.
-- Real app visual verification was run with Computer Use against `/Users/jenson/Desktop/Aimcub/Aimcub.app` after `pnpm desktop:pack` and copying `apps/desktop/dist/mac-arm64/Aimcub.app` to the project-root bundle.
-- Commit/push: completed for this session.
+- Real app visual verification confirmed the old top titlebar and top-right command trigger are absent.
+- Commit: completed for this session. Push is pending explicit user approval because the environment blocked pushing to an unverified external remote.
 
 ## Next Session Prompt
 
 ```text
-Continue from `main`. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md, then load only task-relevant module memory. Preserve the desktop-quality direction: stable workbench shell, command-composer first-run Aim stage, real command shortcuts, compact sidebar rows, preference-style Settings detail panes, and reduced card noise. Preserve the Settings split view: the primary left app sidebar becomes settings category navigation, and the center workspace shows one selected detail pane. Preserve the Context Sources rule: one summary, compact planning readiness gates, and one editable control surface. If changes are made, update docs/handoff.md and run the full required verification command set.
+Continue from `main`. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md, then load only task-relevant module memory. Preserve the desktop-quality direction: no visible full-width top titlebar, stable workbench shell, command-composer first-run Aim stage, real command shortcuts, compact sidebar rows, preference-style Settings detail panes, and reduced card noise. Preserve the Settings split view: the primary left app sidebar becomes settings category navigation, and the center workspace shows one selected detail pane. Preserve the Context Sources rule: one summary, compact planning readiness gates, and one editable control surface. If changes are made, update docs/handoff.md and run the full required verification command set.
 ```

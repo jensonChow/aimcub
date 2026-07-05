@@ -61,30 +61,6 @@ select:focus-visible {
   letter-spacing: 0;
 }
 
-.od-titlebar {
-  height: 38px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  padding: 0 14px 0 86px;
-  background: var(--od-surface);
-  border-bottom: 1px solid var(--od-border-soft);
-  color: var(--od-muted);
-  font-size: 12px;
-  font-weight: 650;
-  -webkit-app-region: drag;
-}
-
-.od-titlebar-status {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.od-command-trigger,
-.od-titlebar button,
-.od-titlebar kbd,
 .od-command-palette,
 .od-command-palette button,
 .od-command-palette input,
@@ -108,30 +84,9 @@ kbd {
   line-height: 1;
 }
 
-.od-command-trigger {
-  min-height: 26px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  border: 1px solid var(--od-border-soft);
-  border-radius: var(--od-radius-pill);
-  background: var(--od-surface-warm);
-  color: var(--od-muted);
-  padding: 0 8px 0 11px;
-  font-size: 12px;
-  font-weight: 650;
-  cursor: pointer;
-}
-
-.od-command-trigger:hover {
-  border-color: var(--od-border);
-  color: var(--od-fg);
-  background: var(--od-bg);
-}
-
 .od-app {
   --sidebar-width: 256px;
-  height: calc(100% - 38px);
+  height: 100%;
   min-height: 0;
   display: grid;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
@@ -157,11 +112,12 @@ kbd {
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   align-content: start;
   gap: 12px;
-  padding: 16px 12px 14px;
+  padding: 54px 12px 14px;
   overflow: auto;
   background: var(--od-surface);
   border-right: 1px solid var(--od-border-soft);
   scrollbar-gutter: stable;
+  -webkit-app-region: drag;
 }
 
 .od-sidebar[data-mode="settings"] {
@@ -192,6 +148,7 @@ kbd {
   justify-content: space-between;
   align-items: flex-start;
   gap: 10px;
+  -webkit-app-region: drag;
 }
 
 .od-sidebar-head h1 {
@@ -3377,14 +3334,6 @@ kbd {
 }
 
 @media (max-width: 760px) {
-  .od-titlebar {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .od-titlebar-status {
-    display: none;
-  }
-
   .od-stage-nav {
     flex-wrap: wrap;
   }

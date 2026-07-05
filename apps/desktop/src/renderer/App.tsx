@@ -1251,8 +1251,6 @@ function AimOsApp() {
       goals={goals}
       selected={selected}
       activeStage={activeStage}
-      busy={busy}
-      error={error}
       onNewAim={startNewAim}
       onOpenGoal={(goal) => void openGoal(goal)}
       onStage={openCockpitStage}

@@ -360,7 +360,6 @@ export const STRINGS = {
   "os.pendingContext": { en: "Pending context", zh: "待处理上下文" },
   "os.blocked": { en: "Blocked", zh: "阻塞" },
 
-  "cockpit.titlebar.ready": { en: "Ready", zh: "就绪" },
   "cockpit.stage.aim": { en: "intake", zh: "输入目标" },
   "cockpit.stage.context": { en: "session + trace", zh: "会话 + 轨迹" },
   "cockpit.stage.contracts": { en: "sub-aim + eval", zh: "子目标 + 评估" },
@@ -373,8 +372,6 @@ export const STRINGS = {
   "cockpit.settings.meta": { en: "models / agents / context", zh: "模型 / agent / 上下文" },
   "cockpit.resizeSidebar": { en: "Resize left sidebar", zh: "调整左侧边栏宽度" },
   "cockpit.workflow": { en: "Aim OS workflow", zh: "Aim OS 流程" },
-  "command.open": { en: "Commands", zh: "命令" },
-  "command.shortcut": { en: "Cmd K", zh: "Cmd K" },
   "command.escape": { en: "Esc", zh: "Esc" },
   "command.palette": { en: "Command palette", zh: "命令面板" },
   "command.searchPlaceholder": { en: "Search commands", zh: "搜索命令" },

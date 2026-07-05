@@ -22,8 +22,6 @@ interface CockpitShellProps {
   goals: Goal[];
   selected: Goal | null;
   activeStage: CockpitStage;
-  busy: string | null;
-  error: string | null;
   onNewAim: () => void;
   onOpenGoal: (goal: Goal) => void;
   onStage: (stage: CockpitStage) => void;
@@ -52,8 +50,6 @@ export function CockpitShell({
   goals,
   selected,
   activeStage,
-  busy,
-  error,
   onNewAim,
   onOpenGoal,
   onStage,
@@ -128,14 +124,6 @@ export function CockpitShell({
 
   return (
     <div className="od-window" data-od-id="desktop-window">
-      <header className="od-titlebar" data-od-id="mac-titlebar">
-        <div className="od-titlebar-status">{busy || error || ""}</div>
-        <button className="od-command-trigger" type="button" onClick={() => setPaletteOpen(true)}>
-          <span>{t("command.open")}</span>
-          <kbd>{t("command.shortcut")}</kbd>
-        </button>
-      </header>
-
       <div className={`od-app od-app-stage-${activeStage}`} data-empty-aim={firstRunAim ? "true" : "false"}>
         <aside
           className="od-sidebar"

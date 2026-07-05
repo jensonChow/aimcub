@@ -163,8 +163,6 @@ describe("CockpitShell", () => {
           goals={[]}
           selected={null}
           activeStage="settings"
-          busy={null}
-          error={null}
           onNewAim={noop}
           onOpenGoal={noop}
           onStage={noop}
@@ -175,8 +173,7 @@ describe("CockpitShell", () => {
     );
 
     expect(html).toContain('data-od-id="left-settings-sidebar"');
-    expect(html).toContain("Commands");
-    expect(html).toContain("Cmd K");
+    expect(html).not.toContain('data-od-id="mac-titlebar"');
     expect(html).toContain("Settings sections");
     expect(html).toContain("Planning model");
     expect(html).toContain("Settings detail pane");

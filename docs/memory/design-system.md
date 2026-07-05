@@ -1,6 +1,6 @@
 # Design System Memory
 
-Last updated: 2026-07-04
+Last updated: 2026-07-05
 
 ## Scope
 
@@ -55,12 +55,12 @@ Reference links:
 
 ## Desktop Information Architecture
 
-- Default shell: native-feeling titlebar/status strip, left aim sidebar, center workspace. No default right inspector.
+- Default shell: no visible top titlebar/status strip, left aim sidebar, center workspace. macOS window controls may sit in the sidebar-safe top area, but the app must not reserve a full-width bar above the workbench. No default right inspector.
 - Sidebar: brand, language toggle, New Aim, aim search/filter, recent aim list, settings entry. Keep it narrow enough to preserve work area, currently around 280 px.
 - Center workspace: workflow step navigation, then the active stage surface. The workspace should sit in a constrained max width so text lines and controls do not stretch across large windows.
 - New/empty Aim stage: hide workflow step navigation until there is an Aim or the user moves into later stages. The first surface should be a centered command-composer workbench with a concise title, one outcome input, optional supporting context, and one primary continue action.
 - Empty sidebar state: when there are no aims, do not show search, filters, or a large dashed empty card. Show a compact history placeholder under Recent aims. Add search/filter only after aim history exists.
-- Empty first-run composer proportions should stay compact: no automatic heavy focus ring on launch, no tall textarea-like blank space, no titlebar "ready" text competing with the input, and no large shadow that makes the surface feel like a floating card.
+- Empty first-run composer proportions should stay compact: no automatic heavy focus ring on launch, no tall textarea-like blank space, no visible top titlebar or titlebar "ready" text competing with the input, and no large shadow that makes the surface feel like a floating card.
 - Command palette: Desktop must provide a Cmd/Ctrl+K command surface for common navigation and actions. Keyboard shortcuts should be real, visible where useful, and not merely decorative labels.
 - Optional inspector: process, context, quality, activity, and debug details may exist as an opt-in overlay, drawer, popover, or developer-mode surface. It must be independently scrollable and cannot displace the primary task by default.
 - Stage model: Aim -> Context -> Plan/Contracts -> Execute -> Eval. Stage navigation may be visible, but each stage must still present a single dominant action.
@@ -179,7 +179,7 @@ Reference links:
 - Meet WCAG AA contrast: 4.5:1 for normal text and 3:1 for large text or icons conveying state.
 - Test high contrast, large text, keyboard-only navigation, and screen reader accessible names for any significant UI change.
 - Do not hard-code font sizes in ways that block OS text scaling when native platform support is available.
-- Preserve visible focus order that matches reading order: titlebar/status, sidebar controls, stage navigation, workspace content, optional overlays.
+- Preserve visible focus order that matches reading order: sidebar controls, stage navigation, workspace content, optional overlays.
 - Every icon-only control needs an accessible label and tooltip.
 - English repo prose is required. Chinese can appear only in `zh` i18n values. Design for both languages by allowing labels to wrap or truncate predictably.
 - Avoid abbreviations unless already introduced and useful. User-facing errors should state what happened, what Aimcub preserved, and the next action.

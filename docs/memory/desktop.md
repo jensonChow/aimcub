@@ -14,6 +14,7 @@ The default desktop shell is a simplified two-column product layout:
 
 - Left sidebar: brand, language toggle, New Aim, recent aim list, settings. Search/filter appears only after aim history exists; an empty first-run state uses a compact Recent aims placeholder.
 - Center workspace: the empty Aim stage is a quiet command-composer surface with no workflow step pills. Context, Plan/Contracts, Execute, and Eval may show lightweight workflow step pills above the active task surface.
+- No visible full-width titlebar above the workbench. Keep macOS window controls in sidebar-safe space and keep command palette access keyboard-first.
 - No right inspector/debug rail in the default product shell.
 
 The first-run Aim stage must stay calmer than the composer: no idle titlebar status text, no duplicate "New Aim" eyebrow in the main surface, no automatic heavy focus ring, and no large form-like blank textarea. The primary action is naming the outcome; context is secondary until the next stage.
