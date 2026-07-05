@@ -36,6 +36,12 @@ pnpm desktop:pack
 
 This creates `apps/desktop/dist/mac-arm64/Aimcub.app`; copy that bundle to root `Aimcub.app` for the current local handoff. In development macOS may label the Dock app as `Electron`, but the window title should be `Aimcub`.
 
+Desktop currently uses Electron 42.5.1. If sandboxed packaging cannot write Electron's default cache under `~/Library/Caches/electron`, run packaging with a writable cache, for example:
+
+```bash
+ELECTRON_CACHE=/private/tmp/aimcub-electron-cache pnpm desktop:pack
+```
+
 For any repo-changing session, `pnpm build` is not enough because it updates build output but not the project-root `Aimcub.app` bundle. Run `pnpm desktop:pack`, copy `apps/desktop/dist/mac-arm64/Aimcub.app` to root `Aimcub.app`, and restart/open that exact bundle when the user needs to inspect visible app behavior.
 
 Desktop release packaging for distributable DMG/zip artifacts uses:

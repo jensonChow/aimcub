@@ -1,7 +1,7 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-05
-Branch: `codex/native-window-chrome`
+Branch: `main`
 
 ## Current Session
 
@@ -18,6 +18,8 @@ Branch: `codex/native-window-chrome`
 - Updated renderer titlebar-safe tokens so the sidebar toggle aligns to the same 46 px row and stays beside, not over, native buttons.
 - Updated desktop/design memory to lock in Electron 42.5.1 as the current native traffic-light size baseline.
 - Per user direction, did not address inactive-state contrast/night-mode appearance in this change.
+- Committed the work as `107ccbc Match native macOS traffic light size`, pushed `codex/native-window-chrome`, fast-forward merged it into `main`, and pushed `main`.
+- Memory-refresh follow-up corrected this handoff to the merged `main` state and recorded the Electron 42 packaging cache guidance in operations memory.
 
 ## Current State
 
@@ -48,6 +50,7 @@ Notes:
 - MCP worker tests may log the expected missing-Supabase opaque-error path while passing.
 - Electron 42 binary download is large; the local builder cache used for this session was `/private/tmp/aimcub-electron-cache`.
 - Root `Aimcub.app`, `apps/desktop/dist`, and `apps/desktop/out` are ignored build artifacts and are not staged.
+- Commit/push status: traffic-light implementation commit `107ccbc` is included in `main` and `origin/main`; the memory refresh was done directly on `main`, so no separate merge remains pending.
 
 ## Next Session Prompt
 
