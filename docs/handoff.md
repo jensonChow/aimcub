@@ -1,56 +1,44 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-05
-Branch: `main`
+Branch: `codex/upgrade-pnpm-11`
 
 ## Current Session
 
-- Investigated the macOS traffic-light size mismatch against local Claude/Codex/Finder evidence instead of renderer/CSS guesses.
-- Measured user-provided screenshots:
-  - Claude/Finder native traffic lights: 28 physical pixels, matching 14 pt on Retina.
-  - Aimcub on Electron 33.4.11: 24 physical pixels, matching 12 pt on Retina.
-- Verified with a minimal Electron test that Electron 33.4.11 renders 24 px traffic lights, while Electron 42.5.1 renders 28 px traffic lights with native controls.
-- Upgraded Desktop Electron from `^33.0.0` to `^42.5.1`.
-- Added a Claude/Codex-like native macOS window chrome helper in the main process:
-  - native traffic lights stay system-rendered;
-  - position is computed from a 46 px titlebar row and 14 pt traffic-light metric;
-  - position/visibility is reapplied on show, focus, blur, restore, load, fullscreen, and zoom changes.
-- Updated renderer titlebar-safe tokens so the sidebar toggle aligns to the same 46 px row and stays beside, not over, native buttons.
-- Updated desktop/design memory to lock in Electron 42.5.1 as the current native traffic-light size baseline.
-- Per user direction, did not address inactive-state contrast/night-mode appearance in this change.
-- Committed the work as `107ccbc Match native macOS traffic light size`, pushed `codex/native-window-chrome`, fast-forward merged it into `main`, and pushed `main`.
-- Memory-refresh follow-up corrected this handoff to the merged `main` state and recorded the Electron 42 packaging cache guidance in operations memory.
+- Investigated failed GitHub Actions run `CI #178` on `main` commit `299d1ae`.
+- Root cause: CI installed the repository-declared `pnpm@9.15.0`, while the current lockfile had already been generated in pnpm 11 format with workspace `overrides`; `pnpm install --frozen-lockfile` failed with `ERR_PNPM_LOCKFILE_CONFIG_MISMATCH`.
+- Confirmed the latest npm registry `pnpm` version is `11.10.0`.
+- Upgraded the root `packageManager` field from `pnpm@9.15.0` to `pnpm@11.10.0`.
+- Updated operations memory so future verification uses the new declared pnpm version.
+- Refreshed lockfile metadata with `pnpm@11.10.0`; no `pnpm-lock.yaml` content change was needed because it was already in pnpm 11 shape.
+- Refreshed root `Aimcub.app` from a new `desktop:pack` output.
 
 ## Current State
 
-- Packaged root app at `/Users/jenson/Desktop/Aimcub/Aimcub.app` was refreshed from Electron 42.5.1 build output.
-- Verified packaged Aimcub active traffic lights now measure 28x28 physical pixels:
-  - `/private/tmp/aimcub-electron42-window-active.png`
-  - measured components: `(144,108)-(172,136)`, `(190,108)-(218,136)`, `(236,108)-(264,136)`.
-- Native buttons remain owned by Electron/macOS; renderer still does not draw red/yellow/green or inactive substitute dots.
-- Inactive traffic-light contrast remains intentionally deferred.
+- CI should now use `pnpm@11.10.0` through `pnpm/action-setup@v6` and the root `packageManager` field.
+- `pnpm install --frozen-lockfile` passes locally with `pnpm v11.10.0`.
+- Root `Aimcub.app`, `apps/desktop/dist`, and `apps/desktop/out` are ignored build artifacts and are not staged.
+- Commit/push/merge status is pending closeout from this branch.
 
 ## Verification
 
 Passed:
 
-- `pnpm --filter @app/desktop typecheck`
-- `pnpm --filter @app/desktop test`
-- `pnpm build`
-- `pnpm test`
-- `pnpm typecheck`
-- `pnpm lint`
-- `pnpm core:purity`
-- `ELECTRON_CACHE=/private/tmp/aimcub-electron-cache pnpm desktop:pack`
+- `COREPACK_HOME=/private/tmp/aimcub-corepack corepack pnpm install --lockfile-only --store-dir /private/tmp/aimcub-pnpm-store`
+- `COREPACK_HOME=/private/tmp/aimcub-corepack corepack pnpm install --frozen-lockfile --store-dir /private/tmp/aimcub-pnpm-store --fetch-timeout 300000 --fetch-retries 5`
+- `COREPACK_HOME=/private/tmp/aimcub-corepack corepack pnpm build`
+- `COREPACK_HOME=/private/tmp/aimcub-corepack corepack pnpm test`
+- `COREPACK_HOME=/private/tmp/aimcub-corepack corepack pnpm typecheck`
+- `COREPACK_HOME=/private/tmp/aimcub-corepack corepack pnpm lint`
+- `COREPACK_HOME=/private/tmp/aimcub-corepack corepack pnpm core:purity`
 - `git diff --check`
+- `ELECTRON_CACHE=/private/tmp/aimcub-electron-cache COREPACK_HOME=/private/tmp/aimcub-corepack corepack pnpm desktop:pack`
 - `ditto apps/desktop/dist/mac-arm64/Aimcub.app Aimcub.app`
 
 Notes:
 
+- The first frozen install attempt with a fresh temporary pnpm store timed out downloading `app-builder-bin`; rerunning with a longer fetch timeout completed successfully.
 - MCP worker tests may log the expected missing-Supabase opaque-error path while passing.
-- Electron 42 binary download is large; the local builder cache used for this session was `/private/tmp/aimcub-electron-cache`.
-- Root `Aimcub.app`, `apps/desktop/dist`, and `apps/desktop/out` are ignored build artifacts and are not staged.
-- Commit/push status: traffic-light implementation commit `107ccbc` is included in `main` and `origin/main`; the memory refresh was done directly on `main`, so no separate merge remains pending.
 
 ## Next Session Prompt
 

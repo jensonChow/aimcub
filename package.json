@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "description": "Aimcub — a universal aim-management layer for the harness era: humans and agents are interchangeable tools for reaching a goal, and Aimcub holds the aim, routes work, ingests evidence, judges progress, and accrues context. The current workspace is Desktop-first with CLI, MCP, Supabase, and shared core packages.",
-  "packageManager": "pnpm@9.15.0",
+  "packageManager": "pnpm@11.10.0",
   "engines": {
     "node": ">=20"
   },

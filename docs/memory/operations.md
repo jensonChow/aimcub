@@ -13,7 +13,7 @@ PATH=/Users/jenson/.local/node/bin:$PATH pnpm core:purity
 git diff --check
 ```
 
-The project declares `pnpm@9.15.0`; the Codex runtime may resolve another pnpm. Prefer the `/Users/jenson/.local/node/bin` PATH prefix on this machine.
+The project declares `pnpm@11.10.0`; the Codex runtime may resolve another pnpm. Prefer the `/Users/jenson/.local/node/bin` PATH prefix on this machine.
 
 Every repository-changing session must finish by running the full verification suite above, refreshing the project-root `Aimcub.app` with `pnpm desktop:pack`, updating `docs/handoff.md`, creating a focused commit, pushing it, and merging completed branch work into `main` unless the user explicitly opts out. If work happens directly on `main`, record that no separate merge was needed.
 
