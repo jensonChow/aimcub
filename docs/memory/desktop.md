@@ -13,7 +13,7 @@ The user rejected the prior over-stacked desktop direction. Do not add more defa
 The default desktop shell is a simplified two-column product layout:
 
 - Left sidebar: brand, language toggle, New Aim, recent aim list, settings. Search/filter appears only after aim history exists; an empty first-run state uses a compact Recent aims placeholder.
-- Sidebar toggle requirement: a top-left icon button should control pinned/collapsed sidebar state. When collapsed, hovering or focusing the button should reveal a temporary overlay peek sidebar without changing the main workspace width.
+- Sidebar toggle: a top-left icon button controls pinned/collapsed sidebar state. When collapsed, hovering or focusing the button reveals a temporary overlay peek sidebar without changing the main workspace width. At narrow mobile-sized widths, the sidebar auto-collapses and any opened sidebar remains an overlay so the workspace does not shrink.
 - Center workspace: the empty Aim stage is a quiet command-composer surface with no workflow step pills. Context, Plan/Contracts, Execute, and Eval may show lightweight workflow step pills above the active task surface.
 - No visible full-width titlebar above the workbench. Keep macOS window controls in sidebar-safe space and keep command palette access keyboard-first.
 - No right inspector/debug rail in the default product shell.
@@ -54,4 +54,4 @@ Desktop settings use the app's primary left sidebar as category navigation and t
 
 ## Next Desktop Direction
 
-Immediate open risk: the current sidebar-toggle implementation has pinned/collapsed/peek state in code, but the user reports the control still cannot be clicked manually. Next Desktop work should reproduce with real pointer input, inspect Electron draggable/titlebar regions plus z-index/hit target behavior, and only then continue screen-by-screen product cleanup. Keep the single best next action visible. If debug trace is needed, expose it behind developer mode with bounded summaries and independent scrolling.
+The sidebar toggle manual click risk was resolved and verified in the packaged Electron app after the responsive layout cleanup. Continue screen-by-screen layout stabilization from the smallest viable window upward: explicit grid/flex containers, gap-based spacing, bounded widths, consistent control heights, mobile overlay sidebar behavior, and no decorative restyling unless explicitly requested. Keep the single best next action visible. If debug trace is needed, expose it behind developer mode with bounded summaries and independent scrolling.
