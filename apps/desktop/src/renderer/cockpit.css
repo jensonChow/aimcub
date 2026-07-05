@@ -156,7 +156,7 @@ kbd {
   background: var(--od-surface);
   border-right: 1px solid var(--od-border-soft);
   scrollbar-gutter: stable;
-  -webkit-app-region: drag;
+  -webkit-app-region: no-drag;
   transition: transform 180ms ease, opacity 160ms ease, box-shadow 180ms ease;
 }
 
@@ -205,6 +205,11 @@ kbd {
   align-items: flex-start;
   gap: 10px;
   -webkit-app-region: drag;
+}
+
+.od-sidebar-head-actions,
+.od-sidebar-head-actions * {
+  -webkit-app-region: no-drag;
 }
 
 .od-sidebar-head h1 {

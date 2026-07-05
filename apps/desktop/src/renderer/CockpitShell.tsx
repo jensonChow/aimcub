@@ -70,7 +70,7 @@ export function CockpitShell({
   const [sidebarPeeking, setSidebarPeeking] = useState(false);
   const revealSidebarTimer = useRef<number | null>(null);
   const hideSidebarTimer = useRef<number | null>(null);
-  const pointerToggleHandled = useRef(false);
+  const suppressSidebarPeekUntilExit = useRef(false);
   const usingSettingsSidebar = activeStage === "settings" && Boolean(settingsSidebar);
   const hasGoals = goals.length > 0;
   const firstRunAim = activeStage === "aim" && !selected && !hasGoals;
@@ -125,6 +125,7 @@ export function CockpitShell({
 
   function revealSidebarAfterHover() {
     if (sidebarPinned) return;
+    if (suppressSidebarPeekUntilExit.current) return;
     clearSidebarHideTimer();
     if (sidebarPeeking) return;
     clearSidebarRevealTimer();
@@ -136,11 +137,13 @@ export function CockpitShell({
 
   function keepSidebarPeekOpen() {
     if (sidebarPinned) return;
+    if (suppressSidebarPeekUntilExit.current) return;
     clearSidebarTimers();
     setSidebarPeeking(true);
   }
 
   function scheduleSidebarPeekClose() {
+    suppressSidebarPeekUntilExit.current = false;
     if (sidebarPinned) return;
     clearSidebarRevealTimer();
     clearSidebarHideTimer();
@@ -153,26 +156,16 @@ export function CockpitShell({
   function toggleSidebarPin() {
     clearSidebarTimers();
     setSidebarPeeking(false);
+    suppressSidebarPeekUntilExit.current = sidebarPinned;
     setSidebarPinned((current) => !current);
   }
 
   function onSidebarTogglePointerDown(event: React.PointerEvent<HTMLButtonElement>) {
-    event.preventDefault();
     event.stopPropagation();
-    pointerToggleHandled.current = true;
-    toggleSidebarPin();
-    window.setTimeout(() => {
-      pointerToggleHandled.current = false;
-    }, 750);
   }
 
   function onSidebarToggleClick(event: React.MouseEvent<HTMLButtonElement>) {
-    event.preventDefault();
     event.stopPropagation();
-    if (pointerToggleHandled.current) {
-      pointerToggleHandled.current = false;
-      return;
-    }
     toggleSidebarPin();
   }
 
@@ -181,6 +174,16 @@ export function CockpitShell({
     event.preventDefault();
     event.stopPropagation();
     toggleSidebarPin();
+  }
+
+  function onSidebarTogglePointerLeave() {
+    suppressSidebarPeekUntilExit.current = false;
+    scheduleSidebarPeekClose();
+  }
+
+  function onSidebarToggleBlur() {
+    suppressSidebarPeekUntilExit.current = false;
+    scheduleSidebarPeekClose();
   }
 
   useEffect(() => {
@@ -252,9 +255,9 @@ export function CockpitShell({
           onPointerDown={onSidebarTogglePointerDown}
           onKeyDown={onSidebarToggleKeyDown}
           onPointerEnter={revealSidebarAfterHover}
-          onPointerLeave={scheduleSidebarPeekClose}
+          onPointerLeave={onSidebarTogglePointerLeave}
           onFocus={keepSidebarPeekOpen}
-          onBlur={scheduleSidebarPeekClose}
+          onBlur={onSidebarToggleBlur}
         >
           <SidebarToggleIcon />
         </button>

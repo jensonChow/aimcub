@@ -165,6 +165,7 @@ Reference links:
 
 - Every interactive element needs visible hover, active, focus-visible, disabled, selected/current, loading, and error states where applicable.
 - Sidebar peek must be transient and hover/focus driven: it should open after a short hover delay, stay open while the pointer is over the sidebar, and close without changing the pinned/collapsed preference when the pointer leaves.
+- Manual sidebar toggle actions take precedence over peek behavior: clicking or keyboard-toggling collapsed must not immediately reopen from hover/focus, and draggable chrome must not cover the toggle hit target.
 - Keyboard focus must remain visible. Current focus token is a 4 px accent-tinted ring; keep or improve it, do not remove it.
 - Core desktop commands should be available through keyboard-first flows. Add command palette entries alongside visible controls when a workflow becomes top-level navigation or a frequent action.
 - Pointer targets should be at least 24 by 24 CSS px, with practical Aimcub targets usually 32 to 44 px.
