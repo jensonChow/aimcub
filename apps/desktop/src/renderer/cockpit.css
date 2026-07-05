@@ -92,8 +92,6 @@ kbd {
 .od-app {
   --sidebar-width: 256px;
   --traffic-light-left: 16px;
-  --traffic-light-size: 12px;
-  --traffic-light-gap: 8px;
   --traffic-light-cluster-width: 52px;
   --titlebar-control-gap: 8px;
   --fullscreen-titlebar-toggle-left: 16px;
@@ -128,35 +126,6 @@ kbd {
   user-select: none;
   app-region: drag;
   -webkit-app-region: drag;
-}
-
-.od-traffic-light-inactive-dots {
-  position: fixed;
-  z-index: 700;
-  top: 16px;
-  left: 16px;
-  display: flex;
-  gap: var(--traffic-light-gap);
-  align-items: center;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 160ms ease;
-}
-
-.od-traffic-light-inactive-dots span {
-  width: var(--traffic-light-size);
-  height: var(--traffic-light-size);
-  border: 1px solid #b9b9c0;
-  border-radius: 50%;
-  background: #c9c9cf;
-}
-
-.od-app[data-window-focused="false"][data-window-traffic-lights="true"] .od-traffic-light-inactive-dots {
-  opacity: 1;
-}
-
-.od-app[data-window-fullscreen="true"] .od-traffic-light-inactive-dots {
-  opacity: 0;
 }
 
 .od-sidebar-hover-zone {

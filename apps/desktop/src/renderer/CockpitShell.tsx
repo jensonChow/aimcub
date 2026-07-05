@@ -15,8 +15,6 @@ const SIDEBAR_REVEAL_DELAY_MS = 180;
 const SIDEBAR_CLOSE_DELAY_MS = 180;
 const DEFAULT_WINDOW_CHROME_STATE: WindowChromeState = {
   fullscreen: false,
-  focused: true,
-  trafficLightsVisible: true,
 };
 
 export interface CockpitCommand {
@@ -306,15 +304,8 @@ export function CockpitShell({
         data-empty-aim={firstRunAim ? "true" : "false"}
         data-sidebar-state={sidebarState}
         data-window-fullscreen={windowChrome.fullscreen ? "true" : "false"}
-        data-window-focused={windowChrome.focused ? "true" : "false"}
-        data-window-traffic-lights={windowChrome.trafficLightsVisible ? "true" : "false"}
       >
         <div className="od-window-drag-strip" aria-hidden="true" data-od-id="window-drag-strip" />
-        <div className="od-traffic-light-inactive-dots" aria-hidden="true" data-od-id="traffic-light-inactive-dots">
-          <span />
-          <span />
-          <span />
-        </div>
         {usingSettingsSidebar ? null : (
           <div className="od-sidebar-hover-zone" data-od-id="sidebar-hover-zone" ref={sidebarHoverZoneRef}>
             <div

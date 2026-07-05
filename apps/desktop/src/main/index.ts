@@ -12,11 +12,8 @@ app.setName("Aimcub");
 let mainWindow: BrowserWindow | null = null;
 
 function windowChromeState(win: BrowserWindow): WindowChromeState {
-  const fullscreen = win.isFullScreen();
   return {
-    fullscreen,
-    focused: win.isFocused(),
-    trafficLightsVisible: process.platform === "darwin" && !fullscreen,
+    fullscreen: win.isFullScreen(),
   };
 }
 
@@ -34,7 +31,7 @@ function createWindow(): void {
     show: false,
     title: "Aimcub",
     backgroundColor: "#fafafa",
-    titleBarStyle: process.platform === "darwin" ? "hidden" : "default",
+    titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
     trafficLightPosition: process.platform === "darwin" ? { x: 16, y: 16 } : undefined,
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
@@ -47,8 +44,6 @@ function createWindow(): void {
     if (mainWindow === win) mainWindow = null;
   });
   win.on("ready-to-show", () => win.show());
-  win.on("focus", () => sendWindowChromeState(win));
-  win.on("blur", () => sendWindowChromeState(win));
   win.on("enter-full-screen", () => sendWindowChromeState(win));
   win.on("leave-full-screen", () => sendWindowChromeState(win));
   win.webContents.on("did-finish-load", () => sendWindowChromeState(win));

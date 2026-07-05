@@ -230,32 +230,23 @@ describe("CockpitShell", () => {
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
 
     expect(html).toContain('data-od-id="window-drag-strip"');
-    expect(html).toContain('data-od-id="traffic-light-inactive-dots"');
     expect(html).toContain('data-window-fullscreen="false"');
-    expect(html).toContain('data-window-focused="true"');
-    expect(html).toContain('data-window-traffic-lights="true"');
+    expect(html).not.toContain('data-od-id="traffic-light-inactive-dots"');
+    expect(html).not.toContain("data-window-focused");
+    expect(html).not.toContain("data-window-traffic-lights");
     expect(css).toMatch(/\.od-window-drag-strip\s*{[^}]*app-region:\s*drag;[^}]*-webkit-app-region:\s*drag;/s);
     expect(css).toMatch(/\.od-sidebar-toggle\s*{[^}]*app-region:\s*no-drag;[^}]*-webkit-app-region:\s*no-drag;/s);
     expect(css).toMatch(/\.od-user-menu-anchor,\s*\.od-user-menu-anchor \*\s*{[^}]*app-region:\s*no-drag;[^}]*-webkit-app-region:\s*no-drag;/s);
   });
 
-  it("keeps inactive macOS traffic lights visible without intercepting them", () => {
+  it("leaves macOS traffic lights to native window chrome", () => {
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
+    const main = readFileSync(new URL("../main/index.ts", import.meta.url), "utf8");
 
-    expect(css).toMatch(/\.od-traffic-light-inactive-dots\s*{[^}]*opacity:\s*0;/s);
-    expect(css).toMatch(/\.od-traffic-light-inactive-dots\s*{[^}]*pointer-events:\s*none;/s);
-    expect(css).toMatch(/--traffic-light-size:\s*12px;/);
-    expect(css).toMatch(/--traffic-light-gap:\s*8px;/);
-    expect(css).toMatch(/\.od-traffic-light-inactive-dots\s*{[^}]*gap:\s*var\(--traffic-light-gap\);/s);
-    expect(css).toMatch(
-      /\.od-traffic-light-inactive-dots span\s*{[^}]*width:\s*var\(--traffic-light-size\);[^}]*height:\s*var\(--traffic-light-size\);[^}]*border-radius:\s*50%;[^}]*background:\s*#c9c9cf;/s,
-    );
-    expect(css).toMatch(
-      /\.od-app\[data-window-focused="false"\]\[data-window-traffic-lights="true"\] \.od-traffic-light-inactive-dots\s*{[^}]*opacity:\s*1;/s,
-    );
-    expect(css).toMatch(
-      /\.od-app\[data-window-fullscreen="true"\] \.od-traffic-light-inactive-dots\s*{[^}]*opacity:\s*0;/s,
-    );
+    expect(main).toContain('titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default"');
+    expect(main).toContain("trafficLightPosition: process.platform === \"darwin\" ? { x: 16, y: 16 } : undefined");
+    expect(css).not.toContain("od-traffic-light-inactive-dots");
+    expect(css).not.toContain("--traffic-light-size");
   });
 
   it("moves the sidebar toggle left only when the macOS window is fullscreen", () => {
