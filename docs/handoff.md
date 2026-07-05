@@ -1,53 +1,56 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-05
-Branch: `codex/standard-native-traffic-lights`
+Branch: `codex/native-window-chrome`
 
 ## Current Session
 
-- Checked Electron official docs for macOS traffic-light behavior instead of relying on visual guesses.
-- Kept renderer traffic lights removed: no React/CSS red/yellow/green or inactive substitute dots.
-- Switched macOS Desktop from `titleBarStyle: "hiddenInset"` to `titleBarStyle: "hidden"` because Electron documents `hidden` as preserving standard macOS window controls, while `hiddenInset` is an alternative inset look.
-- Verified by measuring packaged-window screenshots that Electron's native controls still render at about 24 physical pixels on this machine. User-provided active Finder screenshot measures about 28 physical pixels, which is not adjustable through Electron's documented traffic-light APIs.
+- Investigated the macOS traffic-light size mismatch against local Claude/Codex/Finder evidence instead of renderer/CSS guesses.
+- Measured user-provided screenshots:
+  - Claude/Finder native traffic lights: 28 physical pixels, matching 14 pt on Retina.
+  - Aimcub on Electron 33.4.11: 24 physical pixels, matching 12 pt on Retina.
+- Verified with a minimal Electron test that Electron 33.4.11 renders 24 px traffic lights, while Electron 42.5.1 renders 28 px traffic lights with native controls.
+- Upgraded Desktop Electron from `^33.0.0` to `^42.5.1`.
+- Added a Claude/Codex-like native macOS window chrome helper in the main process:
+  - native traffic lights stay system-rendered;
+  - position is computed from a 46 px titlebar row and 14 pt traffic-light metric;
+  - position/visibility is reapplied on show, focus, blur, restore, load, fullscreen, and zoom changes.
+- Updated renderer titlebar-safe tokens so the sidebar toggle aligns to the same 46 px row and stays beside, not over, native buttons.
+- Updated desktop/design memory to lock in Electron 42.5.1 as the current native traffic-light size baseline.
+- Per user direction, did not address inactive-state contrast/night-mode appearance in this change.
 
 ## Current State
 
-- `main` keeps the simplified Desktop shell: no full-width visible titlebar, left sidebar, center workspace, command-composer first-run Aim screen, and settings split-view.
-- Settings still lock the primary sidebar open and omit the normal Aim workspace sidebar toggle, peek rail, and `Aimcub / Workbench` brand header.
-- The sidebar toggle contract remains: manual click/keyboard toggle wins over hover/focus peek; fresh hover reveal still works from the button and left-edge rail; transient peek does not resize the workspace.
-- In normal macOS window mode, the sidebar toggle keeps its existing 76 px left offset after traffic lights. In fullscreen, the renderer receives fullscreen state and moves the toggle to 16 px left, with the drag strip starting after the shifted control.
-- Native macOS traffic lights are no longer mirrored or substituted in React/CSS. Active/inactive appearance and size are controlled by Electron/AppKit, not renderer CSS.
-- The root packaged app at `/Users/jenson/Desktop/Aimcub/Aimcub.app` was refreshed from `pnpm desktop:pack`.
+- Packaged root app at `/Users/jenson/Desktop/Aimcub/Aimcub.app` was refreshed from Electron 42.5.1 build output.
+- Verified packaged Aimcub active traffic lights now measure 28x28 physical pixels:
+  - `/private/tmp/aimcub-electron42-window-active.png`
+  - measured components: `(144,108)-(172,136)`, `(190,108)-(218,136)`, `(236,108)-(264,136)`.
+- Native buttons remain owned by Electron/macOS; renderer still does not draw red/yellow/green or inactive substitute dots.
+- Inactive traffic-light contrast remains intentionally deferred.
 
 ## Verification
 
-- Passed:
-  - `pnpm --filter @app/desktop test -- --runInBand`
-  - `pnpm build`
-  - `pnpm test`
-  - `pnpm typecheck`
-  - `pnpm lint`
-  - `pnpm core:purity`
-  - `pnpm desktop:pack`
-  - `git diff --check`
-  - `ditto apps/desktop/dist/mac-arm64/Aimcub.app Aimcub.app`
-  - Window-scoped packaged-app measurements:
-    - `/private/tmp/aimcub-hidden-window.png`: `titleBarStyle: "hidden"` with position, traffic lights measured 24x24 px.
-    - `/private/tmp/aimcub-hidden-default-position-window.png`: `titleBarStyle: "hidden"` without position, traffic lights measured 24x24 px.
-    - `/private/tmp/aimcub-default-titlebar-window.png`: `titleBarStyle: "default"`, traffic lights measured 24x24 px.
-  - Official Electron docs checked:
-    - `titleBarStyle: "hidden"` preserves standard macOS window controls.
-    - `titleBarStyle: "hiddenInset"` is an alternative inset look.
-    - `trafficLightPosition` only customizes position for macOS traffic-light buttons.
+Passed:
+
+- `pnpm --filter @app/desktop typecheck`
+- `pnpm --filter @app/desktop test`
+- `pnpm build`
+- `pnpm test`
+- `pnpm typecheck`
+- `pnpm lint`
+- `pnpm core:purity`
+- `ELECTRON_CACHE=/private/tmp/aimcub-electron-cache pnpm desktop:pack`
+- `git diff --check`
+- `ditto apps/desktop/dist/mac-arm64/Aimcub.app Aimcub.app`
 
 Notes:
+
 - MCP worker tests may log the expected missing-Supabase opaque-error path while passing.
-- Root `Aimcub.app`, `apps/desktop/dist`, and `apps/desktop/out` are ignored build artifacts; they were refreshed locally but are not staged.
-- Attempting a same-method Finder window screenshot was blocked because it would capture Downloads contents; use the user-provided Finder screenshot for the 28 px comparison.
-- Commit/push status: not yet committed.
+- Electron 42 binary download is large; the local builder cache used for this session was `/private/tmp/aimcub-electron-cache`.
+- Root `Aimcub.app`, `apps/desktop/dist`, and `apps/desktop/out` are ignored build artifacts and are not staged.
 
 ## Next Session Prompt
 
 ```text
-Continue from `main`. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md, then load only task-relevant module memory. For every repo-changing session, run the full verification suite, refresh root `Aimcub.app` from `pnpm desktop:pack`, update handoff, commit, push, and merge completed branch work into `main` unless the user explicitly opts out.
+Continue from `main`. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md, then load only task-relevant module memory. For every repo-changing session, run the full verification suite, refresh root Aimcub.app from pnpm desktop:pack, update docs/handoff.md, create a focused commit, push, and merge completed branch work into main unless the user explicitly opts out.
 ```

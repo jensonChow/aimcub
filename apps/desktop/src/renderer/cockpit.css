@@ -92,11 +92,14 @@ kbd {
 .od-app {
   --sidebar-width: 256px;
   --traffic-light-left: 16px;
-  --traffic-light-cluster-width: 52px;
+  --traffic-light-row-height: 46px;
+  --traffic-light-button-size: 14px;
+  --traffic-light-cluster-width: 58px;
   --titlebar-control-gap: 8px;
   --fullscreen-titlebar-toggle-left: 16px;
   --titlebar-toggle-left: calc(var(--traffic-light-left) + var(--traffic-light-cluster-width) + var(--titlebar-control-gap));
   --titlebar-toggle-size: 32px;
+  --titlebar-toggle-top: calc((var(--traffic-light-row-height) - var(--titlebar-toggle-size)) / 2);
   position: relative;
   height: 100%;
   min-height: 0;
@@ -151,7 +154,7 @@ kbd {
 .od-sidebar-toggle {
   position: fixed;
   z-index: 1000;
-  top: 8px;
+  top: var(--titlebar-toggle-top);
   left: var(--titlebar-toggle-left);
   width: var(--titlebar-toggle-size);
   height: var(--titlebar-toggle-size);

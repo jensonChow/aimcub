@@ -243,8 +243,11 @@ describe("CockpitShell", () => {
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
     const main = readFileSync(new URL("../main/index.ts", import.meta.url), "utf8");
 
-    expect(main).toContain('titleBarStyle: process.platform === "darwin" ? "hidden" : "default"');
-    expect(main).toContain("trafficLightPosition: process.platform === \"darwin\" ? { x: 16, y: 16 } : undefined");
+    expect(main).toContain('titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default"');
+    expect(main).toContain('trafficLightPosition: process.platform === "darwin" ? nativeTrafficLightPosition() : undefined');
+    expect(main).toContain("win.setWindowButtonVisibility(!win.isFullScreen())");
+    expect(main).toContain("win.setWindowButtonPosition(nativeTrafficLightPosition(win.webContents.getZoomFactor()))");
+    expect(main).toContain('win.webContents.on("zoom-changed", () => scheduleNativeMacWindowChrome(win))');
     expect(css).not.toContain("od-traffic-light-inactive-dots");
     expect(css).not.toContain("--traffic-light-size");
   });
@@ -258,6 +261,9 @@ describe("CockpitShell", () => {
     expect(css).toMatch(
       /\.od-app\[data-window-fullscreen="true"\]\s*{[^}]*--titlebar-toggle-left:\s*var\(--fullscreen-titlebar-toggle-left\);/s,
     );
+    expect(css).toContain("--traffic-light-row-height: 46px;");
+    expect(css).toContain("--traffic-light-button-size: 14px;");
+    expect(css).toContain("--titlebar-toggle-top: calc((var(--traffic-light-row-height) - var(--titlebar-toggle-size)) / 2);");
   });
 
   it("groups transient sidebar hover controls without changing grid layout", () => {

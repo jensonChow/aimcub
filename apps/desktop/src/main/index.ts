@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, type Point } from "electron";
 import { join } from "node:path";
 
 import { registerIpc } from "./ipc";
@@ -10,6 +10,29 @@ import { IPC, type WindowChromeState } from "../shared/ipc";
 app.setName("Aimcub");
 
 let mainWindow: BrowserWindow | null = null;
+
+const MAC_TRAFFIC_LIGHT_X = 16;
+const MAC_TRAFFIC_LIGHT_ROW_HEIGHT = 46;
+const MAC_TRAFFIC_LIGHT_BUTTON_SIZE = 14;
+
+function nativeTrafficLightPosition(zoomFactor = 1): Point {
+  const safeZoomFactor = Number.isFinite(zoomFactor) && zoomFactor > 0 ? zoomFactor : 1;
+  return {
+    x: MAC_TRAFFIC_LIGHT_X,
+    y: Math.round((MAC_TRAFFIC_LIGHT_ROW_HEIGHT * safeZoomFactor - MAC_TRAFFIC_LIGHT_BUTTON_SIZE) / 2),
+  };
+}
+
+function applyNativeMacWindowChrome(win: BrowserWindow): void {
+  if (process.platform !== "darwin" || win.isDestroyed()) return;
+  win.setWindowButtonVisibility(!win.isFullScreen());
+  win.setWindowButtonPosition(nativeTrafficLightPosition(win.webContents.getZoomFactor()));
+}
+
+function scheduleNativeMacWindowChrome(win: BrowserWindow): void {
+  if (process.platform !== "darwin") return;
+  setTimeout(() => applyNativeMacWindowChrome(win), 0);
+}
 
 function windowChromeState(win: BrowserWindow): WindowChromeState {
   return {
@@ -31,8 +54,8 @@ function createWindow(): void {
     show: false,
     title: "Aimcub",
     backgroundColor: "#fafafa",
-    titleBarStyle: process.platform === "darwin" ? "hidden" : "default",
-    trafficLightPosition: process.platform === "darwin" ? { x: 16, y: 16 } : undefined,
+    titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
+    trafficLightPosition: process.platform === "darwin" ? nativeTrafficLightPosition() : undefined,
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
       sandbox: false,
@@ -40,13 +63,31 @@ function createWindow(): void {
   });
 
   mainWindow = win;
+  applyNativeMacWindowChrome(win);
   win.on("closed", () => {
     if (mainWindow === win) mainWindow = null;
   });
-  win.on("ready-to-show", () => win.show());
-  win.on("enter-full-screen", () => sendWindowChromeState(win));
-  win.on("leave-full-screen", () => sendWindowChromeState(win));
-  win.webContents.on("did-finish-load", () => sendWindowChromeState(win));
+  win.on("ready-to-show", () => {
+    applyNativeMacWindowChrome(win);
+    win.show();
+  });
+  win.on("focus", () => applyNativeMacWindowChrome(win));
+  win.on("blur", () => applyNativeMacWindowChrome(win));
+  win.on("show", () => applyNativeMacWindowChrome(win));
+  win.on("restore", () => applyNativeMacWindowChrome(win));
+  win.on("enter-full-screen", () => {
+    applyNativeMacWindowChrome(win);
+    sendWindowChromeState(win);
+  });
+  win.on("leave-full-screen", () => {
+    applyNativeMacWindowChrome(win);
+    sendWindowChromeState(win);
+  });
+  win.webContents.on("did-finish-load", () => {
+    applyNativeMacWindowChrome(win);
+    sendWindowChromeState(win);
+  });
+  win.webContents.on("zoom-changed", () => scheduleNativeMacWindowChrome(win));
 
   // In dev, electron-vite serves the renderer over HTTP; in prod, load the built file.
   const devUrl = process.env.ELECTRON_RENDERER_URL;
