@@ -245,15 +245,17 @@ describe("CockpitShell", () => {
 
     expect(main).toContain('titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default"');
     expect(main).toContain('trafficLightPosition: process.platform === "darwin" ? nativeTrafficLightPosition() : undefined');
-    expect(main).toContain("win.setWindowButtonVisibility(!win.isFullScreen())");
+    expect(main).toContain("win.setWindowButtonVisibility(true)");
+    expect(main).not.toContain("win.setWindowButtonVisibility(!win.isFullScreen())");
     expect(main).toContain("win.setWindowButtonPosition(nativeTrafficLightPosition(win.webContents.getZoomFactor()))");
     expect(main).toContain('win.webContents.on("zoom-changed", () => scheduleNativeMacWindowChrome(win))');
     expect(css).not.toContain("od-traffic-light-inactive-dots");
     expect(css).not.toContain("--traffic-light-size");
   });
 
-  it("moves the sidebar toggle left only when the macOS window is fullscreen", () => {
+  it("moves the sidebar toggle left in fullscreen without hiding native titlebar traffic lights", () => {
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
+    const main = readFileSync(new URL("../main/index.ts", import.meta.url), "utf8");
 
     expect(css).toMatch(
       /\.od-app\s*{[^}]*--titlebar-toggle-left:\s*calc\(var\(--traffic-light-left\) \+ var\(--traffic-light-cluster-width\) \+ var\(--titlebar-control-gap\)\);/s,
@@ -264,6 +266,7 @@ describe("CockpitShell", () => {
     expect(css).toContain("--traffic-light-row-height: 46px;");
     expect(css).toContain("--traffic-light-button-size: 14px;");
     expect(css).toContain("--titlebar-toggle-top: calc((var(--traffic-light-row-height) - var(--titlebar-toggle-size)) / 2);");
+    expect(main).toContain("win.setWindowButtonVisibility(true)");
   });
 
   it("groups transient sidebar hover controls without changing grid layout", () => {

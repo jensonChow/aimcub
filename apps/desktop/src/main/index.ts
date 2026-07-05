@@ -25,7 +25,7 @@ function nativeTrafficLightPosition(zoomFactor = 1): Point {
 
 function applyNativeMacWindowChrome(win: BrowserWindow): void {
   if (process.platform !== "darwin" || win.isDestroyed()) return;
-  win.setWindowButtonVisibility(!win.isFullScreen());
+  win.setWindowButtonVisibility(true);
   win.setWindowButtonPosition(nativeTrafficLightPosition(win.webContents.getZoomFactor()));
 }
 
