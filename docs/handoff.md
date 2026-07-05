@@ -1,7 +1,7 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-06
-Branch: `codex/compatible-dependency-upgrades`
+Branch: `main`
 
 ## Current Session
 
@@ -17,7 +17,7 @@ Branch: `codex/compatible-dependency-upgrades`
 - `pnpm outdated -r` only reports intentional compatibility boundaries: `@types/node` 22.20.0 vs 26.1.0, `@vitejs/plugin-react` 5.2.0 vs 6.0.3, and Vite 7.3.6 vs 8.1.3.
 - `pnpm desktop:pack` may still fail inside the sandbox because electron-builder 26 invokes `@electron/get`'s macOS cache under `~/Library/Caches/electron`; use the documented split build plus `--config.electronDownload.cache=/private/tmp/aimcub-electron-cache` workaround in `docs/memory/operations.md`.
 - Root `Aimcub.app`, `apps/desktop/dist`, and `apps/desktop/out` are ignored build artifacts and are not staged.
-- Commit/push/merge status is pending closeout from this branch.
+- Commit `910baca` was pushed on `codex/compatible-dependency-upgrades`, fast-forward merged into `main`, and pushed to `origin/main`.
 
 ## Verification
 
