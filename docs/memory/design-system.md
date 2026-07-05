@@ -78,8 +78,9 @@ Reference links:
 
 ## Layout Rules
 
-- Use a 4 px base grid. Preferred spacing tokens: 4, 6, 8, 10, 12, 14, 16, 18, 24, 32, 40, 56, 72.
-- Page/workspace padding: 24 px minimum on desktop, expanding to a restrained max such as 72 px. Use 18 px on narrow desktop windows.
+- UI cleanup passes should be layout-stability work, not visual restyling. Fix missing grid/flex/gap constraints, stray margin/padding positioning, inconsistent row/control heights, mobile overflow, and CSS that lets elements drift, while avoiding new gradients, shadows, decoration, or feature work.
+- Use a 4 px base grid. UI cleanup work should converge touched layout spacing to 4, 8, 12, 16, 24, and 32 px. Older 6, 10, 14, 18, 40, 56, and 72 px values are legacy allowances only until their local layout is touched.
+- Page/workspace padding: 24 px minimum on desktop, expanding to a restrained max such as 32 px for dense workbench views. Use 16 px on narrow desktop and mobile windows.
 - Content width: main task surfaces should generally max at 760 px for writing/intake and 940 px for operational grids or review surfaces.
 - Sidebar width: default 280 px. Avoid widths below 240 px or above 320 px unless a user-resizable sidebar is implemented with stable min/max bounds.
 - Vertical rhythm: 22 to 24 px between major page bands, 12 to 16 px between controls inside a group, 6 to 10 px inside compact repeated items.

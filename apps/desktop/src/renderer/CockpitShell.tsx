@@ -47,6 +47,10 @@ function statusLabel(goal: Goal): string {
   return goal.status.replace("_", " ");
 }
 
+function prefersCollapsedSidebar() {
+  return typeof window !== "undefined" && window.matchMedia("(max-width: 760px)").matches;
+}
+
 export function CockpitShell({
   goals,
   selected,
@@ -62,7 +66,7 @@ export function CockpitShell({
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "paused">("all");
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [sidebarPinned, setSidebarPinned] = useState(true);
+  const [sidebarPinned, setSidebarPinned] = useState(() => !prefersCollapsedSidebar());
   const [sidebarPeeking, setSidebarPeeking] = useState(false);
   const revealSidebarTimer = useRef<number | null>(null);
   const hideSidebarTimer = useRef<number | null>(null);
@@ -184,6 +188,19 @@ export function CockpitShell({
       if (revealSidebarTimer.current !== null) window.clearTimeout(revealSidebarTimer.current);
       if (hideSidebarTimer.current !== null) window.clearTimeout(hideSidebarTimer.current);
     };
+  }, []);
+
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 760px)");
+    function syncSidebarForViewport(event: MediaQueryList | MediaQueryListEvent) {
+      clearSidebarTimers();
+      setSidebarPeeking(false);
+      setSidebarPinned(!event.matches);
+    }
+
+    syncSidebarForViewport(query);
+    query.addEventListener("change", syncSidebarForViewport);
+    return () => query.removeEventListener("change", syncSidebarForViewport);
   }, []);
 
   useEffect(() => {

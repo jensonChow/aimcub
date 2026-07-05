@@ -104,8 +104,8 @@ kbd {
 .od-sidebar-toggle {
   position: fixed;
   z-index: 1000;
-  top: 14px;
-  left: 100px;
+  top: 16px;
+  left: 96px;
   width: 36px;
   height: 36px;
   display: grid;
@@ -151,7 +151,7 @@ kbd {
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   align-content: start;
   gap: 12px;
-  padding: 54px 12px 14px;
+  padding: 56px 12px 16px;
   overflow: auto;
   background: var(--od-surface);
   border-right: 1px solid var(--od-border-soft);
@@ -274,11 +274,11 @@ kbd {
 
 .od-new-aim {
   width: 100%;
-  min-height: 34px;
+  min-height: 36px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  border-radius: 7px;
+  border-radius: var(--od-radius-sm);
   color: var(--od-fg);
   text-align: left;
 }
@@ -293,7 +293,6 @@ kbd {
 .od-section-label {
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 4px;
   color: var(--od-muted);
   font-size: 12px;
   font-weight: 650;
@@ -321,7 +320,7 @@ kbd {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 8px;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   min-height: 44px;
   padding: 8px 10px 8px 12px;
   border: 1px solid transparent;
@@ -430,7 +429,7 @@ kbd {
 
 .od-aim-list {
   display: grid;
-  gap: 3px;
+  gap: 4px;
 }
 
 .od-empty {
@@ -619,8 +618,8 @@ kbd {
   min-height: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  gap: 18px;
-  padding: 22px clamp(22px, 4.5vw, 56px) 22px;
+  gap: 16px;
+  padding: 24px clamp(24px, 4vw, 32px);
   background: var(--od-bg);
 }
 
@@ -645,8 +644,8 @@ kbd {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  min-height: 34px;
+  gap: 8px;
+  min-height: 36px;
   border: 1px solid transparent;
   border-radius: var(--od-radius-pill);
   background: var(--od-surface-warm);
@@ -695,10 +694,12 @@ kbd {
 
 .od-workspace {
   min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: 16px;
   overflow: auto;
   width: min(100%, 940px);
   margin: 0 auto;
-  padding-right: 2px;
   scrollbar-gutter: stable;
 }
 
@@ -712,13 +713,8 @@ kbd {
   align-content: start;
 }
 
-.od-workspace > * + * {
-  margin-top: 14px;
-}
-
 .od-helper-intro {
   max-width: 720px;
-  margin-bottom: 16px;
 }
 
 .od-helper-intro h2 {
@@ -762,7 +758,8 @@ kbd {
   min-width: 0;
   display: grid;
   gap: 5px;
-  min-height: 58px;
+  grid-template-rows: auto 16px minmax(32px, 1fr);
+  min-height: 120px;
   padding: 8px 9px 8px 12px;
   border: 1px solid transparent;
   border-radius: var(--od-radius-sm);
@@ -864,6 +861,13 @@ kbd {
   font-size: 12px;
   line-height: 1.35;
   overflow-wrap: anywhere;
+}
+
+.od-settings-nav-next strong {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .od-settings-detail,
@@ -3306,7 +3310,7 @@ kbd {
   }
 
   .od-main {
-    padding: 18px;
+    padding: 16px;
   }
 
   .od-context-source-status-list,
@@ -3341,6 +3345,32 @@ kbd {
 }
 
 @media (max-width: 760px) {
+  .od-app,
+  .od-app[data-sidebar-state="pinned"],
+  .od-app[data-sidebar-state="collapsed"],
+  .od-app[data-sidebar-state="peek"] {
+    grid-template-columns: 0 minmax(0, 1fr);
+  }
+
+  .od-sidebar-toggle {
+    left: 16px;
+  }
+
+  .od-app[data-sidebar-state="collapsed"] .od-main {
+    padding-top: calc(32px + 24px);
+  }
+
+  .od-app[data-sidebar-state="pinned"] .od-sidebar,
+  .od-app[data-sidebar-state="peek"] .od-sidebar {
+    position: absolute;
+    inset: 0 auto 0 0;
+    height: 100%;
+    z-index: 24;
+    visibility: visible;
+    transform: translateX(0);
+    opacity: 1;
+  }
+
   .od-stage-nav {
     flex-wrap: wrap;
   }
