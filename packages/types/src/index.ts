@@ -9,6 +9,8 @@
  */
 import { z } from "zod";
 
+const DbId = z.string().guid();
+
 // ──────────────────────────────────────────────────────────────────────────
 // Base enums
 // ──────────────────────────────────────────────────────────────────────────
@@ -215,18 +217,18 @@ export const CiPayload = z.object({
 export type CiPayload = z.infer<typeof CiPayload>;
 
 export const Evidence = z.object({
-  id: z.string().uuid(),
-  owner_id: z.string().uuid(),
-  goal_id: z.string().uuid(),
-  milestone_id: z.string().uuid().nullable().default(null),
-  emitter_id: z.string().uuid().nullable(),
+  id: DbId,
+  owner_id: DbId,
+  goal_id: DbId,
+  milestone_id: DbId.nullable().default(null),
+  emitter_id: DbId.nullable(),
   kind: EvidenceKind,
   /** Native ID of the upstream event; together with emitter_id forms the idempotency key. */
   source_event_id: z.string().nullable(),
   /** When the event actually occurred (ISO 8601), not when it was persisted. */
   occurred_at: z.string(),
   summary: z.string().default(""),
-  payload: z.record(z.unknown()).default({}),
+  payload: z.record(z.string(), z.unknown()).default({}),
   /** Source trustworthiness: verified commit / CI > MCP self-report > manual. */
   trust_score: z.number().min(0).max(1).default(1),
   created_at: z.string().optional(),
@@ -241,7 +243,7 @@ export type ManualEvidenceRequiredItem = z.infer<typeof ManualEvidenceRequiredIt
 
 export const ManualEvidencePayload = z.object({
   confirmed: z.literal(true).default(true),
-  milestone_id: z.string().uuid(),
+  milestone_id: DbId,
   proof_note: z.string().min(1).optional(),
   urls: z.array(z.string().url()).default([]),
   file_paths: z.array(z.string().min(1)).default([]),
@@ -254,8 +256,8 @@ export type ManualEvidencePayload = z.infer<typeof ManualEvidencePayload>;
 // ──────────────────────────────────────────────────────────────────────────
 
 export const Goal = z.object({
-  id: z.string().uuid(),
-  owner_id: z.string().uuid(),
+  id: DbId,
+  owner_id: DbId,
   title: z.string().min(1),
   description: z.string().default(""),
   domain: GoalDomain.default("software"),
@@ -263,26 +265,26 @@ export const Goal = z.object({
   target_date: z.string().nullable().default(null),
   /** Snapshot of the current decomposition (replaces a heavyweight milestone_versions table). */
   plan_json: z.unknown().nullable().default(null),
-  metadata: z.record(z.unknown()).default({}),
+  metadata: z.record(z.string(), z.unknown()).default({}),
   created_at: z.string().optional(),
 });
 export type Goal = z.infer<typeof Goal>;
 
 export const Milestone = z.object({
-  id: z.string().uuid(),
-  goal_id: z.string().uuid(),
-  owner_id: z.string().uuid(),
+  id: DbId,
+  goal_id: DbId,
+  owner_id: DbId,
   title: z.string().min(1),
   description: z.string().default(""),
   status: MilestoneStatus.default("pending"),
   order_index: z.number().int().nonnegative(),
   /** Single-parent dependency (linear / shallow tree); upgraded to a DAG edge table when goals generalize. null = no prerequisite. */
-  depends_on_id: z.string().uuid().nullable().default(null),
+  depends_on_id: DbId.nullable().default(null),
   acceptance_rule: AcceptanceRule,
   /** Neutral effort/contribution weight (sums into goal progress; an input to eval weighting). Not a gamification score. */
   xp_reward: z.number().int().positive().default(10),
   completed_at: z.string().nullable().default(null),
-  metadata: z.record(z.unknown()).default({}),
+  metadata: z.record(z.string(), z.unknown()).default({}),
 });
 export type Milestone = z.infer<typeof Milestone>;
 
@@ -363,8 +365,8 @@ export type DecompositionOutput = z.infer<typeof DecompositionOutput>;
 // ──────────────────────────────────────────────────────────────────────────
 
 export const Emitter = z.object({
-  id: z.string().uuid(),
-  owner_id: z.string().uuid(),
+  id: DbId,
+  owner_id: DbId,
   kind: EmitterKind,
   display_name: z.string().default(""),
   token_hash: z.string().nullable().default(null),
@@ -374,11 +376,11 @@ export const Emitter = z.object({
 export type Emitter = z.infer<typeof Emitter>;
 
 export const MilestoneCompletion = z.object({
-  id: z.string().uuid(),
-  milestone_id: z.string().uuid(),
-  owner_id: z.string().uuid(),
+  id: DbId,
+  milestone_id: DbId,
+  owner_id: DbId,
   decided_by: DecidedBy,
-  triggering_evidence_ids: z.array(z.string().uuid()).default([]),
+  triggering_evidence_ids: z.array(DbId).default([]),
   /** Effort/contribution weight credited by this completion (mirrors the milestone's xp_reward). */
   awarded_xp: z.number().int().nonnegative().default(0),
   created_at: z.string().optional(),
@@ -390,8 +392,8 @@ export type MilestoneCompletion = z.infer<typeof MilestoneCompletion>;
 // ──────────────────────────────────────────────────────────────────────────
 
 const ActorBase = {
-  id: z.string().uuid(),
-  owner_id: z.string().uuid(),
+  id: DbId,
+  owner_id: DbId,
   display_name: z.string().default(""),
   capabilities: z.array(z.string()).default([]),
   status: ActorStatus.default("active"),
@@ -401,7 +403,7 @@ const ActorBase = {
 export const HumanActor = z.object({
   ...ActorBase,
   kind: z.literal("human"),
-  user_id: z.string().uuid().nullable().default(null),
+  user_id: DbId.nullable().default(null),
 });
 export type HumanActor = z.infer<typeof HumanActor>;
 
@@ -419,11 +421,11 @@ export const Actor = z.discriminatedUnion("kind", [HumanActor, AgentProfile]);
 export type Actor = z.infer<typeof Actor>;
 
 export const SubAimRelation = z.object({
-  id: z.string().uuid(),
-  owner_id: z.string().uuid(),
-  parent_goal_id: z.string().uuid(),
-  parent_milestone_id: z.string().uuid(),
-  child_goal_id: z.string().uuid(),
+  id: DbId,
+  owner_id: DbId,
+  parent_goal_id: DbId,
+  parent_milestone_id: DbId,
+  child_goal_id: DbId,
   status: SubAimRelationStatus.default("active"),
   reason: z.string().default(""),
   created_at: z.string().optional(),
@@ -432,12 +434,12 @@ export const SubAimRelation = z.object({
 export type SubAimRelation = z.infer<typeof SubAimRelation>;
 
 export const Assignment = z.object({
-  id: z.string().uuid(),
-  owner_id: z.string().uuid(),
-  goal_id: z.string().uuid(),
-  milestone_id: z.string().uuid(),
+  id: DbId,
+  owner_id: DbId,
+  goal_id: DbId,
+  milestone_id: DbId,
   actor_kind: ActorKind,
-  actor_id: z.string().uuid().nullable().default(null),
+  actor_id: DbId.nullable().default(null),
   status: AssignmentStatus.default("assigned"),
   source: AssignmentSource.default("routing"),
   reason: z.string().default(""),
@@ -448,13 +450,13 @@ export const Assignment = z.object({
 export type Assignment = z.infer<typeof Assignment>;
 
 export const Run = z.object({
-  id: z.string().uuid(),
-  owner_id: z.string().uuid(),
-  goal_id: z.string().uuid(),
-  milestone_id: z.string().uuid(),
-  assignment_id: z.string().uuid().nullable().default(null),
+  id: DbId,
+  owner_id: DbId,
+  goal_id: DbId,
+  milestone_id: DbId,
+  assignment_id: DbId.nullable().default(null),
   actor_kind: ActorKind,
-  actor_id: z.string().uuid().nullable().default(null),
+  actor_id: DbId.nullable().default(null),
   kind: RunKind,
   status: RunStatus.default("queued"),
   attempt: z.number().int().positive().default(1),
@@ -473,37 +475,37 @@ export const Run = z.object({
 export type Run = z.infer<typeof Run>;
 
 export const RunEvent = z.object({
-  id: z.string().uuid(),
-  owner_id: z.string().uuid(),
-  run_id: z.string().uuid(),
+  id: DbId,
+  owner_id: DbId,
+  run_id: DbId,
   type: RunEventType,
   summary: z.string().default(""),
-  payload: z.record(z.unknown()).default({}),
+  payload: z.record(z.string(), z.unknown()).default({}),
   created_at: z.string().optional(),
 });
 export type RunEvent = z.infer<typeof RunEvent>;
 
 export const RunArtifact = z.object({
-  id: z.string().uuid(),
-  owner_id: z.string().uuid(),
-  run_id: z.string().uuid(),
+  id: DbId,
+  owner_id: DbId,
+  run_id: DbId,
   kind: RunArtifactKind,
   uri: z.string().default(""),
   path: z.string().nullable().default(null),
   summary: z.string().default(""),
-  evidence_id: z.string().uuid().nullable().default(null),
+  evidence_id: DbId.nullable().default(null),
   created_at: z.string().optional(),
 });
 export type RunArtifact = z.infer<typeof RunArtifact>;
 
 export const ToolTrace = z.object({
-  id: z.string().uuid(),
-  owner_id: z.string().uuid(),
-  session_id: z.string().uuid().nullable().default(null),
+  id: DbId,
+  owner_id: DbId,
+  session_id: DbId.nullable().default(null),
   tool_name: z.string(),
   status: ToolTraceStatus,
   summary: z.string().default(""),
-  sources: z.array(z.record(z.unknown())).default([]),
+  sources: z.array(z.record(z.string(), z.unknown())).default([]),
   error: z.string().nullable().default(null),
   started_at: z.string().nullable().default(null),
   finished_at: z.string().nullable().default(null),
@@ -512,9 +514,9 @@ export const ToolTrace = z.object({
 export type ToolTrace = z.infer<typeof ToolTrace>;
 
 export const ContextIntakeSession = z.object({
-  id: z.string().uuid(),
-  owner_id: z.string().uuid(),
-  goal_id: z.string().uuid().nullable().default(null),
+  id: DbId,
+  owner_id: DbId,
+  goal_id: DbId.nullable().default(null),
   aim_title: z.string(),
   aim_description: z.string().default(""),
   status: ContextIntakeSessionStatus.default("collecting"),
@@ -523,7 +525,7 @@ export const ContextIntakeSession = z.object({
   should_pause: z.boolean().default(false),
   missing_questions: z.array(z.string()).default([]),
   blocked_reasons: z.array(z.string()).default([]),
-  tool_trace_ids: z.array(z.string().uuid()).default([]),
+  tool_trace_ids: z.array(DbId).default([]),
   started_at: z.string().optional(),
   closed_at: z.string().nullable().default(null),
   created_at: z.string().optional(),
@@ -531,15 +533,15 @@ export const ContextIntakeSession = z.object({
 export type ContextIntakeSession = z.infer<typeof ContextIntakeSession>;
 
 export const EvidenceAttribution = z.object({
-  id: z.string().uuid(),
-  owner_id: z.string().uuid(),
-  evidence_id: z.string().uuid(),
-  goal_id: z.string().uuid(),
-  milestone_id: z.string().uuid().nullable().default(null),
-  run_id: z.string().uuid().nullable().default(null),
-  assignment_id: z.string().uuid().nullable().default(null),
+  id: DbId,
+  owner_id: DbId,
+  evidence_id: DbId,
+  goal_id: DbId,
+  milestone_id: DbId.nullable().default(null),
+  run_id: DbId.nullable().default(null),
+  assignment_id: DbId.nullable().default(null),
   actor_kind: ActorKind.nullable().default(null),
-  actor_id: z.string().uuid().nullable().default(null),
+  actor_id: DbId.nullable().default(null),
   trust_score: z.number().min(0).max(1).default(0),
   reason: z.string().default(""),
   created_at: z.string().optional(),
@@ -549,7 +551,7 @@ export type EvidenceAttribution = z.infer<typeof EvidenceAttribution>;
 export const EvaluatorRuntimeResult = z.object({
   evaluator: Evaluator,
   status: EvaluatorRuntimeStatus,
-  matched_evidence_ids: z.array(z.string().uuid()).default([]),
+  matched_evidence_ids: z.array(DbId).default([]),
   trust_score: z.number().min(0).max(1).default(0),
   explanation: z.string().default(""),
   failure_reason: z.string().nullable().default(null),
@@ -559,7 +561,7 @@ export type EvaluatorRuntimeResult = z.infer<typeof EvaluatorRuntimeResult>;
 
 export const EvaluationReview = z.object({
   passed: z.boolean().default(false),
-  matched_evidence_ids: z.array(z.string().uuid()).default([]),
+  matched_evidence_ids: z.array(DbId).default([]),
   trust_score: z.number().min(0).max(1).default(0),
   reason: z.string().default(""),
   next_action: z.string().default(""),
@@ -588,7 +590,13 @@ export const AimProgressMilestoneRead = z.object({
   assignment: Assignment.nullable().default(null),
   latest_run: Run.nullable().default(null),
   child_relations: z.array(SubAimRelation).default([]),
-  eval_review: EvaluationReview.default({}),
+  eval_review: EvaluationReview.default({
+    passed: false,
+    matched_evidence_ids: [],
+    trust_score: 0,
+    reason: "",
+    next_action: "",
+  }),
   evaluator_results: z.array(EvaluatorRuntimeResult).default([]),
   evidence: z.array(EvidenceReviewItem).default([]),
   evidence_count: z.number().int().nonnegative().default(0),
@@ -603,23 +611,23 @@ export type AimProgressMilestoneRead = z.infer<typeof AimProgressMilestoneRead>;
 // ──────────────────────────────────────────────────────────────────────────
 
 export const Memory = z.object({
-  id: z.string().uuid(),
-  owner_id: z.string().uuid(),
-  goal_id: z.string().uuid().nullable().default(null),
+  id: DbId,
+  owner_id: DbId,
+  goal_id: DbId.nullable().default(null),
   kind: MemoryKind,
   category: ContextCategory.default("project_fact"),
   content: z.string(),
   confidence: z.number().min(0).max(1).default(1),
   source: z.enum(["agent_inferred", "user_stated", "evidence_derived"]).default("agent_inferred"),
   status: MemoryStatus.default("active"),
-  superseded_by: z.string().uuid().nullable().default(null),
+  superseded_by: DbId.nullable().default(null),
   created_at: z.string().optional(),
 });
 export type Memory = z.infer<typeof Memory>;
 
 export const AimCompletionRecapEvidenceRead = z.object({
-  id: z.string().uuid(),
-  milestone_id: z.string().uuid().nullable().default(null),
+  id: DbId,
+  milestone_id: DbId.nullable().default(null),
   kind: EvidenceKind,
   summary: z.string().default(""),
   occurred_at: z.string(),
@@ -628,28 +636,28 @@ export const AimCompletionRecapEvidenceRead = z.object({
 export type AimCompletionRecapEvidenceRead = z.infer<typeof AimCompletionRecapEvidenceRead>;
 
 export const AimCompletionRecapEvalRead = z.object({
-  milestone_id: z.string().uuid(),
+  milestone_id: DbId,
   evaluator: Evaluator,
   status: EvaluatorRuntimeStatus,
   explanation: z.string().default(""),
   trust_score: z.number().min(0).max(1).default(0),
-  matched_evidence_ids: z.array(z.string().uuid()).default([]),
+  matched_evidence_ids: z.array(DbId).default([]),
 });
 export type AimCompletionRecapEvalRead = z.infer<typeof AimCompletionRecapEvalRead>;
 
 export const AimCompletionRecapSubAimRead = z.object({
-  milestone_id: z.string().uuid(),
+  milestone_id: DbId,
   title: z.string(),
   outcome: z.string().default(""),
   completed_at: z.string().nullable().default(null),
   decided_by: DecidedBy.nullable().default(null),
-  evidence_ids: z.array(z.string().uuid()).default([]),
+  evidence_ids: z.array(DbId).default([]),
   eval_status: EvaluatorRuntimeStatus.nullable().default(null),
 });
 export type AimCompletionRecapSubAimRead = z.infer<typeof AimCompletionRecapSubAimRead>;
 
 export const AimCompletionRecapMemoryRead = z.object({
-  id: z.string().uuid(),
+  id: DbId,
   content: z.string(),
   category: ContextCategory,
   source: z.enum(["agent_inferred", "user_stated", "evidence_derived"]),
@@ -688,7 +696,7 @@ export const AimProgressReadModel = z.object({
 export type AimProgressReadModel = z.infer<typeof AimProgressReadModel>;
 
 export const Subscription = z.object({
-  owner_id: z.string().uuid(),
+  owner_id: DbId,
   source: SubscriptionSource,
   tier: SubscriptionTier.default("free"),
   expires_at: z.string().nullable().default(null),
@@ -696,9 +704,9 @@ export const Subscription = z.object({
 export type Subscription = z.infer<typeof Subscription>;
 
 export const Job = z.object({
-  id: z.string().uuid(),
+  id: DbId,
   type: JobType,
-  payload: z.record(z.unknown()).default({}),
+  payload: z.record(z.string(), z.unknown()).default({}),
   status: JobStatus.default("queued"),
   /** Idempotency key: the same logical event is enqueued only once. */
   dedup_key: z.string().nullable().default(null),

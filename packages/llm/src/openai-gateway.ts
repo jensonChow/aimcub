@@ -112,13 +112,16 @@ function isDeepSeekBaseUrl(baseURL: string): boolean {
   }
 }
 
-function inferCompatibleDefaults(baseURL: string): { maxTokensParam?: MaxTokensParam; structuredOutputMode?: StructuredOutputMode } {
-  let host = "";
+function hostnameOrRaw(baseURL: string): string {
   try {
-    host = new URL(baseURL).hostname;
+    return new URL(baseURL).hostname;
   } catch {
-    host = baseURL;
+    return baseURL;
   }
+}
+
+function inferCompatibleDefaults(baseURL: string): { maxTokensParam?: MaxTokensParam; structuredOutputMode?: StructuredOutputMode } {
+  const host = hostnameOrRaw(baseURL);
   if (host.includes("api.deepseek.com")) return { maxTokensParam: "max_tokens", structuredOutputMode: "json_object" };
   if (host.includes("api.z.ai")) return { maxTokensParam: "max_tokens", structuredOutputMode: "json_object" };
   if (host.includes("api.minimax.io") || host.includes("api.minimaxi.com")) return { maxTokensParam: "max_tokens", structuredOutputMode: "prompt" };
@@ -128,12 +131,7 @@ function inferCompatibleDefaults(baseURL: string): { maxTokensParam?: MaxTokensP
 }
 
 function inferRequestBodyDefaults(baseURL: string): Record<string, unknown> | undefined {
-  let host = "";
-  try {
-    host = new URL(baseURL).hostname;
-  } catch {
-    host = baseURL;
-  }
+  const host = hostnameOrRaw(baseURL);
   if (host.includes("api.deepseek.com")) return { thinking: { type: "disabled" } };
   return undefined;
 }
@@ -211,7 +209,7 @@ export class OpenAiCompatibleLlmGateway implements LlmGateway {
       parsed = JSON.parse(text) as T;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      throw new Error(`structured output was not valid JSON: ${message}`);
+      throw new Error(`structured output was not valid JSON: ${message}`, { cause: err });
     }
     return { output: parsed, usage };
   }
@@ -270,7 +268,7 @@ export class OpenAiCompatibleLlmGateway implements LlmGateway {
       data = JSON.parse(raw) as ChatCompletionResponse;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      throw new Error(`openai-compatible response was not valid JSON: ${message}`);
+      throw new Error(`openai-compatible response was not valid JSON: ${message}`, { cause: err });
     }
 
     // A strict-mode safety refusal arrives as `message.refusal` with null content. Surface

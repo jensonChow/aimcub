@@ -10,10 +10,12 @@ packages:
   - "apps/mcp"
 confirmModulesPurge: false
 allowBuilds:
+  '@swc/core': true
   electron: true
+  electron-winstaller: true
   esbuild: true
   sharp: true
   workerd: true
 overrides:
-  react: 18.3.1
-  react-dom: 18.3.1
+  react: 19.2.7
+  react-dom: 19.2.7

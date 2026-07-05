@@ -21,6 +21,8 @@ import type { Milestone } from "@core/domain";
 import type { ToolDeps } from "./ports.js";
 import { ReportEvidenceInput, normalizeReport, toIngestInput } from "./evidence-input.js";
 
+const DbId = z.string().guid();
+
 /** Helper: a single text-content MCP tool result carrying a JSON-serialized body. */
 function jsonResult(body: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(body) }] };
@@ -108,7 +110,7 @@ export function registerAimcubTools(server: McpServer, deps: ToolDeps): void {
     {
       title: "Goal status",
       description: "Return a milestone-progress summary for a goal.",
-      inputSchema: { goalId: z.string().uuid() },
+      inputSchema: { goalId: DbId },
     },
     async ({ goalId }) => {
       const goal = await deps.repo.getGoal(goalId);
@@ -135,7 +137,7 @@ export function registerAimcubTools(server: McpServer, deps: ToolDeps): void {
     {
       title: "List milestones",
       description: "List the milestones of a goal with their status and acceptance rules.",
-      inputSchema: { goalId: z.string().uuid() },
+      inputSchema: { goalId: DbId },
     },
     async ({ goalId }) => {
       // Owner scoping without an extra goal read: every milestone row carries

@@ -381,7 +381,7 @@ export class BraveWebSearchClient implements WebSearchClient {
       parsed = JSON.parse(body) as BraveSearchResponse;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      throw new Error(`Brave search response was not valid JSON: ${message}`);
+      throw new Error(`Brave search response was not valid JSON: ${message}`, { cause: err });
     }
 
     const results = (parsed.web?.results ?? [])

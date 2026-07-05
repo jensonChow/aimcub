@@ -129,7 +129,7 @@ export class AnthropicLlmGateway implements LlmGateway {
       parsed = JSON.parse(text) as T;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      throw new Error(`structured output was not valid JSON: ${message}`);
+      throw new Error(`structured output was not valid JSON: ${message}`, { cause: err });
     }
     return { output: parsed, usage };
   }

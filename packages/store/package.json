@@ -23,7 +23,7 @@
     "@core/types": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^22.10.5",
-    "vitest": "^2.1.8"
+    "@types/node": "^22.20.0",
+    "vitest": "^4.1.9"
   }
 }

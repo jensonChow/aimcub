@@ -518,8 +518,8 @@ export async function decomposeWithQuality(
   return { ...retry, quality: retryQuality, retried: true, attempts: 2, firstQuality };
 }
 
-function formatZodIssue(issue: { path: (string | number)[]; message: string }): string {
-  const path = issue.path.length > 0 ? issue.path.join(".") : "(root)";
+function formatZodIssue(issue: { path: PropertyKey[]; message: string }): string {
+  const path = issue.path.length > 0 ? issue.path.map(String).join(".") : "(root)";
   return `${path}: ${issue.message}`;
 }
 

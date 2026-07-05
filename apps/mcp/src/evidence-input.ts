@@ -16,6 +16,8 @@ import {
 } from "@core/domain";
 import type { IngestEvidenceInput } from "@core/api-client";
 
+const DbId = z.string().guid();
+
 /**
  * Upper bounds on agent-supplied content. The caller is authenticated but the
  * content is free-form: bound every unbounded string/array/record so a single
@@ -28,7 +30,7 @@ const MAX_FILE_PATH_CHARS = 1000;
 const MAX_PAYLOAD_JSON_CHARS = 32 * 1024;
 
 /** Free-form payload record, capped by SERIALIZED size — bytes are what hit the DB. */
-const BoundedPayload = z.record(z.unknown()).superRefine((value, ctx) => {
+const BoundedPayload = z.record(z.string(), z.unknown()).superRefine((value, ctx) => {
   if (JSON.stringify(value).length > MAX_PAYLOAD_JSON_CHARS) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -80,9 +82,9 @@ export type EvidenceReport = z.infer<typeof EvidenceReport>;
  */
 export const ReportEvidenceInput = z.object({
   /** Goal this progress advances. */
-  goalId: z.string().uuid(),
+  goalId: DbId,
   /** Optional target milestone. */
-  milestoneId: z.string().uuid().nullable().optional(),
+  milestoneId: DbId.nullable().optional(),
   /** ISO 8601 timestamp of when the event actually occurred. */
   occurredAt: z.string().min(1),
   report: EvidenceReport,

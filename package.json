@@ -5,7 +5,7 @@
   "description": "Aimcub — a universal aim-management layer for the harness era: humans and agents are interchangeable tools for reaching a goal, and Aimcub holds the aim, routes work, ingests evidence, judges progress, and accrues context. The current workspace is Desktop-first with CLI, MCP, Supabase, and shared core packages.",
   "packageManager": "pnpm@11.10.0",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.13"
   },
   "type": "module",
   "scripts": {
@@ -21,12 +21,12 @@
     "core:purity": "pnpm --filter @core/domain --filter @core/types run purity"
   },
   "devDependencies": {
-    "@eslint/js": "^9.18.0",
-    "@types/node": "^22.10.5",
-    "eslint": "^9.18.0",
-    "turbo": "^2.3.4",
-    "typescript": "^5.7.3",
-    "typescript-eslint": "^8.20.0",
-    "vitest": "^2.1.8"
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.20.0",
+    "eslint": "^10.6.0",
+    "turbo": "^2.10.3",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.62.1",
+    "vitest": "^4.1.9"
   }
 }

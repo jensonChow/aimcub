@@ -8,22 +8,22 @@
     "aimcub": "./dist/index.js"
   },
   "scripts": {
-    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node18 --outfile=dist/index.js --external:@anthropic-ai/sdk --banner:js='#!/usr/bin/env node'",
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist/index.js --external:@anthropic-ai/sdk --banner:js='#!/usr/bin/env node'",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",
     "test": "vitest run"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.102.0",
+    "@anthropic-ai/sdk": "^0.110.0",
     "@core/domain": "workspace:*",
     "@core/llm": "workspace:*",
     "@core/store": "workspace:*",
     "@core/types": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^22.10.5",
-    "esbuild": "^0.24.2",
-    "typescript": "^5.7.3",
-    "vitest": "^2.1.8"
+    "@types/node": "^22.20.0",
+    "esbuild": "^0.28.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
   }
 }

@@ -23,11 +23,11 @@
     "test:live-providers": "vitest run --config scripts/vitest.live.config.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.102.0",
+    "@anthropic-ai/sdk": "^0.110.0",
     "@core/domain": "workspace:*",
     "@core/types": "workspace:*"
   },
   "devDependencies": {
-    "vitest": "^2.1.8"
+    "vitest": "^4.1.9"
   }
 }

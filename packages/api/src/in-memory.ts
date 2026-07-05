@@ -59,8 +59,8 @@ export class InvariantError extends Error {
 }
 
 const defaultId = (): string => {
-  // `globalThis.crypto` exists in Node >= 20 and all our runtimes.
-  return globalThis.crypto.randomUUID();
+  // `globalThis.crypto` exists in the supported runtimes, but this package avoids ambient platform types.
+  return (globalThis as typeof globalThis & { crypto: { randomUUID: () => string } }).crypto.randomUUID();
 };
 
 const defaultNow = (): string => new Date().toISOString();
