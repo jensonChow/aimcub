@@ -38,6 +38,14 @@ const api: AimcubApi = {
   runLocalAgent: (req) => ipcRenderer.invoke(IPC.runLocalAgent, req),
   runMilestoneAgent: (req) => ipcRenderer.invoke(IPC.runMilestoneAgent, req),
   confirmMilestone: (req) => ipcRenderer.invoke(IPC.confirmMilestone, req),
+  getWindowChromeState: () => ipcRenderer.invoke(IPC.getWindowChromeState),
+  onWindowChromeState: (handler) => {
+    const listener = (_event: IpcRendererEvent, payload: unknown) => {
+      handler(payload as Parameters<typeof handler>[0]);
+    };
+    ipcRenderer.on(IPC.windowChromeState, listener);
+    return () => ipcRenderer.removeListener(IPC.windowChromeState, listener);
+  },
   onPlanningLiveEvent: (handler) => {
     const listener = (_event: IpcRendererEvent, payload: unknown) => {
       handler(payload as Parameters<typeof handler>[0]);

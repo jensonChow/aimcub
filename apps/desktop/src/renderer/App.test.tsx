@@ -230,9 +230,21 @@ describe("CockpitShell", () => {
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
 
     expect(html).toContain('data-od-id="window-drag-strip"');
+    expect(html).toContain('data-window-fullscreen="false"');
     expect(css).toMatch(/\.od-window-drag-strip\s*{[^}]*app-region:\s*drag;[^}]*-webkit-app-region:\s*drag;/s);
     expect(css).toMatch(/\.od-sidebar-toggle\s*{[^}]*app-region:\s*no-drag;[^}]*-webkit-app-region:\s*no-drag;/s);
     expect(css).toMatch(/\.od-user-menu-anchor,\s*\.od-user-menu-anchor \*\s*{[^}]*app-region:\s*no-drag;[^}]*-webkit-app-region:\s*no-drag;/s);
+  });
+
+  it("moves the sidebar toggle left only when the macOS window is fullscreen", () => {
+    const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
+
+    expect(css).toMatch(
+      /\.od-app\s*{[^}]*--titlebar-toggle-left:\s*calc\(var\(--traffic-light-left\) \+ var\(--traffic-light-cluster-width\) \+ var\(--titlebar-control-gap\)\);/s,
+    );
+    expect(css).toMatch(
+      /\.od-app\[data-window-fullscreen="true"\]\s*{[^}]*--titlebar-toggle-left:\s*var\(--fullscreen-titlebar-toggle-left\);/s,
+    );
   });
 
   it("groups transient sidebar hover controls without changing grid layout", () => {

@@ -71,6 +71,7 @@ export function CockpitShell({
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [sidebarPinned, setSidebarPinned] = useState(() => !prefersCollapsedSidebar());
   const [sidebarPeeking, setSidebarPeeking] = useState(false);
+  const [windowFullscreen, setWindowFullscreen] = useState(false);
   const sidebarHoverZoneRef = useRef<HTMLDivElement | null>(null);
   const sidebarRef = useRef<HTMLElement | null>(null);
   const revealSidebarTimer = useRef<number | null>(null);
@@ -217,6 +218,21 @@ export function CockpitShell({
   }, []);
 
   useEffect(() => {
+    let active = true;
+    window.aimcub?.getWindowChromeState().then((state) => {
+      if (active) setWindowFullscreen(state.fullscreen);
+    }).catch(() => {});
+
+    const unsubscribe = window.aimcub?.onWindowChromeState((state) => {
+      setWindowFullscreen(state.fullscreen);
+    });
+    return () => {
+      active = false;
+      unsubscribe?.();
+    };
+  }, []);
+
+  useEffect(() => {
     function resetTransientSidebarState() {
       clearSidebarTimers();
       suppressSidebarPeekUntilExit.current = false;
@@ -283,6 +299,7 @@ export function CockpitShell({
         className={`od-app od-app-stage-${activeStage}`}
         data-empty-aim={firstRunAim ? "true" : "false"}
         data-sidebar-state={sidebarState}
+        data-window-fullscreen={windowFullscreen ? "true" : "false"}
       >
         <div className="od-window-drag-strip" aria-hidden="true" data-od-id="window-drag-strip" />
         {usingSettingsSidebar ? null : (

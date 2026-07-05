@@ -94,6 +94,7 @@ kbd {
   --traffic-light-left: 16px;
   --traffic-light-cluster-width: 52px;
   --titlebar-control-gap: 8px;
+  --fullscreen-titlebar-toggle-left: 16px;
   --titlebar-toggle-left: calc(var(--traffic-light-left) + var(--traffic-light-cluster-width) + var(--titlebar-control-gap));
   --titlebar-toggle-size: 32px;
   position: relative;
@@ -103,6 +104,10 @@ kbd {
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   background: var(--od-bg);
   transition: grid-template-columns 180ms ease;
+}
+
+.od-app[data-window-fullscreen="true"] {
+  --titlebar-toggle-left: var(--fullscreen-titlebar-toggle-left);
 }
 
 .od-app[data-sidebar-state="collapsed"],

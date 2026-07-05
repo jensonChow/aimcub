@@ -4,7 +4,7 @@
  * aims). Clarifying answers are folded into dimension-aware `user_stated` memories — the
  * first concrete writes toward the memory pillar.
  */
-import { ipcMain, type IpcMainInvokeEvent } from "electron";
+import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from "electron";
 
 import type { Goal, Milestone } from "@core/types";
 import type { NewMemory } from "@core/store";
@@ -348,6 +348,10 @@ async function decompositionStrategy(
 }
 
 export function registerIpc(): void {
+  ipcMain.handle(IPC.getWindowChromeState, (event) => ({
+    fullscreen: Boolean(BrowserWindow.fromWebContents(event.sender)?.isFullScreen()),
+  }));
+
   ipcMain.handle(IPC.intake, async (event, req: DraftRequest) => {
     const runId = planningRunId(req);
     emitPlanningLiveEvent(event, runId, { type: "planning.started", stage: "intake" });

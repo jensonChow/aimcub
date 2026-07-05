@@ -5,10 +5,20 @@ import { registerIpc } from "./ipc";
 import { loadContextSourceConfig } from "./context-source-settings";
 import { loadProviderConfig } from "./gateway";
 import { loadWebResearchConfig } from "./web-research-settings";
+import { IPC, type WindowChromeState } from "../shared/ipc";
 
 app.setName("Aimcub");
 
 let mainWindow: BrowserWindow | null = null;
+
+function windowChromeState(win: BrowserWindow): WindowChromeState {
+  return { fullscreen: win.isFullScreen() };
+}
+
+function sendWindowChromeState(win: BrowserWindow): void {
+  if (win.webContents.isDestroyed()) return;
+  win.webContents.send(IPC.windowChromeState, windowChromeState(win));
+}
 
 function createWindow(): void {
   const win = new BrowserWindow({
@@ -32,6 +42,9 @@ function createWindow(): void {
     if (mainWindow === win) mainWindow = null;
   });
   win.on("ready-to-show", () => win.show());
+  win.on("enter-full-screen", () => sendWindowChromeState(win));
+  win.on("leave-full-screen", () => sendWindowChromeState(win));
+  win.webContents.on("did-finish-load", () => sendWindowChromeState(win));
 
   // In dev, electron-vite serves the renderer over HTTP; in prod, load the built file.
   const devUrl = process.env.ELECTRON_RENDERER_URL;

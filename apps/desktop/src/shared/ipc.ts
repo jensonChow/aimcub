@@ -397,6 +397,10 @@ export interface RunMilestoneAgentResult {
   error: string | null;
 }
 
+export interface WindowChromeState {
+  fullscreen: boolean;
+}
+
 /** The typed surface exposed on `window.aimcub` by the preload bridge. */
 export interface AimcubApi {
   intake(req: DraftRequest): Promise<AimIntakeReport>;
@@ -434,6 +438,8 @@ export interface AimcubApi {
   runLocalAgent(req: LocalAgentRunRequest): Promise<LocalAgentRunResult>;
   runMilestoneAgent(req: RunMilestoneAgentRequest): Promise<RunMilestoneAgentResult>;
   confirmMilestone(req: ConfirmMilestoneRequest): Promise<GoalDetail | null>;
+  getWindowChromeState(): Promise<WindowChromeState>;
+  onWindowChromeState(handler: (state: WindowChromeState) => void): () => void;
   onPlanningLiveEvent(handler: (event: PlanningLiveEvent) => void): () => void;
 }
 
@@ -474,6 +480,8 @@ export const IPC = {
   runLocalAgent: "aimcub:runLocalAgent",
   runMilestoneAgent: "aimcub:runMilestoneAgent",
   confirmMilestone: "aimcub:confirmMilestone",
+  getWindowChromeState: "aimcub:getWindowChromeState",
+  windowChromeState: "aimcub:windowChromeState",
   planningLiveEvent: "aimcub:planningLiveEvent",
 } as const;
 

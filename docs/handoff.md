@@ -5,22 +5,22 @@ Branch: `main`
 
 ## Current Session
 
-- Fixed the collapsed sidebar peek persistence bug: moving from the titlebar toggle or reveal rail into the revealed sidebar now keeps the sidebar open instead of closing as soon as the pointer leaves the toggle.
-- The transient sidebar close path now treats the toggle/rail and sidebar as one hover zone, checks `relatedTarget` before scheduling close, and uses pointer/focus events instead of a mixed mouse/pointer leave path.
-- Added a renderer regression test for the transient sidebar hover-zone structure and updated `docs/memory/design-system.md` with the durable hover-zone interaction rule.
+- Adjusted the non-settings sidebar toggle for macOS fullscreen: normal window mode keeps the toggle immediately after the traffic lights, while fullscreen moves it left into the now-empty traffic-light-safe space.
+- Added typed window chrome IPC (`getWindowChromeState` plus a fullscreen state event) from main to preload to renderer, then used `data-window-fullscreen` to drive the CSS variable for the toggle and drag strip positions.
+- Added renderer regression coverage for the fullscreen-only toggle offset and updated `docs/memory/design-system.md` with the durable fullscreen placement rule.
 
 ## Current State
 
 - `main` keeps the simplified Desktop shell: no full-width visible titlebar, left sidebar, center workspace, command-composer first-run Aim screen, and settings split-view.
 - Settings still lock the primary sidebar open and omit the normal Aim workspace sidebar toggle, peek rail, and `Aimcub / Workbench` brand header.
 - The sidebar toggle contract remains: manual click/keyboard toggle wins over hover/focus peek; fresh hover reveal still works from the button and left-edge rail; transient peek does not resize the workspace.
-- Sidebar peek now remains open while the pointer/focus moves within the combined toggle, reveal rail, revealed sidebar, and short transition path, then closes only after leaving that whole hover zone.
+- In normal macOS window mode, the sidebar toggle keeps its existing 76 px left offset after traffic lights. In fullscreen, the renderer receives fullscreen state and moves the toggle to 16 px left, with the drag strip starting after the shifted control.
 - The root packaged app at `/Users/jenson/Desktop/Aimcub/Aimcub.app` was refreshed from `pnpm desktop:pack`.
 
 ## Verification
 
 - Passed:
-  - Electron CDP hover check against the built app: collapse sidebar, hover toggle to open `peek`, move pointer into sidebar for longer than the close delay, confirm state stays `peek`, then move outside and confirm state becomes `collapsed`.
+  - Electron CDP fullscreen position check against the built app: normal window toggle left `76`, fullscreen state `true`, fullscreen toggle left `16`, fullscreen drag strip left `56`.
   - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop test`
   - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop typecheck`
   - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop lint`
@@ -35,7 +35,7 @@ Branch: `main`
 
 Notes:
 - MCP worker tests may log the expected missing-Supabase opaque-error path while passing.
-- Root `Aimcub.app` and `apps/desktop/dist/mac-arm64/Aimcub.app` both have `app.asar` timestamp `Jul 5 20:58:13 2026`.
+- Root `Aimcub.app` and `apps/desktop/dist/mac-arm64/Aimcub.app` both have `app.asar` timestamp `Jul 5 21:08:52 2026`.
 - Commit/push status: committed and pushed directly on `main`; no separate branch merge was needed.
 
 ## Next Session Prompt
