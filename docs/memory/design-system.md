@@ -165,6 +165,7 @@ Reference links:
 
 - Every interactive element needs visible hover, active, focus-visible, disabled, selected/current, loading, and error states where applicable.
 - Sidebar peek must be transient and hover/focus driven: it should open after a short hover delay, stay open while the pointer is over the sidebar, and close without changing the pinned/collapsed preference when the pointer leaves.
+- Hover-revealed overlays, including sidebar peek, must have symmetric enter and exit motion. Keep the overlay rendered and visible until the collapse transition finishes; do not hide or unmount it instantly on pointer leave.
 - Manual sidebar toggle actions take precedence over peek behavior: clicking or keyboard-toggling collapsed must not immediately reopen from the same pointer/focus state, but a fresh hover over the button or left-edge rail must still reveal the overlay sidebar. Draggable chrome must not cover the toggle or reveal hit targets, and window drag hit areas must stay stable across window focus and activation cycles instead of depending only on transient hover/peek sidebar DOM.
 - Keyboard focus must remain visible. Current focus token is a 4 px accent-tinted ring; keep or improve it, do not remove it.
 - Core desktop commands should be available through keyboard-first flows. Add command palette entries alongside visible controls when a workflow becomes top-level navigation or a frequent action.
