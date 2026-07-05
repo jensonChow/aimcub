@@ -3570,6 +3570,11 @@ kbd {
     grid-template-columns: 0 minmax(0, 1fr);
   }
 
+  .od-app.od-app-stage-settings,
+  .od-app.od-app-stage-settings[data-sidebar-state="pinned"] {
+    grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  }
+
   .od-app[data-sidebar-state="collapsed"] .od-main {
     padding-top: calc(32px + 24px);
   }
@@ -3583,6 +3588,13 @@ kbd {
     visibility: visible;
     transform: translateX(0);
     opacity: 1;
+  }
+
+  .od-app.od-app-stage-settings[data-sidebar-state="pinned"] .od-sidebar {
+    position: relative;
+    inset: auto;
+    height: auto;
+    z-index: 10;
   }
 
   .od-stage-nav {

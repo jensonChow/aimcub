@@ -75,7 +75,7 @@ export function CockpitShell({
   const usingSettingsSidebar = activeStage === "settings" && Boolean(settingsSidebar);
   const hasGoals = goals.length > 0;
   const firstRunAim = activeStage === "aim" && !selected && !hasGoals;
-  const sidebarState: SidebarState = sidebarPinned ? "pinned" : sidebarPeeking ? "peek" : "collapsed";
+  const sidebarState: SidebarState = usingSettingsSidebar ? "pinned" : sidebarPinned ? "pinned" : sidebarPeeking ? "peek" : "collapsed";
   const sidebarVisible = sidebarState !== "collapsed";
   const sidebarToggleLabel = sidebarPinned ? t("sidebar.collapse") : t("sidebar.expand");
 
@@ -272,60 +272,66 @@ export function CockpitShell({
         data-sidebar-state={sidebarState}
       >
         <div className="od-window-drag-strip" aria-hidden="true" data-od-id="window-drag-strip" />
-        <div
-          className="od-sidebar-peek-trigger"
-          aria-hidden="true"
-          data-od-id="sidebar-peek-trigger"
-          onMouseDown={(event) => {
-            event.stopPropagation();
-            revealSidebarFromRailHover();
-          }}
-          onMouseEnter={revealSidebarFromRailHover}
-          onMouseMove={revealSidebarFromRailHover}
-          onMouseLeave={scheduleSidebarPeekClose}
-          onPointerDown={(event) => {
-            event.stopPropagation();
-            revealSidebarFromRailHover();
-          }}
-          onPointerEnter={revealSidebarFromRailHover}
-          onPointerMove={revealSidebarFromRailHover}
-          onPointerLeave={scheduleSidebarPeekClose}
-        />
-        <button
-          className="od-sidebar-toggle"
-          type="button"
-          aria-label={sidebarToggleLabel}
-          aria-expanded={sidebarVisible}
-          aria-pressed={sidebarPinned}
-          title={sidebarToggleLabel}
-          data-state={sidebarState}
-          data-od-id="sidebar-toggle"
-          onClick={onSidebarToggleClick}
-          onPointerDown={onSidebarTogglePointerDown}
-          onKeyDown={onSidebarToggleKeyDown}
-          onMouseEnter={revealSidebarAfterHover}
-          onMouseLeave={onSidebarTogglePointerLeave}
-          onPointerEnter={revealSidebarAfterHover}
-          onPointerLeave={onSidebarTogglePointerLeave}
-          onFocus={keepSidebarPeekOpen}
-          onBlur={onSidebarToggleBlur}
-        >
-          <SidebarToggleIcon />
-        </button>
+        {usingSettingsSidebar ? null : (
+          <>
+            <div
+              className="od-sidebar-peek-trigger"
+              aria-hidden="true"
+              data-od-id="sidebar-peek-trigger"
+              onMouseDown={(event) => {
+                event.stopPropagation();
+                revealSidebarFromRailHover();
+              }}
+              onMouseEnter={revealSidebarFromRailHover}
+              onMouseMove={revealSidebarFromRailHover}
+              onMouseLeave={scheduleSidebarPeekClose}
+              onPointerDown={(event) => {
+                event.stopPropagation();
+                revealSidebarFromRailHover();
+              }}
+              onPointerEnter={revealSidebarFromRailHover}
+              onPointerMove={revealSidebarFromRailHover}
+              onPointerLeave={scheduleSidebarPeekClose}
+            />
+            <button
+              className="od-sidebar-toggle"
+              type="button"
+              aria-label={sidebarToggleLabel}
+              aria-expanded={sidebarVisible}
+              aria-pressed={sidebarPinned}
+              title={sidebarToggleLabel}
+              data-state={sidebarState}
+              data-od-id="sidebar-toggle"
+              onClick={onSidebarToggleClick}
+              onPointerDown={onSidebarTogglePointerDown}
+              onKeyDown={onSidebarToggleKeyDown}
+              onMouseEnter={revealSidebarAfterHover}
+              onMouseLeave={onSidebarTogglePointerLeave}
+              onPointerEnter={revealSidebarAfterHover}
+              onPointerLeave={onSidebarTogglePointerLeave}
+              onFocus={keepSidebarPeekOpen}
+              onBlur={onSidebarToggleBlur}
+            >
+              <SidebarToggleIcon />
+            </button>
+          </>
+        )}
         <aside
           className="od-sidebar"
           data-mode={usingSettingsSidebar ? "settings" : "aims"}
           data-od-id={usingSettingsSidebar ? "left-settings-sidebar" : "left-aim-sidebar"}
           aria-hidden={sidebarVisible ? undefined : true}
-          onPointerEnter={keepSidebarPeekOpen}
-          onPointerLeave={scheduleSidebarPeekClose}
+          onPointerEnter={usingSettingsSidebar ? undefined : keepSidebarPeekOpen}
+          onPointerLeave={usingSettingsSidebar ? undefined : scheduleSidebarPeekClose}
         >
-          <div className="od-sidebar-head">
-            <div>
-              <h1>Aimcub</h1>
-              <p>{t("os.tagline")}</p>
+          {usingSettingsSidebar ? null : (
+            <div className="od-sidebar-head">
+              <div>
+                <h1>Aimcub</h1>
+                <p>{t("os.tagline")}</p>
+              </div>
             </div>
-          </div>
+          )}
 
           {usingSettingsSidebar ? settingsSidebar : (
             <>
