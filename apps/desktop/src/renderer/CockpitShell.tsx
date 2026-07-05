@@ -203,6 +203,25 @@ export function CockpitShell({
   }, []);
 
   useEffect(() => {
+    function resetTransientSidebarState() {
+      clearSidebarTimers();
+      suppressSidebarPeekUntilExit.current = false;
+      setSidebarPeeking(false);
+    }
+
+    function resetWhenHidden() {
+      if (document.visibilityState !== "visible") resetTransientSidebarState();
+    }
+
+    window.addEventListener("blur", resetTransientSidebarState);
+    document.addEventListener("visibilitychange", resetWhenHidden);
+    return () => {
+      window.removeEventListener("blur", resetTransientSidebarState);
+      document.removeEventListener("visibilitychange", resetWhenHidden);
+    };
+  }, []);
+
+  useEffect(() => {
     const query = window.matchMedia("(max-width: 760px)");
     function syncSidebarForViewport(event: MediaQueryList | MediaQueryListEvent) {
       clearSidebarTimers();
@@ -251,6 +270,7 @@ export function CockpitShell({
         data-empty-aim={firstRunAim ? "true" : "false"}
         data-sidebar-state={sidebarState}
       >
+        <div className="od-window-drag-strip" aria-hidden="true" data-od-id="window-drag-strip" />
         <div
           className="od-sidebar-peek-trigger"
           aria-hidden="true"

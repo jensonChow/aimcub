@@ -5,27 +5,26 @@ Branch: `main`
 
 ## Current Session
 
-- Ran the `memory-refresh` audit after the packaged Desktop sidebar placement and hover-reveal fix.
-- Confirmed `AGENTS.md` and `CLAUDE.md` remain within the 50-line root-memory budget and still contain only hard project rules.
-- Confirmed the durable sidebar placement/reveal rule lives in `docs/memory/design-system.md` and `docs/memory/desktop.md`; no root memory expansion was needed.
-- Reconciled this handoff with the actual pushed state for the sidebar fix and the English-only handoff cleanup.
+- Fixed packaged Desktop drag-region instability after window focus/activation cycles.
+- Added a stable invisible top drag strip outside the dynamic sidebar peek/toggle layers.
+- Reset transient sidebar peek state on window blur or document hide so activation cycles cannot leave stale hover state behind.
+- Removed the sidebar-wide `no-drag` override so the sidebar header drag region is not nested under a parent no-drag region.
+- Added a focused renderer regression test for the stable drag strip and toggle no-drag contract.
+- Updated `docs/memory/design-system.md` and `docs/memory/desktop.md` with the durable drag-region stability requirement.
 
 ## Current State
 
-- `main` keeps the simplified Desktop shell: no full-width titlebar, left sidebar, center workspace, command-composer first-run Aim screen, and settings split-view.
-- The sidebar fix is already pushed to `origin/main` in `42ca4d3` (`Fix desktop sidebar hover reveal`), followed by `06553b2` (`Keep handoff text in English`).
-- Real packaged Electron inspection of `/Users/jenson/Desktop/Aimcub/Aimcub.app` confirmed the top-left sidebar toggle collapses and expands the sidebar. Accessibility state changed from "Collapse sidebar" / value `1` to "Expand sidebar" / value `0`, then back again.
-- Chrome DevTools Protocol hit-testing confirmed `document.elementFromPoint(22, 120)` resolves to `data-od-id="sidebar-peek-trigger"`, and dispatching a real mouse move at that point changes `.od-app.dataset.sidebarState` to `peek`.
-- A packaged-app screenshot after that CDP hover showed the overlay sidebar revealed over the workspace, matching the requested hover-reveal behavior.
-- Commit/push status: the sidebar fix is pushed; this memory-refresh update is committed and pushed as a separate focused memory commit.
+- `main` keeps the simplified Desktop shell: no full-width visible titlebar, left sidebar, center workspace, command-composer first-run Aim screen, and settings split-view.
+- The root local app bundle at `/Users/jenson/Desktop/Aimcub/Aimcub.app` has been refreshed from `apps/desktop/dist/mac-arm64/Aimcub.app`.
+- The packaged app was quit and reopened before inspection to avoid testing a stale Electron process.
+- Real packaged-window verification confirmed the drag surface moves the window initially, after an app interaction, and after switching to Finder and back to Aimcub.
 
 ## Verification
 
-- Memory refresh audit:
-  - `python3 /Users/jenson/.codex/skills/memory-refresh/scripts/audit_project_memory.py /Users/jenson/Desktop/Aimcub`
 - Passed:
-  - `pnpm --filter @app/desktop typecheck`
   - `pnpm --filter @app/desktop test`
+  - `pnpm --filter @app/desktop typecheck`
+  - `pnpm --filter @app/desktop lint`
   - `pnpm build`
   - `pnpm test`
   - `pnpm typecheck`
@@ -33,16 +32,20 @@ Branch: `main`
   - `pnpm core:purity`
   - `git diff --check`
   - `pnpm desktop:pack`
-  - copied `apps/desktop/dist/mac-arm64/Aimcub.app` to root `Aimcub.app`
-  - opened and inspected `/Users/jenson/Desktop/Aimcub/Aimcub.app`
-  - CDP hit-test and hover dispatch against `/Users/jenson/Desktop/Aimcub/Aimcub.app`
+  - copied the packaged bundle to root `Aimcub.app` with `ditto`
+  - opened `/Users/jenson/Desktop/Aimcub/Aimcub.app`
+  - verified real window movement by reading macOS window coordinates:
+    - initial drag moved `(185, 0)` to `(325, 0)`
+    - after clicking inside the app, drag moved `(325, 0)` to `(465, 0)`
+    - after Finder -> Aimcub activation cycle, drag moved `(465, 0)` to `(325, 0)`
+    - final cleanup moved the window back to `(185, 0)`
 
 Notes:
 - MCP worker tests still log the expected missing-Supabase opaque-error path while passing.
-- Local packaged app processes were terminated with approval before recopying the rebuilt bundle.
+- Commit/push status: this drag-region fix is included in the latest session commit and should be pushed with the session closeout.
 
 ## Next Session Prompt
 
 ```text
-Continue from `main`. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md, then load only task-relevant module memory. For Desktop shell work, preserve the top-left sidebar toggle contract: manual click/keyboard toggle must win over hover/focus peek, and Electron draggable regions must not cover the toggle hit target.
+Continue from `main`. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md, then load only task-relevant module memory. For Desktop shell work, preserve the top-left sidebar toggle contract: manual click/keyboard toggle wins over hover/focus peek, fresh hover reveal still works from the button and left-edge rail, Electron draggable regions must not cover the toggle/reveal hit targets, and the window drag surface must stay stable across focus/activation cycles.
 ```

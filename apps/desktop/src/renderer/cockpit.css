@@ -108,6 +108,19 @@ kbd {
   grid-template-columns: 0 minmax(0, 1fr);
 }
 
+.od-window-drag-strip {
+  position: fixed;
+  z-index: 800;
+  top: 0;
+  right: 0;
+  left: calc(var(--titlebar-toggle-left) + var(--titlebar-toggle-size) + 8px);
+  height: 24px;
+  background: rgba(255, 255, 255, 0.001);
+  user-select: none;
+  app-region: drag;
+  -webkit-app-region: drag;
+}
+
 .od-sidebar-peek-trigger {
   position: fixed;
   z-index: 900;
@@ -180,8 +193,6 @@ kbd {
   background: var(--od-surface);
   border-right: 1px solid var(--od-border-soft);
   scrollbar-gutter: stable;
-  app-region: no-drag;
-  -webkit-app-region: no-drag;
   transition: transform 180ms ease, opacity 160ms ease, box-shadow 180ms ease;
 }
 
