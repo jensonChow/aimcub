@@ -5,25 +5,24 @@ Branch: `main`
 
 ## Current Session
 
-- Fixed the packaged Desktop sidebar toggle placement and hover-reveal regression reported from the top-left control area.
-- Researched Electron's official custom titlebar and custom window interaction guidance: `titleBarStyle: "hidden"` keeps macOS traffic lights while removing the default titlebar, and any overlapping draggable region must be excluded with `app-region: no-drag` or pointer events will not fire.
-- Moved the sidebar toggle into a titlebar control cluster immediately after the macOS traffic lights instead of leaving it stranded farther into the canvas.
-- Restored hover reveal with two hit targets while collapsed: the titlebar toggle and a 32 px left-edge reveal rail. The rail intentionally bypasses the manual-collapse guard because it represents a fresh pointer entry.
-- Kept Electron drag behavior scoped away from the toggle and reveal rail by marking interactive controls and sidebar surfaces as non-draggable, with only the sidebar header retaining drag behavior.
-- Promoted the durable interaction and placement rule into `docs/memory/design-system.md` and `docs/memory/desktop.md`.
-- Rebuilt and copied the local `Aimcub.app` bundle to the project root.
+- Ran the `memory-refresh` audit after the packaged Desktop sidebar placement and hover-reveal fix.
+- Confirmed `AGENTS.md` and `CLAUDE.md` remain within the 50-line root-memory budget and still contain only hard project rules.
+- Confirmed the durable sidebar placement/reveal rule lives in `docs/memory/design-system.md` and `docs/memory/desktop.md`; no root memory expansion was needed.
+- Reconciled this handoff with the actual pushed state for the sidebar fix and the English-only handoff cleanup.
 
 ## Current State
 
 - `main` keeps the simplified Desktop shell: no full-width titlebar, left sidebar, center workspace, command-composer first-run Aim screen, and settings split-view.
+- The sidebar fix is already pushed to `origin/main` in `42ca4d3` (`Fix desktop sidebar hover reveal`), followed by `06553b2` (`Keep handoff text in English`).
 - Real packaged Electron inspection of `/Users/jenson/Desktop/Aimcub/Aimcub.app` confirmed the top-left sidebar toggle collapses and expands the sidebar. Accessibility state changed from "Collapse sidebar" / value `1` to "Expand sidebar" / value `0`, then back again.
 - Chrome DevTools Protocol hit-testing confirmed `document.elementFromPoint(22, 120)` resolves to `data-od-id="sidebar-peek-trigger"`, and dispatching a real mouse move at that point changes `.od-app.dataset.sidebarState` to `peek`.
 - A packaged-app screenshot after that CDP hover showed the overlay sidebar revealed over the workspace, matching the requested hover-reveal behavior.
-- During verification, old running app processes had to be terminated before copying the rebuilt bundle; copying over a still-running app can leave stale renderer state in the old process.
-- Commit/push status: the sidebar-toggle fix is expected to be committed and pushed in the commit containing this handoff update.
+- Commit/push status: the sidebar fix is pushed; this memory-refresh update is expected to be committed and pushed as a separate focused memory commit.
 
 ## Verification
 
+- Memory refresh audit:
+  - `python3 /Users/jenson/.codex/skills/memory-refresh/scripts/audit_project_memory.py /Users/jenson/Desktop/Aimcub`
 - Passed:
   - `pnpm --filter @app/desktop typecheck`
   - `pnpm --filter @app/desktop test`
