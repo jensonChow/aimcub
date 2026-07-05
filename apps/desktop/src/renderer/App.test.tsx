@@ -244,8 +244,11 @@ describe("CockpitShell", () => {
 
     expect(css).toMatch(/\.od-traffic-light-inactive-dots\s*{[^}]*opacity:\s*0;/s);
     expect(css).toMatch(/\.od-traffic-light-inactive-dots\s*{[^}]*pointer-events:\s*none;/s);
+    expect(css).toMatch(/--traffic-light-size:\s*12px;/);
+    expect(css).toMatch(/--traffic-light-gap:\s*8px;/);
+    expect(css).toMatch(/\.od-traffic-light-inactive-dots\s*{[^}]*gap:\s*var\(--traffic-light-gap\);/s);
     expect(css).toMatch(
-      /\.od-traffic-light-inactive-dots span\s*{[^}]*width:\s*14px;[^}]*height:\s*14px;[^}]*border-radius:\s*50%;[^}]*background:\s*#c9c9cf;/s,
+      /\.od-traffic-light-inactive-dots span\s*{[^}]*width:\s*var\(--traffic-light-size\);[^}]*height:\s*var\(--traffic-light-size\);[^}]*border-radius:\s*50%;[^}]*background:\s*#c9c9cf;/s,
     );
     expect(css).toMatch(
       /\.od-app\[data-window-focused="false"\]\[data-window-traffic-lights="true"\] \.od-traffic-light-inactive-dots\s*{[^}]*opacity:\s*1;/s,

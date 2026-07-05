@@ -92,6 +92,8 @@ kbd {
 .od-app {
   --sidebar-width: 256px;
   --traffic-light-left: 16px;
+  --traffic-light-size: 12px;
+  --traffic-light-gap: 8px;
   --traffic-light-cluster-width: 52px;
   --titlebar-control-gap: 8px;
   --fullscreen-titlebar-toggle-left: 16px;
@@ -134,7 +136,7 @@ kbd {
   top: 16px;
   left: 16px;
   display: flex;
-  gap: 7px;
+  gap: var(--traffic-light-gap);
   align-items: center;
   opacity: 0;
   pointer-events: none;
@@ -142,8 +144,8 @@ kbd {
 }
 
 .od-traffic-light-inactive-dots span {
-  width: 14px;
-  height: 14px;
+  width: var(--traffic-light-size);
+  height: var(--traffic-light-size);
   border: 1px solid #b9b9c0;
   border-radius: 50%;
   background: #c9c9cf;
