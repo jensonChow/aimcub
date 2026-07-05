@@ -5,10 +5,10 @@ Branch: `main`
 
 ## Current Session
 
-- Replaced the Desktop sidebar lower-left global settings entry with a footer user menu trigger.
-- Added an account-style popover menu with Settings and a Language submenu, including ARIA menu/menuitem roles, keyboard arrow navigation, Escape/outside-click close behavior, and visible focus/hover states.
-- Moved the sidebar language control out of the header and recorded the durable footer user-menu requirement in `docs/memory/design-system.md`.
-- Added renderer tests covering the user menu trigger and no-drag app-region contract.
+- Ran `memory-refresh` after commit `3e6e090` and the subsequent push to `origin/main`.
+- Synchronized `docs/memory/desktop.md` with the current sidebar footer user-menu contract.
+- Confirmed `docs/memory/design-system.md` already owns the durable visual requirement for the lower-left account/user menu.
+- Updated this handoff so commit/push status reflects the current local and remote state.
 
 ## Current State
 
@@ -20,9 +20,8 @@ Branch: `main`
 ## Verification
 
 - Passed:
-  - `pnpm --filter @app/desktop typecheck`
-  - `pnpm --filter @app/desktop test`
-  - `pnpm --filter @app/desktop lint`
+  - `python3 /Users/jenson/.codex/skills/memory-refresh/scripts/audit_project_memory.py /Users/jenson/Desktop/Aimcub`
+  - root memory line counts from the audit: `AGENTS.md` 34 lines, `CLAUDE.md` 34 lines
   - `pnpm build`
   - `pnpm test`
   - `pnpm typecheck`
@@ -34,8 +33,8 @@ Branch: `main`
 
 Notes:
 - MCP worker tests may log the expected missing-Supabase opaque-error path while passing.
-- Root `Aimcub.app` and `apps/desktop/dist/mac-arm64/Aimcub.app` both have `app.asar` timestamp `Jul 5 19:11:13 2026`.
-- Commit/push status: this closeout should be committed and pushed after the handoff update. Work happened directly on `main`, so no separate branch merge is needed.
+- Root `Aimcub.app` and `apps/desktop/dist/mac-arm64/Aimcub.app` both have `app.asar` timestamp `Jul 5 19:35:26 2026`.
+- Commit/push status: memory-refresh closeout is committed locally on `main`; push to `origin/main` is pending explicit user approval. Work happened directly on `main`, so no separate branch merge is needed.
 
 ## Next Session Prompt
 

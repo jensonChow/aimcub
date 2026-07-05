@@ -12,7 +12,8 @@ The user rejected the prior over-stacked desktop direction. Do not add more defa
 
 The default desktop shell is a simplified two-column product layout:
 
-- Left sidebar: brand, language toggle, New Aim, recent aim list, settings. Search/filter appears only after aim history exists; an empty first-run state uses a compact Recent aims placeholder.
+- Left sidebar: brand, New Aim, recent aim list, and a footer user menu trigger. Search/filter appears only after aim history exists; an empty first-run state uses a compact Recent aims placeholder.
+- Footer user menu: the lower-left account trigger owns global controls such as Settings and Language through an account-style popover/menu rather than separate header/footer controls.
 - Sidebar toggle: a top-left titlebar-cluster icon button controls pinned/collapsed sidebar state. When collapsed, hovering or focusing the button, or hovering the 32 px left-edge reveal rail, reveals a temporary overlay peek sidebar without changing the main workspace width. At narrow mobile-sized widths, the sidebar auto-collapses and any opened sidebar remains an overlay so the workspace does not shrink.
 - Center workspace: the empty Aim stage is a quiet command-composer surface with no workflow step pills. Context, Plan/Contracts, Execute, and Eval may show lightweight workflow step pills above the active task surface.
 - No visible full-width titlebar above the workbench. Keep macOS window controls in sidebar-safe space and keep command palette access keyboard-first.
