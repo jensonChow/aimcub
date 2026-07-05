@@ -17,6 +17,12 @@ The project declares `pnpm@11.10.0` and Node `>=22.13`; the Codex runtime may re
 
 Every repository-changing session must finish by running the full verification suite above, refreshing the project-root `Aimcub.app` with `pnpm desktop:pack`, updating `docs/handoff.md`, creating a focused commit, pushing it, and merging completed branch work into `main` unless the user explicitly opts out. If work happens directly on `main`, record that no separate merge was needed.
 
+## Dependency Compatibility
+
+As of 2026-07-06, the newest mutually compatible dependency set keeps Electron 43.0.0, electron-builder 26.15.3, electron-vite 5.0.0, Vite 7.3.6, React 19.2.7, TypeScript 6.0.3, Vitest 4.1.9, ESLint 10.6.0, Zod 4.4.3, Supabase JS 2.110.0, Anthropic SDK 0.110.0, Wrangler 4.107.0, and Turbo 2.10.3.
+
+`pnpm outdated -r` is expected to report only intentional compatibility boundaries: `@types/node` 22.20.0 versus npm latest 26.1.0, `@vitejs/plugin-react` 5.2.0 versus 6.0.3, and Vite 7.3.6 versus 8.1.3. Keep `@types/node` on the Node 22 line while the repo engine remains Node `>=22.13`. Keep Vite on 7 until `electron-vite` supports Vite 8; `@vitejs/plugin-react` 6 also requires Vite 8.
+
 ## Desktop Runtime
 
 Root desktop entry points are stable:

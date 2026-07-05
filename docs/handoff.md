@@ -11,6 +11,7 @@ Branch: `main`
 - Updated pnpm build-script allowlist for `@swc/core` and `electron-winstaller`, both required by the upgraded desktop toolchain.
 - Adapted code for Zod 4 and TypeScript 6: shared ID validation now uses Zod 4 GUID semantics to preserve existing database UUID-string behavior, record schemas use explicit string keys, CSS imports use Vite ambient declarations, and new ESLint 10 findings are fixed.
 - Refreshed root `Aimcub.app` from a new Electron 43 folder-style build.
+- Refreshed project memory after the dependency comparison and moved the durable compatibility boundary notes into `docs/memory/operations.md`.
 
 ## Current State
 
@@ -18,11 +19,14 @@ Branch: `main`
 - `pnpm desktop:pack` may still fail inside the sandbox because electron-builder 26 invokes `@electron/get`'s macOS cache under `~/Library/Caches/electron`; use the documented split build plus `--config.electronDownload.cache=/private/tmp/aimcub-electron-cache` workaround in `docs/memory/operations.md`.
 - Root `Aimcub.app`, `apps/desktop/dist`, and `apps/desktop/out` are ignored build artifacts and are not staged.
 - Commit `910baca` was pushed on `codex/compatible-dependency-upgrades`, fast-forward merged into `main`, and pushed to `origin/main`.
+- This memory refresh is docs-only and was prepared directly on `main`; no separate branch merge is needed.
 
 ## Verification
 
 Passed:
 
+- `python3 /Users/jenson/.codex/skills/memory-refresh/scripts/audit_project_memory.py /Users/jenson/Desktop/Aimcub`
+- `wc -l AGENTS.md CLAUDE.md docs/handoff.md docs/memory/operations.md`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm install --lockfile-only --store-dir /private/tmp/aimcub-pnpm-store`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm install --frozen-lockfile --store-dir /private/tmp/aimcub-pnpm-store --fetch-timeout 300000 --fetch-retries 5`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
