@@ -10,6 +10,8 @@ export type CockpitStage = "aim" | "context" | "contracts" | "run" | "eval" | "s
 type SidebarState = "pinned" | "collapsed" | "peek";
 const USER_MENU_ID = "od-sidebar-user-menu";
 const LANGUAGE_MENU_ID = "od-sidebar-language-menu";
+const SIDEBAR_REVEAL_DELAY_MS = 180;
+const SIDEBAR_CLOSE_DELAY_MS = 180;
 
 export interface CockpitCommand {
   id: string;
@@ -69,6 +71,8 @@ export function CockpitShell({
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [sidebarPinned, setSidebarPinned] = useState(() => !prefersCollapsedSidebar());
   const [sidebarPeeking, setSidebarPeeking] = useState(false);
+  const sidebarHoverZoneRef = useRef<HTMLDivElement | null>(null);
+  const sidebarRef = useRef<HTMLElement | null>(null);
   const revealSidebarTimer = useRef<number | null>(null);
   const hideSidebarTimer = useRef<number | null>(null);
   const suppressSidebarPeekUntilExit = useRef(false);
@@ -124,6 +128,14 @@ export function CockpitShell({
     clearSidebarHideTimer();
   }
 
+  function isInsideSidebarHoverZone(target: EventTarget | null) {
+    return (
+      typeof Node !== "undefined" &&
+      target instanceof Node &&
+      (Boolean(sidebarHoverZoneRef.current?.contains(target)) || Boolean(sidebarRef.current?.contains(target)))
+    );
+  }
+
   function revealSidebar(ignoreManualCollapseGuard = false) {
     if (sidebarPinned) return;
     if (suppressSidebarPeekUntilExit.current && !ignoreManualCollapseGuard) return;
@@ -134,7 +146,7 @@ export function CockpitShell({
     revealSidebarTimer.current = window.setTimeout(() => {
       setSidebarPeeking(true);
       revealSidebarTimer.current = null;
-    }, 180);
+    }, SIDEBAR_REVEAL_DELAY_MS);
   }
 
   function revealSidebarAfterHover() {
@@ -152,7 +164,8 @@ export function CockpitShell({
     setSidebarPeeking(true);
   }
 
-  function scheduleSidebarPeekClose() {
+  function scheduleSidebarPeekClose(event?: { relatedTarget: EventTarget | null }) {
+    if (event && isInsideSidebarHoverZone(event.relatedTarget)) return;
     suppressSidebarPeekUntilExit.current = false;
     if (sidebarPinned) return;
     clearSidebarRevealTimer();
@@ -160,7 +173,7 @@ export function CockpitShell({
     hideSidebarTimer.current = window.setTimeout(() => {
       setSidebarPeeking(false);
       hideSidebarTimer.current = null;
-    }, 180);
+    }, SIDEBAR_CLOSE_DELAY_MS);
   }
 
   function toggleSidebarPin() {
@@ -186,14 +199,14 @@ export function CockpitShell({
     toggleSidebarPin();
   }
 
-  function onSidebarTogglePointerLeave() {
+  function onSidebarTogglePointerLeave(event: React.PointerEvent<HTMLButtonElement>) {
     suppressSidebarPeekUntilExit.current = false;
-    scheduleSidebarPeekClose();
+    scheduleSidebarPeekClose(event);
   }
 
-  function onSidebarToggleBlur() {
+  function onSidebarToggleBlur(event: React.FocusEvent<HTMLButtonElement>) {
     suppressSidebarPeekUntilExit.current = false;
-    scheduleSidebarPeekClose();
+    scheduleSidebarPeekClose(event);
   }
 
   useEffect(() => {
@@ -273,7 +286,7 @@ export function CockpitShell({
       >
         <div className="od-window-drag-strip" aria-hidden="true" data-od-id="window-drag-strip" />
         {usingSettingsSidebar ? null : (
-          <>
+          <div className="od-sidebar-hover-zone" data-od-id="sidebar-hover-zone" ref={sidebarHoverZoneRef}>
             <div
               className="od-sidebar-peek-trigger"
               aria-hidden="true"
@@ -282,9 +295,6 @@ export function CockpitShell({
                 event.stopPropagation();
                 revealSidebarFromRailHover();
               }}
-              onMouseEnter={revealSidebarFromRailHover}
-              onMouseMove={revealSidebarFromRailHover}
-              onMouseLeave={scheduleSidebarPeekClose}
               onPointerDown={(event) => {
                 event.stopPropagation();
                 revealSidebarFromRailHover();
@@ -305,8 +315,6 @@ export function CockpitShell({
               onClick={onSidebarToggleClick}
               onPointerDown={onSidebarTogglePointerDown}
               onKeyDown={onSidebarToggleKeyDown}
-              onMouseEnter={revealSidebarAfterHover}
-              onMouseLeave={onSidebarTogglePointerLeave}
               onPointerEnter={revealSidebarAfterHover}
               onPointerLeave={onSidebarTogglePointerLeave}
               onFocus={keepSidebarPeekOpen}
@@ -314,15 +322,18 @@ export function CockpitShell({
             >
               <SidebarToggleIcon />
             </button>
-          </>
+          </div>
         )}
         <aside
+          ref={sidebarRef}
           className="od-sidebar"
           data-mode={usingSettingsSidebar ? "settings" : "aims"}
           data-od-id={usingSettingsSidebar ? "left-settings-sidebar" : "left-aim-sidebar"}
           aria-hidden={sidebarVisible ? undefined : true}
           onPointerEnter={usingSettingsSidebar ? undefined : keepSidebarPeekOpen}
           onPointerLeave={usingSettingsSidebar ? undefined : scheduleSidebarPeekClose}
+          onFocus={usingSettingsSidebar ? undefined : keepSidebarPeekOpen}
+          onBlur={usingSettingsSidebar ? undefined : scheduleSidebarPeekClose}
         >
           {usingSettingsSidebar ? null : (
             <div className="od-sidebar-head">

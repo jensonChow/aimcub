@@ -123,6 +123,10 @@ kbd {
   -webkit-app-region: drag;
 }
 
+.od-sidebar-hover-zone {
+  display: contents;
+}
+
 .od-sidebar-peek-trigger {
   position: fixed;
   z-index: 900;

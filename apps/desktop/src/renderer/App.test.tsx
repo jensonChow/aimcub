@@ -235,6 +235,28 @@ describe("CockpitShell", () => {
     expect(css).toMatch(/\.od-user-menu-anchor,\s*\.od-user-menu-anchor \*\s*{[^}]*app-region:\s*no-drag;[^}]*-webkit-app-region:\s*no-drag;/s);
   });
 
+  it("groups transient sidebar hover controls without changing grid layout", () => {
+    const html = renderToStaticMarkup(
+      <I18nProvider>
+        <CockpitShell
+          goals={[]}
+          selected={null}
+          activeStage="aim"
+          onNewAim={noop}
+          onOpenGoal={noop}
+          onStage={noop}
+          main={<div>New aim</div>}
+        />
+      </I18nProvider>,
+    );
+    const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
+
+    expect(html).toContain('data-od-id="sidebar-hover-zone"');
+    expect(html).toContain('data-od-id="sidebar-toggle"');
+    expect(html).toContain('data-od-id="sidebar-peek-trigger"');
+    expect(css).toMatch(/\.od-sidebar-hover-zone\s*{[^}]*display:\s*contents;/s);
+  });
+
   it("keeps the peek sidebar visible until its collapse animation finishes", () => {
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
 

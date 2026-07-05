@@ -5,36 +5,38 @@ Branch: `main`
 
 ## Current Session
 
-- Ran `memory-refresh` after commit `b51fd55`.
-- Reconciled `docs/memory/desktop.md` with the current Settings shell contract: Settings locks the category sidebar open and omits the normal Aim workspace sidebar toggle, peek rail, and `Aimcub / Workbench` brand header.
-- Confirmed `docs/memory/design-system.md` already owns the detailed control-panel and locked-settings-sidebar visual rules.
+- Fixed the collapsed sidebar peek persistence bug: moving from the titlebar toggle or reveal rail into the revealed sidebar now keeps the sidebar open instead of closing as soon as the pointer leaves the toggle.
+- The transient sidebar close path now treats the toggle/rail and sidebar as one hover zone, checks `relatedTarget` before scheduling close, and uses pointer/focus events instead of a mixed mouse/pointer leave path.
+- Added a renderer regression test for the transient sidebar hover-zone structure and updated `docs/memory/design-system.md` with the durable hover-zone interaction rule.
 
 ## Current State
 
 - `main` keeps the simplified Desktop shell: no full-width visible titlebar, left sidebar, center workspace, command-composer first-run Aim screen, and settings split-view.
-- Settings now use the primary sidebar as compact settings navigation and the center workspace as a bounded control-panel detail pane; the settings sidebar is not collapsible.
+- Settings still lock the primary sidebar open and omit the normal Aim workspace sidebar toggle, peek rail, and `Aimcub / Workbench` brand header.
 - The sidebar toggle contract remains: manual click/keyboard toggle wins over hover/focus peek; fresh hover reveal still works from the button and left-edge rail; transient peek does not resize the workspace.
-- The sidebar footer now owns global account-style controls: the user menu trigger opens Settings and Language instead of showing separate header/footer controls.
-- The root packaged app at `/Users/jenson/Desktop/Aimcub/Aimcub.app` must be refreshed before ending every repo-changing session.
+- Sidebar peek now remains open while the pointer/focus moves within the combined toggle, reveal rail, revealed sidebar, and short transition path, then closes only after leaving that whole hover zone.
+- The root packaged app at `/Users/jenson/Desktop/Aimcub/Aimcub.app` was refreshed from `pnpm desktop:pack`.
 
 ## Verification
 
 - Passed:
-  - `python3 /Users/jenson/.codex/skills/memory-refresh/scripts/audit_project_memory.py /Users/jenson/Desktop/Aimcub`
-  - root memory line counts from the audit: `AGENTS.md` 34 lines, `CLAUDE.md` 34 lines
-  - `pnpm build`
-  - `pnpm test`
-  - `pnpm typecheck`
-  - `pnpm lint`
-  - `pnpm core:purity`
-  - `pnpm desktop:pack`
+  - Electron CDP hover check against the built app: collapse sidebar, hover toggle to open `peek`, move pointer into sidebar for longer than the close delay, confirm state stays `peek`, then move outside and confirm state becomes `collapsed`.
+  - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop test`
+  - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop typecheck`
+  - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop lint`
+  - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
+  - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
+  - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck`
+  - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm lint`
+  - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm core:purity`
+  - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm desktop:pack`
   - `git diff --check`
   - `ditto apps/desktop/dist/mac-arm64/Aimcub.app Aimcub.app`
 
 Notes:
 - MCP worker tests may log the expected missing-Supabase opaque-error path while passing.
-- Root `Aimcub.app` and `apps/desktop/dist/mac-arm64/Aimcub.app` both have `app.asar` timestamp `Jul 5 20:40 2026`.
-- Commit/push status: memory-refresh closeout is committed locally on `main` and pushed to `origin/main`. Work happened directly on `main`, so no separate branch merge is needed.
+- Root `Aimcub.app` and `apps/desktop/dist/mac-arm64/Aimcub.app` both have `app.asar` timestamp `Jul 5 20:58:13 2026`.
+- Commit/push status: committed and pushed directly on `main`; no separate branch merge was needed.
 
 ## Next Session Prompt
 
