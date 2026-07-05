@@ -123,9 +123,10 @@ export function CockpitShell({
     clearSidebarHideTimer();
   }
 
-  function revealSidebarAfterHover() {
+  function revealSidebar(ignoreManualCollapseGuard = false) {
     if (sidebarPinned) return;
-    if (suppressSidebarPeekUntilExit.current) return;
+    if (suppressSidebarPeekUntilExit.current && !ignoreManualCollapseGuard) return;
+    if (ignoreManualCollapseGuard) suppressSidebarPeekUntilExit.current = false;
     clearSidebarHideTimer();
     if (sidebarPeeking) return;
     clearSidebarRevealTimer();
@@ -133,6 +134,14 @@ export function CockpitShell({
       setSidebarPeeking(true);
       revealSidebarTimer.current = null;
     }, 180);
+  }
+
+  function revealSidebarAfterHover() {
+    revealSidebar(false);
+  }
+
+  function revealSidebarFromRailHover() {
+    revealSidebar(true);
   }
 
   function keepSidebarPeekOpen() {
@@ -242,6 +251,25 @@ export function CockpitShell({
         data-empty-aim={firstRunAim ? "true" : "false"}
         data-sidebar-state={sidebarState}
       >
+        <div
+          className="od-sidebar-peek-trigger"
+          aria-hidden="true"
+          data-od-id="sidebar-peek-trigger"
+          onMouseDown={(event) => {
+            event.stopPropagation();
+            revealSidebarFromRailHover();
+          }}
+          onMouseEnter={revealSidebarFromRailHover}
+          onMouseMove={revealSidebarFromRailHover}
+          onMouseLeave={scheduleSidebarPeekClose}
+          onPointerDown={(event) => {
+            event.stopPropagation();
+            revealSidebarFromRailHover();
+          }}
+          onPointerEnter={revealSidebarFromRailHover}
+          onPointerMove={revealSidebarFromRailHover}
+          onPointerLeave={scheduleSidebarPeekClose}
+        />
         <button
           className="od-sidebar-toggle"
           type="button"
@@ -254,6 +282,8 @@ export function CockpitShell({
           onClick={onSidebarToggleClick}
           onPointerDown={onSidebarTogglePointerDown}
           onKeyDown={onSidebarToggleKeyDown}
+          onMouseEnter={revealSidebarAfterHover}
+          onMouseLeave={onSidebarTogglePointerLeave}
           onPointerEnter={revealSidebarAfterHover}
           onPointerLeave={onSidebarTogglePointerLeave}
           onFocus={keepSidebarPeekOpen}

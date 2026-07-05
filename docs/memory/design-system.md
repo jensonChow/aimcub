@@ -57,7 +57,7 @@ Reference links:
 
 - Default shell: no visible top titlebar/status strip, left aim sidebar, center workspace. macOS window controls may sit in the sidebar-safe top area, but the app must not reserve a full-width bar above the workbench. No default right inspector.
 - Sidebar: brand, language toggle, New Aim, aim search/filter, recent aim list, settings entry. Keep it narrow enough to preserve work area, currently around 280 px.
-- Sidebar toggle: provide a Claude Desktop-like icon button near the macOS window controls. It must support three states: pinned sidebar, collapsed sidebar, and peek sidebar. Clicking toggles pinned/collapsed; hovering the button while collapsed reveals a temporary overlay sidebar without resizing the workspace.
+- Sidebar toggle: provide a Claude Desktop-like icon button as part of the top-left titlebar control cluster, immediately after the macOS traffic lights with an 8 px gap. It must support three states: pinned sidebar, collapsed sidebar, and peek sidebar. Clicking toggles pinned/collapsed; hovering the button or the 32 px left-edge reveal rail while collapsed reveals a temporary overlay sidebar without resizing the workspace.
 - Center workspace: workflow step navigation, then the active stage surface. The workspace should sit in a constrained max width so text lines and controls do not stretch across large windows.
 - New/empty Aim stage: hide workflow step navigation until there is an Aim or the user moves into later stages. The first surface should be a centered command-composer workbench with a concise title, one outcome input, optional supporting context, and one primary continue action.
 - Empty sidebar state: when there are no aims, do not show search, filters, or a large dashed empty card. Show a compact history placeholder under Recent aims. Add search/filter only after aim history exists.
@@ -165,7 +165,7 @@ Reference links:
 
 - Every interactive element needs visible hover, active, focus-visible, disabled, selected/current, loading, and error states where applicable.
 - Sidebar peek must be transient and hover/focus driven: it should open after a short hover delay, stay open while the pointer is over the sidebar, and close without changing the pinned/collapsed preference when the pointer leaves.
-- Manual sidebar toggle actions take precedence over peek behavior: clicking or keyboard-toggling collapsed must not immediately reopen from hover/focus, and draggable chrome must not cover the toggle hit target.
+- Manual sidebar toggle actions take precedence over peek behavior: clicking or keyboard-toggling collapsed must not immediately reopen from the same pointer/focus state, but a fresh hover over the button or left-edge rail must still reveal the overlay sidebar. Draggable chrome must not cover the toggle or reveal hit targets.
 - Keyboard focus must remain visible. Current focus token is a 4 px accent-tinted ring; keep or improve it, do not remove it.
 - Core desktop commands should be available through keyboard-first flows. Add command palette entries alongside visible controls when a workflow becomes top-level navigation or a frequent action.
 - Pointer targets should be at least 24 by 24 CSS px, with practical Aimcub targets usually 32 to 44 px.

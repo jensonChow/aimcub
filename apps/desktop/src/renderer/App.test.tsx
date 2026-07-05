@@ -174,6 +174,7 @@ describe("CockpitShell", () => {
 
     expect(html).toContain('data-od-id="left-settings-sidebar"');
     expect(html).toContain('data-od-id="sidebar-toggle"');
+    expect(html).toContain('data-od-id="sidebar-peek-trigger"');
     expect(html).toContain('data-sidebar-state="pinned"');
     expect(html).toContain('aria-label="Collapse sidebar"');
     expect(html).toContain('aria-expanded="true"');

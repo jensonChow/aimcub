@@ -65,7 +65,9 @@ select:focus-visible {
 .od-command-palette button,
 .od-command-palette input,
 .od-command-palette kbd,
+.od-sidebar-peek-trigger,
 .od-sidebar-toggle {
+  app-region: no-drag;
   -webkit-app-region: no-drag;
 }
 
@@ -87,6 +89,11 @@ kbd {
 
 .od-app {
   --sidebar-width: 256px;
+  --traffic-light-left: 16px;
+  --traffic-light-cluster-width: 52px;
+  --titlebar-control-gap: 8px;
+  --titlebar-toggle-left: calc(var(--traffic-light-left) + var(--traffic-light-cluster-width) + var(--titlebar-control-gap));
+  --titlebar-toggle-size: 32px;
   position: relative;
   height: 100%;
   min-height: 0;
@@ -101,13 +108,29 @@ kbd {
   grid-template-columns: 0 minmax(0, 1fr);
 }
 
+.od-sidebar-peek-trigger {
+  position: fixed;
+  z-index: 900;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 32px;
+  background: rgba(255, 255, 255, 0.001);
+  pointer-events: none;
+}
+
+.od-app[data-sidebar-state="collapsed"] .od-sidebar-peek-trigger,
+.od-app[data-sidebar-state="peek"] .od-sidebar-peek-trigger {
+  pointer-events: auto;
+}
+
 .od-sidebar-toggle {
   position: fixed;
   z-index: 1000;
-  top: 16px;
-  left: 96px;
-  width: 36px;
-  height: 36px;
+  top: 8px;
+  left: var(--titlebar-toggle-left);
+  width: var(--titlebar-toggle-size);
+  height: var(--titlebar-toggle-size);
   display: grid;
   place-items: center;
   border: 1px solid transparent;
@@ -119,6 +142,7 @@ kbd {
   touch-action: manipulation;
   user-select: none;
   transition: background 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+  app-region: no-drag;
   -webkit-app-region: no-drag;
 }
 
@@ -156,6 +180,7 @@ kbd {
   background: var(--od-surface);
   border-right: 1px solid var(--od-border-soft);
   scrollbar-gutter: stable;
+  app-region: no-drag;
   -webkit-app-region: no-drag;
   transition: transform 180ms ease, opacity 160ms ease, box-shadow 180ms ease;
 }
@@ -204,11 +229,13 @@ kbd {
   justify-content: space-between;
   align-items: flex-start;
   gap: 10px;
+  app-region: drag;
   -webkit-app-region: drag;
 }
 
 .od-sidebar-head-actions,
 .od-sidebar-head-actions * {
+  app-region: no-drag;
   -webkit-app-region: no-drag;
 }
 
@@ -3355,10 +3382,6 @@ kbd {
   .od-app[data-sidebar-state="collapsed"],
   .od-app[data-sidebar-state="peek"] {
     grid-template-columns: 0 minmax(0, 1fr);
-  }
-
-  .od-sidebar-toggle {
-    left: 16px;
   }
 
   .od-app[data-sidebar-state="collapsed"] .od-main {
