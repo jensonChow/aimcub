@@ -17,7 +17,7 @@ Branch: `main`
 - Real packaged Electron inspection of `/Users/jenson/Desktop/Aimcub/Aimcub.app` confirmed the top-left sidebar toggle collapses and expands the sidebar. Accessibility state changed from "Collapse sidebar" / value `1` to "Expand sidebar" / value `0`, then back again.
 - Chrome DevTools Protocol hit-testing confirmed `document.elementFromPoint(22, 120)` resolves to `data-od-id="sidebar-peek-trigger"`, and dispatching a real mouse move at that point changes `.od-app.dataset.sidebarState` to `peek`.
 - A packaged-app screenshot after that CDP hover showed the overlay sidebar revealed over the workspace, matching the requested hover-reveal behavior.
-- Commit/push status: the sidebar fix is pushed; this memory-refresh update is expected to be committed and pushed as a separate focused memory commit.
+- Commit/push status: the sidebar fix is pushed; this memory-refresh update is committed and pushed as a separate focused memory commit.
 
 ## Verification
 
