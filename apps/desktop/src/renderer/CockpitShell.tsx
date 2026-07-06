@@ -114,6 +114,7 @@ export function CockpitShell({
   const usingSettingsSidebar = activeStage === "settings" && Boolean(settingsSidebar);
   const hasGoals = goals.length > 0;
   const firstRunAim = activeStage === "aim" && !selected && !hasGoals;
+  const newAimCurrent = activeStage === "aim" && !selected;
   const sidebarState: SidebarState = usingSettingsSidebar ? "pinned" : sidebarPinned ? "pinned" : sidebarPeeking ? "peek" : "collapsed";
   const sidebarVisible = sidebarState !== "collapsed";
   const sidebarToggleLabel = sidebarPinned ? t("sidebar.collapse") : t("sidebar.expand");
@@ -483,7 +484,14 @@ export function CockpitShell({
           {usingSettingsSidebar ? settingsSidebar : (
             <>
               <nav className="od-sidebar-global-actions" aria-label={t("shell.globalActions")} data-od-id="sidebar-global-actions">
-                <button className="od-new-aim" type="button" data-od-id="sidebar-new-aim-action" onClick={onNewAim}>
+                <button
+                  className="od-new-aim"
+                  type="button"
+                  aria-current={newAimCurrent ? "page" : undefined}
+                  data-current={newAimCurrent ? "true" : "false"}
+                  data-od-id="sidebar-new-aim-action"
+                  onClick={onNewAim}
+                >
                   <span className="od-new-aim-icon" aria-hidden="true">
                     <PlusIcon />
                   </span>

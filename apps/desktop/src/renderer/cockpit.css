@@ -28,16 +28,6 @@
   --od-shadow-composer: 0 10px 26px rgba(0, 0, 0, 0.035);
   --od-shadow-composer-focus: 0 10px 26px rgba(0, 0, 0, 0.04);
   --od-shadow-command: 0 24px 70px rgba(0, 0, 0, 0.18);
-  --od-new-aim-bg: #1d1d1f;
-  --od-new-aim-bg-hover: #111113;
-  --od-new-aim-border: #1d1d1f;
-  --od-new-aim-fg: #ffffff;
-  --od-new-aim-icon: rgba(255, 255, 255, 0.88);
-  --od-new-aim-icon-hover: #ffffff;
-  --od-new-aim-kbd-bg: rgba(255, 255, 255, 0.1);
-  --od-new-aim-kbd-border: rgba(255, 255, 255, 0.16);
-  --od-new-aim-kbd-fg: rgba(255, 255, 255, 0.72);
-  --od-new-aim-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
   --od-radius-sm: 8px;
   --od-radius-md: 12px;
   --od-radius-lg: 16px;
@@ -76,31 +66,8 @@
     --od-shadow-composer: 0 10px 26px rgba(0, 0, 0, 0.22);
     --od-shadow-composer-focus: 0 10px 26px rgba(0, 0, 0, 0.26);
     --od-shadow-command: 0 24px 70px rgba(0, 0, 0, 0.5);
-    --od-new-aim-bg: #f5f5f7;
-    --od-new-aim-bg-hover: #ffffff;
-    --od-new-aim-border: #f5f5f7;
-    --od-new-aim-fg: #1d1d1f;
-    --od-new-aim-icon: rgba(29, 29, 31, 0.82);
-    --od-new-aim-icon-hover: #1d1d1f;
-    --od-new-aim-kbd-bg: rgba(29, 29, 31, 0.08);
-    --od-new-aim-kbd-border: rgba(29, 29, 31, 0.14);
-    --od-new-aim-kbd-fg: rgba(29, 29, 31, 0.68);
-    --od-new-aim-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
     --od-focus: 0 0 0 4px color-mix(in oklab, var(--od-accent), transparent 56%);
   }
-}
-
-:root:has(.od-app[data-system-appearance="light"]) {
-  --od-new-aim-bg: #1d1d1f;
-  --od-new-aim-bg-hover: #111113;
-  --od-new-aim-border: #1d1d1f;
-  --od-new-aim-fg: #ffffff;
-  --od-new-aim-icon: rgba(255, 255, 255, 0.88);
-  --od-new-aim-icon-hover: #ffffff;
-  --od-new-aim-kbd-bg: rgba(255, 255, 255, 0.1);
-  --od-new-aim-kbd-border: rgba(255, 255, 255, 0.16);
-  --od-new-aim-kbd-fg: rgba(255, 255, 255, 0.72);
-  --od-new-aim-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 :root:has(.od-app[data-system-appearance="dark"]) {
@@ -133,16 +100,6 @@
   --od-shadow-composer: 0 10px 26px rgba(0, 0, 0, 0.22);
   --od-shadow-composer-focus: 0 10px 26px rgba(0, 0, 0, 0.26);
   --od-shadow-command: 0 24px 70px rgba(0, 0, 0, 0.5);
-  --od-new-aim-bg: #f5f5f7;
-  --od-new-aim-bg-hover: #ffffff;
-  --od-new-aim-border: #f5f5f7;
-  --od-new-aim-fg: #1d1d1f;
-  --od-new-aim-icon: rgba(29, 29, 31, 0.82);
-  --od-new-aim-icon-hover: #1d1d1f;
-  --od-new-aim-kbd-bg: rgba(29, 29, 31, 0.08);
-  --od-new-aim-kbd-border: rgba(29, 29, 31, 0.14);
-  --od-new-aim-kbd-fg: rgba(29, 29, 31, 0.68);
-  --od-new-aim-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
   --od-focus: 0 0 0 4px color-mix(in oklab, var(--od-accent), transparent 56%);
 }
 
@@ -511,25 +468,31 @@ kbd {
 
 .od-new-aim {
   width: 100%;
-  min-height: 40px;
+  min-height: 36px;
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
-  border: 1px solid var(--od-new-aim-border);
+  border: 1px solid transparent;
   border-radius: var(--od-radius-sm);
-  background: var(--od-new-aim-bg);
-  box-shadow: var(--od-new-aim-shadow);
-  color: var(--od-new-aim-fg);
-  padding: 5px 9px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--od-fg-2);
+  padding: 4px 8px;
   text-align: left;
   cursor: pointer;
 }
 
 .od-new-aim:hover {
-  background: var(--od-new-aim-bg-hover);
-  border-color: var(--od-new-aim-bg-hover);
-  color: var(--od-new-aim-fg);
+  background: color-mix(in oklab, var(--od-surface-warm), var(--od-bg) 48%);
+  color: var(--od-fg);
+}
+
+.od-new-aim[data-current="true"] {
+  border-color: var(--od-border-soft);
+  background: color-mix(in oklab, var(--od-bg), var(--od-surface) 42%);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  color: var(--od-fg);
 }
 
 .od-new-aim-icon {
@@ -537,11 +500,11 @@ kbd {
   height: 20px;
   display: grid;
   place-items: center;
-  color: var(--od-new-aim-icon);
+  color: currentColor;
 }
 
 .od-new-aim:hover .od-new-aim-icon {
-  color: var(--od-new-aim-icon-hover);
+  color: currentColor;
 }
 
 .od-new-aim-icon svg {
@@ -565,13 +528,22 @@ kbd {
 }
 
 .od-new-aim kbd {
+  display: none;
   justify-self: end;
   min-height: 18px;
-  border-color: var(--od-new-aim-kbd-border);
-  background: var(--od-new-aim-kbd-bg);
-  color: var(--od-new-aim-kbd-fg);
+  border-color: color-mix(in oklab, var(--od-fg), transparent 86%);
+  background: color-mix(in oklab, var(--od-fg), transparent 92%);
+  color: var(--od-muted);
   padding: 0 5px;
   font-size: 9px;
+}
+
+.od-new-aim[data-current="true"] kbd {
+  display: inline-flex;
+}
+
+:root:has(.od-app[data-system-appearance="dark"]) .od-new-aim[data-current="true"] {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .od-section-label {

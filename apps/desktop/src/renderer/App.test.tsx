@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import type { Milestone } from "@core/types";
+import type { Goal, Milestone } from "@core/types";
 import type { ContextSourceStatus, ProviderStatus, WebResearchStatus } from "../shared/ipc";
 
 import { buildSettingsModel, EvidenceSubmissionForm, SettingsPanel } from "./App";
@@ -41,6 +41,18 @@ const milestone: Milestone = {
       eval_signal: "Done means the user confirms approval.",
     },
   },
+};
+
+const savedGoal: Goal = {
+  id: GOAL,
+  owner_id: OWNER,
+  title: "Ship a sidebar pass",
+  description: "Refine the desktop sidebar.",
+  domain: "software",
+  status: "active",
+  target_date: null,
+  plan_json: null,
+  metadata: {},
 };
 
 const noop = () => {};
@@ -203,19 +215,40 @@ describe("CockpitShell", () => {
     expect(html).toContain('data-od-id="sidebar-global-actions"');
     expect(html).toContain('aria-label="Workspace actions"');
     expect(html).toContain('data-od-id="sidebar-new-aim-action"');
+    expect(html).toContain('data-current="true"');
+    expect(html).toContain('aria-current="page"');
     expect(html).toContain('class="od-new-aim-icon"');
     expect(html).toContain('class="od-new-aim-label"');
     expect(html).toContain("New aim");
     expect(html).toContain("Cmd N");
     expect(css).toMatch(/\.od-sidebar-global-actions\s*{[^}]*display:\s*grid;[^}]*gap:\s*4px;/s);
-    expect(css).toMatch(/\.od-new-aim\s*{[^}]*min-height:\s*40px;[^}]*grid-template-columns:\s*20px minmax\(0, 1fr\) auto;/s);
-    expect(css).toMatch(/:root\s*{[^}]*--od-new-aim-bg:\s*#1d1d1f;[^}]*--od-new-aim-fg:\s*#ffffff;/s);
-    expect(css).toMatch(/:root:has\(\.od-app\[data-system-appearance="light"\]\)\s*{[^}]*--od-new-aim-bg:\s*#1d1d1f;[^}]*--od-new-aim-fg:\s*#ffffff;/s);
-    expect(css).toMatch(/:root:has\(\.od-app\[data-system-appearance="dark"\]\)\s*{[^}]*--od-new-aim-bg:\s*#f5f5f7;[^}]*--od-new-aim-fg:\s*#1d1d1f;/s);
-    expect(css).toMatch(/\.od-new-aim\s*{[^}]*background:\s*var\(--od-new-aim-bg\);[^}]*color:\s*var\(--od-new-aim-fg\);/s);
+    expect(css).toMatch(/\.od-new-aim\s*{[^}]*min-height:\s*36px;[^}]*grid-template-columns:\s*20px minmax\(0, 1fr\) auto;[^}]*background:\s*transparent;[^}]*box-shadow:\s*none;/s);
+    expect(css).toMatch(/\.od-new-aim\[data-current="true"\]\s*{[^}]*box-shadow:\s*0 1px 2px/s);
     expect(css).toMatch(/\.od-new-aim-icon\s*{[^}]*width:\s*20px;[^}]*height:\s*20px;/s);
-    expect(css).toMatch(/\.od-new-aim kbd\s*{[^}]*min-height:\s*18px;[^}]*background:\s*var\(--od-new-aim-kbd-bg\);/s);
+    expect(css).toMatch(/\.od-new-aim kbd\s*{[^}]*display:\s*none;[^}]*min-height:\s*18px;/s);
+    expect(css).toMatch(/\.od-new-aim\[data-current="true"\] kbd\s*{[^}]*display:\s*inline-flex;/s);
+    expect(css).not.toContain("--od-new-aim-bg");
     expect(css).not.toContain('.od-app[data-empty-aim="true"] .od-new-aim');
+  });
+
+  it("keeps New Aim unselected when a saved aim is open", () => {
+    const html = renderToStaticMarkup(
+      <I18nProvider>
+        <CockpitShell
+          goals={[savedGoal]}
+          selected={savedGoal}
+          activeStage="aim"
+          onNewAim={noop}
+          onOpenGoal={noop}
+          onStage={noop}
+          main={<div>Saved aim</div>}
+        />
+      </I18nProvider>,
+    );
+
+    expect(html).toContain('data-od-id="sidebar-new-aim-action"');
+    expect(html).toContain('data-current="false"');
+    expect(html).not.toContain('aria-current="page"');
   });
 
   it("renders an invisible pinned sidebar resize hot zone with accessible controls", () => {
