@@ -15,7 +15,7 @@ Branch: `main`
 
 ## Current State
 
-- Work was prepared directly on `main`; no separate feature branch merge is needed.
+- Work was prepared directly on `main` and pushed to `origin/main` as `5f33697` (`Make New Aim a sidebar nav item`); no separate feature branch merge is needed.
 - Root `Aimcub.app`, `apps/desktop/out`, and `apps/desktop/dist` were refreshed locally and remain ignored build artifacts.
 - Temporary browser visual harnesses at `/private/tmp/aimcub-sidebar-harness-current.html`, `/private/tmp/aimcub-sidebar-harness-unselected.html`, and `/private/tmp/aimcub-sidebar-harness-current-dark.html` verified the selected, default, and dark selected row states. At 960 by 680 px and 640 by 520 px, the New Aim row rendered at 34 px tall with a 16 px icon, normal 13 px text, weak visible shortcut hint, no visible border, no shadow, no label/shortcut overlap, and no horizontal overflow.
 
@@ -38,6 +38,7 @@ Notes:
 
 - MCP worker tests may log the expected missing-Supabase opaque-error path while passing.
 - The temporary Vite harness was not committed.
+- Memory refresh audit after `5f33697` found root memory line budgets OK and durable desktop/design memory aligned with the latest sidebar implementation.
 
 ## Next Session Prompt
 
