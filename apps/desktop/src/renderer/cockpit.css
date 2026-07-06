@@ -26,8 +26,8 @@
   --od-shadow-peek: 20px 0 48px rgba(0, 0, 0, 0.12);
   --od-shadow-popover: 0 18px 48px rgba(0, 0, 0, 0.14), 0 3px 14px rgba(0, 0, 0, 0.08);
   --od-shadow-sidebar-action: 0 1px 3px rgba(0, 0, 0, 0.07);
-  --od-shadow-composer: 0 10px 26px rgba(0, 0, 0, 0.035);
-  --od-shadow-composer-focus: 0 10px 26px rgba(0, 0, 0, 0.04);
+  --od-shadow-composer: 0 6px 16px rgba(0, 0, 0, 0.026);
+  --od-shadow-composer-focus: 0 8px 18px rgba(0, 0, 0, 0.035);
   --od-shadow-command: 0 24px 70px rgba(0, 0, 0, 0.18);
   --od-interaction-hover-bg: color-mix(in oklab, var(--od-fg), transparent 96%);
   --od-selection-bg: color-mix(in oklab, var(--od-fg), transparent 91%);
@@ -85,8 +85,8 @@
     --od-shadow-peek: 20px 0 48px rgba(0, 0, 0, 0.38);
     --od-shadow-popover: 0 18px 48px rgba(0, 0, 0, 0.42), 0 3px 14px rgba(0, 0, 0, 0.3);
     --od-shadow-sidebar-action: 0 1px 5px rgba(0, 0, 0, 0.3);
-    --od-shadow-composer: 0 10px 26px rgba(0, 0, 0, 0.22);
-    --od-shadow-composer-focus: 0 10px 26px rgba(0, 0, 0, 0.26);
+    --od-shadow-composer: 0 6px 16px rgba(0, 0, 0, 0.16);
+    --od-shadow-composer-focus: 0 8px 18px rgba(0, 0, 0, 0.2);
     --od-shadow-command: 0 24px 70px rgba(0, 0, 0, 0.5);
     --od-selection-bg: color-mix(in oklab, var(--od-fg), transparent 84%);
     --od-selection-hover-bg: color-mix(in oklab, var(--od-fg), transparent 81%);
@@ -124,8 +124,8 @@
   --od-shadow-peek: 20px 0 48px rgba(0, 0, 0, 0.38);
   --od-shadow-popover: 0 18px 48px rgba(0, 0, 0, 0.42), 0 3px 14px rgba(0, 0, 0, 0.3);
   --od-shadow-sidebar-action: 0 1px 5px rgba(0, 0, 0, 0.3);
-  --od-shadow-composer: 0 10px 26px rgba(0, 0, 0, 0.22);
-  --od-shadow-composer-focus: 0 10px 26px rgba(0, 0, 0, 0.26);
+  --od-shadow-composer: 0 6px 16px rgba(0, 0, 0, 0.16);
+  --od-shadow-composer-focus: 0 8px 18px rgba(0, 0, 0, 0.2);
   --od-shadow-command: 0 24px 70px rgba(0, 0, 0, 0.5);
   --od-selection-bg: color-mix(in oklab, var(--od-fg), transparent 84%);
   --od-selection-hover-bg: color-mix(in oklab, var(--od-fg), transparent 81%);
@@ -1814,9 +1814,9 @@ kbd {
 
 .od-aim-intake {
   width: 100%;
-  min-height: min(520px, calc(100vh - 124px));
+  min-height: min(460px, calc(100vh - 124px));
   align-content: center;
-  gap: 18px;
+  gap: 16px;
 }
 
 .od-aim-intake-child {
@@ -1903,11 +1903,11 @@ kbd {
 }
 
 .od-aim-composer {
-  width: min(100%, 640px);
+  width: min(100%, 520px);
   justify-self: center;
   display: grid;
   overflow: hidden;
-  border: 1px solid color-mix(in oklab, var(--od-border), var(--od-border-soft) 35%);
+  border: 1px solid var(--od-border-soft);
   border-radius: var(--od-radius-md);
   background: var(--od-surface-warm);
   box-shadow: var(--od-shadow-composer);
@@ -1925,9 +1925,9 @@ kbd {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   border-top: 1px solid var(--od-border-soft);
-  padding: 8px 10px 8px 16px;
+  padding: 6px 8px 6px 14px;
 }
 
 .od-aim-composer-footer span {
@@ -1935,7 +1935,7 @@ kbd {
   color: var(--od-meta);
   font-size: var(--od-type-meta);
   line-height: 1.35;
-  font-weight: var(--od-font-weight-semibold);
+  font-weight: var(--od-font-weight-medium);
 }
 
 .od-aim-intake-form {
@@ -2005,19 +2005,27 @@ kbd {
 }
 
 .od-aim-composer .od-aim-title-input {
-  min-height: 54px;
-  padding: 0 18px;
-  font-size: var(--od-type-title);
+  min-height: 46px;
+  padding: 0 14px;
+  font-size: var(--od-type-body);
+  line-height: var(--od-line-body);
   font-weight: var(--od-font-weight-regular);
 }
 
 .od-aim-composer .od-aim-context-input {
-  min-height: 48px;
+  height: 52px;
+  min-height: 52px;
   margin-top: 0;
-  padding: 0 18px 12px;
+  padding: 4px 14px 10px;
   resize: none;
   font-size: var(--od-type-body);
-  line-height: 1.5;
+  line-height: var(--od-line-body);
+}
+
+.od-aim-composer-footer .od-aim-primary {
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: var(--od-type-meta);
 }
 
 .od-aim-composer .od-aim-title-input:focus,
@@ -4333,7 +4341,8 @@ kbd {
 
   .od-aim-composer-footer {
     display: grid;
-    padding: 12px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 6px 8px 6px 14px;
   }
 
   .od-aim-intake h1,
@@ -4350,6 +4359,10 @@ kbd {
   .od-aim-primary,
   .od-aim-secondary {
     width: 100%;
+  }
+
+  .od-aim-composer-footer .od-aim-primary {
+    width: auto;
   }
 
   .od-aim-overview-strip {

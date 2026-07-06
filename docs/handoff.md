@@ -5,11 +5,10 @@ Branch: `main`
 
 ## Current Session
 
-- Added stable selected/current states to the Desktop left sidebar.
-- Home Panel and New Aim now receive `aria-current="page"` when their surfaces are active; saved aim rows receive the same current marker when opened.
-- Added shared sidebar selection tokens using quiet gray fills, soft inset separation, and focus-visible composition.
-- Lowered dark-mode foreground, secondary, muted, and meta text colors so text is less white while retaining contrast.
-- Updated Desktop/design-system memory with the selected-state and dark-text requirements.
+- Compacted the Desktop New Aim command composer so it no longer reads as a large chat card.
+- Reduced the composer max width from 640 px to 520 px, lowered input/footer heights, softened the composer shadow, and kept the optional context field to a short two-line default.
+- Added a small-window footer rule so the hint and Continue button stay on one stable row instead of dropping into a block layout.
+- Updated Desktop design-system memory with the durable compact-composer requirement.
 - Refreshed root `Aimcub.app` from the latest Electron 43 folder-style Desktop build.
 
 ## Current State
@@ -17,7 +16,7 @@ Branch: `main`
 - Work is prepared directly on `main`; no separate feature branch merge is needed.
 - The focused commit for this session was pushed to `origin/main`.
 - Root `Aimcub.app`, `apps/desktop/out`, and `apps/desktop/dist` were refreshed locally and remain ignored build artifacts.
-- Visual QA used the refreshed root Electron app through Computer Use.
+- Visual QA used the refreshed root Electron app through Computer Use at normal and narrow desktop window sizes.
 
 ## Verification
 
@@ -25,7 +24,6 @@ Passed:
 
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop test -- App.test.tsx`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop typecheck`
-- React best-practices checklist for the touched TSX files.
 - `git diff --check`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
@@ -34,7 +32,7 @@ Passed:
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm core:purity`
 - `ELECTRON_BUILDER_CACHE=/private/tmp/aimcub-electron-builder-cache COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm desktop:pack`
 - `ditto apps/desktop/dist/mac-arm64/Aimcub.app Aimcub.app`
-- Visual QA in the refreshed Electron app: Home Panel selected state was visible on the initial workspace; New Aim selected state was visible after opening the composer; dark-mode text appeared softer than the prior near-white palette without losing readability.
+- Visual QA in the refreshed Electron app: New Aim composer rendered at compact width, reduced height, stable Chinese text, and no footer wrapping at a 640 x 520 window.
 
 Notes:
 

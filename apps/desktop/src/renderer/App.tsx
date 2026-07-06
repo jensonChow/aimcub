@@ -1512,7 +1512,7 @@ function AimIntakePanel(props: {
           onChange={(event) => props.onDescription(event.target.value)}
           placeholder={t("aimIntake.contextPlaceholder")}
           aria-label={t("aimIntake.contextLabel")}
-          rows={4}
+          rows={2}
         />
         <div className="od-aim-composer-footer">
           <span>{hasAim ? t("aimIntake.readyHint") : t("aimIntake.emptyHint")}</span>
