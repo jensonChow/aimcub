@@ -221,13 +221,16 @@ describe("CockpitShell", () => {
     expect(html).toContain('class="od-new-aim-label"');
     expect(html).toContain("New aim");
     expect(html).toContain("Cmd N");
-    expect(css).toMatch(/\.od-sidebar-global-actions\s*{[^}]*display:\s*grid;[^}]*gap:\s*4px;/s);
-    expect(css).toMatch(/\.od-new-aim\s*{[^}]*min-height:\s*36px;[^}]*grid-template-columns:\s*20px minmax\(0, 1fr\) auto;[^}]*background:\s*transparent;[^}]*box-shadow:\s*none;/s);
-    expect(css).toMatch(/\.od-new-aim\[data-current="true"\]\s*{[^}]*box-shadow:\s*0 1px 2px/s);
-    expect(css).toMatch(/\.od-new-aim-icon\s*{[^}]*width:\s*20px;[^}]*height:\s*20px;/s);
-    expect(css).toMatch(/\.od-new-aim kbd\s*{[^}]*display:\s*none;[^}]*min-height:\s*18px;/s);
-    expect(css).toMatch(/\.od-new-aim\[data-current="true"\] kbd\s*{[^}]*display:\s*inline-flex;/s);
+    expect(css).toMatch(/\.od-sidebar-global-actions\s*{[^}]*display:\s*grid;[^}]*gap:\s*3px;/s);
+    expect(css).toMatch(/\.od-new-aim\s*{[^}]*min-height:\s*34px;[^}]*grid-template-columns:\s*18px minmax\(0, 1fr\) auto;[^}]*background:\s*transparent;[^}]*box-shadow:\s*none;/s);
+    expect(css).toMatch(/\.od-new-aim:hover\s*{[^}]*background:\s*color-mix\(in oklab, var\(--od-fg\), transparent 96%\);[^}]*color:\s*var\(--od-fg\);/s);
+    expect(css).toMatch(/\.od-new-aim\[data-current="true"\]\s*{[^}]*background:\s*color-mix\(in oklab, var\(--od-fg\), transparent 92%\);[^}]*box-shadow:\s*none;/s);
+    expect(css).toMatch(/\.od-new-aim-icon\s*{[^}]*width:\s*18px;[^}]*height:\s*18px;/s);
+    expect(css).toMatch(/\.od-new-aim-icon svg\s*{[^}]*width:\s*16px;[^}]*height:\s*16px;/s);
+    expect(css).toMatch(/\.od-new-aim-label\s*{[^}]*font-weight:\s*500;[^}]*line-height:\s*16px;/s);
+    expect(css).toMatch(/\.od-new-aim kbd\s*{[^}]*display:\s*inline-flex;[^}]*min-height:\s*16px;[^}]*color:\s*var\(--od-meta\);/s);
     expect(css).not.toContain("--od-new-aim-bg");
+    expect(css).not.toContain(".od-new-aim[data-current=\"true\"] kbd");
     expect(css).not.toContain('.od-app[data-empty-aim="true"] .od-new-aim');
   });
 

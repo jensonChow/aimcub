@@ -5,26 +5,26 @@ Branch: `main`
 
 ## Current Session
 
-- Reworked the normal Aim sidebar's New Aim control into a Claude/Codex-like navigation row.
-- Default state is now just the plus icon and New Aim label on a transparent 36 px row; the `Cmd N` shortcut is hidden until the row is current.
-- Current state is tied to the new Aim intake surface (`activeStage === "aim"` with no selected saved aim) and shows a subtle selected background, border, shadow, and shortcut pill.
-- Removed the previous light/dark solid button inversion treatment while keeping the selected row appearance compatible with dark mode.
-- Updated renderer coverage for the current and unselected states.
-- Updated `docs/memory/design-system.md` and `docs/memory/desktop.md` with the navigation-row requirement.
+- Tightened the normal Aim sidebar's New Aim control into a Codex Desktop-like sidebar navigation item.
+- Default state is now a transparent 34 px row with a 16 px plus icon, normal sidebar label weight, and a weak always-visible `Cmd N` shortcut hint.
+- Current state is tied to the new Aim intake surface (`activeStage === "aim"` with no selected saved aim) and uses only a shallow gray selected background.
+- Removed the remaining card-like treatment: no visible active border, no shadow, no primary-button color, and no click-scale effect.
+- Updated renderer coverage for default, hover, selected, shortcut, and non-card styling.
+- Updated `docs/memory/design-system.md` and `docs/memory/desktop.md` with the Codex-style nav-item requirement.
 - Refreshed root `Aimcub.app` from the latest Electron 43 folder-style Desktop build.
 
 ## Current State
 
 - Work was prepared directly on `main`; no separate feature branch merge is needed.
 - Root `Aimcub.app`, `apps/desktop/out`, and `apps/desktop/dist` were refreshed locally and remain ignored build artifacts.
-- Temporary browser visual harnesses at `/private/tmp/aimcub-sidebar-harness-current.html`, `/private/tmp/aimcub-sidebar-harness-unselected.html`, and `/private/tmp/aimcub-sidebar-harness-current-dark.html` verified the new current, unselected, and dark current row states. At 960 by 680 px and 640 by 520 px, the New Aim row rendered at 36 px tall, current state showed the shadow and shortcut, unselected state stayed transparent with no shadow and no visible shortcut, and there was no horizontal overflow.
+- Temporary browser visual harnesses at `/private/tmp/aimcub-sidebar-harness-current.html`, `/private/tmp/aimcub-sidebar-harness-unselected.html`, and `/private/tmp/aimcub-sidebar-harness-current-dark.html` verified the selected, default, and dark selected row states. At 960 by 680 px and 640 by 520 px, the New Aim row rendered at 34 px tall with a 16 px icon, normal 13 px text, weak visible shortcut hint, no visible border, no shadow, no label/shortcut overlap, and no horizontal overflow.
 
 ## Verification
 
 Passed:
 
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop test -- App.test.tsx`
-- Browser visual check through temporary local harnesses at 960 by 680 px and 640 by 520 px, covering New Aim current/unselected states, dark current state, row sizing, shortcut visibility, text/shortcut fit, and horizontal overflow.
+- Browser visual check through temporary local harnesses at 960 by 680 px and 640 by 520 px, covering New Aim selected/default states, dark selected state, row sizing, icon sizing, shortcut visibility, text/shortcut fit, absent border/shadow, and horizontal overflow.
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck`

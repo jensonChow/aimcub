@@ -411,7 +411,6 @@ kbd {
 }
 
 .od-subtle-button,
-.od-new-aim,
 .od-settings-back,
 .od-settings-button,
 .od-user-menu-trigger,
@@ -425,7 +424,6 @@ kbd {
 }
 
 .od-subtle-button:active,
-.od-new-aim:active,
 .od-settings-back:active,
 .od-settings-button:active,
 .od-user-menu-trigger:active,
@@ -463,14 +461,15 @@ kbd {
 .od-sidebar-global-actions {
   min-width: 0;
   display: grid;
-  gap: 4px;
+  gap: 3px;
 }
 
 .od-new-aim {
+  position: relative;
   width: 100%;
-  min-height: 36px;
+  min-height: 34px;
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) auto;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
   border: 1px solid transparent;
@@ -478,26 +477,26 @@ kbd {
   background: transparent;
   box-shadow: none;
   color: var(--od-fg-2);
-  padding: 4px 8px;
+  padding: 0 8px;
   text-align: left;
   cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
 }
 
 .od-new-aim:hover {
-  background: color-mix(in oklab, var(--od-surface-warm), var(--od-bg) 48%);
+  background: color-mix(in oklab, var(--od-fg), transparent 96%);
   color: var(--od-fg);
 }
 
 .od-new-aim[data-current="true"] {
-  border-color: var(--od-border-soft);
-  background: color-mix(in oklab, var(--od-bg), var(--od-surface) 42%);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  background: color-mix(in oklab, var(--od-fg), transparent 92%);
+  box-shadow: none;
   color: var(--od-fg);
 }
 
 .od-new-aim-icon {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   display: grid;
   place-items: center;
   color: currentColor;
@@ -508,11 +507,11 @@ kbd {
 }
 
 .od-new-aim-icon svg {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.8;
+  stroke-width: 1.7;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -521,29 +520,22 @@ kbd {
   min-width: 0;
   overflow: hidden;
   font-size: 13px;
-  font-weight: 600;
-  line-height: 18px;
+  font-weight: 500;
+  line-height: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .od-new-aim kbd {
-  display: none;
+  display: inline-flex;
   justify-self: end;
-  min-height: 18px;
-  border-color: color-mix(in oklab, var(--od-fg), transparent 86%);
-  background: color-mix(in oklab, var(--od-fg), transparent 92%);
-  color: var(--od-muted);
+  min-height: 16px;
+  border-color: color-mix(in oklab, var(--od-fg), transparent 90%);
+  background: color-mix(in oklab, var(--od-fg), transparent 96%);
+  color: var(--od-meta);
   padding: 0 5px;
   font-size: 9px;
-}
-
-.od-new-aim[data-current="true"] kbd {
-  display: inline-flex;
-}
-
-:root:has(.od-app[data-system-appearance="dark"]) .od-new-aim[data-current="true"] {
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  font-weight: 600;
 }
 
 .od-section-label {
