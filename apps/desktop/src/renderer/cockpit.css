@@ -30,6 +30,10 @@
   --od-shadow-composer-focus: 0 10px 26px rgba(0, 0, 0, 0.04);
   --od-shadow-command: 0 24px 70px rgba(0, 0, 0, 0.18);
   --od-interaction-hover-bg: color-mix(in oklab, var(--od-fg), transparent 96%);
+  --od-selection-bg: color-mix(in oklab, var(--od-fg), transparent 91%);
+  --od-selection-hover-bg: color-mix(in oklab, var(--od-fg), transparent 89%);
+  --od-selection-border: color-mix(in oklab, var(--od-fg), transparent 82%);
+  --od-selection-shadow: inset 0 0 0 1px color-mix(in oklab, var(--od-bg), transparent 82%);
   --od-interaction-hover-shadow: var(--od-shadow-sidebar-action);
   --od-interaction-focus-shadow: var(--od-focus), var(--od-shadow-sidebar-action);
   --od-type-meta: 12px;
@@ -58,10 +62,10 @@
     --od-bg: #1c1c1e;
     --od-surface: #2c2c2e;
     --od-surface-warm: #242426;
-    --od-fg: #f5f5f7;
-    --od-fg-2: #e5e5ea;
-    --od-muted: #c7c7cc;
-    --od-meta: #a1a1a6;
+    --od-fg: #e8e8ed;
+    --od-fg-2: #c9c9cf;
+    --od-muted: #a8a8af;
+    --od-meta: #8f8f99;
     --od-border: #4a4a4f;
     --od-border-soft: #38383d;
     --od-accent: #0a84ff;
@@ -84,6 +88,10 @@
     --od-shadow-composer: 0 10px 26px rgba(0, 0, 0, 0.22);
     --od-shadow-composer-focus: 0 10px 26px rgba(0, 0, 0, 0.26);
     --od-shadow-command: 0 24px 70px rgba(0, 0, 0, 0.5);
+    --od-selection-bg: color-mix(in oklab, var(--od-fg), transparent 84%);
+    --od-selection-hover-bg: color-mix(in oklab, var(--od-fg), transparent 81%);
+    --od-selection-border: color-mix(in oklab, var(--od-fg), transparent 72%);
+    --od-selection-shadow: inset 0 0 0 1px color-mix(in oklab, var(--od-bg), transparent 62%);
     --od-focus: 0 0 0 4px color-mix(in oklab, var(--od-accent), transparent 56%);
   }
 }
@@ -93,10 +101,10 @@
   --od-bg: #1c1c1e;
   --od-surface: #2c2c2e;
   --od-surface-warm: #242426;
-  --od-fg: #f5f5f7;
-  --od-fg-2: #e5e5ea;
-  --od-muted: #c7c7cc;
-  --od-meta: #a1a1a6;
+  --od-fg: #e8e8ed;
+  --od-fg-2: #c9c9cf;
+  --od-muted: #a8a8af;
+  --od-meta: #8f8f99;
   --od-border: #4a4a4f;
   --od-border-soft: #38383d;
   --od-accent: #0a84ff;
@@ -119,6 +127,10 @@
   --od-shadow-composer: 0 10px 26px rgba(0, 0, 0, 0.22);
   --od-shadow-composer-focus: 0 10px 26px rgba(0, 0, 0, 0.26);
   --od-shadow-command: 0 24px 70px rgba(0, 0, 0, 0.5);
+  --od-selection-bg: color-mix(in oklab, var(--od-fg), transparent 84%);
+  --od-selection-hover-bg: color-mix(in oklab, var(--od-fg), transparent 81%);
+  --od-selection-border: color-mix(in oklab, var(--od-fg), transparent 72%);
+  --od-selection-shadow: inset 0 0 0 1px color-mix(in oklab, var(--od-bg), transparent 62%);
   --od-focus: 0 0 0 4px color-mix(in oklab, var(--od-accent), transparent 56%);
 }
 
@@ -542,8 +554,27 @@ kbd {
   color: var(--od-fg);
 }
 
+.od-sidebar-action[aria-current="page"] {
+  background: var(--od-selection-bg);
+  border-color: var(--od-selection-border);
+  box-shadow: var(--od-selection-shadow);
+  color: var(--od-fg);
+}
+
+.od-sidebar-action[aria-current="page"]:hover {
+  background: var(--od-selection-hover-bg);
+  border-color: var(--od-selection-border);
+  box-shadow: var(--od-selection-shadow);
+}
+
 .od-sidebar-action:focus-visible {
   box-shadow: var(--od-interaction-focus-shadow);
+}
+
+.od-sidebar-action[aria-current="page"]:focus-visible {
+  background: var(--od-selection-hover-bg);
+  border-color: var(--od-selection-border);
+  box-shadow: var(--od-focus), var(--od-selection-shadow);
 }
 
 .od-sidebar-action-icon {
@@ -666,12 +697,25 @@ kbd {
 
 .od-aim-card.selected,
 .od-aim-card.current {
-  background: var(--od-surface-warm);
-  box-shadow: none;
+  background: var(--od-selection-bg);
+  box-shadow: var(--od-selection-shadow);
+  color: var(--od-fg);
 }
 
 .od-aim-card.selected {
-  border-color: color-mix(in oklab, var(--od-accent), var(--od-border) 65%);
+  border-color: var(--od-selection-border);
+}
+
+.od-aim-card.selected:hover,
+.od-aim-card.current:hover {
+  background: var(--od-selection-hover-bg);
+  box-shadow: var(--od-selection-shadow);
+}
+
+.od-aim-card.selected:focus-visible,
+.od-aim-card.current:focus-visible {
+  background: var(--od-selection-hover-bg);
+  box-shadow: var(--od-focus), var(--od-selection-shadow);
 }
 
 .od-aim-row-main {

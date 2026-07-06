@@ -5,11 +5,11 @@ Branch: `main`
 
 ## Current Session
 
-- Added a top-left sidebar Home Panel action beside New Aim in the Desktop shell.
-- Home Panel returns the renderer to the main initial workspace: no selected aim, no unsaved composer, and the quiet placeholder visible.
-- Added Home Panel to the command palette and wired `Cmd+0` as the matching keyboard shortcut.
-- Generalized the New Aim sidebar styling into a shared `od-sidebar-action` treatment so Home Panel and New Aim stay aligned and quiet.
-- Updated Desktop/design-system memory with the durable Home Panel sidebar requirement.
+- Added stable selected/current states to the Desktop left sidebar.
+- Home Panel and New Aim now receive `aria-current="page"` when their surfaces are active; saved aim rows receive the same current marker when opened.
+- Added shared sidebar selection tokens using quiet gray fills, soft inset separation, and focus-visible composition.
+- Lowered dark-mode foreground, secondary, muted, and meta text colors so text is less white while retaining contrast.
+- Updated Desktop/design-system memory with the selected-state and dark-text requirements.
 - Refreshed root `Aimcub.app` from the latest Electron 43 folder-style Desktop build.
 
 ## Current State
@@ -34,7 +34,7 @@ Passed:
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm core:purity`
 - `ELECTRON_BUILDER_CACHE=/private/tmp/aimcub-electron-builder-cache COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm desktop:pack`
 - `ditto apps/desktop/dist/mac-arm64/Aimcub.app Aimcub.app`
-- Visual QA in the refreshed Electron app: sidebar expanded with Home Panel and New Aim aligned in the top action group; clicking New Aim opened the composer; clicking Home Panel returned to the initial workspace; `Cmd+0` also returned to the initial workspace.
+- Visual QA in the refreshed Electron app: Home Panel selected state was visible on the initial workspace; New Aim selected state was visible after opening the composer; dark-mode text appeared softer than the prior near-white palette without losing readability.
 
 Notes:
 

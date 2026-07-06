@@ -193,6 +193,7 @@ describe("CockpitShell", () => {
           goals={[]}
           selected={null}
           activeStage="aim"
+          activeSidebarAction={null}
           onHome={noop}
           onNewAim={noop}
           onOpenGoal={noop}
@@ -218,6 +219,7 @@ describe("CockpitShell", () => {
           goals={[]}
           selected={null}
           activeStage="aim"
+          activeSidebarAction="home"
           onHome={noop}
           onNewAim={noop}
           onOpenGoal={noop}
@@ -232,8 +234,8 @@ describe("CockpitShell", () => {
     expect(html).toContain('aria-label="Workspace actions"');
     expect(html).toContain('data-od-id="sidebar-home-panel-action"');
     expect(html).toContain('data-od-id="sidebar-new-aim-action"');
-    expect(html).not.toContain('data-current=');
-    expect(html).not.toContain('aria-current=');
+    expect(html).toContain('<button class="od-sidebar-action od-home-panel" type="button" aria-current="page" data-od-id="sidebar-home-panel-action"');
+    expect(html).toContain('<button class="od-sidebar-action od-new-aim" type="button" data-od-id="sidebar-new-aim-action"');
     expect(html).toContain("od-home-panel");
     expect(html).toContain("od-new-aim");
     expect(html).toContain("od-sidebar-action-icon");
@@ -258,6 +260,8 @@ describe("CockpitShell", () => {
     expect(css).toContain("--od-font-weight-semibold: 450;");
     expect(css).toContain("--od-icon-stroke: 1.55;");
     expect(css).toContain("--od-interaction-hover-bg: color-mix(in oklab, var(--od-fg), transparent 96%);");
+    expect(css).toContain("--od-selection-bg: color-mix(in oklab, var(--od-fg), transparent 91%);");
+    expect(css).toContain("--od-selection-border: color-mix(in oklab, var(--od-fg), transparent 82%);");
     expect(css).toContain("--od-interaction-hover-shadow: var(--od-shadow-sidebar-action);");
     expect(css).toContain("--od-interaction-focus-shadow: var(--od-focus), var(--od-shadow-sidebar-action);");
     expect(css).toMatch(/\.od-sidebar\s*{[^}]*padding:\s*56px var\(--sidebar-horizontal-inset\) 16px;[^}]*overflow-x:\s*hidden;[^}]*overflow-y:\s*auto;/s);
@@ -265,7 +269,9 @@ describe("CockpitShell", () => {
     expect(css).toMatch(/\.od-sidebar-action\s*{[^}]*min-height:\s*34px;[^}]*grid-template-columns:\s*var\(--sidebar-action-icon-slot\) minmax\(0, 1fr\) auto;[^}]*column-gap:\s*var\(--sidebar-action-label-gap\);[^}]*background:\s*transparent;[^}]*box-shadow:\s*none;/s);
     expect(css).toMatch(/\.od-sidebar-action\s*{[^}]*padding:\s*0 var\(--sidebar-row-padding-x\);/s);
     expect(css).toMatch(/\.od-sidebar-action:hover,\s*\.od-sidebar-action:focus-visible\s*{[^}]*background:\s*var\(--od-interaction-hover-bg\);[^}]*box-shadow:\s*var\(--od-interaction-hover-shadow\);[^}]*color:\s*var\(--od-fg\);/s);
+    expect(css).toMatch(/\.od-sidebar-action\[aria-current="page"\]\s*{[^}]*background:\s*var\(--od-selection-bg\);[^}]*border-color:\s*var\(--od-selection-border\);[^}]*box-shadow:\s*var\(--od-selection-shadow\);[^}]*color:\s*var\(--od-fg\);/s);
     expect(css).toMatch(/\.od-sidebar-action:focus-visible\s*{[^}]*box-shadow:\s*var\(--od-interaction-focus-shadow\);/s);
+    expect(css).toMatch(/\.od-sidebar-action\[aria-current="page"\]:focus-visible\s*{[^}]*background:\s*var\(--od-selection-hover-bg\);[^}]*box-shadow:\s*var\(--od-focus\), var\(--od-selection-shadow\);/s);
     expect(css).toMatch(/\.od-sidebar-action-icon\s*{[^}]*width:\s*var\(--sidebar-action-icon-slot\);[^}]*height:\s*20px;[^}]*justify-items:\s*start;[^}]*transform:\s*translateX\(var\(--sidebar-action-icon-offset-x\)\);/s);
     expect(css).toMatch(/\.od-sidebar-action-icon svg\s*{[^}]*width:\s*18px;[^}]*height:\s*18px;[^}]*stroke-width:\s*var\(--od-icon-stroke\);/s);
     expect(css).toMatch(/\.od-sidebar-action-label\s*{[^}]*font-weight:\s*var\(--od-font-weight-medium\);[^}]*line-height:\s*16px;/s);
@@ -276,6 +282,27 @@ describe("CockpitShell", () => {
     expect(css).not.toContain(".od-sidebar-action[data-current");
     expect(css).not.toContain(".od-sidebar-action[data-current=\"true\"] kbd");
     expect(css).not.toContain('.od-app[data-empty-aim="true"] .od-new-aim');
+  });
+
+  it("marks New Aim as current while a new aim is open", () => {
+    const html = renderToStaticMarkup(
+      <I18nProvider>
+        <CockpitShell
+          goals={[]}
+          selected={null}
+          activeStage="aim"
+          activeSidebarAction="newAim"
+          onHome={noop}
+          onNewAim={noop}
+          onOpenGoal={noop}
+          onStage={noop}
+          main={<div>New aim</div>}
+        />
+      </I18nProvider>,
+    );
+
+    expect(html).toContain('<button class="od-sidebar-action od-home-panel" type="button" data-od-id="sidebar-home-panel-action"');
+    expect(html).toContain('<button class="od-sidebar-action od-new-aim" type="button" aria-current="page" data-od-id="sidebar-new-aim-action"');
   });
 
   it("keeps Desktop typography on three sizes and light shared weights", () => {
@@ -309,6 +336,7 @@ describe("CockpitShell", () => {
           goals={[]}
           selected={null}
           activeStage="aim"
+          activeSidebarAction={null}
           onHome={noop}
           onNewAim={noop}
           onOpenGoal={noop}
@@ -325,19 +353,22 @@ describe("CockpitShell", () => {
     expect(css).toMatch(/\.od-section-label\s*{[^}]*justify-content:\s*flex-start;[^}]*padding:\s*0 var\(--sidebar-row-padding-x\);/s);
     expect(css).toMatch(/\.od-sidebar-empty\s*{[^}]*padding:\s*7px var\(--sidebar-row-padding-x\);/s);
     expect(css).toMatch(/\.od-aim-card\s*{[^}]*padding:\s*8px 10px 8px var\(--sidebar-row-padding-x\);/s);
+    expect(css).toMatch(/\.od-aim-card\.selected,\s*\.od-aim-card\.current\s*{[^}]*background:\s*var\(--od-selection-bg\);[^}]*box-shadow:\s*var\(--od-selection-shadow\);[^}]*color:\s*var\(--od-fg\);/s);
+    expect(css).toMatch(/\.od-aim-card\.selected:focus-visible,\s*\.od-aim-card\.current:focus-visible\s*{[^}]*background:\s*var\(--od-selection-hover-bg\);[^}]*box-shadow:\s*var\(--od-focus\), var\(--od-selection-shadow\);/s);
     expect(css).toMatch(/\.od-sidebar-search\s*{[^}]*padding:\s*0 var\(--sidebar-row-padding-x\);/s);
     expect(css).toMatch(/\.od-filter-row\s*{[^}]*padding:\s*0 var\(--sidebar-row-padding-x\) 2px;/s);
     expect(css).toMatch(/\.od-user-menu-anchor\s*{[^}]*width:\s*var\(--sidebar-content-width\);[^}]*justify-self:\s*center;/s);
     expect(css).toMatch(/\.od-user-menu-trigger\s*{[^}]*grid-template-columns:\s*var\(--sidebar-icon-column\) minmax\(0, 1fr\) 18px;[^}]*padding:\s*6px var\(--sidebar-row-padding-x\);/s);
   });
 
-  it("keeps New Aim unselected when a saved aim is open", () => {
+  it("marks the saved aim row as current when a saved aim is open", () => {
     const html = renderToStaticMarkup(
       <I18nProvider>
         <CockpitShell
           goals={[savedGoal]}
           selected={savedGoal}
           activeStage="aim"
+          activeSidebarAction={null}
           onHome={noop}
           onNewAim={noop}
           onOpenGoal={noop}
@@ -348,8 +379,9 @@ describe("CockpitShell", () => {
     );
 
     expect(html).toContain('data-od-id="sidebar-new-aim-action"');
+    expect(html).toContain('<button class="od-sidebar-action od-new-aim" type="button" data-od-id="sidebar-new-aim-action"');
+    expect(html).toContain('<button class="od-aim-card selected" type="button" aria-current="page"');
     expect(html).not.toContain('data-current=');
-    expect(html).not.toContain('aria-current="page"');
   });
 
   it("renders an invisible pinned sidebar resize hot zone with accessible controls", () => {
@@ -359,6 +391,7 @@ describe("CockpitShell", () => {
           goals={[]}
           selected={null}
           activeStage="aim"
+          activeSidebarAction={null}
           onHome={noop}
           onNewAim={noop}
           onOpenGoal={noop}
@@ -404,6 +437,7 @@ describe("CockpitShell", () => {
           goals={[]}
           selected={null}
           activeStage="settings"
+          activeSidebarAction={null}
           onHome={noop}
           onNewAim={noop}
           onOpenGoal={noop}
@@ -436,6 +470,7 @@ describe("CockpitShell", () => {
           goals={[]}
           selected={null}
           activeStage="aim"
+          activeSidebarAction={null}
           onHome={noop}
           onNewAim={noop}
           onOpenGoal={noop}
@@ -491,7 +526,13 @@ describe("CockpitShell", () => {
     expect(css).toContain(':root:has(.od-app[data-system-appearance="dark"])');
     expect(css).toContain("color-scheme: dark;");
     expect(css).toContain("--od-bg: #1c1c1e;");
+    expect(css).toContain("--od-fg: #e8e8ed;");
+    expect(css).toContain("--od-fg-2: #c9c9cf;");
+    expect(css).toContain("--od-muted: #a8a8af;");
+    expect(css).toContain("--od-meta: #8f8f99;");
     expect(css).toContain("--od-popover-bg: rgba(36, 36, 38, 0.96);");
+    expect(css).toContain("--od-selection-bg: color-mix(in oklab, var(--od-fg), transparent 84%);");
+    expect(css).toContain("--od-selection-border: color-mix(in oklab, var(--od-fg), transparent 72%);");
     expect(html).toContain("color-scheme: light dark;");
     expect(html).toContain("@media (prefers-color-scheme: dark)");
     expect(html).not.toContain("background: #fafafa;");
@@ -520,6 +561,7 @@ describe("CockpitShell", () => {
           goals={[]}
           selected={null}
           activeStage="aim"
+          activeSidebarAction={null}
           onHome={noop}
           onNewAim={noop}
           onOpenGoal={noop}

@@ -8,6 +8,7 @@ import { useI18n, type Lang } from "./i18n";
 import "./cockpit.css";
 
 export type CockpitStage = "aim" | "context" | "contracts" | "run" | "eval" | "settings";
+export type SidebarAction = "home" | "newAim" | null;
 type SidebarState = "pinned" | "collapsed" | "peek";
 const USER_MENU_ID = "od-sidebar-user-menu";
 const LANGUAGE_MENU_ID = "od-sidebar-language-menu";
@@ -36,6 +37,7 @@ interface CockpitShellProps {
   goals: Goal[];
   selected: Goal | null;
   activeStage: CockpitStage;
+  activeSidebarAction: SidebarAction;
   onHome: () => void;
   onNewAim: () => void;
   onOpenGoal: (goal: Goal) => void;
@@ -90,6 +92,7 @@ export function CockpitShell({
   goals,
   selected,
   activeStage,
+  activeSidebarAction,
   onHome,
   onNewAim,
   onOpenGoal,
@@ -494,6 +497,7 @@ export function CockpitShell({
                 <button
                   className="od-sidebar-action od-home-panel"
                   type="button"
+                  aria-current={activeSidebarAction === "home" ? "page" : undefined}
                   data-od-id="sidebar-home-panel-action"
                   onClick={onHome}
                 >
@@ -509,6 +513,7 @@ export function CockpitShell({
                 <button
                   className="od-sidebar-action od-new-aim"
                   type="button"
+                  aria-current={activeSidebarAction === "newAim" ? "page" : undefined}
                   data-od-id="sidebar-new-aim-action"
                   onClick={onNewAim}
                 >
@@ -558,20 +563,24 @@ export function CockpitShell({
                       <span>{t(hasGoals ? "shell.noSearchResultsBody" : "shell.noAimsBody")}</span>
                     </div>
                   ) : null}
-                  {visibleGoals.map((goal) => (
-                    <button
-                      key={goal.id}
-                      className={`od-aim-card${selected?.id === goal.id ? " selected" : ""}`}
-                      type="button"
-                      onClick={() => onOpenGoal(goal)}
-                    >
-                      <span className="od-aim-row-main">
-                        <strong>{shortText(goal.title, 58)}</strong>
-                        <span>{statusLabel(goal)}</span>
-                      </span>
-                      <span className="od-aim-row-badge" aria-hidden="true" />
-                    </button>
-                  ))}
+                  {visibleGoals.map((goal) => {
+                    const selectedGoal = selected?.id === goal.id;
+                    return (
+                      <button
+                        key={goal.id}
+                        className={`od-aim-card${selectedGoal ? " selected" : ""}`}
+                        type="button"
+                        aria-current={selectedGoal ? "page" : undefined}
+                        onClick={() => onOpenGoal(goal)}
+                      >
+                        <span className="od-aim-row-main">
+                          <strong>{shortText(goal.title, 58)}</strong>
+                          <span>{statusLabel(goal)}</span>
+                        </span>
+                        <span className="od-aim-row-badge" aria-hidden="true" />
+                      </button>
+                    );
+                  })}
                 </div>
               </section>
 

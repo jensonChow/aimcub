@@ -43,7 +43,7 @@ import type {
   WebResearchStatus,
 } from "../shared/ipc";
 
-import { CockpitShell, type CockpitStage } from "./CockpitShell";
+import { CockpitShell, type CockpitStage, type SidebarAction } from "./CockpitShell";
 import { hasCompletionRecap, stageForOpenedAim } from "./completionRecap";
 import { buildContextCandidateAcceptRequest, ContextInbox, type ContextInboxScope } from "./ContextInbox";
 import { ContextSourcesPanel } from "./ContextSourcesPanel";
@@ -979,6 +979,7 @@ function AimOsApp() {
   const hasUnsavedAim = aimTitle.trim().length > 0;
   const showAimComposer = aimComposerOpen || hasUnsavedAim || Boolean(parent) || Boolean(draft);
   const activeStage = stageOverride ?? cockpitStageFor(mode, selected, activePlan);
+  const activeSidebarAction: SidebarAction = selected ? null : showAimComposer ? "newAim" : activeStage === "aim" ? "home" : null;
   const planningRuntimeReady = hasPlanningRuntime(provider, localAgents);
   const activeAimTitle = selected?.title ?? aimTitle.trim();
   const activeAimDescription = selected?.description ?? aimDescription;
@@ -1290,6 +1291,7 @@ function AimOsApp() {
       goals={goals}
       selected={selected}
       activeStage={activeStage}
+      activeSidebarAction={activeSidebarAction}
       onHome={openHomePanel}
       onNewAim={startNewAim}
       onOpenGoal={(goal) => void openGoal(goal)}
