@@ -459,6 +459,7 @@ describe("CockpitShell", () => {
         />
       </I18nProvider>,
     );
+    const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
 
     expect(html).toContain('data-od-id="left-settings-sidebar"');
     expect(html).not.toContain('data-od-id="sidebar-toggle"');
@@ -473,6 +474,14 @@ describe("CockpitShell", () => {
     expect(html).toContain('data-od-id="sidebar-user-menu-trigger"');
     expect(html).not.toContain("Search aims");
     expect(html).not.toContain("Aim OS workflow");
+    expect(css).toMatch(/\.od-settings-sidebar-content\s*{[^}]*width:\s*var\(--sidebar-content-width\);[^}]*justify-self:\s*center;/s);
+    expect(css).toMatch(/\.od-settings-back\s*{[^}]*width:\s*100%;[^}]*grid-template-columns:\s*var\(--sidebar-action-icon-slot\) minmax\(0, 1fr\);[^}]*padding:\s*0 var\(--sidebar-row-padding-x\);/s);
+    expect(css).toMatch(/\.od-settings-search\s*{[^}]*width:\s*100%;/s);
+    expect(css).toMatch(/\.od-settings-nav\s*{[^}]*padding-right:\s*0;[^}]*scrollbar-gutter:\s*auto;/s);
+    expect(css).toMatch(/\.od-settings-nav-section\s*{[^}]*padding:\s*8px var\(--sidebar-row-padding-x\) 4px;/s);
+    expect(css).toMatch(/\.od-settings-nav-empty\s*{[^}]*padding:\s*8px var\(--sidebar-row-padding-x\);/s);
+    expect(css).toMatch(/\.od-settings-nav-item\s*{[^}]*grid-template-columns:\s*var\(--sidebar-action-icon-slot\) minmax\(0, 1fr\) auto;[^}]*column-gap:\s*var\(--sidebar-action-label-gap\);[^}]*padding:\s*0 var\(--sidebar-row-padding-x\);/s);
+    expect(css).toMatch(/\.od-settings-nav-icon\s*{[^}]*justify-self:\s*start;[^}]*transform:\s*translateX\(var\(--sidebar-action-icon-offset-x\)\);/s);
   });
 
   it("keeps a stable top drag strip outside the dynamic sidebar layers", () => {

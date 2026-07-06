@@ -5,17 +5,16 @@ Branch: `main`
 
 ## Current Session
 
-- Updated the Desktop sidebar footer user menu so Language opens a Claude-like side submenu on hover or keyboard focus instead of expanding inline below the row.
-- Kept the language submenu available while the pointer moves from the Language row into the options, and preserved keyboard access with ArrowRight/ArrowLeft behavior.
-- Restyled the language options as a compact right-side popover that reuses the account-menu surface, border, shadow, row rhythm, and checked-language treatment.
-- Added renderer CSS assertions for the submenu anchor, hover bridge, visible overflow, and right-side language menu position.
-- Updated `docs/memory/design-system.md` and `docs/memory/desktop.md` with the durable language submenu requirement.
+- Aligned the Desktop Settings sidebar controls to the same sidebar geometry used by the main Aim sidebar.
+- Updated Settings Back, search, section labels, nav rows, icons, and nav scroll gutter to share `--sidebar-content-width`, `--sidebar-row-padding-x`, `--sidebar-action-icon-slot`, and `--sidebar-action-label-gap`.
+- Added renderer CSS assertions so the Settings sidebar keeps a shared content width, row inset, icon column, and text baseline.
+- Updated `docs/memory/design-system.md` and `docs/memory/desktop.md` with the durable Settings sidebar alignment requirement.
 - Refreshed root `Aimcub.app` from the latest Electron 43 folder-style Desktop build after verification.
 
 ## Current State
 
 - Work happened directly on `main`; no separate feature branch merge is needed.
-- The focused session commit includes the language submenu implementation, memory updates, this handoff, and test coverage; inspect `git log` for the exact hash.
+- The focused session commit includes the Settings sidebar alignment implementation, memory updates, this handoff, and test coverage; inspect `git log` for the exact hash.
 - Root `Aimcub.app`, `apps/desktop/out`, and `apps/desktop/dist` were refreshed locally and remain ignored build artifacts.
 
 ## Verification
