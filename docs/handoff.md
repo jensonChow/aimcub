@@ -5,28 +5,29 @@ Branch: `main`
 
 ## Current Session
 
-- Added native macOS light/dark appearance support for Desktop.
-- Main process now follows Electron `nativeTheme.themeSource = "system"`, applies matching BrowserWindow background colors, and emits `colorScheme` with window chrome state.
-- Renderer now exposes `data-system-appearance`, supports dark tokens through both `prefers-color-scheme: dark` and native appearance state, and removes legacy light-only inline style values from visible Desktop surfaces.
-- Updated Desktop shell tests to lock native theme behavior, dark tokens, and no renderer-drawn traffic-light substitutes.
-- Updated `docs/memory/design-system.md` and `docs/memory/desktop.md` with the macOS system appearance rule.
+- Simplified the Desktop Context stage workbench so it no longer dumps source setup, web capability, permission, gate, and review surfaces all at once.
+- Context intake now shows one blocking question at a time, with progress text, and only enables plan generation after the step has enough current context.
+- Added a workbench variant of `ContextSourcesPanel` that keeps the Context stage focused on aim-local files/folders plus a Settings handoff for advanced helpers.
+- Kept the full context-source controls available in Settings, where online connectors, web research, and permission/setup configuration belong.
+- Hid the Context bundle review on the Context stage until planning context, tool results, or relevant review items exist.
+- Updated `docs/memory/design-system.md` with the durable stepwise Context workbench rule.
 - Refreshed root `Aimcub.app` from the latest Electron 43 folder-style Desktop build.
-- Ran a post-implementation memory-refresh audit and updated this handoff to reflect final Git status.
 
 ## Current State
 
 - Work was prepared directly on `main`; no separate feature branch merge is needed.
-- Commit `91b728d` was pushed directly to `origin/main`; no separate branch merge was needed.
+- A focused session commit was prepared on `main`; push to `origin/main` is the remaining repository step.
 - Root `Aimcub.app`, `apps/desktop/out`, and `apps/desktop/dist` were refreshed locally and remain ignored build artifacts.
-- Visual verification forced Electron nativeTheme light and dark states and checked narrow dark layout. The only console warning was Electron's expected dev/unpackaged CSP warning.
+- A temporary Electron/Vite visual harness was attempted for desktop and narrow Context-stage screenshots, but Electron did not advance past app ready in this sandboxed run. Component tests and CSS/DOM assertions cover the simplified workbench structure; a live GUI smoke test remains useful if the next session changes this surface again.
 
 ## Verification
 
 Passed:
 
-- `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop test -- App.test.tsx`
-- `PATH=/Users/jenson/.local/node/bin:$PATH node /private/tmp/aimcub-electron-theme-verify.mjs`
-- `python3 /Users/jenson/.codex/skills/memory-refresh/scripts/audit_project_memory.py /Users/jenson/Desktop/Aimcub`
+- `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop test -- ContextSourcesPanel.test.tsx App.test.tsx`
+- `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop typecheck`
+- `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop lint`
+- `git diff --check`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck`
@@ -39,7 +40,7 @@ Passed:
 Notes:
 
 - MCP worker tests may log the expected missing-Supabase opaque-error path while passing.
-- Electron visual verification requires launching a local GUI process outside the filesystem sandbox.
+- The failed temporary visual harness lived under `/private/tmp/aimcub-context-visual-check.mjs` and was not committed.
 
 ## Next Session Prompt
 

@@ -48,6 +48,14 @@ function renderPanel(sourceStatus: ContextSourceStatus): string {
   );
 }
 
+function renderWorkbenchPanel(sourceStatus: ContextSourceStatus): string {
+  return renderToStaticMarkup(
+    <I18nProvider>
+      <ContextSourcesPanel status={sourceStatus} variant="workbench" onOpenSettings={noop} onSaved={noop} />
+    </I18nProvider>,
+  );
+}
+
 describe("ContextSourcesPanel", () => {
   it("renders planning gate rows from the preserved context-source flow", () => {
     const html = renderPanel(status());
@@ -59,5 +67,17 @@ describe("ContextSourcesPanel", () => {
     expect(html).toContain("scope.guard");
     expect(html).toContain("Sub-aim gate");
     expect(html).toContain("Sub-aim contracts stay locked until enough context exists to avoid fake certainty.");
+  });
+
+  it("keeps the workbench source step focused on local material and settings handoff", () => {
+    const html = renderWorkbenchPanel(status());
+
+    expect(html).toContain('data-od-id="context-workbench-sources"');
+    expect(html).toContain("Add only what changes this plan");
+    expect(html).toContain("Attach local material");
+    expect(html).toContain("Open settings");
+    expect(html).not.toContain('data-od-id="context-source-gates"');
+    expect(html).not.toContain("Online folders and databases");
+    expect(html).not.toContain("Research controls");
   });
 });

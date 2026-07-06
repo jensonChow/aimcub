@@ -997,6 +997,16 @@ function AimOsApp() {
     plan: activePlan,
     answeredQuestionIds: [...builtIntakeAnswers, ...builtAnswers].map((answer) => answer.question_id),
   }), [activePlan, builtAnswers, builtIntakeAnswers, currentIntake, currentPlanningContext, currentPlanningTools, currentReview]);
+  const contextReviewItemCount = contextReview.usedContext.length
+    + contextReview.skippedContext.length
+    + contextReview.permissionGaps.length
+    + contextReview.decompositionRisks.length;
+  const shouldShowContextReviewInContext = clarifyPhase !== "intake"
+    && (contextReviewItemCount > 0
+      || Boolean(currentPlanningContext)
+      || Boolean(currentPlanningTools)
+      || (mode === "contexting" && Boolean(busy))
+      || mode === "drafting");
 
   function applyPlanEdit(nextPlan: DecompositionOutput) {
     setFinalPlan(nextPlan);
@@ -1033,6 +1043,12 @@ function AimOsApp() {
 
   function openSettingsForAim() {
     setSettingsSection(settingsSectionForFocus(activeAimHelper.settingsFocus));
+    setMode("settings");
+    setStageOverride("settings");
+  }
+
+  function openContextSettings() {
+    setSettingsSection("context");
     setMode("settings");
     setStageOverride("settings");
   }
@@ -1173,9 +1189,18 @@ function AimOsApp() {
               onEdit={selected ? undefined : () => openCockpitStage("aim")}
             />
           )}
-          <ContextSourcesPanel status={contextSources} disabled={Boolean(busy)} onSaved={setContextSources} />
-          <ContextReviewPanel bundle={contextReview} running={mode === "contexting" && Boolean(busy)} />
-          {clarifyPanel}
+          {clarifyPhase === "intake" ? clarifyPanel : null}
+          <ContextSourcesPanel
+            status={contextSources}
+            disabled={Boolean(busy)}
+            variant="workbench"
+            onOpenSettings={openContextSettings}
+            onSaved={setContextSources}
+          />
+          {shouldShowContextReviewInContext ? (
+            <ContextReviewPanel bundle={contextReview} running={mode === "contexting" && Boolean(busy)} />
+          ) : null}
+          {clarifyPhase !== "intake" ? clarifyPanel : null}
         </>
       );
     }
@@ -1672,14 +1697,31 @@ function ClarifyPanel(props: {
   const { t } = useI18n();
   const intake = props.phase === "intake";
   const questions = intake && !props.questionnaireEnabled ? [] : props.clarify.questions;
+  const answeredQuestionIds = new Set(Object.entries(props.answers)
+    .filter(([, answer]) => answer.other.trim() || answer.labels.length > 0)
+    .map(([id]) => id));
+  const activeQuestionIndex = intake
+    ? questions.findIndex((question) => !answeredQuestionIds.has(question.id))
+    : -1;
+  const visibleQuestions = intake
+    ? activeQuestionIndex >= 0 ? [questions[activeQuestionIndex]!] : []
+    : questions;
   const hasQuestionAnswer = Object.values(props.answers).some((answer) => answer.other.trim() || answer.labels.length > 0);
+  const activeQuestion = activeQuestionIndex >= 0 ? questions[activeQuestionIndex] : null;
+  const activeAnswer = activeQuestion ? props.answers[activeQuestion.id] : null;
+  const activeQuestionAnswered = Boolean(activeAnswer && (activeAnswer.other.trim() || activeAnswer.labels.length > 0));
+  const contextNoteProvided = props.conversationEnabled && props.contextNote.trim().length > 0;
   const hasContextAnswer = (props.conversationEnabled && props.contextNote.trim().length > 0)
     || hasQuestionAnswer;
   const primaryAcceptsDraft = !intake && !hasQuestionAnswer && Boolean(props.onSkip);
   const primaryAction = primaryAcceptsDraft && props.onSkip ? props.onSkip : props.onRefine;
   const primaryLabel = intake ? t("os.generateFromContext") : primaryAcceptsDraft ? t("os.acceptDraft") : t("os.refineDraft");
   const secondaryLabel = hasQuestionAnswer ? t("os.acceptDraft") : t("os.skipRefinement");
-  const primaryDisabled = props.disabled || (intake && !hasContextAnswer);
+  const primaryDisabled = props.disabled || (intake && (
+    activeQuestion
+      ? !activeQuestionAnswered && !contextNoteProvided
+      : !hasContextAnswer
+  ));
   const body = intake
     ? t("os.contextIntakeBody")
     : questions.length
@@ -1702,8 +1744,17 @@ function ClarifyPanel(props: {
         </div>
       </div>
       <p style={mutedTextStyle()}>{body}</p>
+      {intake && questions.length > 0 ? (
+        <div className="od-context-step-progress">
+          <span>
+            {activeQuestionIndex >= 0
+              ? t("os.contextQuestionProgress", { current: activeQuestionIndex + 1, total: questions.length })
+              : t("os.contextQuestionsComplete", { total: questions.length })}
+          </span>
+        </div>
+      ) : null}
       <div style={{ display: "grid", gap: 12 }}>
-        {questions.map((question) => {
+        {visibleQuestions.map((question) => {
           const answer = props.answers[question.id] ?? { labels: [], other: "" };
           const multi = question.selection_mode === "multiple";
           return (

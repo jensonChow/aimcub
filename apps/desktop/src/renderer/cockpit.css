@@ -1869,6 +1869,24 @@ kbd {
   border-bottom: 1px solid var(--od-border-soft);
 }
 
+.od-context-step-progress {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.od-context-step-progress span {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-pill);
+  background: var(--od-surface);
+  color: var(--od-muted);
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 750;
+}
+
 .od-context-review-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3256,6 +3274,126 @@ kbd {
   min-width: 0;
 }
 
+.od-context-workbench-panel {
+  min-width: 0;
+  display: grid;
+  gap: 16px;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-md);
+  background: var(--od-surface-warm);
+  padding: 16px;
+}
+
+.od-context-workbench-head {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: start;
+}
+
+.od-context-workbench-head h2 {
+  margin: 4px 0 0;
+  color: var(--od-fg);
+  font-size: 20px;
+  line-height: 1.35;
+  font-weight: 750;
+  letter-spacing: 0;
+}
+
+.od-context-workbench-head p,
+.od-context-workbench-step p,
+.od-context-workbench-step small {
+  margin: 0;
+  color: var(--od-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.od-context-workbench-head p {
+  max-width: 640px;
+  margin-top: 4px;
+}
+
+.od-context-workbench-steps {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-sm);
+  background: var(--od-bg);
+}
+
+.od-context-workbench-step {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  border-top: 1px solid var(--od-border-soft);
+  padding: 14px;
+}
+
+.od-context-workbench-step:first-child {
+  border-top: 0;
+}
+
+.od-context-workbench-index {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-pill);
+  background: var(--od-surface);
+  color: var(--od-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.od-context-workbench-step strong {
+  display: block;
+  color: var(--od-fg);
+  font-size: 14px;
+  line-height: 1.35;
+  font-weight: 750;
+}
+
+.od-context-workbench-step p {
+  margin-top: 3px;
+}
+
+.od-context-workbench-step small {
+  display: block;
+  margin-top: 8px;
+}
+
+.od-context-workbench-step .od-context-source-actions {
+  margin-top: 10px;
+}
+
+.od-context-workbench-path,
+.od-context-workbench-file-list {
+  margin-top: 10px;
+}
+
+.od-context-workbench-path {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-sm);
+  background: var(--od-surface);
+  color: var(--od-muted);
+  padding: 8px 10px;
+  font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.od-context-workbench-file-list {
+  display: grid;
+  gap: 8px;
+}
+
 .od-context-source-summary {
   display: grid;
   gap: 12px;
@@ -3705,6 +3843,8 @@ kbd {
 
   .od-context-source-status-list,
   .od-context-setting-grid,
+  .od-context-workbench-head,
+  .od-context-workbench-step,
   .od-context-source-status,
   .od-context-gate-row,
   .od-context-next-action,
