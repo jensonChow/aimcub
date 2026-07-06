@@ -557,14 +557,14 @@ kbd {
 .od-sidebar-action[aria-current="page"] {
   background: var(--od-selection-bg);
   border-color: transparent;
-  box-shadow: var(--od-selection-shadow);
+  box-shadow: none;
   color: var(--od-fg);
 }
 
 .od-sidebar-action[aria-current="page"]:hover {
   background: var(--od-selection-hover-bg);
   border-color: transparent;
-  box-shadow: var(--od-selection-shadow);
+  box-shadow: none;
 }
 
 .od-sidebar-action:focus-visible {
@@ -574,7 +574,7 @@ kbd {
 .od-sidebar-action[aria-current="page"]:focus-visible {
   background: var(--od-selection-hover-bg);
   border-color: transparent;
-  box-shadow: var(--od-focus), var(--od-selection-shadow);
+  box-shadow: var(--od-focus);
 }
 
 .od-sidebar-action-icon {
@@ -1050,9 +1050,9 @@ kbd {
   width: var(--sidebar-content-width);
   max-height: min(360px, calc(100vh - 96px));
   display: grid;
-  gap: 4px;
+  gap: 2px;
   overflow: auto;
-  padding: 8px;
+  padding: 6px;
   border: 1px solid var(--od-border);
   border-radius: var(--od-radius-md);
   background: color-mix(in oklab, var(--od-bg), var(--od-surface-warm) 18%);
@@ -1062,10 +1062,10 @@ kbd {
 .od-user-menu-header {
   min-width: 0;
   display: grid;
-  grid-template-columns: var(--sidebar-icon-column) minmax(0, 1fr);
+  grid-template-columns: 26px minmax(0, 1fr);
   align-items: center;
   gap: 8px;
-  padding: 5px 6px 7px;
+  padding: 4px 6px 6px;
 }
 
 .od-user-menu-header span:last-child {
@@ -1077,16 +1077,16 @@ kbd {
 .od-user-menu-item {
   width: 100%;
   min-width: 0;
-  min-height: 36px;
+  min-height: 32px;
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr) auto;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
   border: 1px solid transparent;
   border-radius: var(--od-radius-sm);
   background: transparent;
   color: var(--od-fg);
-  padding: 0 8px;
+  padding: 0 6px;
   text-align: left;
   cursor: pointer;
 }
@@ -1105,17 +1105,24 @@ kbd {
 .od-user-menu-item span {
   min-width: 0;
   overflow: hidden;
-  font-size: var(--od-type-body);
+  font-size: var(--od-type-meta);
   font-weight: var(--od-font-weight-medium);
-  line-height: 1.3;
+  line-height: var(--od-line-meta);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.od-user-menu-item svg,
-.od-user-menu-trigger > svg {
-  width: 18px;
-  height: 18px;
+.od-user-menu-item kbd {
+  min-height: 18px;
+  border-radius: 6px;
+  padding: 0 5px;
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-medium);
+}
+
+.od-user-menu-item svg {
+  width: 16px;
+  height: 16px;
   fill: none;
   stroke: currentColor;
   stroke-width: var(--od-icon-stroke);
@@ -1128,23 +1135,48 @@ kbd {
 }
 
 .od-user-menu-trigger > svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: var(--od-icon-stroke);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.od-user-menu-header .od-user-avatar {
+  width: 26px;
+  height: 26px;
+}
+
+.od-user-menu-header strong {
+  font-size: var(--od-type-meta);
+  line-height: var(--od-line-meta);
+}
+
+.od-user-menu-header small {
+  font-size: var(--od-type-meta);
+  line-height: 14px;
+}
+
+.od-user-menu-trigger > svg {
   color: var(--od-meta);
 }
 
 .od-user-menu-separator {
   height: 1px;
-  margin: 4px 6px;
+  margin: 3px 6px;
   background: var(--od-border-soft);
 }
 
 .od-user-language-menu {
   display: grid;
-  gap: 2px;
-  padding-left: 16px;
+  gap: 1px;
+  padding-left: 12px;
 }
 
 .od-user-language-option {
-  grid-template-columns: 22px minmax(0, 1fr);
+  grid-template-columns: 18px minmax(0, 1fr);
 }
 
 .od-user-language-option[aria-checked="true"] {

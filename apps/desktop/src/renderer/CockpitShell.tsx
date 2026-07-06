@@ -703,7 +703,7 @@ function SidebarUserMenu(props: { onSettings: () => void }) {
       closeMenu();
       return;
     }
-    openMenu(true);
+    openMenu();
   }
 
   function focusMenuItem(offset: number) {
