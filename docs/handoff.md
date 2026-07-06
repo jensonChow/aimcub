@@ -5,24 +5,25 @@ Branch: `main`
 
 ## Current Session
 
-- Refined the normal Aim sidebar's top-left New Aim entry into a black, slimmer app-level action button.
-- Kept the same plus icon, label, and `Cmd N` shortcut, but reduced the button height to 40 px, removed the icon chip, and softened the shortcut styling.
-- Updated renderer coverage for the black button treatment, slimmer sizing, icon size, and shortcut pill styling.
-- Updated `docs/memory/design-system.md` and `docs/memory/desktop.md` with the refined black New Aim button requirement.
+- Updated the normal Aim sidebar's New Aim button to invert with appearance: black in light mode, white in dark mode.
+- Moved the New Aim button colors into dedicated CSS variables and added explicit `data-system-appearance="light"` and `data-system-appearance="dark"` overrides so browser media preferences cannot accidentally flip the wrong mode.
+- Kept the slim 40 px row, plus icon, label, and `Cmd N` shortcut styling.
+- Updated renderer coverage for the light and dark New Aim button variables.
+- Updated `docs/memory/design-system.md` and `docs/memory/desktop.md` with the appearance-aware New Aim button requirement.
 - Refreshed root `Aimcub.app` from the latest Electron 43 folder-style Desktop build.
 
 ## Current State
 
 - Work was prepared directly on `main`; no separate feature branch merge is needed.
 - Root `Aimcub.app`, `apps/desktop/out`, and `apps/desktop/dist` were refreshed locally and remain ignored build artifacts.
-- A temporary browser visual harness at `/private/tmp/aimcub-sidebar-harness.html` verified the sidebar at 960 by 680 px and 640 by 520 px. The New Aim button rendered at 40 px tall, text and shortcut did not overlap, there was no horizontal overflow, and browser console logs were empty.
+- Temporary browser visual harnesses at `/private/tmp/aimcub-sidebar-harness.html` and `/private/tmp/aimcub-sidebar-harness-dark.html` verified light mode black button and dark mode white button. At 960 by 680 px and 640 by 520 px, the New Aim button rendered at 40 px tall, text and shortcut did not overlap, there was no horizontal overflow, and browser console logs were empty.
 
 ## Verification
 
 Passed:
 
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop test -- App.test.tsx`
-- Browser visual check through the temporary local harness at 960 by 680 px and 640 by 520 px, covering New Aim row sizing, text/shortcut fit, and horizontal overflow.
+- Browser visual check through temporary light/dark local harnesses at 960 by 680 px and 640 by 520 px, covering New Aim button appearance inversion, row sizing, text/shortcut fit, and horizontal overflow.
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck`

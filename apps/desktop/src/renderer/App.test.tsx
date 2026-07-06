@@ -209,9 +209,12 @@ describe("CockpitShell", () => {
     expect(html).toContain("Cmd N");
     expect(css).toMatch(/\.od-sidebar-global-actions\s*{[^}]*display:\s*grid;[^}]*gap:\s*4px;/s);
     expect(css).toMatch(/\.od-new-aim\s*{[^}]*min-height:\s*40px;[^}]*grid-template-columns:\s*20px minmax\(0, 1fr\) auto;/s);
-    expect(css).toMatch(/\.od-new-aim\s*{[^}]*background:\s*#1d1d1f;[^}]*color:\s*#ffffff;/s);
+    expect(css).toMatch(/:root\s*{[^}]*--od-new-aim-bg:\s*#1d1d1f;[^}]*--od-new-aim-fg:\s*#ffffff;/s);
+    expect(css).toMatch(/:root:has\(\.od-app\[data-system-appearance="light"\]\)\s*{[^}]*--od-new-aim-bg:\s*#1d1d1f;[^}]*--od-new-aim-fg:\s*#ffffff;/s);
+    expect(css).toMatch(/:root:has\(\.od-app\[data-system-appearance="dark"\]\)\s*{[^}]*--od-new-aim-bg:\s*#f5f5f7;[^}]*--od-new-aim-fg:\s*#1d1d1f;/s);
+    expect(css).toMatch(/\.od-new-aim\s*{[^}]*background:\s*var\(--od-new-aim-bg\);[^}]*color:\s*var\(--od-new-aim-fg\);/s);
     expect(css).toMatch(/\.od-new-aim-icon\s*{[^}]*width:\s*20px;[^}]*height:\s*20px;/s);
-    expect(css).toMatch(/\.od-new-aim kbd\s*{[^}]*min-height:\s*18px;[^}]*background:\s*rgba\(255, 255, 255, 0\.1\);/s);
+    expect(css).toMatch(/\.od-new-aim kbd\s*{[^}]*min-height:\s*18px;[^}]*background:\s*var\(--od-new-aim-kbd-bg\);/s);
     expect(css).not.toContain('.od-app[data-empty-aim="true"] .od-new-aim');
   });
 
