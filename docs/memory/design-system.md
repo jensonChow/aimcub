@@ -165,7 +165,7 @@ Reference links:
 - Cards and fixed tool surfaces should generally use 8 px or 12 px radius. Use 16 px only for larger, soft containers where it does not make the tool feel childish.
 - Use 1 px borders for structure. Prefer soft borders for normal containers and stronger borders for selection, focus-adjacent states, and active rows.
 - Active/selected list items should change background and border, not only text color.
-- Hover states should be subtle: background, border, or text color changes within 160 ms. Pressed state can use `transform: scale(0.99)` only on compact controls where it does not blur text or shift layout.
+- Hover and focus states for non-primary desktop controls should converge on the New Aim treatment: transparent/default rest state, a subtle shared hover background, and slight shadow elevation only while hovered or keyboard-focused. Avoid hover states that turn controls into white bordered cards. Focus must keep the visible accent focus ring plus the subtle elevation. Reserve persistent filled backgrounds or borders for selected/current, active, disabled, primary, or destructive semantic states.
 
 ## Controls
 

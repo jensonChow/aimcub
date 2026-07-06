@@ -227,12 +227,15 @@ describe("CockpitShell", () => {
     expect(css).toContain("--sidebar-row-padding-x: 8px;");
     expect(css).toContain("--sidebar-icon-column: 28px;");
     expect(css).toContain("--sidebar-content-width: calc(var(--sidebar-width) - (var(--sidebar-horizontal-inset) * 2) - 1px);");
+    expect(css).toContain("--od-interaction-hover-bg: color-mix(in oklab, var(--od-fg), transparent 96%);");
+    expect(css).toContain("--od-interaction-hover-shadow: var(--od-shadow-sidebar-action);");
+    expect(css).toContain("--od-interaction-focus-shadow: var(--od-focus), var(--od-shadow-sidebar-action);");
     expect(css).toMatch(/\.od-sidebar\s*{[^}]*padding:\s*56px var\(--sidebar-horizontal-inset\) 16px;[^}]*overflow-x:\s*hidden;[^}]*overflow-y:\s*auto;/s);
     expect(css).toMatch(/\.od-sidebar-global-actions\s*{[^}]*width:\s*var\(--sidebar-content-width\);[^}]*display:\s*grid;[^}]*justify-self:\s*center;[^}]*gap:\s*3px;/s);
     expect(css).toMatch(/\.od-new-aim\s*{[^}]*min-height:\s*34px;[^}]*grid-template-columns:\s*var\(--sidebar-icon-column\) minmax\(0, 1fr\) auto;[^}]*background:\s*transparent;[^}]*box-shadow:\s*none;/s);
     expect(css).toMatch(/\.od-new-aim\s*{[^}]*padding:\s*0 var\(--sidebar-row-padding-x\);/s);
-    expect(css).toMatch(/\.od-new-aim:hover,\s*\.od-new-aim:focus-visible\s*{[^}]*background:\s*color-mix\(in oklab, var\(--od-fg\), transparent 96%\);[^}]*box-shadow:\s*var\(--od-shadow-sidebar-action\);[^}]*color:\s*var\(--od-fg\);/s);
-    expect(css).toMatch(/\.od-new-aim:focus-visible\s*{[^}]*box-shadow:\s*var\(--od-focus\), var\(--od-shadow-sidebar-action\);/s);
+    expect(css).toMatch(/\.od-new-aim:hover,\s*\.od-new-aim:focus-visible\s*{[^}]*background:\s*var\(--od-interaction-hover-bg\);[^}]*box-shadow:\s*var\(--od-interaction-hover-shadow\);[^}]*color:\s*var\(--od-fg\);/s);
+    expect(css).toMatch(/\.od-new-aim:focus-visible\s*{[^}]*box-shadow:\s*var\(--od-interaction-focus-shadow\);/s);
     expect(css).toMatch(/\.od-new-aim-icon\s*{[^}]*width:\s*var\(--sidebar-icon-column\);[^}]*height:\s*18px;/s);
     expect(css).toMatch(/\.od-new-aim-icon svg\s*{[^}]*width:\s*16px;[^}]*height:\s*16px;/s);
     expect(css).toMatch(/\.od-new-aim-label\s*{[^}]*font-weight:\s*500;[^}]*line-height:\s*16px;/s);
@@ -243,6 +246,20 @@ describe("CockpitShell", () => {
     expect(css).not.toContain(".od-new-aim[data-current");
     expect(css).not.toContain(".od-new-aim[data-current=\"true\"] kbd");
     expect(css).not.toContain('.od-app[data-empty-aim="true"] .od-new-aim');
+  });
+
+  it("uses the New Aim quiet hover treatment for secondary desktop controls", () => {
+    const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
+
+    expect(css).toMatch(/\.od-sidebar-toggle:hover,\s*\.od-sidebar-toggle\[data-state="peek"\]\s*{[^}]*background:\s*var\(--od-interaction-hover-bg\);[^}]*border-color:\s*transparent;[^}]*box-shadow:\s*var\(--od-interaction-hover-shadow\);/s);
+    expect(css).toMatch(/\.od-sidebar-toggle:focus-visible\s*{[^}]*background:\s*var\(--od-interaction-hover-bg\);[^}]*border-color:\s*transparent;[^}]*box-shadow:\s*var\(--od-interaction-focus-shadow\);/s);
+    expect(css).toMatch(/\.od-user-menu-trigger:hover,\s*\.od-user-menu-trigger\[aria-expanded="true"\]\s*{[^}]*border-color:\s*transparent;[^}]*background:\s*var\(--od-interaction-hover-bg\);[^}]*box-shadow:\s*var\(--od-interaction-hover-shadow\);/s);
+    expect(css).toMatch(/\.od-user-menu-trigger:focus-visible\s*{[^}]*border-color:\s*transparent;[^}]*background:\s*var\(--od-interaction-hover-bg\);[^}]*box-shadow:\s*var\(--od-interaction-focus-shadow\);/s);
+    expect(css).toMatch(/\.od-settings-button:hover\s*{[^}]*border-color:\s*transparent;[^}]*background:\s*var\(--od-interaction-hover-bg\);[^}]*box-shadow:\s*var\(--od-interaction-hover-shadow\);/s);
+    expect(css).toMatch(/\.od-aim-secondary:hover\s*{[^}]*border-color:\s*transparent;[^}]*background:\s*var\(--od-interaction-hover-bg\);[^}]*box-shadow:\s*var\(--od-interaction-hover-shadow\);/s);
+    expect(css).toMatch(/\.od-command-row:hover,\s*\.od-command-row\[data-active="true"\]\s*{[^}]*border-color:\s*transparent;[^}]*background:\s*var\(--od-interaction-hover-bg\);[^}]*box-shadow:\s*var\(--od-interaction-hover-shadow\);/s);
+    expect(css).toMatch(/\.od-routing-owner button:hover:not\(:disabled\)\s*{[^}]*background:\s*var\(--od-interaction-hover-bg\);[^}]*box-shadow:\s*var\(--od-interaction-hover-shadow\);/s);
+    expect(css).toMatch(/\.od-scope-button:hover:not\(:disabled\)\s*{[^}]*border-color:\s*transparent;[^}]*background:\s*var\(--od-interaction-hover-bg\);[^}]*box-shadow:\s*var\(--od-interaction-hover-shadow\);/s);
   });
 
   it("keeps the normal aim sidebar left aligned without a recent-count zero", () => {

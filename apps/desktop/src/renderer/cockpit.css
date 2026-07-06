@@ -29,6 +29,9 @@
   --od-shadow-composer: 0 10px 26px rgba(0, 0, 0, 0.035);
   --od-shadow-composer-focus: 0 10px 26px rgba(0, 0, 0, 0.04);
   --od-shadow-command: 0 24px 70px rgba(0, 0, 0, 0.18);
+  --od-interaction-hover-bg: color-mix(in oklab, var(--od-fg), transparent 96%);
+  --od-interaction-hover-shadow: var(--od-shadow-sidebar-action);
+  --od-interaction-focus-shadow: var(--od-focus), var(--od-shadow-sidebar-action);
   --od-radius-sm: 8px;
   --od-radius-md: 12px;
   --od-radius-lg: 16px;
@@ -283,10 +286,17 @@ kbd {
 }
 
 .od-sidebar-toggle:hover,
-.od-sidebar-toggle[data-state="peek"],
-.od-sidebar-toggle[data-state="collapsed"]:focus-visible {
-  background: color-mix(in oklab, var(--od-surface), var(--od-bg) 35%);
-  border-color: var(--od-border-soft);
+.od-sidebar-toggle[data-state="peek"] {
+  background: var(--od-interaction-hover-bg);
+  border-color: transparent;
+  box-shadow: var(--od-interaction-hover-shadow);
+  color: var(--od-fg);
+}
+
+.od-sidebar-toggle:focus-visible {
+  background: var(--od-interaction-hover-bg);
+  border-color: transparent;
+  box-shadow: var(--od-interaction-focus-shadow);
   color: var(--od-fg);
 }
 
@@ -428,7 +438,7 @@ kbd {
 .od-filter-row button,
 .od-stage-nav button,
 .od-aim-card {
-  transition: background 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
 }
 
 .od-subtle-button:active,
@@ -459,8 +469,23 @@ kbd {
 }
 
 .od-subtle-button:hover,
-.od-filter-row button:hover,
+.od-filter-row button:hover {
+  border-color: transparent;
+  background: var(--od-interaction-hover-bg);
+  box-shadow: var(--od-interaction-hover-shadow);
+  color: var(--od-fg);
+}
+
+.od-subtle-button:focus-visible,
+.od-filter-row button:focus-visible {
+  border-color: transparent;
+  background: var(--od-interaction-hover-bg);
+  box-shadow: var(--od-interaction-focus-shadow);
+  color: var(--od-fg);
+}
+
 .od-filter-row button.active {
+  box-shadow: none;
   color: var(--od-fg);
   background: var(--od-bg);
   border-color: var(--od-border);
@@ -495,13 +520,13 @@ kbd {
 
 .od-new-aim:hover,
 .od-new-aim:focus-visible {
-  background: color-mix(in oklab, var(--od-fg), transparent 96%);
-  box-shadow: var(--od-shadow-sidebar-action);
+  background: var(--od-interaction-hover-bg);
+  box-shadow: var(--od-interaction-hover-shadow);
   color: var(--od-fg);
 }
 
 .od-new-aim:focus-visible {
-  box-shadow: var(--od-focus), var(--od-shadow-sidebar-action);
+  box-shadow: var(--od-interaction-focus-shadow);
 }
 
 .od-new-aim-icon {
@@ -610,10 +635,20 @@ kbd {
   cursor: pointer;
 }
 
-.od-aim-card:hover,
+.od-aim-card:hover {
+  background: var(--od-interaction-hover-bg);
+  box-shadow: var(--od-interaction-hover-shadow);
+}
+
+.od-aim-card:focus-visible {
+  background: var(--od-interaction-hover-bg);
+  box-shadow: var(--od-interaction-focus-shadow);
+}
+
 .od-aim-card.selected,
 .od-aim-card.current {
   background: var(--od-surface-warm);
+  box-shadow: none;
 }
 
 .od-aim-card.selected {
@@ -772,8 +807,15 @@ kbd {
 }
 
 .od-chip:hover {
-  background: var(--od-surface);
-  border-color: var(--od-meta);
+  background: var(--od-interaction-hover-bg);
+  border-color: transparent;
+  box-shadow: var(--od-interaction-hover-shadow);
+}
+
+.od-chip:focus-visible {
+  background: var(--od-interaction-hover-bg);
+  border-color: transparent;
+  box-shadow: var(--od-interaction-focus-shadow);
 }
 
 .od-chip.primary {
@@ -819,8 +861,15 @@ kbd {
 }
 
 .od-settings-button:hover {
-  border-color: var(--od-border);
-  background: var(--od-bg);
+  border-color: transparent;
+  background: var(--od-interaction-hover-bg);
+  box-shadow: var(--od-interaction-hover-shadow);
+}
+
+.od-settings-button:focus-visible {
+  border-color: transparent;
+  background: var(--od-interaction-hover-bg);
+  box-shadow: var(--od-interaction-focus-shadow);
 }
 
 .od-settings-button span {
@@ -876,8 +925,15 @@ kbd {
 
 .od-user-menu-trigger:hover,
 .od-user-menu-trigger[aria-expanded="true"] {
-  border-color: var(--od-border-soft);
-  background: var(--od-bg);
+  border-color: transparent;
+  background: var(--od-interaction-hover-bg);
+  box-shadow: var(--od-interaction-hover-shadow);
+}
+
+.od-user-menu-trigger:focus-visible {
+  border-color: transparent;
+  background: var(--od-interaction-hover-bg);
+  box-shadow: var(--od-interaction-focus-shadow);
 }
 
 .od-user-avatar {
@@ -974,8 +1030,13 @@ kbd {
 
 .od-user-menu-item:hover,
 .od-user-menu-item:focus-visible {
-  border-color: var(--od-border-soft);
-  background: var(--od-surface);
+  border-color: transparent;
+  background: var(--od-interaction-hover-bg);
+  box-shadow: var(--od-interaction-hover-shadow);
+}
+
+.od-user-menu-item:focus-visible {
+  box-shadow: var(--od-interaction-focus-shadow);
 }
 
 .od-user-menu-item span {
@@ -1113,9 +1174,21 @@ kbd {
 }
 
 .od-stage-nav button:hover,
+.od-stage-nav button:focus-visible {
+  border-color: transparent;
+  background: var(--od-interaction-hover-bg);
+  box-shadow: var(--od-interaction-hover-shadow);
+  color: var(--od-fg);
+}
+
+.od-stage-nav button:focus-visible {
+  box-shadow: var(--od-interaction-focus-shadow);
+}
+
 .od-stage-nav button.active {
   border-color: var(--od-border);
   background: var(--od-bg);
+  box-shadow: none;
   color: var(--od-fg);
 }
 
@@ -1217,7 +1290,14 @@ kbd {
 }
 
 .od-settings-back:hover {
-  background: var(--od-bg);
+  background: var(--od-interaction-hover-bg);
+  box-shadow: var(--od-interaction-hover-shadow);
+  color: var(--od-fg);
+}
+
+.od-settings-back:focus-visible {
+  background: var(--od-interaction-hover-bg);
+  box-shadow: var(--od-interaction-focus-shadow);
   color: var(--od-fg);
 }
 
@@ -1302,7 +1382,7 @@ kbd {
   color: var(--od-fg);
   text-align: left;
   cursor: pointer;
-  transition: background 140ms ease, border-color 140ms ease;
+  transition: background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
 }
 
 .od-settings-nav-item::before {
@@ -1317,13 +1397,21 @@ kbd {
 }
 
 .od-settings-nav-item:hover {
-  background: color-mix(in oklab, var(--od-bg), var(--od-surface) 35%);
-  border-color: var(--od-border-soft);
+  background: var(--od-interaction-hover-bg);
+  border-color: transparent;
+  box-shadow: var(--od-interaction-hover-shadow);
+}
+
+.od-settings-nav-item:focus-visible {
+  background: var(--od-interaction-hover-bg);
+  border-color: transparent;
+  box-shadow: var(--od-interaction-focus-shadow);
 }
 
 .od-settings-nav-item[data-active="true"] {
   background: var(--od-bg);
   border-color: var(--od-border-soft);
+  box-shadow: none;
 }
 
 .od-settings-nav-item[data-active="true"]::before {
@@ -1533,8 +1621,15 @@ kbd {
 }
 
 .od-settings-row-button:hover {
-  background: var(--od-bg);
-  border-color: var(--od-border);
+  background: var(--od-interaction-hover-bg);
+  border-color: transparent;
+  box-shadow: var(--od-interaction-hover-shadow);
+}
+
+.od-settings-row-button:focus-visible {
+  background: var(--od-interaction-hover-bg);
+  border-color: transparent;
+  box-shadow: var(--od-interaction-focus-shadow);
 }
 
 .od-settings-current-aim {
@@ -1896,8 +1991,15 @@ kbd {
 }
 
 .od-aim-secondary:hover {
-  border-color: var(--od-border);
-  background: var(--od-surface);
+  border-color: transparent;
+  background: var(--od-interaction-hover-bg);
+  box-shadow: var(--od-interaction-hover-shadow);
+}
+
+.od-aim-secondary:focus-visible {
+  border-color: transparent;
+  background: var(--od-interaction-hover-bg);
+  box-shadow: var(--od-interaction-focus-shadow);
 }
 
 .od-aim-primary:active:not(:disabled),
@@ -2298,7 +2400,18 @@ kbd {
   border-left: 0;
 }
 
-.od-routing-owner button:hover:not(:disabled),
+.od-routing-owner button:hover:not(:disabled) {
+  background: var(--od-interaction-hover-bg);
+  box-shadow: var(--od-interaction-hover-shadow);
+  color: var(--od-fg);
+}
+
+.od-routing-owner button:focus-visible {
+  background: var(--od-interaction-hover-bg);
+  box-shadow: var(--od-interaction-focus-shadow);
+  color: var(--od-fg);
+}
+
 .od-routing-owner button.active {
   background: var(--od-surface);
   color: var(--od-fg);
@@ -2360,8 +2473,16 @@ kbd {
 }
 
 .od-routing-reset:hover:not(:disabled) {
-  border-color: var(--od-border);
-  background: var(--od-surface);
+  border-color: transparent;
+  background: var(--od-interaction-hover-bg);
+  box-shadow: var(--od-interaction-hover-shadow);
+  color: var(--od-fg);
+}
+
+.od-routing-reset:focus-visible {
+  border-color: transparent;
+  background: var(--od-interaction-hover-bg);
+  box-shadow: var(--od-interaction-focus-shadow);
   color: var(--od-fg);
 }
 
@@ -2582,8 +2703,16 @@ kbd {
 
 .od-plan-actions button:hover:not(:disabled),
 .od-plan-field-head button:hover {
-  border-color: var(--od-border);
-  background: var(--od-surface);
+  border-color: transparent;
+  background: var(--od-interaction-hover-bg);
+  box-shadow: var(--od-interaction-hover-shadow);
+}
+
+.od-plan-actions button:focus-visible,
+.od-plan-field-head button:focus-visible {
+  border-color: transparent;
+  background: var(--od-interaction-hover-bg);
+  box-shadow: var(--od-interaction-focus-shadow);
 }
 
 .od-plan-actions button:disabled {
@@ -3177,7 +3306,20 @@ kbd {
   transition: background 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
 }
 
-.od-scope-button:hover:not(:disabled),
+.od-scope-button:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--od-interaction-hover-bg);
+  box-shadow: var(--od-interaction-hover-shadow);
+  color: var(--od-fg);
+}
+
+.od-scope-button:focus-visible {
+  border-color: transparent;
+  background: var(--od-interaction-hover-bg);
+  box-shadow: var(--od-interaction-focus-shadow);
+  color: var(--od-fg);
+}
+
 .od-scope-button.active {
   border-color: color-mix(in oklab, var(--od-accent), var(--od-bg) 48%);
   background: color-mix(in oklab, var(--od-accent), var(--od-bg) 92%);
@@ -3757,8 +3899,15 @@ kbd {
 }
 
 .od-context-small-button:hover:not(:disabled) {
-  background: var(--od-surface);
-  border-color: var(--od-meta);
+  background: var(--od-interaction-hover-bg);
+  border-color: transparent;
+  box-shadow: var(--od-interaction-hover-shadow);
+}
+
+.od-context-small-button:focus-visible {
+  background: var(--od-interaction-hover-bg);
+  border-color: transparent;
+  box-shadow: var(--od-interaction-focus-shadow);
 }
 
 .od-context-setting-grid {
@@ -3845,8 +3994,15 @@ kbd {
 
 .od-command-row:hover,
 .od-command-row[data-active="true"] {
-  border-color: var(--od-border-soft);
-  background: var(--od-surface);
+  border-color: transparent;
+  background: var(--od-interaction-hover-bg);
+  box-shadow: var(--od-interaction-hover-shadow);
+}
+
+.od-command-row:focus-visible {
+  border-color: transparent;
+  background: var(--od-interaction-hover-bg);
+  box-shadow: var(--od-interaction-focus-shadow);
 }
 
 .od-command-row:disabled {
