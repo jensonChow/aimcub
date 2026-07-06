@@ -11,11 +11,12 @@ Branch: `main`
 - Updated Desktop shell tests to lock native theme behavior, dark tokens, and no renderer-drawn traffic-light substitutes.
 - Updated `docs/memory/design-system.md` and `docs/memory/desktop.md` with the macOS system appearance rule.
 - Refreshed root `Aimcub.app` from the latest Electron 43 folder-style Desktop build.
+- Ran a post-implementation memory-refresh audit and updated this handoff to reflect final Git status.
 
 ## Current State
 
 - Work was prepared directly on `main`; no separate feature branch merge is needed.
-- `main` started one local commit ahead of `origin/main` (`d0c80ca`, docs-only handoff refresh from the prior session). Push the final `main` state after committing this session.
+- Commit `91b728d` was pushed directly to `origin/main`; no separate branch merge was needed.
 - Root `Aimcub.app`, `apps/desktop/out`, and `apps/desktop/dist` were refreshed locally and remain ignored build artifacts.
 - Visual verification forced Electron nativeTheme light and dark states and checked narrow dark layout. The only console warning was Electron's expected dev/unpackaged CSP warning.
 
@@ -25,6 +26,7 @@ Passed:
 
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop test -- App.test.tsx`
 - `PATH=/Users/jenson/.local/node/bin:$PATH node /private/tmp/aimcub-electron-theme-verify.mjs`
+- `python3 /Users/jenson/.codex/skills/memory-refresh/scripts/audit_project_memory.py /Users/jenson/Desktop/Aimcub`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck`
