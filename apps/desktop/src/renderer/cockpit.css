@@ -329,26 +329,6 @@ kbd {
   -webkit-app-region: no-drag;
 }
 
-.od-sidebar-resizer::before {
-  content: "";
-  position: absolute;
-  top: 56px;
-  bottom: 16px;
-  left: 3px;
-  width: 2px;
-  border-radius: var(--od-radius-pill);
-  background: color-mix(in oklab, var(--od-border), transparent 38%);
-  transition: background 140ms ease, width 140ms ease, left 140ms ease;
-}
-
-.od-sidebar-resizer:hover::before,
-.od-sidebar-resizer:focus-visible::before,
-.od-sidebar-resizer[data-resizing="true"]::before {
-  left: 2px;
-  width: 4px;
-  background: color-mix(in oklab, var(--od-accent), var(--od-border) 36%);
-}
-
 .od-sidebar-resizer:focus-visible {
   outline: 0;
   box-shadow: var(--od-focus);

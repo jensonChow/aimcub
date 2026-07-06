@@ -87,7 +87,8 @@ Reference links:
 - Use a 4 px base grid. UI cleanup work should converge touched layout spacing to 4, 8, 12, 16, 24, and 32 px. Older 6, 10, 14, 18, 40, 56, and 72 px values are legacy allowances only until their local layout is touched.
 - Page/workspace padding: 24 px minimum on desktop, expanding to a restrained max such as 32 px for dense workbench views. Use 16 px on narrow desktop and mobile windows.
 - Content width: main task surfaces should generally max at 760 px for writing/intake and 940 px for operational grids or review surfaces.
-- Sidebar width: default 280 px. Fixed sidebars need a visible splitter/sash and user resize support; keep stable bounds around 240 to 360 px and auto-collapse the normal Aim sidebar before it squeezes the main workspace below a usable width.
+- Sidebar width: default 280 px. Fixed sidebars need a transparent resize hot zone and native resize cursor at the sidebar edge, not a permanently visible divider. Keep stable bounds around 240 to 360 px and auto-collapse the normal Aim sidebar before it squeezes the main workspace below a usable width.
+- Desktop window sizing should stay compact by default. Avoid launching a large window that dominates the desktop; current default bounds are about 960 by 680 px with minimum bounds around 640 by 520 px.
 - Vertical rhythm: 22 to 24 px between major page bands, 12 to 16 px between controls inside a group, 6 to 10 px inside compact repeated items.
 - Lists: use stable row heights and predictable alignment. Aim cards and context rows should not resize dramatically on hover, loading, selection, or locale changes.
 - Sidebar rows should behave like desktop navigation rows: stable 36 to 48 px rhythm, subtle hover, clear selected state, compact status badge or marker, and no card-like stacking unless the row contains genuinely multi-line content.

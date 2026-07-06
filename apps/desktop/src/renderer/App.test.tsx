@@ -184,7 +184,7 @@ describe("CockpitShell", () => {
     expect(html).not.toContain("<p>Workbench</p>");
   });
 
-  it("renders a pinned sidebar resize sash with accessible controls", () => {
+  it("renders an invisible pinned sidebar resize hot zone with accessible controls", () => {
     const html = renderToStaticMarkup(
       <I18nProvider>
         <CockpitShell
@@ -211,7 +211,21 @@ describe("CockpitShell", () => {
     expect(html).toContain('aria-valuemax="360"');
     expect(html).toContain('aria-valuenow="280"');
     expect(css).toMatch(/\.od-sidebar-resizer\s*{[^}]*cursor:\s*col-resize;[^}]*touch-action:\s*none;/s);
-    expect(css).toMatch(/\.od-sidebar-resizer::before\s*{[^}]*background:/s);
+    expect(css).toMatch(/\.od-sidebar-resizer\s*{[^}]*background:\s*transparent;/s);
+    expect(css).not.toContain(".od-sidebar-resizer::before");
+  });
+
+  it("uses compact default window bounds instead of a large desktop footprint", () => {
+    const main = readFileSync(new URL("../main/index.ts", import.meta.url), "utf8");
+
+    expect(main).toContain("const DEFAULT_WINDOW_WIDTH = 960;");
+    expect(main).toContain("const DEFAULT_WINDOW_HEIGHT = 680;");
+    expect(main).toContain("const MIN_WINDOW_WIDTH = 640;");
+    expect(main).toContain("const MIN_WINDOW_HEIGHT = 520;");
+    expect(main).toContain("width: DEFAULT_WINDOW_WIDTH");
+    expect(main).toContain("height: DEFAULT_WINDOW_HEIGHT");
+    expect(main).toContain("minWidth: MIN_WINDOW_WIDTH");
+    expect(main).toContain("minHeight: MIN_WINDOW_HEIGHT");
   });
 
   it("replaces the primary left sidebar with settings navigation on settings stage", () => {

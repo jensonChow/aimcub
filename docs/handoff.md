@@ -5,19 +5,17 @@ Branch: `main`
 
 ## Current Session
 
-- Removed the redundant normal-sidebar `Aimcub` / `Workbench` header text from `CockpitShell`.
-- Added a visible, keyboard-accessible pinned-sidebar resize sash with 240 to 360 px bounds and persisted width.
-- Changed the normal Aim sidebar to auto-collapse at medium window widths so the main workspace keeps usable width instead of being squeezed by a fixed rail.
-- Kept Settings in its always-visible split sidebar mode while allowing the shared sidebar width behavior.
-- Stabilized sidebar aim rows so a single aim no longer stretches to fill the remaining sidebar height.
-- Updated `docs/memory/design-system.md` and `docs/memory/desktop.md` with the durable sidebar cleanup and resize rules.
+- Replaced the visible pinned-sidebar resize sash with a transparent resize hot zone. Hovering the sidebar edge now exposes only the native resize cursor; no permanent divider line is drawn.
+- Reduced the Desktop `BrowserWindow` footprint from 1280 by 820 px with 1100 by 720 px minimum bounds to 960 by 680 px with 640 by 520 px minimum bounds.
+- Kept the existing medium-width sidebar auto-collapse behavior so the compact default window opens with the main workspace at full width.
+- Updated `docs/memory/design-system.md` and `docs/memory/desktop.md` with the transparent resize-zone and compact-window requirements.
 - Refreshed root `Aimcub.app` from the latest Electron 43 folder-style Desktop build.
 
 ## Current State
 
 - Work was prepared directly on `main`; no separate feature branch merge is needed.
 - Root `Aimcub.app`, `apps/desktop/out`, and `apps/desktop/dist` were refreshed locally and remain ignored build artifacts.
-- A temporary Vite visual harness under `/private/tmp/aimcub-sidebar-harness` rendered `CockpitShell` at 1280, 900, and 700 px widths. It verified no sidebar brand header, visible resize sash, drag from 280 px to 330 px, auto-collapse at 900 px, single-column content at 700 px, and no horizontal overflow.
+- A temporary Vite visual harness under `/private/tmp/aimcub-sidebar-harness` verified that the sidebar resize hot zone is transparent, reports `col-resize`, has no pseudo-element divider, and that 960 by 680 px plus 640 by 520 px layouts have no horizontal overflow.
 
 ## Verification
 
@@ -26,7 +24,7 @@ Passed:
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop test -- App.test.tsx`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop typecheck`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop lint`
-- Browser visual check through the temporary Vite harness at 1280, 900, and 700 px.
+- Browser visual check through the temporary Vite harness at 1280, 960, and 640 px widths.
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck`

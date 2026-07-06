@@ -15,6 +15,10 @@ let mainWindow: BrowserWindow | null = null;
 const MAC_TRAFFIC_LIGHT_X = 16;
 const MAC_TRAFFIC_LIGHT_ROW_HEIGHT = 46;
 const MAC_TRAFFIC_LIGHT_BUTTON_SIZE = 14;
+const DEFAULT_WINDOW_WIDTH = 960;
+const DEFAULT_WINDOW_HEIGHT = 680;
+const MIN_WINDOW_WIDTH = 640;
+const MIN_WINDOW_HEIGHT = 520;
 const LIGHT_WINDOW_BACKGROUND = "#ffffff";
 const DARK_WINDOW_BACKGROUND = "#1c1c1e";
 
@@ -64,10 +68,10 @@ function sendWindowChromeState(win: BrowserWindow): void {
 
 function createWindow(): void {
   const win = new BrowserWindow({
-    width: 1280,
-    height: 820,
-    minWidth: 1100,
-    minHeight: 720,
+    width: DEFAULT_WINDOW_WIDTH,
+    height: DEFAULT_WINDOW_HEIGHT,
+    minWidth: MIN_WINDOW_WIDTH,
+    minHeight: MIN_WINDOW_HEIGHT,
     show: false,
     title: "Aimcub",
     backgroundColor: nativeWindowBackgroundColor(),
