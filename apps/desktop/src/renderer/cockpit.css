@@ -1051,7 +1051,7 @@ kbd {
   max-height: min(360px, calc(100vh - 96px));
   display: grid;
   gap: 2px;
-  overflow: auto;
+  overflow: visible;
   padding: 6px;
   border: 1px solid var(--od-border);
   border-radius: var(--od-radius-md);
@@ -1092,6 +1092,7 @@ kbd {
 }
 
 .od-user-menu-item:hover,
+.od-user-menu-item[data-submenu-open="true"],
 .od-user-menu-item:focus-visible {
   border-color: transparent;
   background: var(--od-interaction-hover-bg);
@@ -1169,14 +1170,41 @@ kbd {
   background: var(--od-border-soft);
 }
 
+.od-user-menu-submenu-anchor {
+  position: relative;
+  display: grid;
+}
+
+.od-user-menu-submenu-anchor::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  top: -4px;
+  bottom: -4px;
+  left: 100%;
+  width: 10px;
+}
+
 .od-user-language-menu {
+  position: absolute;
+  z-index: 2;
+  top: -4px;
+  left: calc(100% + 8px);
+  width: 180px;
+  max-height: min(240px, calc(100vh - 120px));
   display: grid;
   gap: 1px;
-  padding-left: 12px;
+  overflow: auto;
+  padding: 6px;
+  border: 1px solid var(--od-border);
+  border-radius: var(--od-radius-md);
+  background: color-mix(in oklab, var(--od-bg), var(--od-surface-warm) 18%);
+  box-shadow: var(--od-shadow-popover);
 }
 
 .od-user-language-option {
   grid-template-columns: 18px minmax(0, 1fr);
+  padding: 0 8px;
 }
 
 .od-user-language-option[aria-checked="true"] {

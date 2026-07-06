@@ -5,27 +5,25 @@ Branch: `main`
 
 ## Current Session
 
-- Refreshed project memory after the recent Desktop UI styling work.
-- Ran the memory-refresh audit at `0de2b23` and confirmed `main` was clean and synced with `origin/main` before this handoff refresh.
-- Confirmed `docs/memory/design-system.md` and `docs/memory/desktop.md` already contain the latest no-border selected navigation, Claude-like composer hover, lower composer placeholder, and compact account popover requirements.
-- Replaced stale prior-session transfer language that said the UI styling commit still needed to be pushed.
+- Updated the Desktop sidebar footer user menu so Language opens a Claude-like side submenu on hover or keyboard focus instead of expanding inline below the row.
+- Kept the language submenu available while the pointer moves from the Language row into the options, and preserved keyboard access with ArrowRight/ArrowLeft behavior.
+- Restyled the language options as a compact right-side popover that reuses the account-menu surface, border, shadow, row rhythm, and checked-language treatment.
+- Added renderer CSS assertions for the submenu anchor, hover bridge, visible overflow, and right-side language menu position.
+- Updated `docs/memory/design-system.md` and `docs/memory/desktop.md` with the durable language submenu requirement.
 - Refreshed root `Aimcub.app` from the latest Electron 43 folder-style Desktop build after verification.
 
 ## Current State
 
 - Work happened directly on `main`; no separate feature branch merge is needed.
-- The previous UI styling commit `0de2b23` is already on `origin/main`.
-- This session changes only `docs/handoff.md`; no app/runtime code changed.
+- The focused session commit includes the language submenu implementation, memory updates, this handoff, and test coverage; inspect `git log` for the exact hash.
 - Root `Aimcub.app`, `apps/desktop/out`, and `apps/desktop/dist` were refreshed locally and remain ignored build artifacts.
 
 ## Verification
 
 Passed:
 
-- `python3 /Users/jenson/.codex/skills/memory-refresh/scripts/audit_project_memory.py /Users/jenson/Desktop/Aimcub`
-- `git status --short --branch`
-- `git log --oneline -8`
-- Targeted reads of `docs/memory/design-system.md`, `docs/memory/desktop.md`, `docs/memory/operations.md`, Desktop renderer CSS, shell code, and renderer tests confirmed durable memory matches current implementation.
+- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop test`
+- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop typecheck`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck`
@@ -37,7 +35,7 @@ Passed:
 
 Notes:
 
-- MCP worker tests may log the expected missing-Supabase opaque-error path while passing.
+- MCP worker tests logged the expected missing-Supabase opaque-error path while passing.
 
 ## Next Session Prompt
 

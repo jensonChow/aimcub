@@ -678,14 +678,43 @@ function SidebarUserMenu(props: { onSettings: () => void }) {
   const panelRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const firstItemRef = useRef<HTMLButtonElement | null>(null);
+  const languageTriggerRef = useRef<HTMLButtonElement | null>(null);
   const focusFirstItemOnOpen = useRef(false);
+  const languageCloseTimerRef = useRef<number | null>(null);
   const languageOptions = [
     { lang: "en", label: t("userMenu.languageEnglish") },
     { lang: "zh", label: t("userMenu.languageChinese") },
   ] satisfies Array<{ lang: Lang; label: string }>;
 
+  function cancelLanguageClose() {
+    if (languageCloseTimerRef.current === null) return;
+    window.clearTimeout(languageCloseTimerRef.current);
+    languageCloseTimerRef.current = null;
+  }
+
+  function openLanguageMenu(focusOption = false) {
+    cancelLanguageClose();
+    setLanguageOpen(true);
+    if (!focusOption) return;
+    window.requestAnimationFrame(() => {
+      const currentOption =
+        panelRef.current?.querySelector<HTMLButtonElement>(".od-user-language-option[aria-checked=\"true\"]") ??
+        panelRef.current?.querySelector<HTMLButtonElement>(".od-user-language-option");
+      currentOption?.focus();
+    });
+  }
+
+  function scheduleLanguageClose() {
+    cancelLanguageClose();
+    languageCloseTimerRef.current = window.setTimeout(() => {
+      languageCloseTimerRef.current = null;
+      setLanguageOpen(false);
+    }, 140);
+  }
+
   function closeMenu(focusTrigger = false) {
     focusFirstItemOnOpen.current = false;
+    cancelLanguageClose();
     setOpen(false);
     setLanguageOpen(false);
     if (focusTrigger) {
@@ -796,12 +825,13 @@ function SidebarUserMenu(props: { onSettings: () => void }) {
             }
             if (event.key === "ArrowRight" && document.activeElement instanceof HTMLElement && document.activeElement.dataset.menuAction === "language") {
               event.preventDefault();
-              setLanguageOpen(true);
+              openLanguageMenu(true);
               return;
             }
             if (event.key === "ArrowLeft" && languageOpen) {
               event.preventDefault();
               setLanguageOpen(false);
+              languageTriggerRef.current?.focus();
             }
           }}
         >
@@ -830,38 +860,53 @@ function SidebarUserMenu(props: { onSettings: () => void }) {
 
           <div className="od-user-menu-separator" role="separator" />
 
-          <button
-            className="od-user-menu-item"
-            type="button"
-            role="menuitem"
-            aria-haspopup="menu"
-            aria-expanded={languageOpen}
-            aria-controls={LANGUAGE_MENU_ID}
-            data-menu-action="language"
-            onClick={() => setLanguageOpen((current) => !current)}
+          <div
+            className="od-user-menu-submenu-anchor"
+            data-open={languageOpen}
+            onPointerEnter={() => openLanguageMenu()}
+            onPointerLeave={scheduleLanguageClose}
+            onFocusCapture={() => openLanguageMenu()}
+            onBlurCapture={(event) => {
+              const nextTarget = event.relatedTarget;
+              if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) return;
+              setLanguageOpen(false);
+            }}
           >
-            <GlobeIcon />
-            <span>{t("userMenu.language")}</span>
-            <ChevronRightIcon />
-          </button>
+            <button
+              className="od-user-menu-item"
+              ref={languageTriggerRef}
+              type="button"
+              role="menuitem"
+              aria-haspopup="menu"
+              aria-expanded={languageOpen}
+              aria-controls={LANGUAGE_MENU_ID}
+              data-menu-action="language"
+              data-submenu-open={languageOpen}
+              onClick={() => openLanguageMenu()}
+            >
+              <GlobeIcon />
+              <span>{t("userMenu.language")}</span>
+              <ChevronRightIcon />
+            </button>
 
-          {languageOpen ? (
-            <div className="od-user-language-menu" id={LANGUAGE_MENU_ID} role="menu" aria-label={t("userMenu.languageMenu")}>
-              {languageOptions.map((option) => (
-                <button
-                  key={option.lang}
-                  className="od-user-menu-item od-user-language-option"
-                  type="button"
-                  role="menuitemradio"
-                  aria-checked={lang === option.lang}
-                  onClick={() => chooseLanguage(option.lang)}
-                >
-                  <CheckIcon visible={lang === option.lang} />
-                  <span>{option.label}</span>
-                </button>
-              ))}
-            </div>
-          ) : null}
+            {languageOpen ? (
+              <div className="od-user-language-menu" id={LANGUAGE_MENU_ID} role="menu" aria-label={t("userMenu.languageMenu")}>
+                {languageOptions.map((option) => (
+                  <button
+                    key={option.lang}
+                    className="od-user-menu-item od-user-language-option"
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={lang === option.lang}
+                    onClick={() => chooseLanguage(option.lang)}
+                  >
+                    <CheckIcon visible={lang === option.lang} />
+                    <span>{option.label}</span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
         </div>
       ) : null}
 
