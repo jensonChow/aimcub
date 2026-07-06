@@ -360,13 +360,15 @@ describe("CockpitShell", () => {
     expect(css).toMatch(/\.od-sidebar-hover-zone\s*{[^}]*display:\s*contents;/s);
   });
 
-  it("auto-collapses the normal sidebar before the workspace becomes too narrow", () => {
+  it("keeps manual pinned sidebar in layout while only collapsed and peek states free workspace width", () => {
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
 
     expect(css).toContain("@media (max-width: 1040px)");
-    expect(css).toContain(".od-app:not(.od-app-stage-settings)[data-sidebar-state=\"pinned\"]");
+    expect(css).toContain(".od-app:not(.od-app-stage-settings)[data-sidebar-state=\"collapsed\"]");
+    expect(css).toContain(".od-app:not(.od-app-stage-settings)[data-sidebar-state=\"peek\"]");
     expect(css).toContain("grid-template-columns: 0 minmax(0, 1fr);");
-    expect(css).toContain(".od-app:not(.od-app-stage-settings) .od-sidebar-resizer");
+    expect(css).toContain(".od-app:not(.od-app-stage-settings)[data-sidebar-state=\"peek\"] .od-sidebar");
+    expect(css).not.toContain(".od-app:not(.od-app-stage-settings)[data-sidebar-state=\"pinned\"] .od-sidebar");
     expect(css).toContain("flex-wrap: wrap;");
   });
 

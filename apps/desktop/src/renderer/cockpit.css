@@ -3839,18 +3839,11 @@ kbd {
 }
 
 @media (max-width: 1040px) {
-  .od-app:not(.od-app-stage-settings),
-  .od-app:not(.od-app-stage-settings)[data-sidebar-state="pinned"],
   .od-app:not(.od-app-stage-settings)[data-sidebar-state="collapsed"],
   .od-app:not(.od-app-stage-settings)[data-sidebar-state="peek"] {
     grid-template-columns: 0 minmax(0, 1fr);
   }
 
-  .od-app:not(.od-app-stage-settings) .od-sidebar-resizer {
-    display: none;
-  }
-
-  .od-app:not(.od-app-stage-settings)[data-sidebar-state="pinned"] .od-sidebar,
   .od-app:not(.od-app-stage-settings)[data-sidebar-state="peek"] .od-sidebar {
     position: absolute;
     inset: 0 auto 0 0;
@@ -3868,8 +3861,6 @@ kbd {
 }
 
 @media (max-width: 760px) {
-  .od-app,
-  .od-app[data-sidebar-state="pinned"],
   .od-app[data-sidebar-state="collapsed"],
   .od-app[data-sidebar-state="peek"] {
     grid-template-columns: 0 minmax(0, 1fr);
@@ -3884,7 +3875,6 @@ kbd {
     padding-top: calc(32px + 24px);
   }
 
-  .od-app[data-sidebar-state="pinned"] .od-sidebar,
   .od-app[data-sidebar-state="peek"] .od-sidebar {
     position: absolute;
     inset: 0 auto 0 0;

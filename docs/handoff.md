@@ -5,17 +5,17 @@ Branch: `main`
 
 ## Current Session
 
-- Replaced the visible pinned-sidebar resize sash with a transparent resize hot zone. Hovering the sidebar edge now exposes only the native resize cursor; no permanent divider line is drawn.
-- Reduced the Desktop `BrowserWindow` footprint from 1280 by 820 px with 1100 by 720 px minimum bounds to 960 by 680 px with 640 by 520 px minimum bounds.
-- Kept the existing medium-width sidebar auto-collapse behavior so the compact default window opens with the main workspace at full width.
-- Updated `docs/memory/design-system.md` and `docs/memory/desktop.md` with the transparent resize-zone and compact-window requirements.
+- Fixed the normal Aim sidebar's compact-window expanded state: a user-pinned sidebar now stays in the grid and pushes the workspace instead of covering it.
+- Kept overlay behavior only for collapsed/peek states, so temporary hover reveal can cover the edge without resizing the workspace.
+- Preserved the transparent resize hot zone for pinned sidebars. Hovering the sidebar edge exposes only the native resize cursor; no permanent divider line is drawn.
+- Updated `docs/memory/design-system.md` and `docs/memory/desktop.md` with the pinned-sidebar layout requirement.
 - Refreshed root `Aimcub.app` from the latest Electron 43 folder-style Desktop build.
 
 ## Current State
 
 - Work was prepared directly on `main`; no separate feature branch merge is needed.
 - Root `Aimcub.app`, `apps/desktop/out`, and `apps/desktop/dist` were refreshed locally and remain ignored build artifacts.
-- A temporary Vite visual harness under `/private/tmp/aimcub-sidebar-harness` verified that the sidebar resize hot zone is transparent, reports `col-resize`, has no pseudo-element divider, and that 960 by 680 px plus 640 by 520 px layouts have no horizontal overflow.
+- A temporary Vite visual harness under `/private/tmp/aimcub-sidebar-harness` verified that a 960 by 680 px collapsed shell expands to pinned grid columns around `330px 630px`; the sidebar right edge matched the main content left edge, `covered` was false, and there was no horizontal overflow.
 
 ## Verification
 
@@ -24,7 +24,7 @@ Passed:
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop test -- App.test.tsx`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop typecheck`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop lint`
-- Browser visual check through the temporary Vite harness at 1280, 960, and 640 px widths.
+- Browser visual check through the temporary Vite harness at 960 by 680 px, covering collapsed-to-pinned expansion and workspace occlusion geometry.
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck`
