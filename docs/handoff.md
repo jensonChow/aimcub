@@ -5,36 +5,36 @@ Branch: `main`
 
 ## Current Session
 
-- Replaced the initial empty Desktop main workspace with a quiet placeholder instead of auto-rendering the aim/chat composer.
-- Added `aimComposerOpen` renderer state so the intake composer still appears after the user explicitly chooses New Aim, while saved aims continue to open to the Aim overview.
-- Added renderer coverage asserting the first-run main workspace does not contain the aim composer, aim title/context fields, or Continue action.
-- Updated `docs/memory/design-system.md` and `docs/memory/desktop.md` with the durable requirement that the initial main workspace must not auto-render chat/intake UI.
+- Added a top-left sidebar Home Panel action beside New Aim in the Desktop shell.
+- Home Panel returns the renderer to the main initial workspace: no selected aim, no unsaved composer, and the quiet placeholder visible.
+- Added Home Panel to the command palette and wired `Cmd+0` as the matching keyboard shortcut.
+- Generalized the New Aim sidebar styling into a shared `od-sidebar-action` treatment so Home Panel and New Aim stay aligned and quiet.
+- Updated Desktop/design-system memory with the durable Home Panel sidebar requirement.
 - Refreshed root `Aimcub.app` from the latest Electron 43 folder-style Desktop build.
 
 ## Current State
 
 - Work is prepared directly on `main`; no separate feature branch merge is needed.
-- The user explicitly approved commit, push, and merge. The six local commits through `d27c1a8` were pushed to `origin/main`.
-- No separate merge was needed because the completed work was prepared directly on `main`.
+- The focused commit for this session was pushed to `origin/main`.
 - Root `Aimcub.app`, `apps/desktop/out`, and `apps/desktop/dist` were refreshed locally and remain ignored build artifacts.
-- Visual QA used the launched local Electron dev app through Computer Use.
+- Visual QA used the refreshed root Electron app through Computer Use.
 
 ## Verification
 
 Passed:
 
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop test -- App.test.tsx`
-- `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop test -- firstRunFlow.test.ts`
-- Visual QA in the Electron dev app at default size: initial main workspace showed the quiet placeholder without chat/composer controls; expanding the sidebar preserved layout; clicking New Aim still opened the composer.
-- Visual QA in the Electron dev app at about 640 by 520 px: initial quiet placeholder rendered without text overlap or overflow.
+- `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop typecheck`
+- React best-practices checklist for the touched TSX files.
+- `git diff --check`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm lint`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm core:purity`
-- `git diff --check`
 - `ELECTRON_BUILDER_CACHE=/private/tmp/aimcub-electron-builder-cache COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm desktop:pack`
 - `ditto apps/desktop/dist/mac-arm64/Aimcub.app Aimcub.app`
+- Visual QA in the refreshed Electron app: sidebar expanded with Home Panel and New Aim aligned in the top action group; clicking New Aim opened the composer; clicking Home Panel returned to the initial workspace; `Cmd+0` also returned to the initial workspace.
 
 Notes:
 

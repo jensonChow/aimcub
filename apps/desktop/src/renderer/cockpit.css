@@ -516,7 +516,7 @@ kbd {
   gap: 3px;
 }
 
-.od-new-aim {
+.od-sidebar-action {
   position: relative;
   width: 100%;
   min-height: 34px;
@@ -535,18 +535,18 @@ kbd {
   transition: background 140ms ease, color 140ms ease, box-shadow 140ms ease;
 }
 
-.od-new-aim:hover,
-.od-new-aim:focus-visible {
+.od-sidebar-action:hover,
+.od-sidebar-action:focus-visible {
   background: var(--od-interaction-hover-bg);
   box-shadow: var(--od-interaction-hover-shadow);
   color: var(--od-fg);
 }
 
-.od-new-aim:focus-visible {
+.od-sidebar-action:focus-visible {
   box-shadow: var(--od-interaction-focus-shadow);
 }
 
-.od-new-aim-icon {
+.od-sidebar-action-icon {
   width: var(--sidebar-action-icon-slot);
   height: 20px;
   display: grid;
@@ -556,12 +556,12 @@ kbd {
   transform: translateX(var(--sidebar-action-icon-offset-x));
 }
 
-.od-new-aim:hover .od-new-aim-icon,
-.od-new-aim:focus-visible .od-new-aim-icon {
+.od-sidebar-action:hover .od-sidebar-action-icon,
+.od-sidebar-action:focus-visible .od-sidebar-action-icon {
   color: currentColor;
 }
 
-.od-new-aim-icon svg {
+.od-sidebar-action-icon svg {
   width: 18px;
   height: 18px;
   fill: none;
@@ -571,7 +571,7 @@ kbd {
   stroke-linejoin: round;
 }
 
-.od-new-aim-label {
+.od-sidebar-action-label {
   min-width: 0;
   overflow: hidden;
   font-size: var(--od-type-body);
@@ -581,7 +581,7 @@ kbd {
   white-space: nowrap;
 }
 
-.od-new-aim kbd {
+.od-sidebar-action kbd {
   display: inline-flex;
   justify-self: end;
   align-items: center;
@@ -598,14 +598,14 @@ kbd {
   transition: opacity 140ms ease, transform 140ms ease;
 }
 
-.od-new-aim kbd span[aria-hidden="true"] {
+.od-sidebar-action kbd span[aria-hidden="true"] {
   font-size: var(--od-type-meta);
   font-weight: var(--od-font-weight-semibold);
   line-height: 1;
 }
 
-.od-new-aim:hover kbd,
-.od-new-aim:focus-visible kbd {
+.od-sidebar-action:hover kbd,
+.od-sidebar-action:focus-visible kbd {
   opacity: 1;
   transform: translateX(0);
 }

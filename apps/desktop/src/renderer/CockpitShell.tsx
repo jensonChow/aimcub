@@ -36,6 +36,7 @@ interface CockpitShellProps {
   goals: Goal[];
   selected: Goal | null;
   activeStage: CockpitStage;
+  onHome: () => void;
   onNewAim: () => void;
   onOpenGoal: (goal: Goal) => void;
   onStage: (stage: CockpitStage) => void;
@@ -89,6 +90,7 @@ export function CockpitShell({
   goals,
   selected,
   activeStage,
+  onHome,
   onNewAim,
   onOpenGoal,
   onStage,
@@ -139,6 +141,7 @@ export function CockpitShell({
     .slice(0, 12);
 
   const commandItems = useMemo<CockpitCommand[]>(() => commands ?? [
+    { id: "home-panel", label: t("command.homePanel"), detail: t("command.homePanel.detail"), shortcut: "Cmd 0", action: onHome },
     { id: "new-aim", label: t("command.newAim"), detail: t("command.newAim.detail"), shortcut: "Cmd N", action: onNewAim },
     { id: "stage-aim", label: t("os.stepAim"), detail: t("command.stageAim.detail"), shortcut: "Cmd 1", action: () => onStage("aim") },
     { id: "stage-context", label: t("os.stepContext"), detail: t("command.stageContext.detail"), shortcut: "Cmd 2", action: () => onStage("context") },
@@ -146,7 +149,7 @@ export function CockpitShell({
     { id: "stage-run", label: t("os.stepExecute"), detail: t("command.stageRun.detail"), shortcut: "Cmd 4", action: () => onStage("run") },
     { id: "stage-eval", label: t("os.stepEval"), detail: t("command.stageEval.detail"), shortcut: "Cmd 5", action: () => onStage("eval") },
     { id: "settings", label: t("os.settings"), detail: t("command.settings.detail"), shortcut: "Cmd ,", action: () => onStage("settings") },
-  ], [commands, onNewAim, onStage, t]);
+  ], [commands, onHome, onNewAim, onStage, t]);
 
   function clearSidebarRevealTimer() {
     if (revealSidebarTimer.current === null) return;
@@ -403,6 +406,11 @@ export function CockpitShell({
         onNewAim();
         return;
       }
+      if (key === "0") {
+        event.preventDefault();
+        onHome();
+        return;
+      }
       if (key === ",") {
         event.preventDefault();
         onStage("settings");
@@ -416,7 +424,7 @@ export function CockpitShell({
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onNewAim, onStage]);
+  }, [onHome, onNewAim, onStage]);
 
   return (
     <div className="od-window" data-od-id="desktop-window">
@@ -484,15 +492,30 @@ export function CockpitShell({
             <>
               <nav className="od-sidebar-global-actions" aria-label={t("shell.globalActions")} data-od-id="sidebar-global-actions">
                 <button
-                  className="od-new-aim"
+                  className="od-sidebar-action od-home-panel"
+                  type="button"
+                  data-od-id="sidebar-home-panel-action"
+                  onClick={onHome}
+                >
+                  <span className="od-sidebar-action-icon" aria-hidden="true">
+                    <HomePanelIcon />
+                  </span>
+                  <span className="od-sidebar-action-label">{t("os.homePanel")}</span>
+                  <kbd aria-label="Command 0">
+                    <span aria-hidden="true">⌘</span>
+                    <span>0</span>
+                  </kbd>
+                </button>
+                <button
+                  className="od-sidebar-action od-new-aim"
                   type="button"
                   data-od-id="sidebar-new-aim-action"
                   onClick={onNewAim}
                 >
-                  <span className="od-new-aim-icon" aria-hidden="true">
+                  <span className="od-sidebar-action-icon od-new-aim-icon" aria-hidden="true">
                     <NewAimIcon />
                   </span>
-                  <span className="od-new-aim-label">{t("os.newAim")}</span>
+                  <span className="od-sidebar-action-label od-new-aim-label">{t("os.newAim")}</span>
                   <kbd aria-label="Command N">
                     <span aria-hidden="true">⌘</span>
                     <span>N</span>
@@ -624,6 +647,16 @@ function NewAimIcon() {
     <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
       <circle cx="10" cy="10" r="5.25" />
       <path d="M10 2.75v2.25M10 15v2.25M2.75 10h2.25M15 10h2.25M10 8.25v3.5M8.25 10h3.5" />
+    </svg>
+  );
+}
+
+function HomePanelIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
+      <path d="M4 8.5 10 3.75 16 8.5" />
+      <path d="M5.75 7.75v8h8.5v-8" />
+      <path d="M8.5 15.75v-4h3v4" />
     </svg>
   );
 }

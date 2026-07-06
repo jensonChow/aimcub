@@ -193,6 +193,7 @@ describe("CockpitShell", () => {
           goals={[]}
           selected={null}
           activeStage="aim"
+          onHome={noop}
           onNewAim={noop}
           onOpenGoal={noop}
           onStage={noop}
@@ -210,13 +211,14 @@ describe("CockpitShell", () => {
     expect(html).not.toContain("<p>Workbench</p>");
   });
 
-  it("renders New Aim as a top-left app-level sidebar action", () => {
+  it("renders Home Panel and New Aim as top-left app-level sidebar actions", () => {
     const html = renderToStaticMarkup(
       <I18nProvider>
         <CockpitShell
           goals={[]}
           selected={null}
           activeStage="aim"
+          onHome={noop}
           onNewAim={noop}
           onOpenGoal={noop}
           onStage={noop}
@@ -228,12 +230,17 @@ describe("CockpitShell", () => {
 
     expect(html).toContain('data-od-id="sidebar-global-actions"');
     expect(html).toContain('aria-label="Workspace actions"');
+    expect(html).toContain('data-od-id="sidebar-home-panel-action"');
     expect(html).toContain('data-od-id="sidebar-new-aim-action"');
     expect(html).not.toContain('data-current=');
     expect(html).not.toContain('aria-current=');
-    expect(html).toContain('class="od-new-aim-icon"');
-    expect(html).toContain('class="od-new-aim-label"');
+    expect(html).toContain("od-home-panel");
+    expect(html).toContain("od-new-aim");
+    expect(html).toContain("od-sidebar-action-icon");
+    expect(html).toContain("od-sidebar-action-label");
+    expect(html).toContain("Home panel");
     expect(html).toContain("New aim");
+    expect(html).toContain('aria-label="Command 0"');
     expect(html).toContain('aria-label="Command N"');
     expect(html).toContain("⌘");
     expect(html).not.toContain("Cmd N</kbd>");
@@ -255,19 +262,19 @@ describe("CockpitShell", () => {
     expect(css).toContain("--od-interaction-focus-shadow: var(--od-focus), var(--od-shadow-sidebar-action);");
     expect(css).toMatch(/\.od-sidebar\s*{[^}]*padding:\s*56px var\(--sidebar-horizontal-inset\) 16px;[^}]*overflow-x:\s*hidden;[^}]*overflow-y:\s*auto;/s);
     expect(css).toMatch(/\.od-sidebar-global-actions\s*{[^}]*width:\s*var\(--sidebar-content-width\);[^}]*display:\s*grid;[^}]*justify-self:\s*center;[^}]*gap:\s*3px;/s);
-    expect(css).toMatch(/\.od-new-aim\s*{[^}]*min-height:\s*34px;[^}]*grid-template-columns:\s*var\(--sidebar-action-icon-slot\) minmax\(0, 1fr\) auto;[^}]*column-gap:\s*var\(--sidebar-action-label-gap\);[^}]*background:\s*transparent;[^}]*box-shadow:\s*none;/s);
-    expect(css).toMatch(/\.od-new-aim\s*{[^}]*padding:\s*0 var\(--sidebar-row-padding-x\);/s);
-    expect(css).toMatch(/\.od-new-aim:hover,\s*\.od-new-aim:focus-visible\s*{[^}]*background:\s*var\(--od-interaction-hover-bg\);[^}]*box-shadow:\s*var\(--od-interaction-hover-shadow\);[^}]*color:\s*var\(--od-fg\);/s);
-    expect(css).toMatch(/\.od-new-aim:focus-visible\s*{[^}]*box-shadow:\s*var\(--od-interaction-focus-shadow\);/s);
-    expect(css).toMatch(/\.od-new-aim-icon\s*{[^}]*width:\s*var\(--sidebar-action-icon-slot\);[^}]*height:\s*20px;[^}]*justify-items:\s*start;[^}]*transform:\s*translateX\(var\(--sidebar-action-icon-offset-x\)\);/s);
-    expect(css).toMatch(/\.od-new-aim-icon svg\s*{[^}]*width:\s*18px;[^}]*height:\s*18px;[^}]*stroke-width:\s*var\(--od-icon-stroke\);/s);
-    expect(css).toMatch(/\.od-new-aim-label\s*{[^}]*font-weight:\s*var\(--od-font-weight-medium\);[^}]*line-height:\s*16px;/s);
-    expect(css).toMatch(/\.od-new-aim kbd\s*{[^}]*display:\s*inline-flex;[^}]*align-items:\s*center;[^}]*gap:\s*2px;[^}]*min-height:\s*16px;[^}]*color:\s*var\(--od-meta\);[^}]*font-weight:\s*var\(--od-font-weight-medium\);[^}]*opacity:\s*0;[^}]*transform:\s*translateX\(2px\);/s);
-    expect(css).toMatch(/\.od-new-aim kbd span\[aria-hidden="true"\]\s*{[^}]*font-size:\s*var\(--od-type-meta\);[^}]*font-weight:\s*var\(--od-font-weight-semibold\);/s);
-    expect(css).toMatch(/\.od-new-aim:hover kbd,\s*\.od-new-aim:focus-visible kbd\s*{[^}]*opacity:\s*1;[^}]*transform:\s*translateX\(0\);/s);
+    expect(css).toMatch(/\.od-sidebar-action\s*{[^}]*min-height:\s*34px;[^}]*grid-template-columns:\s*var\(--sidebar-action-icon-slot\) minmax\(0, 1fr\) auto;[^}]*column-gap:\s*var\(--sidebar-action-label-gap\);[^}]*background:\s*transparent;[^}]*box-shadow:\s*none;/s);
+    expect(css).toMatch(/\.od-sidebar-action\s*{[^}]*padding:\s*0 var\(--sidebar-row-padding-x\);/s);
+    expect(css).toMatch(/\.od-sidebar-action:hover,\s*\.od-sidebar-action:focus-visible\s*{[^}]*background:\s*var\(--od-interaction-hover-bg\);[^}]*box-shadow:\s*var\(--od-interaction-hover-shadow\);[^}]*color:\s*var\(--od-fg\);/s);
+    expect(css).toMatch(/\.od-sidebar-action:focus-visible\s*{[^}]*box-shadow:\s*var\(--od-interaction-focus-shadow\);/s);
+    expect(css).toMatch(/\.od-sidebar-action-icon\s*{[^}]*width:\s*var\(--sidebar-action-icon-slot\);[^}]*height:\s*20px;[^}]*justify-items:\s*start;[^}]*transform:\s*translateX\(var\(--sidebar-action-icon-offset-x\)\);/s);
+    expect(css).toMatch(/\.od-sidebar-action-icon svg\s*{[^}]*width:\s*18px;[^}]*height:\s*18px;[^}]*stroke-width:\s*var\(--od-icon-stroke\);/s);
+    expect(css).toMatch(/\.od-sidebar-action-label\s*{[^}]*font-weight:\s*var\(--od-font-weight-medium\);[^}]*line-height:\s*16px;/s);
+    expect(css).toMatch(/\.od-sidebar-action kbd\s*{[^}]*display:\s*inline-flex;[^}]*align-items:\s*center;[^}]*gap:\s*2px;[^}]*min-height:\s*16px;[^}]*color:\s*var\(--od-meta\);[^}]*font-weight:\s*var\(--od-font-weight-medium\);[^}]*opacity:\s*0;[^}]*transform:\s*translateX\(2px\);/s);
+    expect(css).toMatch(/\.od-sidebar-action kbd span\[aria-hidden="true"\]\s*{[^}]*font-size:\s*var\(--od-type-meta\);[^}]*font-weight:\s*var\(--od-font-weight-semibold\);/s);
+    expect(css).toMatch(/\.od-sidebar-action:hover kbd,\s*\.od-sidebar-action:focus-visible kbd\s*{[^}]*opacity:\s*1;[^}]*transform:\s*translateX\(0\);/s);
     expect(css).not.toContain("--od-new-aim-bg");
-    expect(css).not.toContain(".od-new-aim[data-current");
-    expect(css).not.toContain(".od-new-aim[data-current=\"true\"] kbd");
+    expect(css).not.toContain(".od-sidebar-action[data-current");
+    expect(css).not.toContain(".od-sidebar-action[data-current=\"true\"] kbd");
     expect(css).not.toContain('.od-app[data-empty-aim="true"] .od-new-aim');
   });
 
@@ -302,6 +309,7 @@ describe("CockpitShell", () => {
           goals={[]}
           selected={null}
           activeStage="aim"
+          onHome={noop}
           onNewAim={noop}
           onOpenGoal={noop}
           onStage={noop}
@@ -330,6 +338,7 @@ describe("CockpitShell", () => {
           goals={[savedGoal]}
           selected={savedGoal}
           activeStage="aim"
+          onHome={noop}
           onNewAim={noop}
           onOpenGoal={noop}
           onStage={noop}
@@ -350,6 +359,7 @@ describe("CockpitShell", () => {
           goals={[]}
           selected={null}
           activeStage="aim"
+          onHome={noop}
           onNewAim={noop}
           onOpenGoal={noop}
           onStage={noop}
@@ -394,6 +404,7 @@ describe("CockpitShell", () => {
           goals={[]}
           selected={null}
           activeStage="settings"
+          onHome={noop}
           onNewAim={noop}
           onOpenGoal={noop}
           onStage={noop}
@@ -425,6 +436,7 @@ describe("CockpitShell", () => {
           goals={[]}
           selected={null}
           activeStage="aim"
+          onHome={noop}
           onNewAim={noop}
           onOpenGoal={noop}
           onStage={noop}
@@ -508,6 +520,7 @@ describe("CockpitShell", () => {
           goals={[]}
           selected={null}
           activeStage="aim"
+          onHome={noop}
           onNewAim={noop}
           onOpenGoal={noop}
           onStage={noop}

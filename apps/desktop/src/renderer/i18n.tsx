@@ -107,6 +107,7 @@ export const STRINGS = {
   "mvp.flow.save": { en: "Save", zh: "保存" },
 
   "os.tagline": { en: "Workbench", zh: "工作台" },
+  "os.homePanel": { en: "Home panel", zh: "主面板" },
   "os.newAim": { en: "New aim", zh: "新目标" },
   "os.savedAims": { en: "Saved aims", zh: "已保存目标" },
   "os.noAims": { en: "No saved aims yet.", zh: "还没有保存的目标。" },
@@ -394,6 +395,8 @@ export const STRINGS = {
   "command.palette": { en: "Command palette", zh: "命令面板" },
   "command.searchPlaceholder": { en: "Search commands", zh: "搜索命令" },
   "command.empty": { en: "No matching commands.", zh: "没有匹配的命令。" },
+  "command.homePanel": { en: "Home panel", zh: "主面板" },
+  "command.homePanel.detail": { en: "Return to the main workspace panel.", zh: "返回主工作区面板。" },
   "command.newAim": { en: "New aim", zh: "新目标" },
   "command.newAim.detail": { en: "Start a new aim intake.", zh: "开始输入新的 Aim。" },
   "command.stageAim.detail": { en: "Open the aim overview or intake.", zh: "打开 Aim 概览或输入区。" },

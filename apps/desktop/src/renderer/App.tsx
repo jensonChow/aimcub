@@ -1045,6 +1045,12 @@ function AimOsApp() {
     setStageOverride("aim");
   }
 
+  function openHomePanel() {
+    resetComposer();
+    setMode("cockpit");
+    setStageOverride("aim");
+  }
+
   function openSettingsForAim() {
     setSettingsSection(settingsSectionForFocus(activeAimHelper.settingsFocus));
     setMode("settings");
@@ -1284,6 +1290,7 @@ function AimOsApp() {
       goals={goals}
       selected={selected}
       activeStage={activeStage}
+      onHome={openHomePanel}
       onNewAim={startNewAim}
       onOpenGoal={(goal) => void openGoal(goal)}
       onStage={openCockpitStage}
