@@ -5,11 +5,11 @@ Branch: `main`
 
 ## Current Session
 
-- Redesigned the Desktop New Aim composer into a Claude-inspired prompt well.
-- The top-level New Aim surface now uses a single large rounded composer with the aim question as the placeholder, no separate heading above it, a bottom toolbar, a plus icon for optional context, and an icon-only arrow submit button.
-- Optional context now expands from the plus button instead of always taking vertical space in the default composer.
-- The composer focus state is quieter, with a neutral border instead of a strong blue ring; enabled submit uses a local warm orange action color.
-- Updated Desktop design-system memory with the durable Claude-inspired prompt-well requirement.
+- Tightened the Desktop New Aim Claude-style prompt well after visual feedback.
+- Reduced the composer from the previous oversized treatment to a compact 560 px max-width, 24 px radius, shorter title area, smaller toolbar rhythm, and 36 px fixed icon controls.
+- Centered the Aim workspace/composer more explicitly with centered grid alignment, composer auto margins, and balanced scrollbar gutters for the Aim workspace.
+- Fixed the submit icon drift by overriding the generic primary-button padding inside the composer and centering SVGs in fixed square targets.
+- Updated Desktop design-system memory with the durable compact, centered prompt-well and fixed icon-control requirement.
 - Refreshed root `Aimcub.app` from the latest Electron 43 folder-style Desktop build.
 
 ## Current State
@@ -17,7 +17,7 @@ Branch: `main`
 - Work is prepared directly on `main`; no separate feature branch merge is needed.
 - The focused commit for this session was pushed to `origin/main`.
 - Root `Aimcub.app`, `apps/desktop/out`, and `apps/desktop/dist` were refreshed locally and remain ignored build artifacts.
-- Visual QA used the dev Electron app and refreshed root Electron app through Computer Use at normal and narrow desktop window sizes.
+- Visual QA used the dev Electron app and refreshed root Electron app through Computer Use.
 
 ## Verification
 
@@ -33,8 +33,8 @@ Passed:
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm core:purity`
 - `ELECTRON_BUILDER_CACHE=/private/tmp/aimcub-electron-builder-cache COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm desktop:pack`
 - `ditto apps/desktop/dist/mac-arm64/Aimcub.app Aimcub.app`
-- Visual QA in Electron dev app: New Aim rendered as a Claude-style single prompt well, enabled state showed the orange arrow button, optional context expanded from the plus button, and the layout stayed stable at 640 x 520.
-- Visual QA in the refreshed root Electron app: Chinese New Aim placeholder, plus button, ready state, and orange arrow button rendered correctly.
+- Visual QA in Electron dev app: New Aim rendered as a lower, narrower centered prompt well; empty and enabled states kept plus and arrow icons centered.
+- Visual QA in the refreshed root Electron app: Chinese New Aim placeholder, plus button, ready state, and orange arrow button rendered correctly with equal workspace side spacing.
 
 Notes:
 
