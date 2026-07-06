@@ -10,13 +10,13 @@ Branch: `main`
 - Added a workbench variant of `ContextSourcesPanel` that keeps the Context stage focused on aim-local files/folders plus a Settings handoff for advanced helpers.
 - Kept the full context-source controls available in Settings, where online connectors, web research, and permission/setup configuration belong.
 - Hid the Context bundle review on the Context stage until planning context, tool results, or relevant review items exist.
-- Updated `docs/memory/design-system.md` with the durable stepwise Context workbench rule.
+- Updated `docs/memory/design-system.md` and `docs/memory/desktop.md` with the durable stepwise Context workbench rule.
 - Refreshed root `Aimcub.app` from the latest Electron 43 folder-style Desktop build.
 
 ## Current State
 
 - Work was prepared directly on `main`; no separate feature branch merge is needed.
-- Session changes were pushed directly to `origin/main`; no separate branch merge was needed.
+- Context workbench and memory-refresh follow-up changes were pushed directly to `origin/main`; no separate branch merge was needed.
 - Root `Aimcub.app`, `apps/desktop/out`, and `apps/desktop/dist` were refreshed locally and remain ignored build artifacts.
 - A temporary Electron/Vite visual harness was attempted for desktop and narrow Context-stage screenshots, but Electron did not advance past app ready in this sandboxed run. Component tests and CSS/DOM assertions cover the simplified workbench structure; a live GUI smoke test remains useful if the next session changes this surface again.
 
@@ -27,7 +27,7 @@ Passed:
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop test -- ContextSourcesPanel.test.tsx App.test.tsx`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop typecheck`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop lint`
-- `git diff --check`
+- `python3 /Users/jenson/.codex/skills/memory-refresh/scripts/audit_project_memory.py /Users/jenson/Desktop/Aimcub`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck`
