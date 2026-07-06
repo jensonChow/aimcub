@@ -147,7 +147,7 @@ export const STRINGS = {
   },
   "aimIntake.workbenchKicker": { en: "New aim", zh: "新 Aim" },
   "aimIntake.workbenchTitle": { en: "What should Aimcub move forward?", zh: "今天想推进什么？" },
-  "aimIntake.workbenchBody": { en: "Name the outcome. Aimcub will ask for context next.", zh: "先写结果，下一步再补上下文。" },
+  "aimIntake.workbenchBody": { en: "Name the outcome. Aimcub will ask for context next.", zh: "写下你想推进的目标，下一步再补上下文。" },
   "aimIntake.subAimBody": {
     en: "Use this child aim as the next planning target and add the evidence needed to prove completion.",
     zh: "把这个子目标作为下一层规划目标，并补充判断完成所需的证据。",
@@ -159,7 +159,6 @@ export const STRINGS = {
   "aimIntake.addContext": { en: "Add context", zh: "添加上下文" },
   "aimIntake.empty": { en: "Empty aim", zh: "空 Aim" },
   "aimIntake.ready": { en: "Ready for context", zh: "可进入 Context" },
-  "aimIntake.emptyHint": { en: "Start with the outcome", zh: "先写结果" },
   "aimIntake.readyHint": { en: "Ready", zh: "就绪" },
   "aimIntake.optional": { en: "optional", zh: "可选" },
   "aimIntake.unsaved": { en: "New aim is not saved yet.", zh: "新 Aim 尚未保存。" },

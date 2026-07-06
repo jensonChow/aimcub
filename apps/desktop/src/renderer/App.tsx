@@ -1543,7 +1543,7 @@ function AimIntakePanel(props: {
           >
             <ComposerPlusIcon />
           </button>
-          <span>{hasAim ? t("aimIntake.readyHint") : t("aimIntake.emptyHint")}</span>
+          <span aria-hidden={!hasAim}>{hasAim ? t("aimIntake.readyHint") : null}</span>
           <button
             className="od-aim-primary od-aim-send-button"
             type="button"

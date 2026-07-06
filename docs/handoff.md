@@ -5,11 +5,9 @@ Branch: `main`
 
 ## Current Session
 
-- Tuned the Desktop New Aim prompt well to match the requested Claude-style hover behavior.
-- Made the composer border transparent at rest, with only a subtle light outline on hover or input focus.
-- Removed the persistent bright border from selected sidebar action rows so Home Panel/New Aim selection reads as a quiet fill instead of a bordered card.
-- Lowered the New Aim title placeholder inside the composer by adding top padding to the title textarea.
-- Updated Desktop design-system memory with the durable hover-only composer border and lowered-placeholder rule.
+- Removed the redundant empty-state toolbar hint from the Desktop New Aim composer.
+- Deleted the unused `aimIntake.emptyHint` i18n key and changed the fallback Chinese workbench body so the removed phrase does not return through another path.
+- Updated Desktop design-system memory to keep empty composer toolbar guidance in the placeholder rather than extra toolbar text.
 - Refreshed root `Aimcub.app` from the latest Electron 43 folder-style Desktop build.
 
 ## Current State
@@ -23,18 +21,19 @@ Branch: `main`
 
 Passed:
 
+- `rg -n "aimIntake\\.emptyHint|Start with the outcome|先写结果" apps/desktop/src/renderer docs/memory/design-system.md` returned no matches.
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop test -- App.test.tsx`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop typecheck`
-- Visual QA in Electron dev app: New Aim selected sidebar row no longer showed an obvious bright border; composer rest state had no visible outline; hover/focused input showed only a subtle light border; placeholder sat lower than before.
+- `git diff --check`
+- Visual QA in Electron dev app: New Aim empty toolbar no longer showed the redundant hint text.
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm lint`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm core:purity`
-- `git diff --check`
 - `ELECTRON_BUILDER_CACHE=/private/tmp/aimcub-electron-builder-cache COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm desktop:pack`
 - `ditto apps/desktop/dist/mac-arm64/Aimcub.app Aimcub.app`
-- Visual QA in refreshed root `Aimcub.app`: Chinese New Aim sidebar and composer matched the requested lower placeholder and hover-only subtle outline.
+- Visual QA in refreshed root `Aimcub.app`: Chinese New Aim composer showed the placeholder, plus button, and disabled arrow without the removed hint text.
 
 Notes:
 
