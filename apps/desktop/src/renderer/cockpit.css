@@ -192,6 +192,7 @@ kbd {
   --sidebar-width: 280px;
   --traffic-light-left: 16px;
   --traffic-light-row-height: 46px;
+  --window-drag-strip-height: 36px;
   --traffic-light-button-size: 14px;
   --traffic-light-cluster-width: 58px;
   --titlebar-control-gap: 8px;
@@ -236,7 +237,7 @@ kbd {
   top: 0;
   right: 0;
   left: calc(var(--titlebar-toggle-left) + var(--titlebar-toggle-size) + 8px);
-  height: 24px;
+  height: var(--window-drag-strip-height);
   background: var(--od-hit-region);
   user-select: none;
   app-region: drag;
