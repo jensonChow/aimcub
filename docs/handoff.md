@@ -5,18 +5,17 @@ Branch: `main`
 
 ## Current Session
 
-- Redesigned the normal Aim sidebar's top-left New Aim entry as an app-level/workspace action row with plus icon, label, and `Cmd N` shortcut.
-- Added a dedicated `od-sidebar-global-actions` container so future global sidebar actions can sit beside New Aim without mixing into recent aim history.
-- Removed the first-run empty-state rule that made New Aim look like a weak transparent text button.
-- Added renderer coverage for the global action row structure, icon, sizing, and empty-state visibility.
-- Updated `docs/memory/design-system.md` and `docs/memory/desktop.md` with the top-left app/workspace navigation requirement.
+- Refined the normal Aim sidebar's top-left New Aim entry into a black, slimmer app-level action button.
+- Kept the same plus icon, label, and `Cmd N` shortcut, but reduced the button height to 40 px, removed the icon chip, and softened the shortcut styling.
+- Updated renderer coverage for the black button treatment, slimmer sizing, icon size, and shortcut pill styling.
+- Updated `docs/memory/design-system.md` and `docs/memory/desktop.md` with the refined black New Aim button requirement.
 - Refreshed root `Aimcub.app` from the latest Electron 43 folder-style Desktop build.
 
 ## Current State
 
 - Work was prepared directly on `main`; no separate feature branch merge is needed.
 - Root `Aimcub.app`, `apps/desktop/out`, and `apps/desktop/dist` were refreshed locally and remain ignored build artifacts.
-- A temporary browser visual harness at `/private/tmp/aimcub-sidebar-harness.html` verified the sidebar at 960 by 680 px and 640 by 520 px. The New Aim row rendered at 44 px tall, text and shortcut did not overlap, and there was no horizontal overflow.
+- A temporary browser visual harness at `/private/tmp/aimcub-sidebar-harness.html` verified the sidebar at 960 by 680 px and 640 by 520 px. The New Aim button rendered at 40 px tall, text and shortcut did not overlap, there was no horizontal overflow, and browser console logs were empty.
 
 ## Verification
 

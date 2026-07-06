@@ -453,7 +453,6 @@ kbd {
 }
 
 .od-subtle-button:hover,
-.od-new-aim:hover,
 .od-filter-row button:hover,
 .od-filter-row button.active {
   color: var(--od-fg);
@@ -469,46 +468,45 @@ kbd {
 
 .od-new-aim {
   width: 100%;
-  min-height: 44px;
+  min-height: 40px;
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) auto;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
-  border: 1px solid var(--od-border-soft);
+  border: 1px solid #1d1d1f;
   border-radius: var(--od-radius-sm);
-  background: var(--od-surface-warm);
-  color: var(--od-fg);
-  padding: 6px 8px;
+  background: #1d1d1f;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  padding: 5px 9px;
   text-align: left;
   cursor: pointer;
 }
 
 .od-new-aim:hover {
-  background: var(--od-bg);
-  border-color: var(--od-border);
+  background: #111113;
+  border-color: #111113;
+  color: #ffffff;
 }
 
 .od-new-aim-icon {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   display: grid;
   place-items: center;
-  border-radius: var(--od-radius-pill);
-  background: color-mix(in oklab, var(--od-fg), transparent 92%);
-  color: var(--od-fg-2);
+  color: rgba(255, 255, 255, 0.88);
 }
 
 .od-new-aim:hover .od-new-aim-icon {
-  background: color-mix(in oklab, var(--od-accent), transparent 88%);
-  color: var(--od-accent);
+  color: #ffffff;
 }
 
 .od-new-aim-icon svg {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 2;
+  stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -517,7 +515,7 @@ kbd {
   min-width: 0;
   overflow: hidden;
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 600;
   line-height: 18px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -525,6 +523,12 @@ kbd {
 
 .od-new-aim kbd {
   justify-self: end;
+  min-height: 18px;
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.72);
+  padding: 0 5px;
+  font-size: 9px;
 }
 
 .od-section-label {
