@@ -5,32 +5,28 @@ Branch: `main`
 
 ## Current Session
 
-- Collapsed Desktop typography to a strict three-size token system: `--od-type-meta` 12 px, `--od-type-body` 13 px, and `--od-type-title` 16 px.
-- Lowered Desktop typography weights to a light token set: regular/medium 400, semibold 450, and strong 500; `--od-font-weight-heavy` is now an alias of strong.
-- Replaced renderer CSS and legacy inline style font sizes/weights with shared `TYPE` and `WEIGHT` helpers so page, sidebar, Settings, Context, Plan, Eval, proof, command palette, and setup surfaces share the same typography contract.
-- Lightened the first-run composer title input to regular weight after visual inspection showed the intermediate token still rendered too heavy on macOS.
-- Updated renderer coverage to assert the three-size CSS contract and reject raw heavy weights.
-- Updated `docs/memory/design-system.md` with the durable user requirement for three Desktop type sizes and lighter tokenized weights.
-- Ran the memory-refresh audit and revised `docs/memory/desktop.md` so sidebar label weight wording points to the Desktop type ramp instead of the older medium-weight phrasing.
+- Replaced the initial empty Desktop main workspace with a quiet placeholder instead of auto-rendering the aim/chat composer.
+- Added `aimComposerOpen` renderer state so the intake composer still appears after the user explicitly chooses New Aim, while saved aims continue to open to the Aim overview.
+- Added renderer coverage asserting the first-run main workspace does not contain the aim composer, aim title/context fields, or Continue action.
+- Updated `docs/memory/design-system.md` and `docs/memory/desktop.md` with the durable requirement that the initial main workspace must not auto-render chat/intake UI.
 - Refreshed root `Aimcub.app` from the latest Electron 43 folder-style Desktop build.
 
 ## Current State
 
 - Work is prepared directly on `main`; no separate feature branch merge is needed.
-- Before the typography commit, local `main` was ahead of `origin/main` by 3 from earlier focused commits. After the typography and memory-refresh commits, local `main` should be ahead of `origin/main` by 5 unless the user explicitly approves a default-branch push.
+- Before this commit, local `main` was ahead of `origin/main` by 5 from earlier focused commits. After committing this work, local `main` should be ahead of `origin/main` by 6 unless the user explicitly approves a default-branch push.
 - Pushing `main` to `origin/main` mutates the shared default branch. Ask the user for explicit approval before pushing.
 - Root `Aimcub.app`, `apps/desktop/out`, and `apps/desktop/dist` were refreshed locally and remain ignored build artifacts.
-- The in-app browser blocked localhost navigation and `agent-browser` was not installed in PATH, so visual QA used the launched local Electron dev app through Computer Use instead.
+- Visual QA used the launched local Electron dev app through Computer Use.
 
 ## Verification
 
 Passed:
 
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop test -- App.test.tsx`
-- `python3 /Users/jenson/.codex/skills/memory-refresh/scripts/audit_project_memory.py /Users/jenson/Desktop/Aimcub`
-- `wc -l AGENTS.md CLAUDE.md docs/handoff.md`
-- `rg -n "font-size: (9|10|11|12|13|14|15|16|18|20|22|28|32)px|font-weight: (600|650|700|750|800)|fontSize: (11|12|13|14|15|18|22|24)\\b|fontWeight: (500|600|650|700|750|800)\\b" apps/desktop/src/renderer` returned no matches.
-- Visual QA in the Electron dev app at default size and about 640 by 520 px: first-run composer and expanded sidebar rendered without text overlap or size jumps; narrow width wrapped the disabled Continue button below the footer text as expected.
+- `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop test -- firstRunFlow.test.ts`
+- Visual QA in the Electron dev app at default size: initial main workspace showed the quiet placeholder without chat/composer controls; expanding the sidebar preserved layout; clicking New Aim still opened the composer.
+- Visual QA in the Electron dev app at about 640 by 520 px: initial quiet placeholder rendered without text overlap or overflow.
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck`
@@ -48,5 +44,5 @@ Notes:
 
 ```text
 Continue from `main`. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md, then load only task-relevant module memory. For repo-changing sessions, run the full verification suite, refresh root Aimcub.app from the packaged Desktop output, update docs/handoff.md, create a focused commit, push, and merge completed branch work into main unless the user explicitly opts out.
-Current local main may be ahead of origin/main by 5 because default-branch push requires explicit user approval.
+Current local main may be ahead of origin/main by 6 because default-branch push requires explicit user approval.
 ```

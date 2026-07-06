@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import type { Goal, Milestone } from "@core/types";
 import type { ContextSourceStatus, ProviderStatus, WebResearchStatus } from "../shared/ipc";
 
-import { buildSettingsModel, EvidenceSubmissionForm, SettingsPanel } from "./App";
+import { App, buildSettingsModel, EvidenceSubmissionForm, SettingsPanel } from "./App";
 import { CockpitShell } from "./CockpitShell";
 import { I18nProvider, translate, type I18n } from "./i18n";
 
@@ -132,6 +132,20 @@ describe("EvidenceSubmissionForm", () => {
     expect(html).toContain("Local file references");
     expect(html).toContain("Approval note.");
     expect(html).toContain("Submit proof");
+  });
+});
+
+describe("App first-run workspace", () => {
+  it("keeps the initial main workspace free of the aim composer", () => {
+    const html = renderToStaticMarkup(<App />);
+
+    expect(html).toContain('class="od-initial-workspace"');
+    expect(html).toContain("Workspace ready");
+    expect(html).toContain("Create a new aim when you are ready to start.");
+    expect(html).not.toContain('class="od-aim-composer"');
+    expect(html).not.toContain('id="aim-title"');
+    expect(html).not.toContain('id="aim-context"');
+    expect(html).not.toContain(">Continue</button>");
   });
 });
 

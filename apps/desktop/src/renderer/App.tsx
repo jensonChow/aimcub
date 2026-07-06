@@ -564,6 +564,7 @@ function AimOsApp() {
   const [webResearch, setWebResearch] = useState<WebResearchStatus | null>(null);
   const [contextSources, setContextSources] = useState<ContextSourceStatus | null>(null);
   const [localAgents, setLocalAgents] = useState<LocalAgentDetection[]>([]);
+  const [aimComposerOpen, setAimComposerOpen] = useState(false);
   const [aimTitle, setAimTitle] = useState("");
   const [aimDescription, setAimDescription] = useState("");
   const [parent, setParent] = useState<{ goalId: string; milestoneId: string } | null>(null);
@@ -632,6 +633,7 @@ function AimOsApp() {
   async function openGoal(goal: Goal) {
     setSelected(goal);
     setMode("cockpit");
+    setAimComposerOpen(false);
     setError(null);
     setDraft(null);
     setFinalPlan(null);
@@ -660,8 +662,9 @@ function AimOsApp() {
     setStageOverride(stageForOpenedAim(nextProgress));
   }
 
-  function resetComposer() {
+  function resetComposer(options: { openComposer?: boolean } = {}) {
     setStageOverride("aim");
+    setAimComposerOpen(Boolean(options.openComposer));
     setAimTitle("");
     setAimDescription("");
     setParent(null);
@@ -944,7 +947,7 @@ function AimOsApp() {
   function breakDown(milestone: Milestone) {
     const plan = detail?.goal.plan_json as DecompositionOutput | null | undefined;
     const node = planNodeForMilestone(plan, milestone);
-    resetComposer();
+    resetComposer({ openComposer: true });
     setParent({ goalId: milestone.goal_id, milestoneId: milestone.id });
     setAimTitle(milestone.title);
     setAimDescription([
@@ -974,6 +977,7 @@ function AimOsApp() {
   const total = progress?.total_milestones ?? detail?.milestones.length ?? 0;
   const aimComplete = hasCompletionRecap(progress) || (total > 0 && completed === total);
   const hasUnsavedAim = aimTitle.trim().length > 0;
+  const showAimComposer = aimComposerOpen || hasUnsavedAim || Boolean(parent) || Boolean(draft);
   const activeStage = stageOverride ?? cockpitStageFor(mode, selected, activePlan);
   const planningRuntimeReady = hasPlanningRuntime(provider, localAgents);
   const activeAimTitle = selected?.title ?? aimTitle.trim();
@@ -1036,7 +1040,7 @@ function AimOsApp() {
   }
 
   function startNewAim() {
-    resetComposer();
+    resetComposer({ openComposer: true });
     setMode("cockpit");
     setStageOverride("aim");
   }
@@ -1242,8 +1246,8 @@ function AimOsApp() {
         />
       );
     }
-    return (
-      selected && !draft && !parent ? (
+    if (selected && !draft && !parent) {
+      return (
         <AimOverviewPanel
           goal={selected}
           progress={progress}
@@ -1254,21 +1258,24 @@ function AimOsApp() {
           onRecap={() => openCockpitStage("eval")}
           onNewAim={startNewAim}
         />
-      ) : (
-        <AimIntakePanel
-          title={aimTitle}
-          description={aimDescription}
-          parent={parent}
-          mode={mode}
-          disabled={Boolean(busy)}
-          onTitle={setAimTitle}
-          onDescription={setAimDescription}
-          onDraft={() => void startDraft()}
-          runtimeGuidance={runtimeGuidanceVisible && !planningRuntimeReady ? activeAimHelper : null}
-          onOpenSettings={openSettingsForAim}
-          onKeepEditing={() => setRuntimeGuidanceVisible(false)}
-        />
-      )
+      );
+    }
+    return showAimComposer ? (
+      <AimIntakePanel
+        title={aimTitle}
+        description={aimDescription}
+        parent={parent}
+        mode={mode}
+        disabled={Boolean(busy)}
+        onTitle={setAimTitle}
+        onDescription={setAimDescription}
+        onDraft={() => void startDraft()}
+        runtimeGuidance={runtimeGuidanceVisible && !planningRuntimeReady ? activeAimHelper : null}
+        onOpenSettings={openSettingsForAim}
+        onKeepEditing={() => setRuntimeGuidanceVisible(false)}
+      />
+    ) : (
+      <InitialWorkspacePanel />
     );
   })();
 
@@ -1289,6 +1296,18 @@ function AimOsApp() {
         </>
       )}
     />
+  );
+}
+
+export function InitialWorkspacePanel() {
+  const { t } = useI18n();
+  return (
+    <section className="od-initial-workspace" aria-label={t("initialWorkspace.label")}>
+      <div className="od-initial-workspace-copy">
+        <h1>{t("initialWorkspace.title")}</h1>
+        <p>{t("initialWorkspace.body")}</p>
+      </div>
+    </section>
   );
 }
 

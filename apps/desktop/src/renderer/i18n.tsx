@@ -74,6 +74,10 @@ export const STRINGS = {
   "userMenu.languageEnglish": { en: "English", zh: "English" },
   "userMenu.languageChinese": { en: "Chinese", zh: "中文" },
 
+  "initialWorkspace.label": { en: "Empty workspace", zh: "空工作区" },
+  "initialWorkspace.title": { en: "Workspace ready", zh: "工作区已就绪" },
+  "initialWorkspace.body": { en: "Create a new aim when you are ready to start.", zh: "想开始时，再创建新目标。" },
+
   "chat.new": { en: "New aim", zh: "新目标" },
   "chat.home": { en: "Aims", zh: "目标" },
   "chat.search": { en: "Search aims", zh: "搜索目标" },

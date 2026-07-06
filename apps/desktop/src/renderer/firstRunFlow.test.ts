@@ -8,7 +8,7 @@ import {
 } from "./firstRunFlow";
 
 describe("first-run flow routing", () => {
-  it("starts first-run users on aim capture instead of settings", () => {
+  it("keeps first-run users in the aim stage instead of settings", () => {
     expect(routeAfterRefresh({ hasSelectedAim: false, hasGoals: false })).toEqual({
       autoOpenFirstGoal: false,
       stageOverride: "aim",

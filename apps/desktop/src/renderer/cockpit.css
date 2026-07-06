@@ -1826,6 +1826,38 @@ kbd {
   margin-right: 0;
 }
 
+.od-initial-workspace {
+  width: 100%;
+  min-height: min(520px, calc(100vh - 124px));
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.od-initial-workspace-copy {
+  width: min(100%, 340px);
+  display: grid;
+  gap: 8px;
+  text-align: center;
+}
+
+.od-initial-workspace h1 {
+  margin: 0;
+  color: var(--od-fg);
+  font-family: "SF Pro Display", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: var(--od-type-title);
+  font-weight: var(--od-font-weight-strong);
+  line-height: var(--od-line-title);
+  letter-spacing: 0;
+}
+
+.od-initial-workspace p {
+  margin: 0;
+  color: var(--od-muted);
+  font-size: var(--od-type-body);
+  line-height: var(--od-line-body);
+}
+
 .od-aim-composer {
   width: min(100%, 640px);
   justify-self: center;
