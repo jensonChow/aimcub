@@ -622,8 +622,8 @@ function SidebarToggleIcon() {
 function NewAimIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
-      <circle cx="10" cy="10" r="5.5" />
-      <path d="M10 3v2M10 15v2M3 10h2M15 10h2M10 8v4M8 10h4" />
+      <circle cx="10" cy="10" r="5.25" />
+      <path d="M10 2.75v2.25M10 15v2.25M2.75 10h2.25M15 10h2.25M10 8.25v3.5M8.25 10h3.5" />
     </svg>
   );
 }
