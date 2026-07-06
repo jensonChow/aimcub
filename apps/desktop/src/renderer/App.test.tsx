@@ -180,6 +180,38 @@ describe("CockpitShell", () => {
     expect(html).toContain('aria-expanded="false"');
     expect(html).toContain("Local user");
     expect(html).toContain("Aimcub workspace");
+    expect(html).not.toContain("<h1>Aimcub</h1>");
+    expect(html).not.toContain("<p>Workbench</p>");
+  });
+
+  it("renders a pinned sidebar resize sash with accessible controls", () => {
+    const html = renderToStaticMarkup(
+      <I18nProvider>
+        <CockpitShell
+          goals={[]}
+          selected={null}
+          activeStage="aim"
+          onNewAim={noop}
+          onOpenGoal={noop}
+          onStage={noop}
+          main={<div>New aim</div>}
+        />
+      </I18nProvider>,
+    );
+    const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
+
+    expect(html).toContain('style="--sidebar-width:280px"');
+    expect(html).toContain('id="od-left-aim-sidebar"');
+    expect(html).toContain('data-od-id="sidebar-resizer"');
+    expect(html).toContain('role="separator"');
+    expect(html).toContain('aria-label="Resize left sidebar"');
+    expect(html).toContain('aria-controls="od-left-aim-sidebar"');
+    expect(html).toContain('aria-orientation="vertical"');
+    expect(html).toContain('aria-valuemin="240"');
+    expect(html).toContain('aria-valuemax="360"');
+    expect(html).toContain('aria-valuenow="280"');
+    expect(css).toMatch(/\.od-sidebar-resizer\s*{[^}]*cursor:\s*col-resize;[^}]*touch-action:\s*none;/s);
+    expect(css).toMatch(/\.od-sidebar-resizer::before\s*{[^}]*background:/s);
   });
 
   it("replaces the primary left sidebar with settings navigation on settings stage", () => {
@@ -312,6 +344,16 @@ describe("CockpitShell", () => {
     expect(html).toContain('data-od-id="sidebar-toggle"');
     expect(html).toContain('data-od-id="sidebar-peek-trigger"');
     expect(css).toMatch(/\.od-sidebar-hover-zone\s*{[^}]*display:\s*contents;/s);
+  });
+
+  it("auto-collapses the normal sidebar before the workspace becomes too narrow", () => {
+    const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
+
+    expect(css).toContain("@media (max-width: 1040px)");
+    expect(css).toContain(".od-app:not(.od-app-stage-settings)[data-sidebar-state=\"pinned\"]");
+    expect(css).toContain("grid-template-columns: 0 minmax(0, 1fr);");
+    expect(css).toContain(".od-app:not(.od-app-stage-settings) .od-sidebar-resizer");
+    expect(css).toContain("flex-wrap: wrap;");
   });
 
   it("keeps the peek sidebar visible until its collapse animation finishes", () => {

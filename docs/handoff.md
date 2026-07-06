@@ -5,29 +5,28 @@ Branch: `main`
 
 ## Current Session
 
-- Simplified the Desktop Context stage workbench so it no longer dumps source setup, web capability, permission, gate, and review surfaces all at once.
-- Context intake now shows one blocking question at a time, with progress text, and only enables plan generation after the step has enough current context.
-- Added a workbench variant of `ContextSourcesPanel` that keeps the Context stage focused on aim-local files/folders plus a Settings handoff for advanced helpers.
-- Kept the full context-source controls available in Settings, where online connectors, web research, and permission/setup configuration belong.
-- Hid the Context bundle review on the Context stage until planning context, tool results, or relevant review items exist.
-- Updated `docs/memory/design-system.md` and `docs/memory/desktop.md` with the durable stepwise Context workbench rule.
+- Removed the redundant normal-sidebar `Aimcub` / `Workbench` header text from `CockpitShell`.
+- Added a visible, keyboard-accessible pinned-sidebar resize sash with 240 to 360 px bounds and persisted width.
+- Changed the normal Aim sidebar to auto-collapse at medium window widths so the main workspace keeps usable width instead of being squeezed by a fixed rail.
+- Kept Settings in its always-visible split sidebar mode while allowing the shared sidebar width behavior.
+- Stabilized sidebar aim rows so a single aim no longer stretches to fill the remaining sidebar height.
+- Updated `docs/memory/design-system.md` and `docs/memory/desktop.md` with the durable sidebar cleanup and resize rules.
 - Refreshed root `Aimcub.app` from the latest Electron 43 folder-style Desktop build.
 
 ## Current State
 
 - Work was prepared directly on `main`; no separate feature branch merge is needed.
-- Context workbench and memory-refresh follow-up changes were pushed directly to `origin/main`; no separate branch merge was needed.
 - Root `Aimcub.app`, `apps/desktop/out`, and `apps/desktop/dist` were refreshed locally and remain ignored build artifacts.
-- A temporary Electron/Vite visual harness was attempted for desktop and narrow Context-stage screenshots, but Electron did not advance past app ready in this sandboxed run. Component tests and CSS/DOM assertions cover the simplified workbench structure; a live GUI smoke test remains useful if the next session changes this surface again.
+- A temporary Vite visual harness under `/private/tmp/aimcub-sidebar-harness` rendered `CockpitShell` at 1280, 900, and 700 px widths. It verified no sidebar brand header, visible resize sash, drag from 280 px to 330 px, auto-collapse at 900 px, single-column content at 700 px, and no horizontal overflow.
 
 ## Verification
 
 Passed:
 
-- `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop test -- ContextSourcesPanel.test.tsx App.test.tsx`
+- `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop test -- App.test.tsx`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop typecheck`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop lint`
-- `python3 /Users/jenson/.codex/skills/memory-refresh/scripts/audit_project_memory.py /Users/jenson/Desktop/Aimcub`
+- Browser visual check through the temporary Vite harness at 1280, 900, and 700 px.
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck`
@@ -40,7 +39,7 @@ Passed:
 Notes:
 
 - MCP worker tests may log the expected missing-Supabase opaque-error path while passing.
-- The failed temporary visual harness lived under `/private/tmp/aimcub-context-visual-check.mjs` and was not committed.
+- The temporary Vite harness was not committed.
 
 ## Next Session Prompt
 

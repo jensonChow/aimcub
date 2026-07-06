@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import type { Goal } from "@core/types";
 
@@ -11,8 +11,13 @@ export type CockpitStage = "aim" | "context" | "contracts" | "run" | "eval" | "s
 type SidebarState = "pinned" | "collapsed" | "peek";
 const USER_MENU_ID = "od-sidebar-user-menu";
 const LANGUAGE_MENU_ID = "od-sidebar-language-menu";
+const SIDEBAR_WIDTH_STORAGE_KEY = "aimcub.sidebarWidth";
 const SIDEBAR_REVEAL_DELAY_MS = 180;
 const SIDEBAR_CLOSE_DELAY_MS = 180;
+const SIDEBAR_AUTO_COLLAPSE_QUERY = "(max-width: 1040px)";
+const DEFAULT_SIDEBAR_WIDTH = 280;
+const MIN_SIDEBAR_WIDTH = 240;
+const MAX_SIDEBAR_WIDTH = 360;
 const DEFAULT_WINDOW_CHROME_STATE: WindowChromeState = {
   fullscreen: false,
   colorScheme: "light",
@@ -56,7 +61,28 @@ function statusLabel(goal: Goal): string {
 }
 
 function prefersCollapsedSidebar() {
-  return typeof window !== "undefined" && window.matchMedia("(max-width: 760px)").matches;
+  return typeof window !== "undefined" && window.matchMedia(SIDEBAR_AUTO_COLLAPSE_QUERY).matches;
+}
+
+function maxSidebarWidthForViewport() {
+  if (typeof window === "undefined") return MAX_SIDEBAR_WIDTH;
+  return Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, window.innerWidth - 560));
+}
+
+function clampSidebarWidth(width: number) {
+  return Math.min(Math.max(Math.round(width), MIN_SIDEBAR_WIDTH), maxSidebarWidthForViewport());
+}
+
+function readInitialSidebarWidth() {
+  if (typeof window === "undefined") return DEFAULT_SIDEBAR_WIDTH;
+  const raw = window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY);
+  const parsed = raw ? Number.parseInt(raw, 10) : DEFAULT_SIDEBAR_WIDTH;
+  return Number.isFinite(parsed) ? clampSidebarWidth(parsed) : DEFAULT_SIDEBAR_WIDTH;
+}
+
+function persistSidebarWidth(width: number) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(width));
 }
 
 export function CockpitShell({
@@ -76,9 +102,12 @@ export function CockpitShell({
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [sidebarPinned, setSidebarPinned] = useState(() => !prefersCollapsedSidebar());
   const [sidebarPeeking, setSidebarPeeking] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(readInitialSidebarWidth);
+  const [sidebarResizing, setSidebarResizing] = useState(false);
   const [windowChrome, setWindowChrome] = useState<WindowChromeState>(DEFAULT_WINDOW_CHROME_STATE);
   const sidebarHoverZoneRef = useRef<HTMLDivElement | null>(null);
   const sidebarRef = useRef<HTMLElement | null>(null);
+  const sidebarWidthRef = useRef(sidebarWidth);
   const revealSidebarTimer = useRef<number | null>(null);
   const hideSidebarTimer = useRef<number | null>(null);
   const suppressSidebarPeekUntilExit = useRef(false);
@@ -88,6 +117,8 @@ export function CockpitShell({
   const sidebarState: SidebarState = usingSettingsSidebar ? "pinned" : sidebarPinned ? "pinned" : sidebarPeeking ? "peek" : "collapsed";
   const sidebarVisible = sidebarState !== "collapsed";
   const sidebarToggleLabel = sidebarPinned ? t("sidebar.collapse") : t("sidebar.expand");
+  const sidebarId = usingSettingsSidebar ? "od-left-settings-sidebar" : "od-left-aim-sidebar";
+  const appStyle = { "--sidebar-width": `${sidebarWidth}px` } as CSSProperties;
 
   const stages = useMemo<StageItem[]>(() => [
     { stage: "aim", index: "1", title: t("os.stepAim") },
@@ -189,6 +220,77 @@ export function CockpitShell({
     setSidebarPinned((current) => !current);
   }
 
+  function updateSidebarWidth(nextWidth: number) {
+    const clamped = clampSidebarWidth(nextWidth);
+    sidebarWidthRef.current = clamped;
+    setSidebarWidth(clamped);
+    return clamped;
+  }
+
+  function commitSidebarWidth(nextWidth: number) {
+    const clamped = updateSidebarWidth(nextWidth);
+    persistSidebarWidth(clamped);
+  }
+
+  function beginSidebarResize(event: React.PointerEvent<HTMLDivElement>) {
+    if (sidebarState !== "pinned") return;
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    clearSidebarTimers();
+
+    const handle = event.currentTarget;
+    const pointerId = event.pointerId;
+    const startX = event.clientX;
+    const startWidth = sidebarWidthRef.current;
+    setSidebarResizing(true);
+    document.body.classList.add("od-resizing");
+    handle.setPointerCapture(pointerId);
+
+    function onPointerMove(moveEvent: PointerEvent) {
+      updateSidebarWidth(startWidth + moveEvent.clientX - startX);
+    }
+
+    function onPointerEnd() {
+      persistSidebarWidth(sidebarWidthRef.current);
+      setSidebarResizing(false);
+      document.body.classList.remove("od-resizing");
+      if (handle.hasPointerCapture(pointerId)) {
+        handle.releasePointerCapture(pointerId);
+      }
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerEnd);
+      window.removeEventListener("pointercancel", onPointerEnd);
+    }
+
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerEnd);
+    window.addEventListener("pointercancel", onPointerEnd);
+  }
+
+  function onSidebarResizeKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    const step = event.shiftKey ? 32 : 16;
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      commitSidebarWidth(sidebarWidthRef.current - step);
+      return;
+    }
+    if (event.key === "ArrowRight") {
+      event.preventDefault();
+      commitSidebarWidth(sidebarWidthRef.current + step);
+      return;
+    }
+    if (event.key === "Home") {
+      event.preventDefault();
+      commitSidebarWidth(MIN_SIDEBAR_WIDTH);
+      return;
+    }
+    if (event.key === "End") {
+      event.preventDefault();
+      commitSidebarWidth(MAX_SIDEBAR_WIDTH);
+    }
+  }
+
   function onSidebarTogglePointerDown(event: React.PointerEvent<HTMLButtonElement>) {
     event.stopPropagation();
   }
@@ -220,6 +322,24 @@ export function CockpitShell({
       if (revealSidebarTimer.current !== null) window.clearTimeout(revealSidebarTimer.current);
       if (hideSidebarTimer.current !== null) window.clearTimeout(hideSidebarTimer.current);
     };
+  }, []);
+
+  useEffect(() => {
+    sidebarWidthRef.current = sidebarWidth;
+  }, [sidebarWidth]);
+
+  useEffect(() => {
+    function syncSidebarWidthToViewport() {
+      setSidebarWidth((current) => {
+        const clamped = clampSidebarWidth(current);
+        sidebarWidthRef.current = clamped;
+        return clamped;
+      });
+    }
+
+    syncSidebarWidthToViewport();
+    window.addEventListener("resize", syncSidebarWidthToViewport);
+    return () => window.removeEventListener("resize", syncSidebarWidthToViewport);
   }, []);
 
   useEffect(() => {
@@ -257,7 +377,7 @@ export function CockpitShell({
   }, []);
 
   useEffect(() => {
-    const query = window.matchMedia("(max-width: 760px)");
+    const query = window.matchMedia(SIDEBAR_AUTO_COLLAPSE_QUERY);
     function syncSidebarForViewport(event: MediaQueryList | MediaQueryListEvent) {
       clearSidebarTimers();
       setSidebarPeeking(false);
@@ -301,7 +421,8 @@ export function CockpitShell({
   return (
     <div className="od-window" data-od-id="desktop-window">
       <div
-        className={`od-app od-app-stage-${activeStage}`}
+        className={`od-app od-app-stage-${activeStage}${sidebarResizing ? " od-resizing" : ""}`}
+        style={appStyle}
         data-empty-aim={firstRunAim ? "true" : "false"}
         data-sidebar-state={sidebarState}
         data-system-appearance={windowChrome.colorScheme}
@@ -348,6 +469,7 @@ export function CockpitShell({
           </div>
         )}
         <aside
+          id={sidebarId}
           ref={sidebarRef}
           className="od-sidebar"
           data-mode={usingSettingsSidebar ? "settings" : "aims"}
@@ -358,15 +480,6 @@ export function CockpitShell({
           onFocus={usingSettingsSidebar ? undefined : keepSidebarPeekOpen}
           onBlur={usingSettingsSidebar ? undefined : scheduleSidebarPeekClose}
         >
-          {usingSettingsSidebar ? null : (
-            <div className="od-sidebar-head">
-              <div>
-                <h1>Aimcub</h1>
-                <p>{t("os.tagline")}</p>
-              </div>
-            </div>
-          )}
-
           {usingSettingsSidebar ? settingsSidebar : (
             <>
               <button className="od-new-aim" type="button" onClick={onNewAim}>
@@ -432,6 +545,25 @@ export function CockpitShell({
 
           <SidebarUserMenu onSettings={() => onStage("settings")} />
         </aside>
+
+        {sidebarState === "pinned" ? (
+          <div
+            className="od-sidebar-resizer"
+            role="separator"
+            aria-label={t("cockpit.resizeSidebar")}
+            aria-controls={sidebarId}
+            aria-orientation="vertical"
+            aria-valuemin={MIN_SIDEBAR_WIDTH}
+            aria-valuemax={MAX_SIDEBAR_WIDTH}
+            aria-valuenow={sidebarWidth}
+            tabIndex={0}
+            title={t("cockpit.resizeSidebar")}
+            data-resizing={sidebarResizing ? "true" : "false"}
+            data-od-id="sidebar-resizer"
+            onPointerDown={beginSidebarResize}
+            onKeyDown={onSidebarResizeKeyDown}
+          />
+        ) : null}
 
         <main className={`od-main od-main-${activeStage}`} data-od-id="main-delivery-workbench">
           {activeStage !== "settings" && activeStage !== "aim" ? (
