@@ -203,6 +203,8 @@ kbd {
   --sidebar-horizontal-inset: 12px;
   --sidebar-row-padding-x: 8px;
   --sidebar-icon-column: 28px;
+  --sidebar-action-icon-slot: 20px;
+  --sidebar-action-label-gap: 6px;
   --sidebar-content-width: calc(var(--sidebar-width) - (var(--sidebar-horizontal-inset) * 2) - 1px);
   position: relative;
   height: 100%;
@@ -505,9 +507,9 @@ kbd {
   width: 100%;
   min-height: 34px;
   display: grid;
-  grid-template-columns: var(--sidebar-icon-column) minmax(0, 1fr) auto;
+  grid-template-columns: var(--sidebar-action-icon-slot) minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
+  column-gap: var(--sidebar-action-label-gap);
   border: 1px solid transparent;
   border-radius: var(--od-radius-sm);
   background: transparent;
@@ -531,8 +533,8 @@ kbd {
 }
 
 .od-new-aim-icon {
-  width: var(--sidebar-icon-column);
-  height: 18px;
+  width: var(--sidebar-action-icon-slot);
+  height: 20px;
   display: grid;
   place-items: center;
   color: currentColor;
@@ -544,11 +546,11 @@ kbd {
 }
 
 .od-new-aim-icon svg {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.7;
+  stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
 }

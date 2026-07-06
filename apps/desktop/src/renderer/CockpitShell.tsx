@@ -490,7 +490,7 @@ export function CockpitShell({
                   onClick={onNewAim}
                 >
                   <span className="od-new-aim-icon" aria-hidden="true">
-                    <PlusIcon />
+                    <NewAimIcon />
                   </span>
                   <span className="od-new-aim-label">{t("os.newAim")}</span>
                   <kbd aria-label="Command N">
@@ -619,10 +619,11 @@ function SidebarToggleIcon() {
   );
 }
 
-function PlusIcon() {
+function NewAimIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
-      <path d="M10 4v12M4 10h12" />
+      <circle cx="10" cy="10" r="5.5" />
+      <path d="M10 3v2M10 15v2M3 10h2M15 10h2M10 8v4M8 10h4" />
     </svg>
   );
 }
