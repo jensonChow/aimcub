@@ -14,6 +14,7 @@ Branch: `main`
 ## Current State
 
 - Work was prepared directly on `main`; no separate feature branch merge is needed.
+- Sidebar layout fix was committed as `2ea56e7 Fix pinned sidebar workspace layout` and pushed to `origin/main`.
 - Root `Aimcub.app`, `apps/desktop/out`, and `apps/desktop/dist` were refreshed locally and remain ignored build artifacts.
 - A temporary Vite visual harness under `/private/tmp/aimcub-sidebar-harness` verified that a 960 by 680 px collapsed shell expands to pinned grid columns around `330px 630px`; the sidebar right edge matched the main content left edge, `covered` was false, and there was no horizontal overflow.
 
