@@ -14,8 +14,8 @@ Branch: `main`
 ## Current State
 
 - Work is prepared directly on `main`; no separate feature branch merge is needed.
-- Before this commit, local `main` was ahead of `origin/main` by 5 from earlier focused commits. After committing this work, local `main` should be ahead of `origin/main` by 6 unless the user explicitly approves a default-branch push.
-- Pushing `main` to `origin/main` mutates the shared default branch. Ask the user for explicit approval before pushing.
+- The user explicitly approved commit, push, and merge. The six local commits through `d27c1a8` were pushed to `origin/main`.
+- No separate merge was needed because the completed work was prepared directly on `main`.
 - Root `Aimcub.app`, `apps/desktop/out`, and `apps/desktop/dist` were refreshed locally and remain ignored build artifacts.
 - Visual QA used the launched local Electron dev app through Computer Use.
 
@@ -44,5 +44,5 @@ Notes:
 
 ```text
 Continue from `main`. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md, then load only task-relevant module memory. For repo-changing sessions, run the full verification suite, refresh root Aimcub.app from the packaged Desktop output, update docs/handoff.md, create a focused commit, push, and merge completed branch work into main unless the user explicitly opts out.
-Current local main may be ahead of origin/main by 6 because default-branch push requires explicit user approval.
+Current `main` should be synced with `origin/main`; if it is not, inspect `git status --short --branch` before continuing.
 ```
