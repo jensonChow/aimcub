@@ -1903,39 +1903,87 @@ kbd {
 }
 
 .od-aim-composer {
-  width: min(100%, 520px);
+  width: min(100%, 760px);
   justify-self: center;
   display: grid;
-  overflow: hidden;
-  border: 1px solid var(--od-border-soft);
-  border-radius: var(--od-radius-md);
-  background: var(--od-surface-warm);
+  gap: 2px;
+  border: 1px solid color-mix(in oklab, var(--od-border), var(--od-border-soft) 22%);
+  border-radius: 28px;
+  background: color-mix(in oklab, var(--od-surface), var(--od-bg) 22%);
+  padding: 18px 20px 16px;
   box-shadow: var(--od-shadow-composer);
   transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
 }
 
 .od-aim-composer:focus-within {
-  border-color: color-mix(in oklab, var(--od-accent), var(--od-border) 35%);
-  background: var(--od-bg);
+  border-color: color-mix(in oklab, var(--od-fg), var(--od-border) 72%);
+  background: color-mix(in oklab, var(--od-surface), var(--od-bg) 28%);
   box-shadow: var(--od-shadow-composer-focus);
 }
 
-.od-aim-composer-footer {
-  min-height: 48px;
-  display: flex;
-  justify-content: space-between;
+.od-aim-composer-toolbar {
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  border-top: 1px solid var(--od-border-soft);
-  padding: 6px 8px 6px 14px;
+  padding-top: 8px;
 }
 
-.od-aim-composer-footer span {
+.od-aim-composer-toolbar span {
   min-width: 0;
+  justify-self: end;
   color: var(--od-meta);
   font-size: var(--od-type-meta);
   line-height: 1.35;
   font-weight: var(--od-font-weight-medium);
+}
+
+.od-aim-composer-icon-button,
+.od-aim-send-button {
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--od-radius-pill);
+  padding: 0;
+}
+
+.od-aim-composer-icon-button {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--od-fg);
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.od-aim-composer-icon-button:hover {
+  background: var(--od-interaction-hover-bg);
+  border-color: transparent;
+  box-shadow: var(--od-interaction-hover-shadow);
+}
+
+.od-aim-composer-icon-button:focus-visible {
+  background: var(--od-interaction-hover-bg);
+  border-color: transparent;
+  box-shadow: var(--od-interaction-focus-shadow);
+}
+
+.od-aim-composer-icon-button:active,
+.od-aim-send-button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.od-aim-composer-icon-button svg,
+.od-aim-send-button svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: var(--od-icon-stroke-strong);
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .od-aim-intake-form {
@@ -2005,27 +2053,41 @@ kbd {
 }
 
 .od-aim-composer .od-aim-title-input {
-  min-height: 46px;
-  padding: 0 14px;
-  font-size: var(--od-type-body);
-  line-height: var(--od-line-body);
+  min-height: 68px;
+  padding: 0 24px 0 24px;
+  resize: none;
+  font-size: var(--od-type-title);
+  line-height: var(--od-line-title);
   font-weight: var(--od-font-weight-regular);
 }
 
 .od-aim-composer .od-aim-context-input {
-  height: 52px;
-  min-height: 52px;
+  height: 48px;
+  min-height: 48px;
   margin-top: 0;
-  padding: 4px 14px 10px;
+  padding: 0 24px 8px;
   resize: none;
   font-size: var(--od-type-body);
   line-height: var(--od-line-body);
 }
 
-.od-aim-composer-footer .od-aim-primary {
-  min-height: 36px;
-  padding: 0 14px;
-  font-size: var(--od-type-meta);
+.od-aim-composer .od-aim-context-input {
+  color: var(--od-fg-2);
+}
+
+.od-aim-composer .od-aim-send-button {
+  background: #d96842;
+  color: #ffffff;
+}
+
+.od-aim-composer .od-aim-send-button:hover:not(:disabled) {
+  background: #e0714a;
+}
+
+.od-aim-composer .od-aim-send-button:disabled {
+  background: color-mix(in oklab, var(--od-fg), transparent 82%);
+  color: var(--od-muted);
+  opacity: 1;
 }
 
 .od-aim-composer .od-aim-title-input:focus,
@@ -4339,10 +4401,12 @@ kbd {
     display: grid;
   }
 
-  .od-aim-composer-footer {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    padding: 6px 8px 6px 14px;
+  .od-aim-composer {
+    padding: 16px;
+  }
+
+  .od-aim-composer-toolbar {
+    grid-template-columns: auto minmax(0, 1fr) auto;
   }
 
   .od-aim-intake h1,
@@ -4361,8 +4425,8 @@ kbd {
     width: 100%;
   }
 
-  .od-aim-composer-footer .od-aim-primary {
-    width: auto;
+  .od-aim-composer-toolbar .od-aim-primary {
+    width: 40px;
   }
 
   .od-aim-overview-strip {

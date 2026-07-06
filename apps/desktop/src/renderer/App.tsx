@@ -1481,43 +1481,78 @@ function AimIntakePanel(props: {
   onKeepEditing: () => void;
 }) {
   const { t } = useI18n();
+  const contextInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const [contextOpen, setContextOpen] = useState(() => props.description.trim().length > 0);
   const hasAim = props.title.trim().length > 0;
   const submitting = props.mode === "contexting" || props.mode === "drafting";
   const disabled = props.disabled || !hasAim;
   const intakeTitle = props.parent ? t("os.breakdownTitle") : t("aimIntake.workbenchTitle");
   const intakeBody = props.parent ? t("aimIntake.subAimBody") : t("aimIntake.workbenchBody");
+  const composerPlaceholder = props.parent ? t("aimIntake.composerPlaceholder") : t("aimIntake.workbenchTitle");
+
+  useEffect(() => {
+    if (props.description.trim().length > 0) setContextOpen(true);
+  }, [props.description]);
+
+  function openContextInput() {
+    setContextOpen(true);
+    window.setTimeout(() => contextInputRef.current?.focus(), 0);
+  }
+
   return (
     <section className={props.parent ? "od-aim-intake od-aim-intake-child" : "od-aim-intake"}>
-      <div className="od-aim-intake-head">
-        <div>
-          {props.parent ? <div className="od-aim-kicker">{t("os.subAimMode")}</div> : null}
-          <h1>{intakeTitle}</h1>
-          <p>{intakeBody}</p>
+      {props.parent ? (
+        <div className="od-aim-intake-head">
+          <div>
+            <div className="od-aim-kicker">{t("os.subAimMode")}</div>
+            <h1>{intakeTitle}</h1>
+            <p>{intakeBody}</p>
+          </div>
         </div>
-      </div>
+      ) : null}
 
       <div className="od-aim-composer">
-        <input
+        <textarea
           id="aim-title"
           className="od-aim-title-input"
           value={props.title}
           onChange={(event) => props.onTitle(event.target.value)}
-          placeholder={t("aimIntake.composerPlaceholder")}
+          placeholder={composerPlaceholder}
           aria-label={t("aimIntake.titleLabel")}
-        />
-        <textarea
-          id="aim-context"
-          className="od-aim-context-input"
-          value={props.description}
-          onChange={(event) => props.onDescription(event.target.value)}
-          placeholder={t("aimIntake.contextPlaceholder")}
-          aria-label={t("aimIntake.contextLabel")}
           rows={2}
         />
-        <div className="od-aim-composer-footer">
+        {contextOpen ? (
+          <textarea
+            id="aim-context"
+            ref={contextInputRef}
+            className="od-aim-context-input"
+            value={props.description}
+            onChange={(event) => props.onDescription(event.target.value)}
+            placeholder={t("aimIntake.contextPlaceholder")}
+            aria-label={t("aimIntake.contextLabel")}
+            rows={2}
+          />
+        ) : null}
+        <div className="od-aim-composer-toolbar">
+          <button
+            className="od-aim-composer-icon-button"
+            type="button"
+            onClick={openContextInput}
+            aria-label={t("aimIntake.addContext")}
+            title={t("aimIntake.addContext")}
+          >
+            <ComposerPlusIcon />
+          </button>
           <span>{hasAim ? t("aimIntake.readyHint") : t("aimIntake.emptyHint")}</span>
-          <button className="od-aim-primary" type="button" onClick={props.onDraft} disabled={disabled}>
-            {submitting ? t("os.drafting") : t("aimIntake.cta")}
+          <button
+            className="od-aim-primary od-aim-send-button"
+            type="button"
+            onClick={props.onDraft}
+            disabled={disabled}
+            aria-label={submitting ? t("os.drafting") : t("aimIntake.cta")}
+            title={submitting ? t("os.drafting") : t("aimIntake.cta")}
+          >
+            <ComposerArrowUpIcon />
           </button>
         </div>
       </div>
@@ -1531,6 +1566,22 @@ function AimIntakePanel(props: {
         />
       ) : null}
     </section>
+  );
+}
+
+function ComposerPlusIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
+      <path d="M10 4.2v11.6M4.2 10h11.6" />
+    </svg>
+  );
+}
+
+function ComposerArrowUpIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
+      <path d="M10 15.8V4.8M5.8 9l4.2-4.2L14.2 9" />
+    </svg>
   );
 }
 

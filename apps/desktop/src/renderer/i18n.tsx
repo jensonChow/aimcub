@@ -156,6 +156,7 @@ export const STRINGS = {
   "aimIntake.contextLabel": { en: "Evidence and constraints", zh: "证据与约束" },
   "aimIntake.composerPlaceholder": { en: "Name the outcome you want", zh: "写下你想达成的结果" },
   "aimIntake.contextPlaceholder": { en: "Optional constraints, source material, or done criteria.", zh: "可选：约束、材料或完成标准。" },
+  "aimIntake.addContext": { en: "Add context", zh: "添加上下文" },
   "aimIntake.empty": { en: "Empty aim", zh: "空 Aim" },
   "aimIntake.ready": { en: "Ready for context", zh: "可进入 Context" },
   "aimIntake.emptyHint": { en: "Start with the outcome", zh: "先写结果" },

@@ -5,10 +5,11 @@ Branch: `main`
 
 ## Current Session
 
-- Compacted the Desktop New Aim command composer so it no longer reads as a large chat card.
-- Reduced the composer max width from 640 px to 520 px, lowered input/footer heights, softened the composer shadow, and kept the optional context field to a short two-line default.
-- Added a small-window footer rule so the hint and Continue button stay on one stable row instead of dropping into a block layout.
-- Updated Desktop design-system memory with the durable compact-composer requirement.
+- Redesigned the Desktop New Aim composer into a Claude-inspired prompt well.
+- The top-level New Aim surface now uses a single large rounded composer with the aim question as the placeholder, no separate heading above it, a bottom toolbar, a plus icon for optional context, and an icon-only arrow submit button.
+- Optional context now expands from the plus button instead of always taking vertical space in the default composer.
+- The composer focus state is quieter, with a neutral border instead of a strong blue ring; enabled submit uses a local warm orange action color.
+- Updated Desktop design-system memory with the durable Claude-inspired prompt-well requirement.
 - Refreshed root `Aimcub.app` from the latest Electron 43 folder-style Desktop build.
 
 ## Current State
@@ -16,7 +17,7 @@ Branch: `main`
 - Work is prepared directly on `main`; no separate feature branch merge is needed.
 - The focused commit for this session was pushed to `origin/main`.
 - Root `Aimcub.app`, `apps/desktop/out`, and `apps/desktop/dist` were refreshed locally and remain ignored build artifacts.
-- Visual QA used the refreshed root Electron app through Computer Use at normal and narrow desktop window sizes.
+- Visual QA used the dev Electron app and refreshed root Electron app through Computer Use at normal and narrow desktop window sizes.
 
 ## Verification
 
@@ -32,7 +33,8 @@ Passed:
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm core:purity`
 - `ELECTRON_BUILDER_CACHE=/private/tmp/aimcub-electron-builder-cache COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm desktop:pack`
 - `ditto apps/desktop/dist/mac-arm64/Aimcub.app Aimcub.app`
-- Visual QA in the refreshed Electron app: New Aim composer rendered at compact width, reduced height, stable Chinese text, and no footer wrapping at a 640 x 520 window.
+- Visual QA in Electron dev app: New Aim rendered as a Claude-style single prompt well, enabled state showed the orange arrow button, optional context expanded from the plus button, and the layout stayed stable at 640 x 520.
+- Visual QA in the refreshed root Electron app: Chinese New Aim placeholder, plus button, ready state, and orange arrow button rendered correctly.
 
 Notes:
 
