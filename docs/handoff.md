@@ -5,29 +5,28 @@ Branch: `main`
 
 ## Current Session
 
-- Changed the normal Aim sidebar's New Aim control from a current/selected-looking row into a pure sidebar action item.
-- Removed `aria-current` and `data-current` from the New Aim button so the new aim intake state no longer makes it look active by default.
-- Default state is now a transparent 34 px ghost row with a 16 px plus icon, normal sidebar label weight, no shadow, and hidden `⌘N` hint.
-- Hover and keyboard focus now reveal the `⌘N` hint and apply only a very subtle background plus slight shadow elevation; keyboard focus keeps the existing accent focus ring.
-- The action group now uses a shared 12 px sidebar horizontal inset and an explicit `sidebar-width - 2 * inset` width, so the New Aim hover/focus rounded rectangle is centered with equal left/right spacing even with `scrollbar-gutter: stable`.
-- Sidebar resize minimum is now 216 px while the default remains 280 px and max remains 360 px.
-- Updated renderer coverage for default, hover/focus, Command-symbol shortcut reveal, absence of current-state styling, equal-width sidebar action alignment, and 216 px resize minimum.
-- Updated `docs/memory/design-system.md` and `docs/memory/desktop.md` with the revised sidebar action behavior, Command-symbol shortcut hint, centered inset requirement, and narrower sidebar bounds.
-- Ran `$memory-refresh`: root memory line budgets are OK, durable Desktop/design memory matches the current New Aim/sidebar behavior, and `docs/memory/operations.md` now records how to handle approval-blocked default-branch pushes.
+- Removed the Recent aims count from the normal Aim sidebar header, so the empty sidebar no longer shows a trailing `0`.
+- Tightened sidebar alignment with shared row metrics: `--sidebar-row-padding-x`, `--sidebar-icon-column`, and `--sidebar-content-width`.
+- New Aim and the footer user trigger now share the same icon column and text baseline; Recent aims label, search/filter controls, aim rows, and the empty state share one list inset.
+- Fixed the 1 px horizontal overflow that could show a bottom scrollbar by accounting for the sidebar border in `--sidebar-content-width` and making the sidebar `overflow-x: hidden`.
+- Updated renderer coverage for omitted Recent aims count, sidebar alignment variables, list inset consistency, footer/action text alignment, and horizontal overflow constraints.
+- Updated `docs/memory/design-system.md` and `docs/memory/desktop.md` with the Claude-like sidebar alignment requirement.
 - Refreshed root `Aimcub.app` from the latest Electron 43 folder-style Desktop build.
 
 ## Current State
 
-- Work is prepared directly on `main`; no separate feature branch merge is needed. A local commit exists, but `main` remains ahead of `origin/main` because pushing to the default branch requires explicit user approval after the permission review flagged the external/shared-branch risk.
+- Work is prepared directly on `main`; no separate feature branch merge is needed.
+- A local focused commit exists. The previous session already left `main` ahead of `origin/main` by 1, and this session adds one more local commit, so local `main` is ahead by 2.
+- Pushing `main` to `origin/main` was requested once and rejected by permission review because it mutates the shared default branch without an explicit post-risk user approval. Do not retry through another route; ask the user for explicit approval before pushing.
 - Root `Aimcub.app`, `apps/desktop/out`, and `apps/desktop/dist` were refreshed locally and remain ignored build artifacts.
-- Temporary browser harnesses served from `127.0.0.1` verified the New Aim row with the current CSS, then were removed and the local servers were stopped. At 216 px sidebar width, the action row measured 192 px wide with equal 12 px left/right insets, no horizontal overflow, `aria-label="Command N"`, visible `⌘` markup, hidden default shortcut opacity, and no Chinese label/shortcut overlap. Earlier harness coverage also verified equal insets at 240, 280, and 360 px widths. Keyboard focus rendered the reveal state with background, accent focus ring plus slight shadow, visible shortcut hint, and no overlap. Browser CUA did not report a live `:hover` state, so hover is covered by the shared `:hover, :focus-visible` CSS rule plus unit assertions.
+- A temporary browser harness served from `127.0.0.1` verified the current sidebar CSS, then was removed and the local server was stopped. At both 1280 px and 640 px browser widths with the default 280 px sidebar, Recent aims had no `0`, New Aim and footer text both measured x=57, Recent aims and empty-state text both measured x=20, and horizontal overflow delta was 0 with `overflow-x: hidden`.
 
 ## Verification
 
 Passed:
 
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop test -- App.test.tsx`
-- Browser visual check through temporary localhost harnesses, covering 12 px equal left/right New Aim action insets at 216, 240, 280, and 360 px sidebar widths; `⌘N` shortcut markup and accessible label; default ghost state; keyboard-focus reveal state; row sizing; shortcut visibility; text/shortcut fit; absent current attributes; absent default shadow; and horizontal overflow.
+- Browser visual check through a temporary localhost harness, covering no Recent aims `0`, action/footer text baseline alignment, Recent aims/empty-state list inset alignment, and no horizontal overflow at 1280 px and 640 px browser widths.
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck`
@@ -36,15 +35,15 @@ Passed:
 - `git diff --check`
 - `ELECTRON_BUILDER_CACHE=/private/tmp/aimcub-electron-builder-cache COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm desktop:pack`
 - `ditto apps/desktop/dist/mac-arm64/Aimcub.app Aimcub.app`
-- `python3 /Users/jenson/.codex/skills/memory-refresh/scripts/audit_project_memory.py /Users/jenson/Desktop/Aimcub`
 
 Notes:
 
 - MCP worker tests may log the expected missing-Supabase opaque-error path while passing.
-- The temporary browser harness was not committed.
+- The temporary browser harness was not committed and was removed from `/private/tmp`.
 
 ## Next Session Prompt
 
 ```text
 Continue from `main`. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md, then load only task-relevant module memory. For repo-changing sessions, run the full verification suite, refresh root Aimcub.app from the packaged Desktop output, update docs/handoff.md, create a focused commit, push, and merge completed branch work into main unless the user explicitly opts out.
+Current local main may be ahead of origin/main because default-branch push requires explicit user approval.
 ```

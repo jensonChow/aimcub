@@ -525,9 +525,8 @@ export function CockpitShell({
                     </div>
                   </>
                 ) : null}
-                <div className="od-section-label">
+                <div className="od-section-label" data-od-id="sidebar-recent-aims-label">
                   <span>{t("shell.recentAims")}</span>
-                  <span>{visibleGoals.length}</span>
                 </div>
                 <div className="od-aim-list">
                   {visibleGoals.length === 0 ? (

@@ -224,12 +224,16 @@ describe("CockpitShell", () => {
     expect(html).toContain("⌘");
     expect(html).not.toContain("Cmd N</kbd>");
     expect(css).toContain("--sidebar-horizontal-inset: 12px;");
-    expect(css).toMatch(/\.od-sidebar\s*{[^}]*padding:\s*56px var\(--sidebar-horizontal-inset\) 16px;/s);
-    expect(css).toMatch(/\.od-sidebar-global-actions\s*{[^}]*width:\s*calc\(var\(--sidebar-width\) - \(var\(--sidebar-horizontal-inset\) \* 2\)\);[^}]*display:\s*grid;[^}]*justify-self:\s*center;[^}]*gap:\s*3px;/s);
-    expect(css).toMatch(/\.od-new-aim\s*{[^}]*min-height:\s*34px;[^}]*grid-template-columns:\s*18px minmax\(0, 1fr\) auto;[^}]*background:\s*transparent;[^}]*box-shadow:\s*none;/s);
+    expect(css).toContain("--sidebar-row-padding-x: 8px;");
+    expect(css).toContain("--sidebar-icon-column: 28px;");
+    expect(css).toContain("--sidebar-content-width: calc(var(--sidebar-width) - (var(--sidebar-horizontal-inset) * 2) - 1px);");
+    expect(css).toMatch(/\.od-sidebar\s*{[^}]*padding:\s*56px var\(--sidebar-horizontal-inset\) 16px;[^}]*overflow-x:\s*hidden;[^}]*overflow-y:\s*auto;/s);
+    expect(css).toMatch(/\.od-sidebar-global-actions\s*{[^}]*width:\s*var\(--sidebar-content-width\);[^}]*display:\s*grid;[^}]*justify-self:\s*center;[^}]*gap:\s*3px;/s);
+    expect(css).toMatch(/\.od-new-aim\s*{[^}]*min-height:\s*34px;[^}]*grid-template-columns:\s*var\(--sidebar-icon-column\) minmax\(0, 1fr\) auto;[^}]*background:\s*transparent;[^}]*box-shadow:\s*none;/s);
+    expect(css).toMatch(/\.od-new-aim\s*{[^}]*padding:\s*0 var\(--sidebar-row-padding-x\);/s);
     expect(css).toMatch(/\.od-new-aim:hover,\s*\.od-new-aim:focus-visible\s*{[^}]*background:\s*color-mix\(in oklab, var\(--od-fg\), transparent 96%\);[^}]*box-shadow:\s*var\(--od-shadow-sidebar-action\);[^}]*color:\s*var\(--od-fg\);/s);
     expect(css).toMatch(/\.od-new-aim:focus-visible\s*{[^}]*box-shadow:\s*var\(--od-focus\), var\(--od-shadow-sidebar-action\);/s);
-    expect(css).toMatch(/\.od-new-aim-icon\s*{[^}]*width:\s*18px;[^}]*height:\s*18px;/s);
+    expect(css).toMatch(/\.od-new-aim-icon\s*{[^}]*width:\s*var\(--sidebar-icon-column\);[^}]*height:\s*18px;/s);
     expect(css).toMatch(/\.od-new-aim-icon svg\s*{[^}]*width:\s*16px;[^}]*height:\s*16px;/s);
     expect(css).toMatch(/\.od-new-aim-label\s*{[^}]*font-weight:\s*500;[^}]*line-height:\s*16px;/s);
     expect(css).toMatch(/\.od-new-aim kbd\s*{[^}]*display:\s*inline-flex;[^}]*align-items:\s*center;[^}]*gap:\s*2px;[^}]*min-height:\s*16px;[^}]*color:\s*var\(--od-meta\);[^}]*opacity:\s*0;[^}]*transform:\s*translateX\(2px\);/s);
@@ -239,6 +243,34 @@ describe("CockpitShell", () => {
     expect(css).not.toContain(".od-new-aim[data-current");
     expect(css).not.toContain(".od-new-aim[data-current=\"true\"] kbd");
     expect(css).not.toContain('.od-app[data-empty-aim="true"] .od-new-aim');
+  });
+
+  it("keeps the normal aim sidebar left aligned without a recent-count zero", () => {
+    const html = renderToStaticMarkup(
+      <I18nProvider>
+        <CockpitShell
+          goals={[]}
+          selected={null}
+          activeStage="aim"
+          onNewAim={noop}
+          onOpenGoal={noop}
+          onStage={noop}
+          main={<div>New aim</div>}
+        />
+      </I18nProvider>,
+    );
+    const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
+
+    expect(html).toContain('<div class="od-section-label" data-od-id="sidebar-recent-aims-label"><span>Recent aims</span></div>');
+    expect(html).not.toContain('<span>Recent aims</span><span>0</span>');
+    expect(css).toMatch(/\.od-aim-browser\s*{[^}]*width:\s*var\(--sidebar-content-width\);[^}]*justify-self:\s*center;[^}]*padding-right:\s*0;/s);
+    expect(css).toMatch(/\.od-section-label\s*{[^}]*justify-content:\s*flex-start;[^}]*padding:\s*0 var\(--sidebar-row-padding-x\);/s);
+    expect(css).toMatch(/\.od-sidebar-empty\s*{[^}]*padding:\s*7px var\(--sidebar-row-padding-x\);/s);
+    expect(css).toMatch(/\.od-aim-card\s*{[^}]*padding:\s*8px 10px 8px var\(--sidebar-row-padding-x\);/s);
+    expect(css).toMatch(/\.od-sidebar-search\s*{[^}]*padding:\s*0 var\(--sidebar-row-padding-x\);/s);
+    expect(css).toMatch(/\.od-filter-row\s*{[^}]*padding:\s*0 var\(--sidebar-row-padding-x\) 2px;/s);
+    expect(css).toMatch(/\.od-user-menu-anchor\s*{[^}]*width:\s*var\(--sidebar-content-width\);[^}]*justify-self:\s*center;/s);
+    expect(css).toMatch(/\.od-user-menu-trigger\s*{[^}]*grid-template-columns:\s*var\(--sidebar-icon-column\) minmax\(0, 1fr\) 18px;[^}]*padding:\s*6px var\(--sidebar-row-padding-x\);/s);
   });
 
   it("keeps New Aim unselected when a saved aim is open", () => {
