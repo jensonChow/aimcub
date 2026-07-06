@@ -17,6 +17,8 @@ The project declares `pnpm@11.10.0` and Node `>=22.13`; the Codex runtime may re
 
 Every repository-changing session must finish by running the full verification suite above, refreshing the project-root `Aimcub.app` with `pnpm desktop:pack`, updating `docs/handoff.md`, creating a focused commit, pushing it, and merging completed branch work into `main` unless the user explicitly opts out. If work happens directly on `main`, record that no separate merge was needed.
 
+If pushing the default branch is blocked by permission review or requires explicit user approval, do not retry through another route. Leave the local focused commit in place, record the exact ahead/unpushed state in `docs/handoff.md`, and ask the user for explicit approval before pushing.
+
 ## Dependency Compatibility
 
 As of 2026-07-06, the newest mutually compatible dependency set keeps Electron 43.0.0, electron-builder 26.15.3, electron-vite 5.0.0, Vite 7.3.6, React 19.2.7, TypeScript 6.0.3, Vitest 4.1.9, ESLint 10.6.0, Zod 4.4.3, Supabase JS 2.110.0, Anthropic SDK 0.110.0, Wrangler 4.107.0, and Turbo 2.10.3.
@@ -73,6 +75,7 @@ At the end of a repo-changing session, update `docs/handoff.md` with:
 - Completed work.
 - Verification commands and result.
 - Commit and push status, if known.
+- Any approval-required push blocker, especially when local `main` is ahead of `origin/main`.
 - Open risks or intentionally deferred work.
 - A short next-session prompt.
 

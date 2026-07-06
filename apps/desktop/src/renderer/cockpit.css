@@ -25,6 +25,7 @@
   --od-popover-bg: rgba(255, 255, 255, 0.96);
   --od-shadow-peek: 20px 0 48px rgba(0, 0, 0, 0.12);
   --od-shadow-popover: 0 18px 48px rgba(0, 0, 0, 0.14), 0 3px 14px rgba(0, 0, 0, 0.08);
+  --od-shadow-sidebar-action: 0 1px 3px rgba(0, 0, 0, 0.07);
   --od-shadow-composer: 0 10px 26px rgba(0, 0, 0, 0.035);
   --od-shadow-composer-focus: 0 10px 26px rgba(0, 0, 0, 0.04);
   --od-shadow-command: 0 24px 70px rgba(0, 0, 0, 0.18);
@@ -63,6 +64,7 @@
     --od-popover-bg: rgba(36, 36, 38, 0.96);
     --od-shadow-peek: 20px 0 48px rgba(0, 0, 0, 0.38);
     --od-shadow-popover: 0 18px 48px rgba(0, 0, 0, 0.42), 0 3px 14px rgba(0, 0, 0, 0.3);
+    --od-shadow-sidebar-action: 0 1px 5px rgba(0, 0, 0, 0.3);
     --od-shadow-composer: 0 10px 26px rgba(0, 0, 0, 0.22);
     --od-shadow-composer-focus: 0 10px 26px rgba(0, 0, 0, 0.26);
     --od-shadow-command: 0 24px 70px rgba(0, 0, 0, 0.5);
@@ -97,6 +99,7 @@
   --od-popover-bg: rgba(36, 36, 38, 0.96);
   --od-shadow-peek: 20px 0 48px rgba(0, 0, 0, 0.38);
   --od-shadow-popover: 0 18px 48px rgba(0, 0, 0, 0.42), 0 3px 14px rgba(0, 0, 0, 0.3);
+  --od-shadow-sidebar-action: 0 1px 5px rgba(0, 0, 0, 0.3);
   --od-shadow-composer: 0 10px 26px rgba(0, 0, 0, 0.22);
   --od-shadow-composer-focus: 0 10px 26px rgba(0, 0, 0, 0.26);
   --od-shadow-command: 0 24px 70px rgba(0, 0, 0, 0.5);
@@ -193,6 +196,7 @@ kbd {
   --titlebar-toggle-left: calc(var(--traffic-light-left) + var(--traffic-light-cluster-width) + var(--titlebar-control-gap));
   --titlebar-toggle-size: 32px;
   --titlebar-toggle-top: calc((var(--traffic-light-row-height) - var(--titlebar-toggle-size)) / 2);
+  --sidebar-horizontal-inset: 12px;
   position: relative;
   height: 100%;
   min-height: 0;
@@ -304,7 +308,7 @@ kbd {
   grid-template-rows: auto minmax(0, 1fr) auto;
   align-content: start;
   gap: 12px;
-  padding: 56px 12px 16px;
+  padding: 56px var(--sidebar-horizontal-inset) 16px;
   overflow: auto;
   background: var(--od-surface);
   border-right: 1px solid var(--od-border-soft);
@@ -459,8 +463,10 @@ kbd {
 }
 
 .od-sidebar-global-actions {
+  width: calc(var(--sidebar-width) - (var(--sidebar-horizontal-inset) * 2));
   min-width: 0;
   display: grid;
+  justify-self: center;
   gap: 3px;
 }
 
@@ -480,18 +486,18 @@ kbd {
   padding: 0 8px;
   text-align: left;
   cursor: pointer;
-  transition: background 140ms ease, color 140ms ease;
+  transition: background 140ms ease, color 140ms ease, box-shadow 140ms ease;
 }
 
-.od-new-aim:hover {
+.od-new-aim:hover,
+.od-new-aim:focus-visible {
   background: color-mix(in oklab, var(--od-fg), transparent 96%);
+  box-shadow: var(--od-shadow-sidebar-action);
   color: var(--od-fg);
 }
 
-.od-new-aim[data-current="true"] {
-  background: color-mix(in oklab, var(--od-fg), transparent 92%);
-  box-shadow: none;
-  color: var(--od-fg);
+.od-new-aim:focus-visible {
+  box-shadow: var(--od-focus), var(--od-shadow-sidebar-action);
 }
 
 .od-new-aim-icon {
@@ -502,7 +508,8 @@ kbd {
   color: currentColor;
 }
 
-.od-new-aim:hover .od-new-aim-icon {
+.od-new-aim:hover .od-new-aim-icon,
+.od-new-aim:focus-visible .od-new-aim-icon {
   color: currentColor;
 }
 
@@ -529,6 +536,8 @@ kbd {
 .od-new-aim kbd {
   display: inline-flex;
   justify-self: end;
+  align-items: center;
+  gap: 2px;
   min-height: 16px;
   border-color: color-mix(in oklab, var(--od-fg), transparent 90%);
   background: color-mix(in oklab, var(--od-fg), transparent 96%);
@@ -536,6 +545,21 @@ kbd {
   padding: 0 5px;
   font-size: 9px;
   font-weight: 600;
+  opacity: 0;
+  transform: translateX(2px);
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.od-new-aim kbd span[aria-hidden="true"] {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.od-new-aim:hover kbd,
+.od-new-aim:focus-visible kbd {
+  opacity: 1;
+  transform: translateX(0);
 }
 
 .od-section-label {

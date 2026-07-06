@@ -16,7 +16,7 @@ const SIDEBAR_REVEAL_DELAY_MS = 180;
 const SIDEBAR_CLOSE_DELAY_MS = 180;
 const SIDEBAR_AUTO_COLLAPSE_QUERY = "(max-width: 1040px)";
 const DEFAULT_SIDEBAR_WIDTH = 280;
-const MIN_SIDEBAR_WIDTH = 240;
+const MIN_SIDEBAR_WIDTH = 216;
 const MAX_SIDEBAR_WIDTH = 360;
 const DEFAULT_WINDOW_CHROME_STATE: WindowChromeState = {
   fullscreen: false,
@@ -114,7 +114,6 @@ export function CockpitShell({
   const usingSettingsSidebar = activeStage === "settings" && Boolean(settingsSidebar);
   const hasGoals = goals.length > 0;
   const firstRunAim = activeStage === "aim" && !selected && !hasGoals;
-  const newAimCurrent = activeStage === "aim" && !selected;
   const sidebarState: SidebarState = usingSettingsSidebar ? "pinned" : sidebarPinned ? "pinned" : sidebarPeeking ? "peek" : "collapsed";
   const sidebarVisible = sidebarState !== "collapsed";
   const sidebarToggleLabel = sidebarPinned ? t("sidebar.collapse") : t("sidebar.expand");
@@ -487,8 +486,6 @@ export function CockpitShell({
                 <button
                   className="od-new-aim"
                   type="button"
-                  aria-current={newAimCurrent ? "page" : undefined}
-                  data-current={newAimCurrent ? "true" : "false"}
                   data-od-id="sidebar-new-aim-action"
                   onClick={onNewAim}
                 >
@@ -496,7 +493,10 @@ export function CockpitShell({
                     <PlusIcon />
                   </span>
                   <span className="od-new-aim-label">{t("os.newAim")}</span>
-                  <kbd>Cmd N</kbd>
+                  <kbd aria-label="Command N">
+                    <span aria-hidden="true">⌘</span>
+                    <span>N</span>
+                  </kbd>
                 </button>
               </nav>
 

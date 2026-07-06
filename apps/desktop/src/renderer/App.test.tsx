@@ -215,21 +215,28 @@ describe("CockpitShell", () => {
     expect(html).toContain('data-od-id="sidebar-global-actions"');
     expect(html).toContain('aria-label="Workspace actions"');
     expect(html).toContain('data-od-id="sidebar-new-aim-action"');
-    expect(html).toContain('data-current="true"');
-    expect(html).toContain('aria-current="page"');
+    expect(html).not.toContain('data-current=');
+    expect(html).not.toContain('aria-current=');
     expect(html).toContain('class="od-new-aim-icon"');
     expect(html).toContain('class="od-new-aim-label"');
     expect(html).toContain("New aim");
-    expect(html).toContain("Cmd N");
-    expect(css).toMatch(/\.od-sidebar-global-actions\s*{[^}]*display:\s*grid;[^}]*gap:\s*3px;/s);
+    expect(html).toContain('aria-label="Command N"');
+    expect(html).toContain("⌘");
+    expect(html).not.toContain("Cmd N</kbd>");
+    expect(css).toContain("--sidebar-horizontal-inset: 12px;");
+    expect(css).toMatch(/\.od-sidebar\s*{[^}]*padding:\s*56px var\(--sidebar-horizontal-inset\) 16px;/s);
+    expect(css).toMatch(/\.od-sidebar-global-actions\s*{[^}]*width:\s*calc\(var\(--sidebar-width\) - \(var\(--sidebar-horizontal-inset\) \* 2\)\);[^}]*display:\s*grid;[^}]*justify-self:\s*center;[^}]*gap:\s*3px;/s);
     expect(css).toMatch(/\.od-new-aim\s*{[^}]*min-height:\s*34px;[^}]*grid-template-columns:\s*18px minmax\(0, 1fr\) auto;[^}]*background:\s*transparent;[^}]*box-shadow:\s*none;/s);
-    expect(css).toMatch(/\.od-new-aim:hover\s*{[^}]*background:\s*color-mix\(in oklab, var\(--od-fg\), transparent 96%\);[^}]*color:\s*var\(--od-fg\);/s);
-    expect(css).toMatch(/\.od-new-aim\[data-current="true"\]\s*{[^}]*background:\s*color-mix\(in oklab, var\(--od-fg\), transparent 92%\);[^}]*box-shadow:\s*none;/s);
+    expect(css).toMatch(/\.od-new-aim:hover,\s*\.od-new-aim:focus-visible\s*{[^}]*background:\s*color-mix\(in oklab, var\(--od-fg\), transparent 96%\);[^}]*box-shadow:\s*var\(--od-shadow-sidebar-action\);[^}]*color:\s*var\(--od-fg\);/s);
+    expect(css).toMatch(/\.od-new-aim:focus-visible\s*{[^}]*box-shadow:\s*var\(--od-focus\), var\(--od-shadow-sidebar-action\);/s);
     expect(css).toMatch(/\.od-new-aim-icon\s*{[^}]*width:\s*18px;[^}]*height:\s*18px;/s);
     expect(css).toMatch(/\.od-new-aim-icon svg\s*{[^}]*width:\s*16px;[^}]*height:\s*16px;/s);
     expect(css).toMatch(/\.od-new-aim-label\s*{[^}]*font-weight:\s*500;[^}]*line-height:\s*16px;/s);
-    expect(css).toMatch(/\.od-new-aim kbd\s*{[^}]*display:\s*inline-flex;[^}]*min-height:\s*16px;[^}]*color:\s*var\(--od-meta\);/s);
+    expect(css).toMatch(/\.od-new-aim kbd\s*{[^}]*display:\s*inline-flex;[^}]*align-items:\s*center;[^}]*gap:\s*2px;[^}]*min-height:\s*16px;[^}]*color:\s*var\(--od-meta\);[^}]*opacity:\s*0;[^}]*transform:\s*translateX\(2px\);/s);
+    expect(css).toMatch(/\.od-new-aim kbd span\[aria-hidden="true"\]\s*{[^}]*font-size:\s*11px;[^}]*font-weight:\s*700;/s);
+    expect(css).toMatch(/\.od-new-aim:hover kbd,\s*\.od-new-aim:focus-visible kbd\s*{[^}]*opacity:\s*1;[^}]*transform:\s*translateX\(0\);/s);
     expect(css).not.toContain("--od-new-aim-bg");
+    expect(css).not.toContain(".od-new-aim[data-current");
     expect(css).not.toContain(".od-new-aim[data-current=\"true\"] kbd");
     expect(css).not.toContain('.od-app[data-empty-aim="true"] .od-new-aim');
   });
@@ -250,7 +257,7 @@ describe("CockpitShell", () => {
     );
 
     expect(html).toContain('data-od-id="sidebar-new-aim-action"');
-    expect(html).toContain('data-current="false"');
+    expect(html).not.toContain('data-current=');
     expect(html).not.toContain('aria-current="page"');
   });
 
@@ -277,7 +284,7 @@ describe("CockpitShell", () => {
     expect(html).toContain('aria-label="Resize left sidebar"');
     expect(html).toContain('aria-controls="od-left-aim-sidebar"');
     expect(html).toContain('aria-orientation="vertical"');
-    expect(html).toContain('aria-valuemin="240"');
+    expect(html).toContain('aria-valuemin="216"');
     expect(html).toContain('aria-valuemax="360"');
     expect(html).toContain('aria-valuenow="280"');
     expect(css).toMatch(/\.od-sidebar-resizer\s*{[^}]*cursor:\s*col-resize;[^}]*touch-action:\s*none;/s);
