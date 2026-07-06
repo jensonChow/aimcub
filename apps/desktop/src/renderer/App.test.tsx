@@ -184,6 +184,35 @@ describe("CockpitShell", () => {
     expect(html).not.toContain("<p>Workbench</p>");
   });
 
+  it("renders New Aim as a top-left app-level sidebar action", () => {
+    const html = renderToStaticMarkup(
+      <I18nProvider>
+        <CockpitShell
+          goals={[]}
+          selected={null}
+          activeStage="aim"
+          onNewAim={noop}
+          onOpenGoal={noop}
+          onStage={noop}
+          main={<div>New aim</div>}
+        />
+      </I18nProvider>,
+    );
+    const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
+
+    expect(html).toContain('data-od-id="sidebar-global-actions"');
+    expect(html).toContain('aria-label="Workspace actions"');
+    expect(html).toContain('data-od-id="sidebar-new-aim-action"');
+    expect(html).toContain('class="od-new-aim-icon"');
+    expect(html).toContain('class="od-new-aim-label"');
+    expect(html).toContain("New aim");
+    expect(html).toContain("Cmd N");
+    expect(css).toMatch(/\.od-sidebar-global-actions\s*{[^}]*display:\s*grid;[^}]*gap:\s*4px;/s);
+    expect(css).toMatch(/\.od-new-aim\s*{[^}]*min-height:\s*44px;[^}]*grid-template-columns:\s*28px minmax\(0, 1fr\) auto;/s);
+    expect(css).toMatch(/\.od-new-aim-icon\s*{[^}]*width:\s*24px;[^}]*height:\s*24px;/s);
+    expect(css).not.toContain('.od-app[data-empty-aim="true"] .od-new-aim');
+  });
+
   it("renders an invisible pinned sidebar resize hot zone with accessible controls", () => {
     const html = renderToStaticMarkup(
       <I18nProvider>

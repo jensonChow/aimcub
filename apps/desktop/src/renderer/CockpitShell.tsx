@@ -482,10 +482,15 @@ export function CockpitShell({
         >
           {usingSettingsSidebar ? settingsSidebar : (
             <>
-              <button className="od-new-aim" type="button" onClick={onNewAim}>
-                <span>{t("os.newAim")}</span>
-                <kbd>Cmd N</kbd>
-              </button>
+              <nav className="od-sidebar-global-actions" aria-label={t("shell.globalActions")} data-od-id="sidebar-global-actions">
+                <button className="od-new-aim" type="button" data-od-id="sidebar-new-aim-action" onClick={onNewAim}>
+                  <span className="od-new-aim-icon" aria-hidden="true">
+                    <PlusIcon />
+                  </span>
+                  <span className="od-new-aim-label">{t("os.newAim")}</span>
+                  <kbd>Cmd N</kbd>
+                </button>
+              </nav>
 
               <section className="od-aim-browser" aria-label={t("shell.recentAims")}>
                 {hasGoals ? (
@@ -603,6 +608,14 @@ function SidebarToggleIcon() {
     <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
       <rect x="3.5" y="3.5" width="13" height="13" rx="2" />
       <path d="M8 4v12" />
+    </svg>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
+      <path d="M10 4v12M4 10h12" />
     </svg>
   );
 }

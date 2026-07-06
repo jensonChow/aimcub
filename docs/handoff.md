@@ -5,27 +5,25 @@ Branch: `main`
 
 ## Current Session
 
-- Fixed the normal Aim sidebar's compact-window expanded state: a user-pinned sidebar now stays in the grid and pushes the workspace instead of covering it.
-- Kept overlay behavior only for collapsed/peek states, so temporary hover reveal can cover the edge without resizing the workspace.
-- Preserved the transparent resize hot zone for pinned sidebars. Hovering the sidebar edge exposes only the native resize cursor; no permanent divider line is drawn.
-- Updated `docs/memory/design-system.md` and `docs/memory/desktop.md` with the pinned-sidebar layout requirement.
+- Redesigned the normal Aim sidebar's top-left New Aim entry as an app-level/workspace action row with plus icon, label, and `Cmd N` shortcut.
+- Added a dedicated `od-sidebar-global-actions` container so future global sidebar actions can sit beside New Aim without mixing into recent aim history.
+- Removed the first-run empty-state rule that made New Aim look like a weak transparent text button.
+- Added renderer coverage for the global action row structure, icon, sizing, and empty-state visibility.
+- Updated `docs/memory/design-system.md` and `docs/memory/desktop.md` with the top-left app/workspace navigation requirement.
 - Refreshed root `Aimcub.app` from the latest Electron 43 folder-style Desktop build.
 
 ## Current State
 
 - Work was prepared directly on `main`; no separate feature branch merge is needed.
-- Sidebar layout fix was committed as `2ea56e7 Fix pinned sidebar workspace layout` and pushed to `origin/main`.
 - Root `Aimcub.app`, `apps/desktop/out`, and `apps/desktop/dist` were refreshed locally and remain ignored build artifacts.
-- A temporary Vite visual harness under `/private/tmp/aimcub-sidebar-harness` verified that a 960 by 680 px collapsed shell expands to pinned grid columns around `330px 630px`; the sidebar right edge matched the main content left edge, `covered` was false, and there was no horizontal overflow.
+- A temporary browser visual harness at `/private/tmp/aimcub-sidebar-harness.html` verified the sidebar at 960 by 680 px and 640 by 520 px. The New Aim row rendered at 44 px tall, text and shortcut did not overlap, and there was no horizontal overflow.
 
 ## Verification
 
 Passed:
 
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop test -- App.test.tsx`
-- `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop typecheck`
-- `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop lint`
-- Browser visual check through the temporary Vite harness at 960 by 680 px, covering collapsed-to-pinned expansion and workspace occlusion geometry.
+- Browser visual check through the temporary local harness at 960 by 680 px and 640 by 520 px, covering New Aim row sizing, text/shortcut fit, and horizontal overflow.
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
 - `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck`

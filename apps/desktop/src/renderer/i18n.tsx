@@ -30,6 +30,7 @@ export const STRINGS = {
   "shell.noSearchResultsBody": { en: "Try another search or filter.", zh: "换个关键词或筛选条件。" },
   "shell.noAimsTitle": { en: "No aims yet", zh: "还没有 Aim" },
   "shell.noAimsBody": { en: "Saved aims appear here.", zh: "保存后会显示在这里。" },
+  "shell.globalActions": { en: "Workspace actions", zh: "工作区动作" },
   "shell.recentAims": { en: "Recent aims", zh: "近期目标" },
   "shell.planningLayers": { en: "Planning layers", zh: "规划视图" },
   "shell.pendingContext_one": { en: "{n} pending context item", zh: "{n} 条待处理上下文" },

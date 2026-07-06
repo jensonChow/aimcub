@@ -158,6 +158,8 @@ select:focus-visible {
 .od-sidebar-peek-trigger,
 .od-sidebar-toggle,
 .od-sidebar-resizer,
+.od-sidebar-global-actions,
+.od-sidebar-global-actions *,
 .od-user-menu-anchor,
 .od-user-menu-anchor * {
   app-region: no-drag;
@@ -437,7 +439,6 @@ kbd {
 }
 
 .od-subtle-button,
-.od-new-aim,
 .od-filter-row button {
   min-height: 32px;
   border: 1px solid var(--od-border-soft);
@@ -460,22 +461,70 @@ kbd {
   border-color: var(--od-border);
 }
 
-.od-new-aim {
-  width: 100%;
-  min-height: 36px;
+.od-sidebar-global-actions {
+  min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  border-radius: var(--od-radius-sm);
-  color: var(--od-fg);
-  text-align: left;
+  gap: 4px;
 }
 
-.od-new-aim span {
+.od-new-aim {
+  width: 100%;
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-sm);
+  background: var(--od-surface-warm);
+  color: var(--od-fg);
+  padding: 6px 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.od-new-aim:hover {
+  background: var(--od-bg);
+  border-color: var(--od-border);
+}
+
+.od-new-aim-icon {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--od-radius-pill);
+  background: color-mix(in oklab, var(--od-fg), transparent 92%);
+  color: var(--od-fg-2);
+}
+
+.od-new-aim:hover .od-new-aim-icon {
+  background: color-mix(in oklab, var(--od-accent), transparent 88%);
+  color: var(--od-accent);
+}
+
+.od-new-aim-icon svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.od-new-aim-label {
   min-width: 0;
   overflow: hidden;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 18px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.od-new-aim kbd {
+  justify-self: end;
 }
 
 .od-section-label {
@@ -647,16 +696,6 @@ kbd {
   color: var(--od-meta);
   font-size: 12px;
   line-height: 1.35;
-}
-
-.od-app[data-empty-aim="true"] .od-new-aim {
-  background: transparent;
-  border-color: transparent;
-}
-
-.od-app[data-empty-aim="true"] .od-new-aim:hover {
-  background: var(--od-bg);
-  border-color: var(--od-border-soft);
 }
 
 .od-app[data-empty-aim="true"] .od-aim-browser {
