@@ -32,10 +32,17 @@
   --od-interaction-hover-bg: color-mix(in oklab, var(--od-fg), transparent 96%);
   --od-interaction-hover-shadow: var(--od-shadow-sidebar-action);
   --od-interaction-focus-shadow: var(--od-focus), var(--od-shadow-sidebar-action);
-  --od-font-weight-medium: 500;
-  --od-font-weight-semibold: 560;
-  --od-font-weight-strong: 620;
-  --od-font-weight-heavy: 680;
+  --od-type-meta: 12px;
+  --od-type-body: 13px;
+  --od-type-title: 16px;
+  --od-line-meta: 16px;
+  --od-line-body: 18px;
+  --od-line-title: 22px;
+  --od-font-weight-regular: 400;
+  --od-font-weight-medium: 400;
+  --od-font-weight-semibold: 450;
+  --od-font-weight-strong: 500;
+  --od-font-weight-heavy: var(--od-font-weight-strong);
   --od-icon-stroke: 1.55;
   --od-icon-stroke-strong: 1.65;
   --od-radius-sm: 8px;
@@ -189,7 +196,7 @@ kbd {
   color: var(--od-meta);
   padding: 0 6px;
   font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
-  font-size: 10px;
+  font-size: var(--od-type-meta);
   font-weight: var(--od-font-weight-semibold);
   line-height: 1;
 }
@@ -422,7 +429,7 @@ kbd {
 .od-sidebar-head h1 {
   margin: 0;
   font-family: "SF Pro Display", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 15px;
+  font-size: var(--od-type-body);
   line-height: 1.1;
   letter-spacing: 0;
 }
@@ -430,7 +437,7 @@ kbd {
 .od-sidebar-head p {
   margin: 3px 0 0;
   color: var(--od-muted);
-  font-size: 11px;
+  font-size: var(--od-type-meta);
 }
 
 .od-sidebar-head-actions {
@@ -472,7 +479,7 @@ kbd {
   background: var(--od-surface-warm);
   color: var(--od-muted);
   padding: 0 12px;
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   font-weight: var(--od-font-weight-semibold);
   white-space: nowrap;
   cursor: pointer;
@@ -567,7 +574,7 @@ kbd {
 .od-new-aim-label {
   min-width: 0;
   overflow: hidden;
-  font-size: 13px;
+  font-size: var(--od-type-body);
   font-weight: var(--od-font-weight-medium);
   line-height: 16px;
   text-overflow: ellipsis;
@@ -584,7 +591,7 @@ kbd {
   background: color-mix(in oklab, var(--od-fg), transparent 96%);
   color: var(--od-meta);
   padding: 0 5px;
-  font-size: 9px;
+  font-size: var(--od-type-meta);
   font-weight: var(--od-font-weight-medium);
   opacity: 0;
   transform: translateX(2px);
@@ -592,7 +599,7 @@ kbd {
 }
 
 .od-new-aim kbd span[aria-hidden="true"] {
-  font-size: 11px;
+  font-size: var(--od-type-meta);
   font-weight: var(--od-font-weight-semibold);
   line-height: 1;
 }
@@ -607,7 +614,7 @@ kbd {
   justify-content: flex-start;
   gap: 8px;
   color: var(--od-muted);
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   font-weight: var(--od-font-weight-semibold);
   padding: 0 var(--sidebar-row-padding-x);
 }
@@ -677,7 +684,7 @@ kbd {
 .od-next-action strong {
   min-width: 0;
   color: var(--od-fg);
-  font-size: 13px;
+  font-size: var(--od-type-body);
   line-height: 1.25;
   font-weight: var(--od-font-weight-semibold);
 }
@@ -687,7 +694,7 @@ kbd {
   min-width: 0;
   overflow: hidden;
   color: var(--od-muted);
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -728,7 +735,7 @@ kbd {
 
 .od-sidebar-search label {
   color: var(--od-muted);
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   font-weight: var(--od-font-weight-semibold);
 }
 
@@ -740,7 +747,7 @@ kbd {
   padding: 0 13px;
   background: var(--od-surface-warm);
   color: var(--od-fg);
-  font-size: 13px;
+  font-size: var(--od-type-body);
 }
 
 .od-filter-row {
@@ -765,7 +772,7 @@ kbd {
   border: 1px dashed var(--od-border);
   border-radius: var(--od-radius-md);
   color: var(--od-muted);
-  font-size: 13px;
+  font-size: var(--od-type-body);
 }
 
 .od-sidebar-empty {
@@ -777,14 +784,14 @@ kbd {
 
 .od-sidebar-empty strong {
   color: var(--od-fg-2);
-  font-size: 13px;
+  font-size: var(--od-type-body);
   line-height: 1.3;
   font-weight: var(--od-font-weight-semibold);
 }
 
 .od-sidebar-empty span {
   color: var(--od-meta);
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 1.35;
 }
 
@@ -813,8 +820,8 @@ kbd {
   background: var(--od-bg);
   color: var(--od-fg);
   padding: 0 12px;
-  font-size: 12px;
-  font-weight: 650;
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-semibold);
   cursor: pointer;
 }
 
@@ -894,7 +901,7 @@ kbd {
   min-width: 0;
   overflow: hidden;
   color: var(--od-fg);
-  font-size: 13px;
+  font-size: var(--od-type-body);
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -904,7 +911,7 @@ kbd {
   min-width: 0;
   overflow: hidden;
   color: var(--od-meta);
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -957,7 +964,7 @@ kbd {
   border-radius: 50%;
   background: color-mix(in oklab, var(--od-accent), var(--od-bg) 88%);
   color: var(--od-accent);
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   font-weight: var(--od-font-weight-strong);
   line-height: 1;
 }
@@ -973,7 +980,7 @@ kbd {
   min-width: 0;
   overflow: hidden;
   color: var(--od-fg);
-  font-size: 13px;
+  font-size: var(--od-type-body);
   line-height: 1.25;
   font-weight: var(--od-font-weight-semibold);
   text-overflow: ellipsis;
@@ -985,7 +992,7 @@ kbd {
   min-width: 0;
   overflow: hidden;
   color: var(--od-meta);
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1054,7 +1061,7 @@ kbd {
 .od-user-menu-item span {
   min-width: 0;
   overflow: hidden;
-  font-size: 13px;
+  font-size: var(--od-type-body);
   font-weight: var(--od-font-weight-medium);
   line-height: 1.3;
   text-overflow: ellipsis;
@@ -1122,14 +1129,14 @@ kbd {
 
 .od-runtime-strip span {
   color: var(--od-meta);
-  font-size: 11px;
+  font-size: var(--od-type-meta);
 }
 
 .od-runtime-strip strong {
   overflow: hidden;
   color: var(--od-fg);
   font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1213,7 +1220,7 @@ kbd {
   background: var(--od-surface);
   color: var(--od-muted);
   font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
-  font-size: 10px;
+  font-size: var(--od-type-meta);
   font-weight: var(--od-font-weight-semibold);
 }
 
@@ -1231,7 +1238,7 @@ kbd {
 }
 
 .od-stage-title {
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   font-weight: var(--od-font-weight-semibold);
 }
 
@@ -1267,7 +1274,7 @@ kbd {
 .od-helper-intro h2 {
   margin: 4px 0 0;
   color: var(--od-fg);
-  font-size: 20px;
+  font-size: var(--od-type-title);
   line-height: 1.4;
   letter-spacing: 0;
 }
@@ -1275,7 +1282,7 @@ kbd {
 .od-helper-intro p {
   margin: 8px 0 0;
   color: var(--od-muted);
-  font-size: 14px;
+  font-size: var(--od-type-body);
   line-height: 1.5;
 }
 
@@ -1295,8 +1302,8 @@ kbd {
   background: transparent;
   color: var(--od-muted);
   padding: 0 8px;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--od-type-body);
+  font-weight: var(--od-font-weight-medium);
   text-align: left;
   cursor: pointer;
 }
@@ -1346,7 +1353,7 @@ kbd {
   background: var(--od-surface-warm);
   color: var(--od-fg);
   padding: 0 11px;
-  font-size: 13px;
+  font-size: var(--od-type-body);
 }
 
 .od-settings-search input::placeholder {
@@ -1366,7 +1373,7 @@ kbd {
 .od-settings-nav-section,
 .od-settings-nav-empty {
   color: var(--od-meta);
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 16px;
 }
 
@@ -1449,7 +1456,7 @@ kbd {
   min-width: 0;
   overflow: hidden;
   color: var(--od-fg);
-  font-size: 13px;
+  font-size: var(--od-type-body);
   line-height: 18px;
   font-weight: var(--od-font-weight-medium);
   text-overflow: ellipsis;
@@ -1497,9 +1504,9 @@ kbd {
 .od-settings-pane-head h3 {
   margin: 0;
   color: var(--od-fg);
-  font-size: 22px;
+  font-size: var(--od-type-title);
   line-height: 28px;
-  font-weight: 650;
+  font-weight: var(--od-font-weight-semibold);
   letter-spacing: 0;
 }
 
@@ -1507,7 +1514,7 @@ kbd {
   max-width: 620px;
   margin: 8px 0 0;
   color: var(--od-muted);
-  font-size: 14px;
+  font-size: var(--od-type-body);
   line-height: 20px;
 }
 
@@ -1524,16 +1531,16 @@ kbd {
 .od-settings-row-section-head h4 {
   margin: 0;
   color: var(--od-fg);
-  font-size: 14px;
+  font-size: var(--od-type-body);
   line-height: 20px;
-  font-weight: 650;
+  font-weight: var(--od-font-weight-semibold);
 }
 
 .od-settings-row-section-head p {
   max-width: 620px;
   margin: 4px 0 0;
   color: var(--od-muted);
-  font-size: 13px;
+  font-size: var(--od-type-body);
   line-height: 18px;
 }
 
@@ -1562,22 +1569,22 @@ kbd {
 .od-settings-row-copy strong,
 .od-settings-current-aim-copy strong {
   color: var(--od-fg);
-  font-size: 14px;
+  font-size: var(--od-type-body);
   line-height: 20px;
-  font-weight: 500;
+  font-weight: var(--od-font-weight-medium);
 }
 
 .od-settings-row-copy span,
 .od-settings-current-aim-copy small {
   color: var(--od-muted);
-  font-size: 13px;
+  font-size: var(--od-type-body);
   line-height: 18px;
 }
 
 .od-settings-row-copy small,
 .od-settings-current-aim-copy span {
   color: var(--od-meta);
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 16px;
 }
 
@@ -1601,9 +1608,9 @@ kbd {
   background: var(--od-surface);
   color: var(--od-muted);
   padding: 2px 8px;
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 16px;
-  font-weight: 500;
+  font-weight: var(--od-font-weight-medium);
   white-space: nowrap;
 }
 
@@ -1625,9 +1632,9 @@ kbd {
   background: var(--od-surface-warm);
   color: var(--od-fg);
   padding: 0 10px;
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 16px;
-  font-weight: 650;
+  font-weight: var(--od-font-weight-semibold);
   white-space: nowrap;
   cursor: pointer;
 }
@@ -1668,8 +1675,8 @@ kbd {
 
 .od-form-title {
   color: var(--od-fg);
-  font-size: 15px;
-  font-weight: 700;
+  font-size: var(--od-type-body);
+  font-weight: var(--od-font-weight-strong);
   line-height: 1.3;
 }
 
@@ -1677,7 +1684,7 @@ kbd {
   max-width: 660px;
   margin-top: 4px;
   color: var(--od-muted);
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 1.4;
 }
 
@@ -1709,7 +1716,7 @@ kbd {
 .od-first-run-helper h2 {
   margin: 4px 0 0;
   color: var(--od-fg);
-  font-size: 18px;
+  font-size: var(--od-type-title);
   line-height: 1.35;
   letter-spacing: 0;
 }
@@ -1717,7 +1724,7 @@ kbd {
 .od-first-run-helper p {
   margin: 6px 0 0;
   color: var(--od-muted);
-  font-size: 13px;
+  font-size: var(--od-type-body);
   line-height: 1.45;
 }
 
@@ -1739,14 +1746,14 @@ kbd {
 
 .od-first-run-helper-fact span {
   color: var(--od-meta);
-  font-size: 11px;
-  font-weight: 750;
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-strong);
 }
 
 .od-first-run-helper-fact strong {
   min-width: 0;
   color: var(--od-fg);
-  font-size: 13px;
+  font-size: var(--od-type-body);
   line-height: 1.35;
   overflow-wrap: anywhere;
 }
@@ -1789,7 +1796,7 @@ kbd {
 
 .od-aim-kicker {
   color: var(--od-muted);
-  font-size: 13px;
+  font-size: var(--od-type-body);
   font-weight: var(--od-font-weight-semibold);
 }
 
@@ -1798,7 +1805,7 @@ kbd {
   margin: 0;
   color: var(--od-fg);
   font-family: "SF Pro Display", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 32px;
+  font-size: var(--od-type-title);
   font-weight: var(--od-font-weight-heavy);
   line-height: 1.16;
   letter-spacing: 0;
@@ -1809,7 +1816,7 @@ kbd {
   max-width: 520px;
   margin: 8px auto 0;
   color: var(--od-muted);
-  font-size: 14px;
+  font-size: var(--od-type-body);
   line-height: 1.45;
 }
 
@@ -1850,9 +1857,9 @@ kbd {
 .od-aim-composer-footer span {
   min-width: 0;
   color: var(--od-meta);
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 1.35;
-  font-weight: 650;
+  font-weight: var(--od-font-weight-semibold);
 }
 
 .od-aim-intake-form {
@@ -1867,8 +1874,8 @@ kbd {
   justify-content: space-between;
   gap: 12px;
   color: var(--od-muted);
-  font-size: 12px;
-  font-weight: 750;
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-strong);
 }
 
 .od-field-head span {
@@ -1890,8 +1897,8 @@ kbd {
 .od-aim-title-input {
   min-height: 56px;
   padding: 0 16px;
-  font-size: 20px;
-  font-weight: 700;
+  font-size: var(--od-type-title);
+  font-weight: var(--od-font-weight-strong);
 }
 
 .od-aim-context-input {
@@ -1899,7 +1906,7 @@ kbd {
   margin-top: 4px;
   padding: 15px 16px;
   resize: vertical;
-  font-size: 15px;
+  font-size: var(--od-type-body);
   line-height: 1.5;
 }
 
@@ -1924,8 +1931,8 @@ kbd {
 .od-aim-composer .od-aim-title-input {
   min-height: 54px;
   padding: 0 18px;
-  font-size: 18px;
-  font-weight: 650;
+  font-size: var(--od-type-title);
+  font-weight: var(--od-font-weight-regular);
 }
 
 .od-aim-composer .od-aim-context-input {
@@ -1933,7 +1940,7 @@ kbd {
   margin-top: 0;
   padding: 0 18px 12px;
   resize: none;
-  font-size: 13px;
+  font-size: var(--od-type-body);
   line-height: 1.5;
 }
 
@@ -1958,7 +1965,7 @@ kbd {
 .od-aim-intake-footer p {
   margin: 0;
   color: var(--od-muted);
-  font-size: 13px;
+  font-size: var(--od-type-body);
   line-height: 1.45;
 }
 
@@ -1974,8 +1981,8 @@ kbd {
   min-height: 44px;
   border-radius: var(--od-radius-pill);
   padding: 0 18px;
-  font-size: 14px;
-  font-weight: 750;
+  font-size: var(--od-type-body);
+  font-weight: var(--od-font-weight-strong);
   white-space: nowrap;
   cursor: pointer;
   transition: background 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
@@ -2039,7 +2046,7 @@ kbd {
 .od-aim-overview-strip span,
 .od-aim-overview-strip small {
   color: var(--od-muted);
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 1.35;
 }
 
@@ -2047,7 +2054,7 @@ kbd {
   min-width: 0;
   overflow: hidden;
   color: var(--od-fg);
-  font-size: 18px;
+  font-size: var(--od-type-title);
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2068,14 +2075,14 @@ kbd {
   min-width: 0;
   margin: 5px 0 0;
   color: var(--od-fg);
-  font-size: 20px;
+  font-size: var(--od-type-title);
   line-height: 1.28;
 }
 
 .od-aim-context-summary p {
   margin: 8px 0 0;
   color: var(--od-muted);
-  font-size: 13px;
+  font-size: var(--od-type-body);
   line-height: 1.45;
 }
 
@@ -2084,7 +2091,7 @@ kbd {
   justify-items: end;
   gap: 10px;
   color: var(--od-muted);
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 1.42;
   text-align: right;
 }
@@ -2118,8 +2125,8 @@ kbd {
   background: var(--od-surface);
   color: var(--od-muted);
   padding: 0 10px;
-  font-size: 12px;
-  font-weight: 750;
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-strong);
 }
 
 .od-context-review-grid {
@@ -2141,9 +2148,9 @@ kbd {
   min-width: 0;
   margin: 0;
   color: var(--od-fg);
-  font-size: 14px;
+  font-size: var(--od-type-body);
   line-height: 1.35;
-  font-weight: 750;
+  font-weight: var(--od-font-weight-strong);
 }
 
 .od-context-review-bucket {
@@ -2191,9 +2198,9 @@ kbd {
 .od-context-review-item-head strong {
   min-width: 0;
   color: var(--od-fg);
-  font-size: 13px;
+  font-size: var(--od-type-body);
   line-height: 1.35;
-  font-weight: 750;
+  font-weight: var(--od-font-weight-strong);
 }
 
 .od-context-review-item p,
@@ -2201,14 +2208,14 @@ kbd {
 .od-context-review-more {
   margin: 0;
   color: var(--od-muted);
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 1.4;
 }
 
 .od-context-review-more {
   padding-top: 8px;
   border-top: 1px solid var(--od-border-soft);
-  font-weight: 650;
+  font-weight: var(--od-font-weight-semibold);
 }
 
 .od-stage-panel-head {
@@ -2220,14 +2227,14 @@ kbd {
 
 .od-stage-kicker {
   color: var(--od-accent);
-  font-size: 11px;
-  font-weight: 800;
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-strong);
 }
 
 .od-stage-panel-head h2 {
   margin: 4px 0 0;
   color: var(--od-fg);
-  font-size: 20px;
+  font-size: var(--od-type-title);
   line-height: 1.35;
 }
 
@@ -2235,7 +2242,7 @@ kbd {
   max-width: 680px;
   margin: 6px 0 0;
   color: var(--od-muted);
-  font-size: 13px;
+  font-size: var(--od-type-body);
   line-height: 1.45;
 }
 
@@ -2258,7 +2265,7 @@ kbd {
 .od-stage-metric span {
   overflow: hidden;
   color: var(--od-muted);
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2266,7 +2273,7 @@ kbd {
 
 .od-stage-metric strong {
   color: var(--od-fg);
-  font-size: 18px;
+  font-size: var(--od-type-title);
   line-height: 1.25;
 }
 
@@ -2282,13 +2289,13 @@ kbd {
 
 .od-routing-alert strong {
   color: var(--od-fg);
-  font-size: 13px;
+  font-size: var(--od-type-body);
   line-height: 1.35;
 }
 
 .od-routing-alert span {
   color: var(--od-muted);
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 1.4;
 }
 
@@ -2320,8 +2327,8 @@ kbd {
   border-radius: 50%;
   background: color-mix(in oklab, var(--od-accent), var(--od-bg) 92%);
   color: var(--od-accent);
-  font-size: 12px;
-  font-weight: 800;
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-strong);
 }
 
 .od-plan-node-main {
@@ -2340,7 +2347,7 @@ kbd {
 .od-plan-node-head h3 {
   margin: 0;
   color: var(--od-fg);
-  font-size: 14px;
+  font-size: var(--od-type-body);
   line-height: 1.35;
   letter-spacing: 0;
 }
@@ -2348,7 +2355,7 @@ kbd {
 .od-plan-node-head p {
   margin: 4px 0 0;
   color: var(--od-muted);
-  font-size: 13px;
+  font-size: var(--od-type-body);
   line-height: 1.45;
 }
 
@@ -2372,15 +2379,15 @@ kbd {
 .od-routing-rationale span,
 .od-plan-contract-line span {
   color: var(--od-meta);
-  font-size: 11px;
-  font-weight: 750;
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-strong);
 }
 
 .od-routing-rationale strong {
   color: var(--od-fg-2);
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 1.4;
-  font-weight: 500;
+  font-weight: var(--od-font-weight-medium);
 }
 
 .od-routing-controls {
@@ -2404,8 +2411,8 @@ kbd {
   background: transparent;
   color: var(--od-muted);
   padding: 0 12px;
-  font-size: 12px;
-  font-weight: 750;
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-strong);
   cursor: pointer;
 }
 
@@ -2456,8 +2463,8 @@ kbd {
 
 .od-routing-selects span {
   color: var(--od-muted);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-strong);
 }
 
 .od-routing-selects select {
@@ -2469,7 +2476,7 @@ kbd {
   background: var(--od-bg);
   color: var(--od-fg);
   padding: 0 10px;
-  font-size: 13px;
+  font-size: var(--od-type-body);
 }
 
 .od-routing-reset {
@@ -2479,8 +2486,8 @@ kbd {
   background: var(--od-bg);
   color: var(--od-muted);
   padding: 0 12px;
-  font-size: 12px;
-  font-weight: 750;
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-strong);
   white-space: nowrap;
   cursor: pointer;
 }
@@ -2507,7 +2514,7 @@ kbd {
   border-left: 3px solid var(--od-warn);
   color: var(--od-warn);
   padding-left: 9px;
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 1.4;
 }
 
@@ -2556,16 +2563,16 @@ kbd {
 .od-work-title strong {
   min-width: 0;
   color: var(--od-fg);
-  font-size: 14px;
+  font-size: var(--od-type-body);
   line-height: 1.35;
-  font-weight: 750;
+  font-weight: var(--od-font-weight-strong);
 }
 
 .od-work-card-main > p {
   max-width: 760px;
   margin: 0;
   color: var(--od-muted);
-  font-size: 13px;
+  font-size: var(--od-type-body);
   line-height: 1.45;
 }
 
@@ -2589,7 +2596,7 @@ kbd {
 .od-work-detail-grid small {
   overflow: hidden;
   color: var(--od-muted);
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2599,7 +2606,7 @@ kbd {
   min-width: 0;
   overflow: hidden;
   color: var(--od-fg);
-  font-size: 13px;
+  font-size: var(--od-type-body);
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2612,19 +2619,19 @@ kbd {
   align-items: baseline;
   flex-wrap: wrap;
   color: var(--od-muted);
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 1.4;
 }
 
 .od-work-note strong,
 .od-next-work span {
   color: var(--od-fg);
-  font-weight: 750;
+  font-weight: var(--od-font-weight-strong);
 }
 
 .od-next-work strong {
   color: var(--od-muted);
-  font-weight: 500;
+  font-weight: var(--od-font-weight-medium);
 }
 
 .od-work-actions {
@@ -2638,7 +2645,7 @@ kbd {
 .od-work-actions .od-aim-secondary {
   min-height: 36px;
   padding: 0 12px;
-  font-size: 13px;
+  font-size: var(--od-type-body);
 }
 
 .od-plan-editor .od-aim-primary {
@@ -2670,8 +2677,8 @@ kbd {
   background: color-mix(in oklab, var(--od-accent), var(--od-bg) 92%);
   color: var(--od-accent);
   font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
-  font-size: 12px;
-  font-weight: 750;
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-strong);
 }
 
 .od-plan-card-main,
@@ -2708,8 +2715,8 @@ kbd {
   background: var(--od-surface-warm);
   color: var(--od-fg);
   padding: 0 10px;
-  font-size: 12px;
-  font-weight: 650;
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-semibold);
   cursor: pointer;
   transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
 }
@@ -2750,8 +2757,8 @@ kbd {
 .od-plan-field span,
 .od-plan-field-head span {
   color: var(--od-muted);
-  font-size: 12px;
-  font-weight: 750;
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-strong);
 }
 
 .od-plan-field input,
@@ -2763,7 +2770,7 @@ kbd {
   background: var(--od-surface-warm);
   color: var(--od-fg);
   padding: 10px 11px;
-  font-size: 13px;
+  font-size: var(--od-type-body);
   line-height: 1.45;
   outline: 0;
 }
@@ -2787,7 +2794,7 @@ kbd {
 
 .od-plan-rule-input {
   font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 1.5;
 }
 
@@ -2797,7 +2804,7 @@ kbd {
 }
 
 .od-plan-error {
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 1.4;
 }
 
@@ -2808,7 +2815,7 @@ kbd {
   border-radius: var(--od-radius-sm);
   background: color-mix(in oklab, var(--od-danger), var(--od-bg) 94%);
   padding: 10px 12px;
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 1.4;
 }
 
@@ -2855,13 +2862,13 @@ kbd {
 
 .od-proof-head strong {
   color: var(--od-fg);
-  font-size: 14px;
+  font-size: var(--od-type-body);
   line-height: 1.35;
 }
 
 .od-proof-head span {
   color: var(--od-muted);
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 1.4;
 }
 
@@ -2870,8 +2877,8 @@ kbd {
   display: grid;
   gap: 6px;
   color: var(--od-fg);
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--od-type-body);
+  font-weight: var(--od-font-weight-strong);
 }
 
 .od-proof-field textarea {
@@ -2884,7 +2891,7 @@ kbd {
   color: var(--od-fg);
   padding: 10px 12px;
   font: inherit;
-  font-weight: 400;
+  font-weight: var(--od-font-weight-regular);
   line-height: 1.45;
 }
 
@@ -2897,8 +2904,8 @@ kbd {
 
 .od-proof-file-actions small {
   color: var(--od-muted);
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-medium);
   line-height: 1.4;
 }
 
@@ -2922,8 +2929,8 @@ kbd {
   min-width: 0;
   overflow: hidden;
   color: var(--od-muted);
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-medium);
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2936,8 +2943,8 @@ kbd {
   background: var(--od-surface-warm);
   color: var(--od-fg);
   padding: 0 10px;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-strong);
 }
 
 .od-proof-required {
@@ -2951,8 +2958,8 @@ kbd {
 
 .od-proof-required legend {
   color: var(--od-fg);
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--od-type-body);
+  font-weight: var(--od-font-weight-strong);
   line-height: 1.35;
   padding: 0 0 6px;
 }
@@ -2969,7 +2976,7 @@ kbd {
   align-items: start;
   gap: 8px;
   color: var(--od-muted);
-  font-size: 13px;
+  font-size: var(--od-type-body);
   line-height: 1.4;
 }
 
@@ -2985,7 +2992,7 @@ kbd {
   background: color-mix(in oklab, var(--od-warn), var(--od-bg) 94%);
   color: var(--od-warn);
   padding: 9px 10px;
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 1.4;
 }
 
@@ -3011,7 +3018,7 @@ kbd {
 .od-evidence-list-head strong,
 .od-evidence-list-head span {
   color: var(--od-muted);
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 1.35;
 }
 
@@ -3027,15 +3034,15 @@ kbd {
 
 .od-evidence-row strong {
   color: var(--od-fg);
-  font-size: 13px;
+  font-size: var(--od-type-body);
   line-height: 1.4;
-  font-weight: 650;
+  font-weight: var(--od-font-weight-semibold);
 }
 
 .od-evidence-row span {
   overflow: hidden;
   color: var(--od-muted);
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3065,15 +3072,15 @@ kbd {
 .od-eval-summary span,
 .od-evidence-review-head {
   color: var(--od-muted);
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 1.35;
 }
 
 .od-eval-summary strong {
   color: var(--od-fg);
-  font-size: 13px;
+  font-size: var(--od-type-body);
   line-height: 1.4;
-  font-weight: 650;
+  font-weight: var(--od-font-weight-semibold);
 }
 
 .od-evaluator-row {
@@ -3097,7 +3104,7 @@ kbd {
   min-width: 0;
   overflow: hidden;
   color: var(--od-fg);
-  font-size: 13px;
+  font-size: var(--od-type-body);
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3107,7 +3114,7 @@ kbd {
 .od-evaluator-row small {
   margin: 0;
   color: var(--od-muted);
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 1.4;
 }
 
@@ -3116,7 +3123,7 @@ kbd {
   border-radius: var(--od-radius-sm);
   color: var(--od-muted);
   padding: 10px 12px;
-  font-size: 13px;
+  font-size: var(--od-type-body);
 }
 
 .od-empty-inline strong,
@@ -3126,7 +3133,7 @@ kbd {
 
 .od-empty-inline strong {
   color: var(--od-fg);
-  font-weight: 650;
+  font-weight: var(--od-font-weight-semibold);
 }
 
 .od-empty-inline span {
@@ -3148,7 +3155,7 @@ kbd {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  font-weight: 650;
+  font-weight: var(--od-font-weight-semibold);
 }
 
 .od-evidence-list {
@@ -3181,9 +3188,9 @@ kbd {
 .od-evidence-row-head strong {
   min-width: 0;
   color: var(--od-fg);
-  font-size: 13px;
+  font-size: var(--od-type-body);
   line-height: 1.35;
-  font-weight: 650;
+  font-weight: var(--od-font-weight-semibold);
 }
 
 .od-evidence-row p,
@@ -3191,7 +3198,7 @@ kbd {
 .od-evidence-more {
   margin: 0;
   color: var(--od-muted);
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 1.4;
 }
 
@@ -3212,7 +3219,7 @@ kbd {
   min-width: 0;
   margin: 0;
   color: var(--od-fg);
-  font-size: 16px;
+  font-size: var(--od-type-title);
   line-height: 1.35;
   letter-spacing: 0;
 }
@@ -3228,7 +3235,7 @@ kbd {
   max-width: 640px;
   margin: 4px 0 0;
   color: var(--od-muted);
-  font-size: 13px;
+  font-size: var(--od-type-body);
   line-height: 1.45;
 }
 
@@ -3263,8 +3270,8 @@ kbd {
   background: var(--od-bg);
   color: var(--od-muted);
   padding: 2px 8px;
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-strong);
   line-height: 1.25;
 }
 
@@ -3277,7 +3284,7 @@ kbd {
   color: var(--od-fg);
   padding: 10px 12px;
   resize: vertical;
-  font-size: 14px;
+  font-size: var(--od-type-body);
   line-height: 1.45;
 }
 
@@ -3289,13 +3296,13 @@ kbd {
 .od-context-warning,
 .od-context-scope-help {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 1.4;
 }
 
 .od-context-warning {
   color: var(--od-warn);
-  font-weight: 650;
+  font-weight: var(--od-font-weight-semibold);
 }
 
 .od-context-scope-row,
@@ -3313,8 +3320,8 @@ kbd {
   background: var(--od-bg);
   color: var(--od-muted);
   padding: 0 12px;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-strong);
   cursor: pointer;
   transition: background 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
 }
@@ -3353,7 +3360,7 @@ kbd {
 .od-context-actions .od-aim-secondary {
   min-height: 36px;
   padding: 0 14px;
-  font-size: 13px;
+  font-size: var(--od-type-body);
 }
 
 .od-eval-context {
@@ -3380,15 +3387,15 @@ kbd {
 
 .od-eval-candidate strong {
   color: var(--od-fg);
-  font-size: 13px;
+  font-size: var(--od-type-body);
   line-height: 1.4;
-  font-weight: 650;
+  font-weight: var(--od-font-weight-semibold);
 }
 
 .od-eval-candidate span {
   overflow: hidden;
   color: var(--od-muted);
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3440,16 +3447,16 @@ kbd {
 .od-recap-row strong {
   min-width: 0;
   color: var(--od-fg);
-  font-size: 13px;
+  font-size: var(--od-type-body);
   line-height: 1.4;
-  font-weight: 700;
+  font-weight: var(--od-font-weight-strong);
 }
 
 .od-recap-row span,
 .od-recap-row p {
   margin: 0;
   color: var(--od-muted);
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 1.4;
 }
 
@@ -3464,15 +3471,15 @@ kbd {
 
 .od-recap-reuse span {
   color: var(--od-accent);
-  font-size: 12px;
-  font-weight: 750;
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-strong);
 }
 
 .od-recap-reuse strong {
   color: var(--od-fg);
-  font-size: 13px;
+  font-size: var(--od-type-body);
   line-height: 1.45;
-  font-weight: 600;
+  font-weight: var(--od-font-weight-semibold);
 }
 
 .od-inspector {
@@ -3494,14 +3501,14 @@ kbd {
 
 .od-inspector-head h2 {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--od-type-body);
   line-height: 1.2;
 }
 
 .od-inspector-head span {
   color: var(--od-meta);
   font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
-  font-size: 11px;
+  font-size: var(--od-type-meta);
 }
 
 .od-inspector-body {
@@ -3522,8 +3529,8 @@ kbd {
   background: var(--od-surface);
   color: var(--od-muted);
   padding: 0 10px;
-  font-size: 11px;
-  font-weight: 750;
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-strong);
   white-space: nowrap;
 }
 
@@ -3570,9 +3577,9 @@ kbd {
 .od-context-workbench-head h2 {
   margin: 4px 0 0;
   color: var(--od-fg);
-  font-size: 20px;
+  font-size: var(--od-type-title);
   line-height: 1.35;
-  font-weight: 750;
+  font-weight: var(--od-font-weight-strong);
   letter-spacing: 0;
 }
 
@@ -3581,7 +3588,7 @@ kbd {
 .od-context-workbench-step small {
   margin: 0;
   color: var(--od-muted);
-  font-size: 13px;
+  font-size: var(--od-type-body);
   line-height: 1.45;
 }
 
@@ -3621,16 +3628,16 @@ kbd {
   border-radius: var(--od-radius-pill);
   background: var(--od-surface);
   color: var(--od-muted);
-  font-size: 12px;
-  font-weight: 800;
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-strong);
 }
 
 .od-context-workbench-step strong {
   display: block;
   color: var(--od-fg);
-  font-size: 14px;
+  font-size: var(--od-type-body);
   line-height: 1.35;
-  font-weight: 750;
+  font-weight: var(--od-font-weight-strong);
 }
 
 .od-context-workbench-step p {
@@ -3660,7 +3667,7 @@ kbd {
   color: var(--od-muted);
   padding: 8px 10px;
   font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 1.4;
 }
 
@@ -3694,13 +3701,13 @@ kbd {
 
 .od-context-source-summary-head span:first-child {
   color: var(--od-accent);
-  font-size: 11px;
-  font-weight: 800;
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-strong);
 }
 
 .od-context-source-summary-head strong {
   color: var(--od-fg);
-  font-size: 16px;
+  font-size: var(--od-type-title);
   line-height: 1.3;
 }
 
@@ -3715,15 +3722,15 @@ kbd {
 
 .od-context-next-action span {
   color: var(--od-muted);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-strong);
 }
 
 .od-context-next-action strong {
   min-width: 0;
   color: var(--od-fg);
-  font-size: 13px;
-  font-weight: 650;
+  font-size: var(--od-type-body);
+  font-weight: var(--od-font-weight-semibold);
   line-height: 1.35;
 }
 
@@ -3743,13 +3750,13 @@ kbd {
 
 .od-context-source-status strong {
   color: var(--od-fg);
-  font-size: 13px;
+  font-size: var(--od-type-body);
   line-height: 1.25;
 }
 
 .od-context-source-status span:not(.od-pill) {
   color: var(--od-muted);
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 1.35;
 }
 
@@ -3778,14 +3785,14 @@ kbd {
 .od-context-gate-row strong {
   color: var(--od-fg);
   font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 1.25;
 }
 
 .od-context-gate-row span:nth-child(2) {
   min-width: 0;
   color: var(--od-muted);
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 1.4;
 }
 
@@ -3814,7 +3821,7 @@ kbd {
 
 .od-context-control-title strong {
   color: var(--od-fg);
-  font-size: 14px;
+  font-size: var(--od-type-body);
   line-height: 1.25;
 }
 
@@ -3835,14 +3842,14 @@ kbd {
 .od-context-main-toggle strong,
 .od-context-setting-row strong {
   color: var(--od-fg);
-  font-size: 14px;
+  font-size: var(--od-type-body);
   line-height: 1.25;
 }
 
 .od-context-main-toggle small,
 .od-context-setting-row small {
   color: var(--od-muted);
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 1.4;
 }
 
@@ -3859,8 +3866,8 @@ kbd {
 .od-context-field > span,
 .od-context-list-label {
   color: var(--od-muted);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-strong);
 }
 
 .od-context-attached-list,
@@ -3875,7 +3882,7 @@ kbd {
   gap: 8px;
   align-items: center;
   color: var(--od-muted);
-  font-size: 12px;
+  font-size: var(--od-type-meta);
 }
 
 .od-context-path-row span {
@@ -3895,7 +3902,7 @@ kbd {
   align-items: center;
   gap: 6px;
   color: var(--od-muted);
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   white-space: nowrap;
 }
 
@@ -3906,8 +3913,8 @@ kbd {
   background: var(--od-bg);
   color: var(--od-muted);
   padding: 0 10px;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-strong);
   cursor: pointer;
 }
 
@@ -3974,7 +3981,7 @@ kbd {
   background: transparent;
   color: var(--od-fg);
   padding: 0 4px;
-  font-size: 15px;
+  font-size: var(--od-type-body);
 }
 
 .od-command-search input::placeholder {
@@ -4033,9 +4040,9 @@ kbd {
   min-width: 0;
   overflow: hidden;
   color: var(--od-fg);
-  font-size: 13px;
+  font-size: var(--od-type-body);
   line-height: 1.3;
-  font-weight: 700;
+  font-weight: var(--od-font-weight-strong);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -4043,7 +4050,7 @@ kbd {
 .od-command-row small,
 .od-command-empty {
   color: var(--od-muted);
-  font-size: 12px;
+  font-size: var(--od-type-meta);
   line-height: 1.35;
 }
 
@@ -4255,12 +4262,12 @@ kbd {
 
   .od-aim-intake h1,
   .od-aim-overview h1 {
-    font-size: 28px;
+    font-size: var(--od-type-title);
   }
 
   .od-aim-intake p,
   .od-aim-overview p {
-    font-size: 15px;
+    font-size: var(--od-type-body);
   }
 
   .od-aim-intake-actions,

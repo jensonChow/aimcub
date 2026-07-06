@@ -107,17 +107,9 @@ Reference links:
 - Use one UI type family per app surface. Do not mix decorative fonts into product UI.
 - Letter spacing is always `0`. Do not use negative letter spacing.
 - Do not scale fonts directly with viewport width. Use defined text styles. Existing `clamp()` hero-like sizing should be replaced when the next visual pass touches it.
-- Type ramp:
-  - Caption/meta: 11 px, line-height 16 px, weight 500 to 620.
-  - Small UI/labels: 12 px, line-height 16 px, weight 500 to 560 for labels; 400 to 500 for secondary text.
-  - Sidebar/item titles: 13 px, line-height 16 to 18 px, weight 500 to 560.
-  - Body/control text: 14 px, line-height 20 px, weight 400 to 500.
-  - Form body/editing text: 15 px, line-height 22 px, weight 400.
-  - Body large/explanatory text: 17 to 18 px, line-height 25 to 28 px, weight 400.
-  - Section title: 20 px, line-height 28 px, weight 560 to 680.
-  - Page title: 28 px, line-height 36 px, weight 620 to 680.
-  - Large title: 34 to 38 px, line-height 42 px, weight 620 to 680, only for the New Aim or overview lead surface with enough surrounding whitespace.
-- Use regular or medium weight for navigation and body text, and reserve stronger weights for true hierarchy or selected actions. Avoid defaulting to 700+ weights in shell chrome, sidebar rows, compact labels, or Chinese UI text. Desktop line icons should generally use a refined 1.5 to 1.6 px stroke unless a selected/primary state needs more emphasis. Avoid italics and all caps.
+- Desktop type ramp is capped at three visible sizes. Use `--od-type-meta` 12 px / 16 px line-height for meta text, captions, small labels, chips, and keyboard hints; `--od-type-body` 13 px / 18 px line-height for navigation, body, controls, rows, and form copy; and `--od-type-title` 16 px / 22 px line-height for page, panel, section, composer, and card titles.
+- Desktop font weights must stay light and tokenized: regular and medium both resolve to 400, semibold resolves to 450, and strong resolves to 500. Treat any heavier title/emphasis token as an alias of strong unless the user explicitly asks for a bolder surface.
+- Use regular or medium weight for navigation and body text, and reserve strong weight only for true hierarchy, selected actions, or primary commands. Avoid defaulting to 600+ weights in shell chrome, sidebar rows, compact labels, or Chinese UI text. Desktop line icons should generally use a refined 1.5 to 1.6 px stroke unless a selected/primary state needs more emphasis. Avoid italics and all caps.
 - Use sentence case for UI labels and action text. Buttons should use short action verbs such as "Save", "Review", "Continue", "Add files".
 - Keep paragraph line length roughly 50 to 70 characters. Use tighter widths for explanatory copy and summaries.
 - Truncation: single-line rows use ellipsis; multi-line content should wrap deliberately with a maximum line count when the surrounding layout is fixed.

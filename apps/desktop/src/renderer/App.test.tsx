@@ -230,8 +230,11 @@ describe("CockpitShell", () => {
     expect(css).toContain("--sidebar-action-label-gap: 6px;");
     expect(css).toContain("--sidebar-action-icon-offset-x: -2px;");
     expect(css).toContain("--sidebar-content-width: calc(var(--sidebar-width) - (var(--sidebar-horizontal-inset) * 2) - 1px);");
-    expect(css).toContain("--od-font-weight-medium: 500;");
-    expect(css).toContain("--od-font-weight-semibold: 560;");
+    expect(css).toContain("--od-type-meta: 12px;");
+    expect(css).toContain("--od-type-body: 13px;");
+    expect(css).toContain("--od-type-title: 16px;");
+    expect(css).toContain("--od-font-weight-medium: 400;");
+    expect(css).toContain("--od-font-weight-semibold: 450;");
     expect(css).toContain("--od-icon-stroke: 1.55;");
     expect(css).toContain("--od-interaction-hover-bg: color-mix(in oklab, var(--od-fg), transparent 96%);");
     expect(css).toContain("--od-interaction-hover-shadow: var(--od-shadow-sidebar-action);");
@@ -246,12 +249,22 @@ describe("CockpitShell", () => {
     expect(css).toMatch(/\.od-new-aim-icon svg\s*{[^}]*width:\s*18px;[^}]*height:\s*18px;[^}]*stroke-width:\s*var\(--od-icon-stroke\);/s);
     expect(css).toMatch(/\.od-new-aim-label\s*{[^}]*font-weight:\s*var\(--od-font-weight-medium\);[^}]*line-height:\s*16px;/s);
     expect(css).toMatch(/\.od-new-aim kbd\s*{[^}]*display:\s*inline-flex;[^}]*align-items:\s*center;[^}]*gap:\s*2px;[^}]*min-height:\s*16px;[^}]*color:\s*var\(--od-meta\);[^}]*font-weight:\s*var\(--od-font-weight-medium\);[^}]*opacity:\s*0;[^}]*transform:\s*translateX\(2px\);/s);
-    expect(css).toMatch(/\.od-new-aim kbd span\[aria-hidden="true"\]\s*{[^}]*font-size:\s*11px;[^}]*font-weight:\s*var\(--od-font-weight-semibold\);/s);
+    expect(css).toMatch(/\.od-new-aim kbd span\[aria-hidden="true"\]\s*{[^}]*font-size:\s*var\(--od-type-meta\);[^}]*font-weight:\s*var\(--od-font-weight-semibold\);/s);
     expect(css).toMatch(/\.od-new-aim:hover kbd,\s*\.od-new-aim:focus-visible kbd\s*{[^}]*opacity:\s*1;[^}]*transform:\s*translateX\(0\);/s);
     expect(css).not.toContain("--od-new-aim-bg");
     expect(css).not.toContain(".od-new-aim[data-current");
     expect(css).not.toContain(".od-new-aim[data-current=\"true\"] kbd");
     expect(css).not.toContain('.od-app[data-empty-aim="true"] .od-new-aim');
+  });
+
+  it("keeps Desktop typography on three sizes and light shared weights", () => {
+    const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
+
+    expect(css).toMatch(/font-size:\s*var\(--od-type-(meta|body|title)\);/);
+    expect(css).not.toMatch(/font-size:\s*(9|10|11|12|13|14|15|16|18|20|22|28|32)px;/);
+    expect(css).not.toMatch(/font-weight:\s*(600|650|700|750|800);/);
+    expect(css).toContain("--od-font-weight-strong: 500;");
+    expect(css).toContain("--od-font-weight-heavy: var(--od-font-weight-strong);");
   });
 
   it("uses the New Aim quiet hover treatment for secondary desktop controls", () => {

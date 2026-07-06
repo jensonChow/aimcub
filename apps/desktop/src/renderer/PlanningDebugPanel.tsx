@@ -26,7 +26,7 @@ import {
   reviewOf,
   shortUiText,
 } from "./labels";
-import { C } from "./styles";
+import { C, TYPE, WEIGHT } from "./styles";
 
 type AppMode = "cockpit" | "contexting" | "drafting" | "answering" | "reviewing" | "settings";
 type T = (key: StringKey, vars?: Record<string, string | number>) => string;
@@ -628,11 +628,11 @@ function headerStyle(): CSSProperties {
 }
 
 function eyebrowStyle(): CSSProperties {
-  return { color: C.accent, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0 };
+  return { color: C.accent, fontSize: TYPE.meta, fontWeight: WEIGHT.strong, textTransform: "uppercase", letterSpacing: 0 };
 }
 
 function titleStyle(): CSSProperties {
-  return { margin: "4px 0 0", fontSize: 18, letterSpacing: 0 };
+  return { margin: "4px 0 0", fontSize: TYPE.title, letterSpacing: 0 };
 }
 
 function sectionStyle(): CSSProperties {
@@ -640,7 +640,7 @@ function sectionStyle(): CSSProperties {
 }
 
 function sectionTitleStyle(): CSSProperties {
-  return { fontSize: 12, fontWeight: 800, color: C.text, marginBottom: 8 };
+  return { fontSize: TYPE.meta, fontWeight: WEIGHT.strong, color: C.text, marginBottom: 8 };
 }
 
 function debugRowStyle(): CSSProperties {
@@ -666,15 +666,15 @@ function rowHeaderStyle(): CSSProperties {
 }
 
 function rowTitleStyle(): CSSProperties {
-  return { fontSize: 13, fontWeight: 750, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
+  return { fontSize: TYPE.body, fontWeight: WEIGHT.strong, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
 }
 
 function mutedTextStyle(): CSSProperties {
-  return { color: C.muted, fontSize: 12, lineHeight: 1.45, marginTop: 4, overflowWrap: "anywhere" };
+  return { color: C.muted, fontSize: TYPE.meta, lineHeight: 1.45, marginTop: 4, overflowWrap: "anywhere" };
 }
 
 function metaLineStyle(): CSSProperties {
-  return { ...mutedTextStyle(), fontSize: 11 };
+  return { ...mutedTextStyle(), fontSize: TYPE.meta };
 }
 
 function previewBlockStyle(): CSSProperties {
@@ -685,14 +685,14 @@ function previewBlockStyle(): CSSProperties {
     padding: 8,
     marginTop: 8,
     color: C.muted,
-    fontSize: 11,
+    fontSize: TYPE.meta,
     lineHeight: 1.45,
     overflowWrap: "anywhere",
   };
 }
 
 function previewLabelStyle(): CSSProperties {
-  return { color: C.text, fontWeight: 800, marginBottom: 4 };
+  return { color: C.text, fontWeight: WEIGHT.strong, marginBottom: 4 };
 }
 
 function compactBlockStyle(): CSSProperties {
@@ -706,8 +706,8 @@ function pillStyle(color: string): CSSProperties {
     border: `1px solid ${C.border}`,
     borderRadius: 999,
     padding: "2px 7px",
-    fontSize: 11,
-    fontWeight: 750,
+    fontSize: TYPE.meta,
+    fontWeight: WEIGHT.strong,
     whiteSpace: "nowrap",
   };
 }

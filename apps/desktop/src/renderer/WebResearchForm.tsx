@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { WebResearchConfig, WebResearchStatus } from "../shared/ipc";
 
 import { useI18n } from "./i18n";
-import { C, inputStyle, labelStyle, linkButton, primaryButton, secondaryButton } from "./styles";
+import { C, TYPE, WEIGHT, inputStyle, labelStyle, linkButton, primaryButton, secondaryButton } from "./styles";
 
 interface WebResearchFormProps {
   status: WebResearchStatus | null;
@@ -70,7 +70,7 @@ export function WebResearchForm({ status, onSaved }: WebResearchFormProps) {
           <div className="od-form-title">{t("wf.title")}</div>
           <div className="od-form-body">{t("wf.blurb")}</div>
         </div>
-        <div style={{ color: status?.configured ? C.success : C.muted, fontSize: 12, fontWeight: 700, whiteSpace: "nowrap" }}>
+        <div style={{ color: status?.configured ? C.success : C.muted, fontSize: TYPE.meta, fontWeight: WEIGHT.strong, whiteSpace: "nowrap" }}>
           {status?.configured ? t("wf.ready") : t("wf.notReady")}
         </div>
       </div>
@@ -98,7 +98,7 @@ export function WebResearchForm({ status, onSaved }: WebResearchFormProps) {
       </label>
 
       {message && (
-        <div style={{ color: message.ok ? C.success : C.danger, fontSize: 13, marginTop: 10 }}>
+        <div style={{ color: message.ok ? C.success : C.danger, fontSize: TYPE.body, marginTop: 10 }}>
           {message.text}
         </div>
       )}

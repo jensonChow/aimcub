@@ -68,7 +68,7 @@ import { Notice } from "./Notice";
 import { mergePlanningDebugTraces } from "./PlanningDebugPanel";
 import { ProviderForm } from "./ProviderForm";
 import { WebResearchForm } from "./WebResearchForm";
-import { C, inputStyle, primaryButton, secondaryButton } from "./styles";
+import { C, TYPE, WEIGHT, inputStyle, primaryButton, secondaryButton } from "./styles";
 
 type AppMode = "cockpit" | "contexting" | "drafting" | "answering" | "reviewing" | "settings";
 type ClarifyPhase = "intake" | "postDraft" | null;
@@ -1760,10 +1760,10 @@ function ClarifyPanel(props: {
           return (
             <div key={question.id} style={questionStyle()}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline" }}>
-                <div style={{ fontWeight: 750 }}>{question.question}</div>
+                <div style={{ fontWeight: WEIGHT.strong }}>{question.question}</div>
                 <span style={badgeStyle(C.page, C.muted)}>{t(multi ? "os.multiSelect" : "os.singleSelect")}</span>
               </div>
-              <div style={{ color: C.muted, fontSize: 13, marginTop: 4 }}>{question.why_high_impact}</div>
+              <div style={{ color: C.muted, fontSize: TYPE.body, marginTop: 4 }}>{question.why_high_impact}</div>
               <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
                 {question.options.map((option) => (
                   <button
@@ -1795,8 +1795,8 @@ function ClarifyPanel(props: {
         })}
         {intake && props.conversationEnabled ? (
           <div style={questionStyle()}>
-            <div style={{ fontWeight: 750 }}>{t("os.contextConversation")}</div>
-            <div style={{ color: C.muted, fontSize: 13, marginTop: 4 }}>{t("os.contextConversationBody")}</div>
+            <div style={{ fontWeight: WEIGHT.strong }}>{t("os.contextConversation")}</div>
+            <div style={{ color: C.muted, fontSize: TYPE.body, marginTop: 4 }}>{t("os.contextConversationBody")}</div>
             <textarea
               value={props.contextNote}
               onChange={(event) => props.onContextNote(event.target.value)}
@@ -3376,21 +3376,21 @@ function sectionHeaderStyle(): CSSProperties {
 }
 
 function sectionTitleStyle(): CSSProperties {
-  return { margin: "4px 0 0", fontSize: 18, letterSpacing: 0 };
+  return { margin: "4px 0 0", fontSize: TYPE.title, letterSpacing: 0 };
 }
 
 function eyebrowStyle(): CSSProperties {
   return {
     color: C.accent,
-    fontSize: 11,
-    fontWeight: 800,
+    fontSize: TYPE.meta,
+    fontWeight: WEIGHT.strong,
     textTransform: "uppercase",
     letterSpacing: 0,
   };
 }
 
 function mutedTextStyle(): CSSProperties {
-  return { color: C.muted, fontSize: 13, lineHeight: 1.45, margin: "4px 0 0" };
+  return { color: C.muted, fontSize: TYPE.body, lineHeight: 1.45, margin: "4px 0 0" };
 }
 
 function questionStyle(): CSSProperties {
@@ -3426,8 +3426,8 @@ function badgeStyle(bg: string, fg: string): CSSProperties {
     padding: "2px 8px",
     background: bg,
     color: fg,
-    fontSize: 12,
-    fontWeight: 750,
+    fontSize: TYPE.meta,
+    fontWeight: WEIGHT.strong,
   };
 }
 
@@ -3455,7 +3455,7 @@ function donutInnerStyle(): CSSProperties {
     display: "grid",
     placeItems: "center",
     alignContent: "center",
-    fontSize: 12,
+    fontSize: TYPE.meta,
     color: C.muted,
   };
 }

@@ -17,7 +17,7 @@ import {
   planOf,
   shortUiText,
 } from "./labels";
-import { C, card, linkButton, primaryButton, secondaryButton } from "./styles";
+import { C, TYPE, WEIGHT, card, linkButton, primaryButton, secondaryButton } from "./styles";
 
 interface HomeViewProps {
   goals: Goal[];
@@ -37,8 +37,8 @@ export function HomeView({
     <section style={{ maxWidth: 960 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 12, flexWrap: "wrap" }}>
         <div style={{ minWidth: 0 }}>
-          <h2 style={{ margin: 0, fontSize: 22, letterSpacing: 0 }}>{t("home.recent")}</h2>
-          <div style={{ color: C.muted, fontSize: 13, marginTop: 4 }}>
+          <h2 style={{ margin: 0, fontSize: TYPE.title, letterSpacing: 0 }}>{t("home.recent")}</h2>
+          <div style={{ color: C.muted, fontSize: TYPE.body, marginTop: 4 }}>
             {goals.length === 0 ? t("home.none") : t(goals.length === 1 ? "home.aim_one" : "home.aim_other", { n: goals.length })}
           </div>
         </div>
@@ -48,8 +48,8 @@ export function HomeView({
       {goals.length === 0 && (
         <div style={{ ...card(), minHeight: 220, display: "grid", placeItems: "center", textAlign: "center", borderStyle: "dashed" }}>
           <div style={{ maxWidth: 380 }}>
-            <h3 style={{ margin: 0, fontSize: 24, letterSpacing: 0 }}>{t("home.emptyTitle")}</h3>
-            <p style={{ color: C.muted, fontSize: 14, lineHeight: 1.6, margin: "10px 0 18px" }}>{t("home.emptyHelp")}</p>
+            <h3 style={{ margin: 0, fontSize: TYPE.title, letterSpacing: 0 }}>{t("home.emptyTitle")}</h3>
+            <p style={{ color: C.muted, fontSize: TYPE.body, lineHeight: 1.6, margin: "10px 0 18px" }}>{t("home.emptyHelp")}</p>
             <button onClick={onNew} style={{ ...primaryButton(false), marginTop: 0, whiteSpace: "nowrap" }}>{t("home.new")}</button>
           </div>
         </div>
@@ -61,13 +61,13 @@ export function HomeView({
         return (
           <div key={goal.id} style={{ ...card(), display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, cursor: "pointer" }} onClick={() => onOpen(goal)}>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{goal.title}</div>
+              <div style={{ fontWeight: WEIGHT.medium, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{goal.title}</div>
               {description ? (
-                <div style={{ color: C.muted, fontSize: 13, marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <div style={{ color: C.muted, fontSize: TYPE.body, marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {description}
                 </div>
               ) : null}
-              <div style={{ color: C.muted, fontSize: 12, marginTop: 3 }}>
+              <div style={{ color: C.muted, fontSize: TYPE.meta, marginTop: 3 }}>
                 {t(n === 1 ? "common.milestone_one" : "common.milestone_other", { n })}
                 {goal.created_at ? ` · ${formatDate(goal.created_at)}` : ""}
               </div>
@@ -93,8 +93,8 @@ export function ContextProfilePanel({ report }: { report: ContextProfileReport |
   return (
     <section style={{ marginBottom: 18 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-        <h2 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>{t("context.profile")}</h2>
-        <span style={{ color: C.muted, fontSize: 12 }}>
+        <h2 style={{ fontSize: TYPE.body, fontWeight: WEIGHT.semibold, margin: 0 }}>{t("context.profile")}</h2>
+        <span style={{ color: C.muted, fontSize: TYPE.meta }}>
           {t("context.profileScore", { score: report.coverageScore })}
         </span>
       </div>
@@ -105,20 +105,20 @@ export function ContextProfilePanel({ report }: { report: ContextProfileReport |
               key={row.category}
               style={{ display: "grid", gridTemplateColumns: "112px minmax(80px, 1fr) 72px", gap: 8, alignItems: "center" }}
             >
-              <div style={{ color: C.text, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <div style={{ color: C.text, fontSize: TYPE.meta, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {contextCategoryLabel(row.category, t)}
               </div>
-              <div style={{ color: C.muted, fontSize: 12 }}>
+              <div style={{ color: C.muted, fontSize: TYPE.meta }}>
                 {contextProfileStrengthLabel(row.strength, t)}
               </div>
-              <div style={{ color: C.muted, fontSize: 12, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+              <div style={{ color: C.muted, fontSize: TYPE.meta, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
                 {row.highConfidenceCount}/{row.activeCount}
               </div>
             </div>
           ))}
         </div>
         {gaps.length > 0 && (
-          <div style={{ color: C.muted, fontSize: 12, marginTop: 10 }}>
+          <div style={{ color: C.muted, fontSize: TYPE.meta, marginTop: 10 }}>
             {t("context.profileNext")} {gaps.map((row) => contextCategoryLabel(row.category, t)).join(", ")}
           </div>
         )}
@@ -135,8 +135,8 @@ export function ContextLearningPanel({ report }: { report: ClarifyLearningReport
   return (
     <section style={{ marginBottom: 18 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-        <h2 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>{t("context.learning")}</h2>
-        <span style={{ color: C.muted, fontSize: 12 }}>
+        <h2 style={{ fontSize: TYPE.body, fontWeight: WEIGHT.semibold, margin: 0 }}>{t("context.learning")}</h2>
+        <span style={{ color: C.muted, fontSize: TYPE.meta }}>
           {t("context.learningCounts", { answered: report.total_answered, impacted: report.total_impacted })}
         </span>
       </div>
@@ -147,13 +147,13 @@ export function ContextLearningPanel({ report }: { report: ClarifyLearningReport
               key={row.source_dimension}
               style={{ display: "grid", gridTemplateColumns: "112px minmax(90px, 1fr) 72px", gap: 8, alignItems: "center" }}
             >
-              <div style={{ fontSize: 12, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <div style={{ fontSize: TYPE.meta, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {dimensionLabel(row.source_dimension, t)}
               </div>
-              <div style={{ color: C.muted, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <div style={{ color: C.muted, fontSize: TYPE.meta, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {contextLearningRecommendationLabel(row.recommendation, t)}
               </div>
-              <div style={{ color: C.muted, fontSize: 12, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+              <div style={{ color: C.muted, fontSize: TYPE.meta, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
                 {row.impacted_count}/{row.answered_count}
               </div>
             </div>
@@ -172,8 +172,8 @@ export function ContextLineageLearningPanel({ report }: { report: ContextLineage
   return (
     <section style={{ marginBottom: 18 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-        <h2 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>{t("context.lineageLearning")}</h2>
-        <span style={{ color: C.muted, fontSize: 12 }}>
+        <h2 style={{ fontSize: TYPE.body, fontWeight: WEIGHT.semibold, margin: 0 }}>{t("context.lineageLearning")}</h2>
+        <span style={{ color: C.muted, fontSize: TYPE.meta }}>
           {t("context.lineageLearningCounts", {
             questions: report.totalQuestions,
             captured: report.totalCaptured,
@@ -189,14 +189,14 @@ export function ContextLineageLearningPanel({ report }: { report: ContextLineage
             return (
               <div key={`${row.source}-${row.category}-${row.capturePurpose}-${index}`} style={{ display: "grid", gap: 3 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline" }}>
-                  <div style={{ color: C.text, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <div style={{ color: C.text, fontSize: TYPE.meta, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {source} · {contextCategoryLabel(row.category, t)} · {dimensionLabel(row.improvesDimension, t)}
                   </div>
-                  <div style={{ color: C.muted, fontSize: 12, whiteSpace: "nowrap" }}>
+                  <div style={{ color: C.muted, fontSize: TYPE.meta, whiteSpace: "nowrap" }}>
                     {row.impactedCount}/{row.memoryCapturedCount}
                   </div>
                 </div>
-                <div style={{ color: C.muted, fontSize: 12 }}>
+                <div style={{ color: C.muted, fontSize: TYPE.meta }}>
                   {lineageLearningRecommendationLabel(row.recommendation, t)} · {capturePurposeLabel(row.capturePurpose, t)}
                   {row.pendingContextCount > 0 ? ` · ${t("context.lineageLearningPending", { n: row.pendingContextCount })}` : ""}
                   {row.acceptedContextCount ? ` · ${t("context.lineageLearningAccepted", { n: row.acceptedContextCount })}` : ""}
@@ -204,7 +204,7 @@ export function ContextLineageLearningPanel({ report }: { report: ContextLineage
                     ? ` · ${t("context.lineageLearningRejected", { n: (row.rejectedContextCount ?? 0) + (row.deprioritizedContextCount ?? 0) })}`
                     : ""}
                 </div>
-                <div style={{ color: C.muted, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <div style={{ color: C.muted, fontSize: TYPE.meta, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {shortUiText(row.exampleQuestion)}
                 </div>
               </div>
@@ -223,8 +223,8 @@ export function DecompositionLearningPanel({ report }: { report: DecompositionLe
   return (
     <section style={{ marginBottom: 18 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-        <h2 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>{t("context.decompositionLearning")}</h2>
-        <span style={{ color: C.muted, fontSize: 12 }}>
+        <h2 style={{ fontSize: TYPE.body, fontWeight: WEIGHT.semibold, margin: 0 }}>{t("context.decompositionLearning")}</h2>
+        <span style={{ color: C.muted, fontSize: TYPE.meta }}>
           {t("context.decompositionLearningCounts", {
             aims: report.totalAims,
             completed: report.completedMilestones,
@@ -252,17 +252,17 @@ export function DecompositionLearningPanel({ report }: { report: DecompositionLe
             return (
               <div key={`${row.source}-${row.recommendation}-${row.aimId}-${index}`} style={{ display: "grid", gap: 3 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline" }}>
-                  <div style={{ color: C.text, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <div style={{ color: C.text, fontSize: TYPE.meta, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {decompositionLearningRecommendationLabel(row.recommendation, t)} · {row.source.replace("_", "-")}
                   </div>
-                  <div style={{ color: C.muted, fontSize: 12, whiteSpace: "nowrap" }}>
+                  <div style={{ color: C.muted, fontSize: TYPE.meta, whiteSpace: "nowrap" }}>
                     {row.dimension ? dimensionLabel(row.dimension, t) : row.category ? contextCategoryLabel(row.category, t) : t("context.decompositionLearningContract")}
                   </div>
                 </div>
-                <div style={{ color: C.muted, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <div style={{ color: C.muted, fontSize: TYPE.meta, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {row.nodeTitle ?? row.aimTitle}{context}{evidence}
                 </div>
-                <div style={{ color: C.muted, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <div style={{ color: C.muted, fontSize: TYPE.meta, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {shortUiText(row.example)}
                 </div>
               </div>
@@ -290,7 +290,7 @@ export function ContextHealthPanel({
     const traced = rows.filter((row) => row.selectedCount + row.ignoredCount > 0).length;
     return (
       <section style={{ marginBottom: 18 }}>
-        <div style={{ ...card(), background: C.successBg, color: C.success, fontSize: 13 }}>
+        <div style={{ ...card(), background: C.successBg, color: C.success, fontSize: TYPE.body }}>
           {t("context.healthClean", { traced, total: rows.length })}
         </div>
       </section>
@@ -300,23 +300,23 @@ export function ContextHealthPanel({
   return (
     <section style={{ marginBottom: 18 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-        <h2 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>{t("context.health")}</h2>
-        <span style={{ color: C.muted, fontSize: 12 }}>
+        <h2 style={{ fontSize: TYPE.body, fontWeight: WEIGHT.semibold, margin: 0 }}>{t("context.health")}</h2>
+        <span style={{ color: C.muted, fontSize: TYPE.meta }}>
           {t(actionable.length === 1 ? "context.healthAttention_one" : "context.healthAttention_other", { n: actionable.length })}
         </span>
       </div>
       {actionable.slice(0, 5).map((row) => (
         <div key={row.memoryId} style={{ ...card(), background: C.warnBg }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline" }}>
-            <div style={{ color: C.muted, fontSize: 12 }}>
+            <div style={{ color: C.muted, fontSize: TYPE.meta }}>
               {row.category} · {contextHealthActionLabel(row.action, t)}
             </div>
-            <div style={{ color: C.muted, fontSize: 12, whiteSpace: "nowrap" }}>
+            <div style={{ color: C.muted, fontSize: TYPE.meta, whiteSpace: "nowrap" }}>
               {t("context.healthCounts", { selected: row.selectedCount, ignored: row.ignoredCount })}
             </div>
           </div>
-          <div style={{ fontSize: 13, marginTop: 6 }}>{row.content}</div>
-          <div style={{ color: C.muted, fontSize: 12, marginTop: 6 }}>
+          <div style={{ fontSize: TYPE.body, marginTop: 6 }}>{row.content}</div>
+          <div style={{ color: C.muted, fontSize: TYPE.meta, marginTop: 6 }}>
             {contextHealthReasonLabel(row.reason, t)}
             {row.lastReasons.length > 0 ? ` · ${row.lastReasons.slice(-2).join(", ")}` : ""}
           </div>

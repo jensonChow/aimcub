@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { LocalAgentDetection, LocalAgentId, LocalAgentRunResult } from "../shared/ipc";
 
 import { useI18n } from "./i18n";
-import { C, linkButton, secondaryButton } from "./styles";
+import { C, TYPE, WEIGHT, linkButton, secondaryButton } from "./styles";
 
 interface LocalAgentFormProps {
   agents: LocalAgentDetection[] | null;
@@ -82,8 +82,8 @@ export function LocalAgentForm({ agents, onRefresh }: LocalAgentFormProps) {
             >
               <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "start" }}>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: 700 }}>{agent.name}</div>
-                  <div style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>
+                  <div style={{ fontWeight: WEIGHT.strong }}>{agent.name}</div>
+                  <div style={{ color: C.muted, fontSize: TYPE.meta, marginTop: 2 }}>
                     {agent.available ? t("laf.installed") : t("laf.notInstalled")}
                     {agent.version ? ` · ${agent.version}` : ""}
                     {agent.authStatus !== "unknown" ? ` · ${t(authLabelKey(agent.authStatus))}` : ""}
@@ -97,28 +97,28 @@ export function LocalAgentForm({ agents, onRefresh }: LocalAgentFormProps) {
                   {test?.busy ? t("laf.testing") : t("laf.test")}
                 </button>
               </div>
-              <div style={{ color: C.muted, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <div style={{ color: C.muted, fontSize: TYPE.meta, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {agent.path ?? agent.diagnostics[0] ?? t("laf.noPath")}
               </div>
-              <div style={{ color: C.muted, fontSize: 12 }}>
+              <div style={{ color: C.muted, fontSize: TYPE.meta }}>
                 {t("laf.models", { n: agent.models.length, source: agent.modelsSource })}
               </div>
               {agent.authMessage && agent.authStatus !== "ok" && (
-                <div style={{ color: C.danger, fontSize: 12 }}>{agent.authMessage}</div>
+                <div style={{ color: C.danger, fontSize: TYPE.meta }}>{agent.authMessage}</div>
               )}
               {test?.result && (
-                <div style={{ color: test.result.ok ? C.success : C.danger, fontSize: 12 }}>
+                <div style={{ color: test.result.ok ? C.success : C.danger, fontSize: TYPE.meta }}>
                   {test.result.ok ? t("laf.testOk", { ms: test.result.durationMs }) : test.result.error ?? t("laf.testFailed")}
                 </div>
               )}
               {test?.error && !test.result && (
-                <div style={{ color: C.danger, fontSize: 12 }}>{test.error}</div>
+                <div style={{ color: C.danger, fontSize: TYPE.meta }}>{test.error}</div>
               )}
             </div>
           );
         })}
-        {agents && agents.length === 0 && <div style={{ color: C.muted, fontSize: 13 }}>{t("laf.empty")}</div>}
-        {!agents && <div style={{ color: C.muted, fontSize: 13 }}>{t("laf.loading")}</div>}
+        {agents && agents.length === 0 && <div style={{ color: C.muted, fontSize: TYPE.body }}>{t("laf.empty")}</div>}
+        {!agents && <div style={{ color: C.muted, fontSize: TYPE.body }}>{t("laf.loading")}</div>}
       </div>
     </div>
   );

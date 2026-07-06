@@ -20,7 +20,7 @@ import {
   providerFormStateForProvider,
   providerOrDefault,
 } from "./providerFormState";
-import { C, inputStyle, labelStyle, linkButton, optionButton, primaryButton, secondaryButton } from "./styles";
+import { C, TYPE, WEIGHT, inputStyle, labelStyle, linkButton, optionButton, primaryButton, secondaryButton } from "./styles";
 
 const PROVIDER_OPTIONS = LLM_PROVIDER_CATALOG;
 
@@ -125,8 +125,8 @@ export function ProviderForm({ status, onSaved, onClose }: ProviderFormProps) {
       <div className="od-option-grid">
         {PROVIDER_OPTIONS.map((provider) => (
           <button key={provider.id} onClick={() => selectProvider(provider.id)} style={optionButton(providerKind === provider.id)}>
-            <div style={{ fontWeight: 500 }}>{provider.label}</div>
-            <div style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>{provider.description}</div>
+            <div style={{ fontWeight: WEIGHT.medium }}>{provider.label}</div>
+            <div style={{ color: C.muted, fontSize: TYPE.meta, marginTop: 2 }}>{provider.description}</div>
           </button>
         ))}
       </div>
@@ -149,7 +149,7 @@ export function ProviderForm({ status, onSaved, onClose }: ProviderFormProps) {
         />
       )}
       {selectedModelId && (
-        <div style={{ color: C.muted, fontSize: 12, marginTop: 6 }}>
+        <div style={{ color: C.muted, fontSize: TYPE.meta, marginTop: 6 }}>
           {t("pf.modelId", { id: selectedModelId })}
           {selectedModelHelp ? ` · ${selectedModelHelp}` : ""}
         </div>
@@ -164,7 +164,7 @@ export function ProviderForm({ status, onSaved, onClose }: ProviderFormProps) {
             placeholder={getDefaultBaseURL(providerKind) || t("pf.endpointPlaceholder")}
             style={inputStyle()}
           />
-          <div style={{ color: C.muted, fontSize: 12, marginTop: 6 }}>
+          <div style={{ color: C.muted, fontSize: TYPE.meta, marginTop: 6 }}>
             {providerDef.baseURLHint || t("pf.endpointHint")}
           </div>
         </>
@@ -179,9 +179,9 @@ export function ProviderForm({ status, onSaved, onClose }: ProviderFormProps) {
         style={inputStyle()}
       />
 
-      {formError && <div style={{ color: C.danger, fontSize: 13, marginTop: 10 }}>{formError}</div>}
+      {formError && <div style={{ color: C.danger, fontSize: TYPE.body, marginTop: 10 }}>{formError}</div>}
       {testResult && (
-        <div style={{ color: testResult.ok ? C.success : C.danger, fontSize: 13, marginTop: 10 }}>
+        <div style={{ color: testResult.ok ? C.success : C.danger, fontSize: TYPE.body, marginTop: 10 }}>
           {testResult.message}
         </div>
       )}

@@ -1,5 +1,5 @@
 import { useI18n, type Lang } from "./i18n";
-import { C } from "./styles";
+import { C, TYPE } from "./styles";
 
 export function LangToggle() {
   const { lang, setLang } = useI18n();
@@ -14,7 +14,7 @@ export function LangToggle() {
             border: "none",
             background: lang === l ? C.accent : C.surface,
             color: lang === l ? C.accentOn : C.muted,
-            fontSize: 12,
+            fontSize: TYPE.meta,
             cursor: "pointer",
           }}
         >

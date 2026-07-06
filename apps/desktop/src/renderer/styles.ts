@@ -25,6 +25,19 @@ export const C = {
   dangerBorder: "color-mix(in oklab, var(--od-danger, #dc2626), var(--od-bg, #ffffff) 76%)",
 };
 
+export const TYPE = {
+  meta: "var(--od-type-meta, 12px)",
+  body: "var(--od-type-body, 13px)",
+  title: "var(--od-type-title, 16px)",
+} as const;
+
+export const WEIGHT = {
+  regular: "var(--od-font-weight-regular, 400)",
+  medium: "var(--od-font-weight-medium, 400)",
+  semibold: "var(--od-font-weight-semibold, 450)",
+  strong: "var(--od-font-weight-strong, 500)",
+} as const;
+
 export function card(): CSSProperties {
   return {
     background: C.surface,
@@ -37,19 +50,19 @@ export function card(): CSSProperties {
 }
 
 export function labelStyle(): CSSProperties {
-  return { display: "block", fontSize: 13, color: C.muted, marginBottom: 6 };
+  return { display: "block", fontSize: TYPE.body, color: C.muted, marginBottom: 6 };
 }
 
 export function inputStyle(): CSSProperties {
-  return { width: "100%", boxSizing: "border-box", minHeight: 40, padding: "9px 11px", border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 14, fontFamily: "inherit", background: C.surface, color: C.text };
+  return { width: "100%", boxSizing: "border-box", minHeight: 40, padding: "9px 11px", border: `1px solid ${C.border}`, borderRadius: 8, fontSize: TYPE.body, fontFamily: "inherit", background: C.surface, color: C.text };
 }
 
 export function primaryButton(disabled: boolean): CSSProperties {
-  return { marginTop: 16, minHeight: 40, padding: "0 16px", borderRadius: 999, border: "none", background: disabled ? C.disabledBg : C.accent, color: disabled ? C.disabledText : C.accentOn, fontSize: 14, fontWeight: 700, cursor: disabled ? "default" : "pointer", boxShadow: "none" };
+  return { marginTop: 16, minHeight: 40, padding: "0 16px", borderRadius: 999, border: "none", background: disabled ? C.disabledBg : C.accent, color: disabled ? C.disabledText : C.accentOn, fontSize: TYPE.body, fontWeight: WEIGHT.strong, cursor: disabled ? "default" : "pointer", boxShadow: "none" };
 }
 
 export function secondaryButton(): CSSProperties {
-  return { marginTop: 16, minHeight: 40, padding: "0 14px", borderRadius: 999, border: `1px solid ${C.border}`, background: C.surface, color: C.text, fontSize: 14, fontWeight: 650, cursor: "pointer" };
+  return { marginTop: 16, minHeight: 40, padding: "0 14px", borderRadius: 999, border: `1px solid ${C.border}`, background: C.surface, color: C.text, fontSize: TYPE.body, fontWeight: WEIGHT.semibold, cursor: "pointer" };
 }
 
 export function optionButton(selected: boolean): CSSProperties {
@@ -57,13 +70,13 @@ export function optionButton(selected: boolean): CSSProperties {
 }
 
 export function scopeButton(selected: boolean): CSSProperties {
-  return { padding: "6px 10px", borderRadius: 8, border: `1px solid ${selected ? C.accent : C.border}`, background: selected ? C.accentBg : C.surface, color: selected ? C.accent : C.muted, fontSize: 12, cursor: "pointer" };
+  return { padding: "6px 10px", borderRadius: 8, border: `1px solid ${selected ? C.accent : C.border}`, background: selected ? C.accentBg : C.surface, color: selected ? C.accent : C.muted, fontSize: TYPE.meta, cursor: "pointer" };
 }
 
 export function chipButton(): CSSProperties {
-  return { padding: "6px 12px", borderRadius: 999, border: `1px solid ${C.border}`, background: C.surface, color: C.muted, fontSize: 12, cursor: "pointer" };
+  return { padding: "6px 12px", borderRadius: 999, border: `1px solid ${C.border}`, background: C.surface, color: C.muted, fontSize: TYPE.meta, cursor: "pointer" };
 }
 
 export function linkButton(): CSSProperties {
-  return { border: "none", background: "none", color: C.accent, fontSize: 12, cursor: "pointer", padding: 0 };
+  return { border: "none", background: "none", color: C.accent, fontSize: TYPE.meta, cursor: "pointer", padding: 0 };
 }

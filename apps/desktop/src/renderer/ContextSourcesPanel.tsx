@@ -2,7 +2,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 
 import type { ContextSourceConfig, ContextSourceStatus } from "../shared/ipc";
 import { useI18n } from "./i18n";
-import { C, inputStyle, primaryButton } from "./styles";
+import { C, TYPE, WEIGHT, inputStyle, primaryButton } from "./styles";
 
 type OnlineSource = ContextSourceConfig["online"]["sources"][number];
 type OnlineProvider = OnlineSource["provider"];
@@ -732,11 +732,11 @@ function headerStyle(): CSSProperties {
 }
 
 function eyebrowStyle(): CSSProperties {
-  return { color: C.accent, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0 };
+  return { color: C.accent, fontSize: TYPE.meta, fontWeight: WEIGHT.strong, textTransform: "uppercase", letterSpacing: 0 };
 }
 
 function titleStyle(): CSSProperties {
-  return { margin: "4px 0 0", fontSize: 18, letterSpacing: 0 };
+  return { margin: "4px 0 0", fontSize: TYPE.title, letterSpacing: 0 };
 }
 
 function selectStyle(): CSSProperties {
@@ -744,5 +744,5 @@ function selectStyle(): CSSProperties {
 }
 
 function mutedTextStyle(): CSSProperties {
-  return { color: C.muted, fontSize: 12, lineHeight: 1.45, overflowWrap: "anywhere" };
+  return { color: C.muted, fontSize: TYPE.meta, lineHeight: 1.45, overflowWrap: "anywhere" };
 }
