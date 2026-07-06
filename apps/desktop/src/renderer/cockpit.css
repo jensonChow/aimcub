@@ -556,14 +556,14 @@ kbd {
 
 .od-sidebar-action[aria-current="page"] {
   background: var(--od-selection-bg);
-  border-color: var(--od-selection-border);
+  border-color: transparent;
   box-shadow: var(--od-selection-shadow);
   color: var(--od-fg);
 }
 
 .od-sidebar-action[aria-current="page"]:hover {
   background: var(--od-selection-hover-bg);
-  border-color: var(--od-selection-border);
+  border-color: transparent;
   box-shadow: var(--od-selection-shadow);
 }
 
@@ -573,7 +573,7 @@ kbd {
 
 .od-sidebar-action[aria-current="page"]:focus-visible {
   background: var(--od-selection-hover-bg);
-  border-color: var(--od-selection-border);
+  border-color: transparent;
   box-shadow: var(--od-focus), var(--od-selection-shadow);
 }
 
@@ -1911,7 +1911,7 @@ kbd {
   justify-self: center;
   display: grid;
   gap: 0;
-  border: 1px solid color-mix(in oklab, var(--od-border), var(--od-border-soft) 22%);
+  border: 1px solid transparent;
   border-radius: 24px;
   background: color-mix(in oklab, var(--od-surface), var(--od-bg) 22%);
   padding: 12px 14px;
@@ -1920,8 +1920,16 @@ kbd {
 }
 
 .od-aim-composer:focus-within {
-  border-color: color-mix(in oklab, var(--od-fg), var(--od-border) 72%);
   background: color-mix(in oklab, var(--od-surface), var(--od-bg) 28%);
+  box-shadow: var(--od-shadow-composer-focus);
+}
+
+.od-aim-composer:hover {
+  border-color: color-mix(in oklab, var(--od-fg), transparent 86%);
+}
+
+.od-aim-composer:has(.od-aim-title-input:focus-visible, .od-aim-context-input:focus-visible) {
+  border-color: color-mix(in oklab, var(--od-fg), transparent 86%);
   box-shadow: var(--od-shadow-composer-focus);
 }
 
@@ -2062,7 +2070,7 @@ kbd {
 .od-aim-composer .od-aim-title-input {
   height: 44px;
   min-height: 44px;
-  padding: 0 18px;
+  padding: 8px 18px 0;
   resize: none;
   font-size: var(--od-type-body);
   line-height: var(--od-line-body);

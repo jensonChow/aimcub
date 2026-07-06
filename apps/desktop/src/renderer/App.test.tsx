@@ -269,9 +269,9 @@ describe("CockpitShell", () => {
     expect(css).toMatch(/\.od-sidebar-action\s*{[^}]*min-height:\s*34px;[^}]*grid-template-columns:\s*var\(--sidebar-action-icon-slot\) minmax\(0, 1fr\) auto;[^}]*column-gap:\s*var\(--sidebar-action-label-gap\);[^}]*background:\s*transparent;[^}]*box-shadow:\s*none;/s);
     expect(css).toMatch(/\.od-sidebar-action\s*{[^}]*padding:\s*0 var\(--sidebar-row-padding-x\);/s);
     expect(css).toMatch(/\.od-sidebar-action:hover,\s*\.od-sidebar-action:focus-visible\s*{[^}]*background:\s*var\(--od-interaction-hover-bg\);[^}]*box-shadow:\s*var\(--od-interaction-hover-shadow\);[^}]*color:\s*var\(--od-fg\);/s);
-    expect(css).toMatch(/\.od-sidebar-action\[aria-current="page"\]\s*{[^}]*background:\s*var\(--od-selection-bg\);[^}]*border-color:\s*var\(--od-selection-border\);[^}]*box-shadow:\s*var\(--od-selection-shadow\);[^}]*color:\s*var\(--od-fg\);/s);
+    expect(css).toMatch(/\.od-sidebar-action\[aria-current="page"\]\s*{[^}]*background:\s*var\(--od-selection-bg\);[^}]*border-color:\s*transparent;[^}]*box-shadow:\s*var\(--od-selection-shadow\);[^}]*color:\s*var\(--od-fg\);/s);
     expect(css).toMatch(/\.od-sidebar-action:focus-visible\s*{[^}]*box-shadow:\s*var\(--od-interaction-focus-shadow\);/s);
-    expect(css).toMatch(/\.od-sidebar-action\[aria-current="page"\]:focus-visible\s*{[^}]*background:\s*var\(--od-selection-hover-bg\);[^}]*box-shadow:\s*var\(--od-focus\), var\(--od-selection-shadow\);/s);
+    expect(css).toMatch(/\.od-sidebar-action\[aria-current="page"\]:focus-visible\s*{[^}]*background:\s*var\(--od-selection-hover-bg\);[^}]*border-color:\s*transparent;[^}]*box-shadow:\s*var\(--od-focus\), var\(--od-selection-shadow\);/s);
     expect(css).toMatch(/\.od-sidebar-action-icon\s*{[^}]*width:\s*var\(--sidebar-action-icon-slot\);[^}]*height:\s*20px;[^}]*justify-items:\s*start;[^}]*transform:\s*translateX\(var\(--sidebar-action-icon-offset-x\)\);/s);
     expect(css).toMatch(/\.od-sidebar-action-icon svg\s*{[^}]*width:\s*18px;[^}]*height:\s*18px;[^}]*stroke-width:\s*var\(--od-icon-stroke\);/s);
     expect(css).toMatch(/\.od-sidebar-action-label\s*{[^}]*font-weight:\s*var\(--od-font-weight-medium\);[^}]*line-height:\s*16px;/s);
@@ -318,6 +318,10 @@ describe("CockpitShell", () => {
   it("uses the New Aim quiet hover treatment for secondary desktop controls", () => {
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
 
+    expect(css).toMatch(/\.od-aim-composer\s*{[^}]*border:\s*1px solid transparent;[^}]*transition:\s*border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;/s);
+    expect(css).toMatch(/\.od-aim-composer:hover\s*{[^}]*border-color:\s*color-mix\(in oklab, var\(--od-fg\), transparent 86%\);/s);
+    expect(css).toMatch(/\.od-aim-composer:has\(\.od-aim-title-input:focus-visible,\s*\.od-aim-context-input:focus-visible\)\s*{[^}]*border-color:\s*color-mix\(in oklab, var\(--od-fg\), transparent 86%\);[^}]*box-shadow:\s*var\(--od-shadow-composer-focus\);/s);
+    expect(css).toMatch(/\.od-aim-composer \.od-aim-title-input\s*{[^}]*padding:\s*8px 18px 0;/s);
     expect(css).toMatch(/\.od-sidebar-toggle:hover,\s*\.od-sidebar-toggle\[data-state="peek"\]\s*{[^}]*background:\s*var\(--od-interaction-hover-bg\);[^}]*border-color:\s*transparent;[^}]*box-shadow:\s*var\(--od-interaction-hover-shadow\);/s);
     expect(css).toMatch(/\.od-sidebar-toggle:focus-visible\s*{[^}]*background:\s*var\(--od-interaction-hover-bg\);[^}]*border-color:\s*transparent;[^}]*box-shadow:\s*var\(--od-interaction-focus-shadow\);/s);
     expect(css).toMatch(/\.od-user-menu-trigger:hover,\s*\.od-user-menu-trigger\[aria-expanded="true"\]\s*{[^}]*border-color:\s*transparent;[^}]*background:\s*var\(--od-interaction-hover-bg\);[^}]*box-shadow:\s*var\(--od-interaction-hover-shadow\);/s);
