@@ -1,53 +1,42 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-07
-Branch: detached worktree from `main`
+Branch: `main`
 
 ## Current Session
 
-- Fixed the Desktop workflow step pill safe-area issue from the stage/workspace side.
-- Kept `CockpitShell.tsx` unchanged.
-- Kept the Desktop shell/sidebar/window-chrome framework unchanged.
-- Did not run GUI, packaged app launch, `pnpm desktop`, `pnpm desktop:dev`, `pnpm desktop:pack`, push, merge, or root `Aimcub.app` refresh per the parallel-worktree constraints.
+- Integration session in progress for the next Desktop stage polish batch.
+- Merged `613d2a44` (`Fix desktop stage navigation safe area`) with merge commit `pending`.
+- Merged `aff2943c` (`Focus context blocking question flow`) with merge commit `pending`.
+- Pending merges: Plan contract density and Eval trust disclosure.
+- Preserved the tuned Desktop shell/sidebar/window-chrome framework so far. `CockpitShell.tsx` has not been edited, and CSS changes are scoped to stage/workspace content selectors rather than protected sidebar/window selectors.
 
-## Changed Files
+## Conflict Resolutions
 
-- `apps/desktop/src/renderer/cockpit.css`: added a compact-width titlebar safe-area offset on `.od-main`, centered `.od-stage-nav`, and added narrow wrapping/label compression rules.
-- `apps/desktop/src/renderer/App.test.tsx`: added CSS assertions for the safe-area rule and narrow stage-nav wrapping/compression.
-- `docs/memory/design-system.md`: recorded the durable stage-navigation safe-area rule.
-- `docs/desktop-polish-audit.md`: marked Batch 1 as addressed with a short verification note.
-- `docs/handoff.md`: replaced prior integration transfer notes with this parallel worktree handoff.
+- `docs/handoff.md`: replaced branch-local parallel worktree handoffs with this integration handoff. Final verification, visual inspection, commit, and push status will be recorded before session end.
 
 ## Verification
 
-Passed:
+Pending full integration verification:
 
-- `pnpm --filter @app/desktop test`
-- `pnpm --filter @app/desktop typecheck`
+- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
+- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
+- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck`
+- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm lint`
+- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm core:purity`
 - `git diff --check`
-
-Pending:
-
-- Local commit hash after commit creation.
-
-Notes:
-
-- `pnpm --filter @app/desktop test` materialized local `node_modules` because dependencies were not present, but no package manager files were intentionally changed.
-- Compact-width verification is CSS/test based in this worktree because the prompt forbids GUI interaction, long-running dev servers, packaged app launch, and `desktop:pack`.
-
-## Shell And Sidebar Preservation
-
-- No `CockpitShell.tsx` edits.
-- No intentional changes to `.od-sidebar*`, `.od-user-menu-*`, `.od-window-drag-strip`, `.od-sidebar-hover-zone`, `.od-sidebar-peek-trigger`, `.od-sidebar-toggle`, `.od-sidebar-resizer`, or shell grid/sidebar behavior.
-- The safe-area fix is scoped to `.od-main`, `.od-stage-nav`, and stage/workspace responsive behavior.
+- `ELECTRON_BUILDER_CACHE=/private/tmp/aimcub-electron-builder-cache COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm desktop:pack`
+- Root `Aimcub.app` refresh from `apps/desktop/dist/mac-arm64/Aimcub.app`
+- Packaged app visual inspection with `AIMCUB_HOME=/tmp/aimcub-integration-visual`
 
 ## Commit And Push Status
 
-- Local commit: pending.
-- Push/merge: intentionally not run; the integration session will handle it.
+- Integration merge is in progress.
+- No final integration commit has been created yet.
+- No push has been attempted in this session.
 
 ## Next Session Prompt
 
 ```text
-Continue from this parallel worktree. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md. Confirm the local commit hash, then hand off to the integration session without pushing, merging, packaging, launching the GUI, or refreshing the root Aimcub.app.
+Continue the Desktop stage polish integration from main. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md, then inspect git status and the current merge state. Preserve the Desktop shell/sidebar/window-chrome framework exactly unless the user explicitly approves a shell change.
 ```

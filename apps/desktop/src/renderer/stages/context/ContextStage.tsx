@@ -48,6 +48,16 @@ export function ContextStage({
   const hasBlockingQuestion = clarifyPhase === "intake";
   const hasClarifyPanel = Boolean(clarifyPanel);
   const showContinue = !hasBlockingQuestion && !hasClarifyPanel && Boolean(onContinueToPlan);
+  const showContextReview = !hasBlockingQuestion && showReview;
+  const sourceWorkbench = (
+    <ContextSourcesPanel
+      status={contextSources}
+      disabled={disabled}
+      variant="workbench"
+      onOpenSettings={onOpenSettings}
+      onSaved={onContextSources}
+    />
+  );
 
   return (
     <>
@@ -56,18 +66,25 @@ export function ContextStage({
           title={title}
           description={description}
           saved={saved}
+          compact={hasBlockingQuestion}
           onEdit={onEditAim}
         />
       )}
       {hasBlockingQuestion ? clarifyPanel : null}
-      <ContextSourcesPanel
-        status={contextSources}
-        disabled={disabled}
-        variant="workbench"
-        onOpenSettings={onOpenSettings}
-        onSaved={onContextSources}
-      />
-      {showReview ? <ContextReviewPanel bundle={review} running={reviewRunning} /> : null}
+      {hasBlockingQuestion ? (
+        <details className="od-context-secondary-sources" data-od-id="context-secondary-sources">
+          <summary>
+            <span>
+              <strong>{t("context.workbench.secondarySummary")}</strong>
+              <small>{t("context.workbench.secondaryBody")}</small>
+            </span>
+          </summary>
+          <div className="od-context-secondary-body">
+            {sourceWorkbench}
+          </div>
+        </details>
+      ) : sourceWorkbench}
+      {showContextReview ? <ContextReviewPanel bundle={review} running={reviewRunning} /> : null}
       {!hasBlockingQuestion ? clarifyPanel : null}
       {showContinue ? (
         <div className="od-context-continue">

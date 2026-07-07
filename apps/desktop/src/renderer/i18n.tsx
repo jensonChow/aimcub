@@ -224,7 +224,7 @@ export const STRINGS = {
   "os.noQuestionsHeading": { en: "Draft ready to review", zh: "初稿可进入审查" },
   "os.acceptDraft": { en: "Accept draft", zh: "接受初稿" },
   "os.skipRefinement": { en: "Skip refinements", zh: "跳过优化" },
-  "os.generateFromContext": { en: "Continue to Plan", zh: "继续到 Plan" },
+  "os.generateFromContext": { en: "Generate plan", zh: "生成计划" },
   "os.refineDraft": { en: "Refine draft", zh: "优化初稿" },
   "os.noQuestionsBody": { en: "Aimcub did not find optional refinements. Accept the draft and review the sub-aims.", zh: "Aimcub 没有找到可选优化项。接受初稿后审查子目标。" },
   "os.singleSelect": { en: "single", zh: "单选" },
@@ -702,6 +702,11 @@ export const STRINGS = {
     zh: "先回答阻塞问题。只有会影响范围、分派或评估时，再添加本地材料。",
   },
   "context.workbench.save": { en: "Save context", zh: "保存上下文" },
+  "context.workbench.secondarySummary": { en: "Add source material", zh: "添加来源材料" },
+  "context.workbench.secondaryBody": {
+    en: "Optional while the blocking question is active.",
+    zh: "阻塞问题进行中时为可选补充。",
+  },
   "context.workbench.answerTitle": { en: "Answer the current question", zh: "回答当前问题" },
   "context.workbench.answerBody": {
     en: "Aimcub asks for one planning gap at a time before showing the generated plan.",
