@@ -5,26 +5,50 @@ Branch: `main`
 
 ## Current Session
 
-- Integration session in progress for the first batch of local alpha and Desktop stabilization work.
-- Merged `e8ee7e22` (`Define local alpha contract and golden loop tests`).
-- Merged `0cd2458d` (`Add desktop UI primitives`).
-- Merged `5dbdee93` (`Productize plan contract review`).
-- Merged `f8cd9f42` (`Simplify context stage flow`).
-- Merged `c7b75222` (`Clarify eval evidence review`).
-- Merging `1d18c905` (`Clarify local agent execution UX`).
-- Preserving the Desktop shell/sidebar/window-chrome framework unchanged.
+- Integrated the first local alpha/Desktop stabilization batch into `main`.
+- Merged `e8ee7e22` (`Define local alpha contract and golden loop tests`) via `17418a0a`.
+- Merged `0cd2458d` (`Add desktop UI primitives`) via `927dd74e`.
+- Merged `5dbdee93` (`Productize plan contract review`) via `d7cc1960`.
+- Merged `f8cd9f42` (`Simplify context stage flow`) via `352affac`.
+- Merged `c7b75222` (`Clarify eval evidence review`) via `87ed1ff6`.
+- Merged `1d18c905` (`Clarify local agent execution UX`) via `93b966a9`.
+- Added the local alpha contract and golden-loop tests, Desktop UI primitives, Context/Plan/Eval stage components, and Execute local-agent summary.
+- Preserved the Desktop shell/sidebar/window-chrome framework. `CockpitShell.tsx` was not edited; `cockpit.css` changes are scoped to stage content and responsive stage selectors.
 
-## Current State
+## Conflict Resolutions
 
-- This is an interim handoff while merge conflict resolution is in progress.
-- Final handoff will replace this section with merged commits, conflict resolutions, verification, commit/push status, and the next-session prompt.
+- `docs/handoff.md`: replaced branch-local handoffs with this integration handoff.
+- `apps/desktop/src/renderer/App.tsx`: kept the stage-folder convention and removed obsolete inline Context, Plan, and Eval component bodies. `App.tsx` is now 2,298 lines versus 3,550 on `origin/main`.
+- `apps/desktop/src/renderer/i18n.tsx`: kept Plan's `Execution contracts` heading while adding Context, Eval, and Execute strings.
+- `apps/desktop/src/renderer/App.test.tsx`: kept Plan contract coverage and local-agent execution summary coverage.
+- `apps/desktop/src/renderer/cockpit.css`: combined Context, Plan, Eval, and Execute responsive selectors without touching sidebar/window-chrome selectors.
 
 ## Verification
 
-- Full integration verification has not run yet in this session.
+Passed:
+
+- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
+- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
+- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck`
+- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm lint`
+- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm core:purity`
+- `git diff --check`
+- `ELECTRON_BUILDER_CACHE=/private/tmp/aimcub-electron-builder-cache COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm desktop:pack`
+- `ditto apps/desktop/dist/mac-arm64/Aimcub.app Aimcub.app`
+
+Notes:
+
+- MCP worker tests logged the expected missing-Supabase opaque-error path while passing.
+- Root `Aimcub.app` was refreshed from `apps/desktop/dist/mac-arm64/Aimcub.app`.
+
+## Commit And Push Status
+
+- Verification is complete and the integration is ready to push.
+- Local `main` is ahead of `origin/main` by the integration merge commits plus this final handoff commit.
+- Push will be attempted after this handoff commit; if approval blocks it, leave the local commits in place and do not retry through another route.
 
 ## Next Session Prompt
 
 ```text
-Continue the local alpha/Desktop stabilization integration from `main`. Start by reading AGENTS.md, docs/handoff.md, docs/memory/README.md, and task-relevant module memory. Inspect `git status --short --branch` before changing files, then continue the controlled merge order from the goal objective.
+Continue from `main`. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md, then load only task-relevant module memory. Inspect `git status --short --branch` and `git log --oneline -8` first. If push was blocked, request explicit approval before retrying `git push origin main`. Preserve the Desktop shell/sidebar/window-chrome framework exactly unless the user explicitly approves a sidebar change.
 ```
