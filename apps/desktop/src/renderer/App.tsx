@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import {
+  routingOverrideForMilestone,
   validateExecutablePlan,
   validatePlanRouting,
   type AimProgressReadModel,
@@ -52,7 +53,7 @@ import { ContextClarifyPanel } from "./stages/context/ContextClarifyPanel";
 import { ContextReviewPanel } from "./stages/context/ContextReviewPanel";
 import { ContextStage } from "./stages/context/ContextStage";
 import type { ClarifyPhase, ContextAnswerMap } from "./stages/context/types";
-import { EvalStage, EvidenceReviewList } from "./stages/eval/EvalStage";
+import { EvalStage } from "./stages/eval/EvalStage";
 import { WebResearchForm } from "./WebResearchForm";
 import { LocalAgentExecutionSummary } from "./stages/execute/LocalAgentExecutionSummary";
 import { PlanPanel } from "./stages/plan/PlanPanel";
@@ -654,6 +655,7 @@ function AimOsApp() {
         return result.canceled ? [] : result.paths;
       }}
       onBreakDown={breakDown}
+      onReviewEval={() => openCockpitStage("eval")}
     />
   ) : null;
 
@@ -1106,17 +1108,17 @@ function LockedStagePanel(props: {
   onAction: () => void;
 }) {
   return (
-    <Panel variant="plain" style={panelStyle()}>
-      <div style={sectionHeaderStyle()}>
+    <Panel variant="plain" className="od-stage-panel od-locked-stage-panel">
+      <div className="od-stage-panel-head">
         <div>
-          <div style={eyebrowStyle()}>{props.eyebrow}</div>
-          <h2 style={sectionTitleStyle()}>{props.title}</h2>
+          <div className="od-stage-kicker">{props.eyebrow}</div>
+          <h2>{props.title}</h2>
         </div>
-        <Button variant="primary" size="lg" onClick={props.onAction} style={{ marginTop: 0 }}>
+        <Button variant="primary" size="lg" onClick={props.onAction}>
           {props.action}
         </Button>
       </div>
-      <p style={mutedTextStyle()}>{props.body}</p>
+      <p>{props.body}</p>
     </Panel>
   );
 }
@@ -1164,7 +1166,84 @@ function ComposerPanel(props: {
   );
 }
 
-function ExecutePanel(props: {
+type ExecuteMilestoneRow = AimProgressReadModel["milestones"][number];
+type ExecutePrimaryActionKind = "run_agent" | "submit_proof" | "review_eval" | "blocked";
+
+function isHumanExecuteRoute(row: ExecuteMilestoneRow): boolean {
+  const override = routingOverrideForMilestone(row.milestone);
+  return override?.owner === "human" || row.assignment?.actor_kind === "human";
+}
+
+function executeRouteLabel(row: ExecuteMilestoneRow, t: I18n["t"]): string {
+  return isHumanExecuteRoute(row) ? t("execute.routeHuman") : t("execute.routeAgent");
+}
+
+function executeRowNeedsEval(row: ExecuteMilestoneRow): boolean {
+  if (row.completed) return true;
+  if (row.evidence.some((item) => item.status === "low_trust" || item.status === "unmatched")) return true;
+  return row.evidence_count > 0 && !row.eval_review.passed && Boolean(row.eval_review.next_action);
+}
+
+function executeRowStatus(row: ExecuteMilestoneRow, t: I18n["t"]): { label: string; tone: string } {
+  if (row.completed) return { label: t("os.done"), tone: "success" };
+  if (row.blocked) return { label: t("os.blocked"), tone: "danger" };
+  if (executeRowNeedsEval(row)) return { label: t("execute.needsEvalReview"), tone: "warn" };
+  return { label: row.milestone.status, tone: "" };
+}
+
+function executeEvidenceLine(row: ExecuteMilestoneRow, t: I18n["t"]): string {
+  const count = Math.max(row.evidence_count, row.evidence.length);
+  if (count === 0) return t("execute.selectorEvidenceNone");
+  const lowTrust = row.evidence.filter((item) => item.status === "low_trust").length;
+  if (lowTrust > 0) return t("execute.selectorEvidenceLowTrust", { n: lowTrust });
+  return t("os.evidenceCount", { n: count });
+}
+
+function executeBlockedDetail(row: ExecuteMilestoneRow, t: I18n["t"]): string {
+  return row.latest_run?.error
+    || row.eval_review.next_action
+    || row.next_action
+    || row.assignment?.reason
+    || t("execute.blockedDefault");
+}
+
+function executePrimaryAction(row: ExecuteMilestoneRow, t: I18n["t"]): {
+  kind: ExecutePrimaryActionKind;
+  label: string;
+  detail: string;
+} {
+  if (executeRowNeedsEval(row)) {
+    return {
+      kind: "review_eval",
+      label: t("execute.reviewInEval"),
+      detail: row.eval_review.next_action || row.next_action || t("execute.primaryReviewDetail"),
+    };
+  }
+
+  if (row.blocked) {
+    return {
+      kind: "blocked",
+      label: t("os.blocked"),
+      detail: executeBlockedDetail(row, t),
+    };
+  }
+
+  if (isHumanExecuteRoute(row)) {
+    return {
+      kind: "submit_proof",
+      label: t("os.submitProof"),
+      detail: t("execute.primaryProofDetail"),
+    };
+  }
+
+  return {
+    kind: "run_agent",
+    label: t("os.runAgent"),
+    detail: t("execute.primaryRunDetail"),
+  };
+}
+
+export function ExecutePanel(props: {
   detail: GoalDetail;
   progress: AimProgressReadModel | null;
   disabled: boolean;
@@ -1172,15 +1251,19 @@ function ExecutePanel(props: {
   onConfirm: (milestone: Milestone, submission: Omit<ConfirmMilestoneRequest, "goalId" | "milestoneId">) => Promise<void>;
   onPickFiles: () => Promise<string[]>;
   onBreakDown: (milestone: Milestone) => void;
+  onReviewEval: () => void;
 }) {
   const { t } = useI18n();
   const rows = progressRows(props.detail, props.progress);
   const openRows = rows.filter((row) => !row.completed);
   const agentAssignments = rows.filter((row) => row.assignment?.actor_kind === "agent").length;
   const humanAssignments = rows.filter((row) => row.assignment?.actor_kind === "human").length;
+  const defaultSelectedRow = rows.find((row) => !row.completed && !row.blocked) ?? rows.find((row) => !row.completed) ?? rows[0] ?? null;
+  const [selectedMilestoneId, setSelectedMilestoneId] = useState<string | null>(null);
   const [activeProofId, setActiveProofId] = useState<string | null>(null);
   const [proofDrafts, setProofDrafts] = useState<Record<string, EvidenceSubmissionDraft>>({});
   const [pickingFilesFor, setPickingFilesFor] = useState<string | null>(null);
+  const selectedRow = rows.find((row) => row.milestone.id === selectedMilestoneId) ?? defaultSelectedRow;
 
   function proofDraftFor(milestone: Milestone): EvidenceSubmissionDraft {
     return proofDrafts[milestone.id] ?? emptyEvidenceDraft(milestone);
@@ -1224,6 +1307,36 @@ function ExecutePanel(props: {
     });
   }
 
+  function runPrimaryAction(row: ExecuteMilestoneRow, kind: ExecutePrimaryActionKind): void {
+    if (kind === "run_agent") {
+      props.onRunAgent(row.milestone);
+      return;
+    }
+    if (kind === "submit_proof") {
+      openProof(row.milestone);
+      return;
+    }
+    if (kind === "review_eval") {
+      props.onReviewEval();
+    }
+  }
+
+  const primaryAction = selectedRow ? executePrimaryAction(selectedRow, t) : null;
+  const selectedHumanRoute = selectedRow ? isHumanExecuteRoute(selectedRow) : false;
+  const showSecondaryRun = Boolean(
+    selectedRow
+    && primaryAction?.kind !== "run_agent"
+    && !selectedHumanRoute
+    && !selectedRow.completed
+    && !selectedRow.blocked,
+  );
+  const showSecondaryProof = Boolean(
+    selectedRow
+    && primaryAction?.kind !== "submit_proof"
+    && !selectedRow.completed
+    && !selectedRow.blocked,
+  );
+
   return (
     <section className="od-stage-panel">
       <div className="od-stage-panel-head">
@@ -1240,71 +1353,100 @@ function ExecutePanel(props: {
         <StageMetric label={t("os.humanAssignments")} value={String(humanAssignments)} />
       </div>
 
-      <div className="od-work-list">
-        {rows.map((row) => (
-          <article key={row.milestone.id} className={`od-work-card${row.completed ? " is-complete" : ""}`}>
-            <div className="od-work-card-main">
-              <LocalAgentExecutionSummary row={row} actors={props.progress?.actors ?? []} />
+      {selectedRow && primaryAction ? (
+        <div className="od-execute-layout">
+          <div className="od-execute-selector" aria-label={t("execute.subAimSelectorLabel")}>
+            {rows.map((row, index) => {
+              const status = executeRowStatus(row, t);
+              const selected = row.milestone.id === selectedRow.milestone.id;
+              return (
+                <button
+                  key={row.milestone.id}
+                  className={`od-execute-selector-row${selected ? " is-selected" : ""}`}
+                  type="button"
+                  aria-current={selected ? "true" : undefined}
+                  onClick={() => setSelectedMilestoneId(row.milestone.id)}
+                >
+                  <span className="od-execute-selector-index">{index + 1}</span>
+                  <span className="od-execute-selector-main">
+                    <strong>{shortText(row.milestone.title, 84)}</strong>
+                    <small>{[executeRouteLabel(row, t), executeEvidenceLine(row, t)].join(" | ")}</small>
+                  </span>
+                  <span className={`od-pill ${status.tone}`}>{status.label}</span>
+                </button>
+              );
+            })}
+          </div>
 
-              {row.assignment?.reason ? <div className="od-work-note">{shortText(row.assignment.reason, 220)}</div> : null}
+          <article className="od-execute-detail" aria-label={t("execute.selectedDetailLabel")}>
+            <LocalAgentExecutionSummary row={selectedRow} actors={props.progress?.actors ?? []} />
 
-              {row.child_relations.length ? (
-                <div className="od-work-note">
-                  <strong>{t("os.childBreakdown", { n: row.child_relations.length })}</strong>
-                  <span>{row.child_relations.map((item) => item.status).join(", ")}</span>
-                </div>
-              ) : null}
-
-              <div className="od-next-work">
-                <span>{t("os.nextWork")}</span>
-                <strong>{row.next_action || t("shell.noNextAction")}</strong>
+            {selectedRow.blocked ? (
+              <div className="od-execute-blocker">
+                <strong>{t("execute.blockedTitle")}</strong>
+                <span>{executeBlockedDetail(selectedRow, t)}</span>
               </div>
+            ) : null}
 
-              <EvidenceReviewList row={row} limit={2} compact />
-            </div>
+            {selectedRow.assignment?.reason ? <div className="od-work-note">{shortText(selectedRow.assignment.reason, 220)}</div> : null}
 
-            <div className="od-work-actions">
+            {selectedRow.child_relations.length ? (
+              <div className="od-work-note">
+                <strong>{t("os.childBreakdown", { n: selectedRow.child_relations.length })}</strong>
+                <span>{selectedRow.child_relations.map((item) => item.status).join(", ")}</span>
+              </div>
+            ) : null}
+
+            <div className="od-execute-primary-action">
+              <div>
+                <span>{t("execute.primaryActionLabel")}</span>
+                <strong>{primaryAction.detail}</strong>
+              </div>
               <button
-                className="od-aim-secondary"
+                className="od-aim-primary od-execute-primary-button"
                 type="button"
-                disabled={props.disabled || row.completed || row.assignment?.actor_kind === "human"}
-                onClick={() => props.onRunAgent(row.milestone)}
+                disabled={props.disabled || primaryAction.kind === "blocked"}
+                onClick={() => runPrimaryAction(selectedRow, primaryAction.kind)}
               >
-                {t("os.runAgent")}
-              </button>
-              <button
-                className="od-aim-secondary"
-                type="button"
-                disabled={props.disabled || row.completed}
-                onClick={() => openProof(row.milestone)}
-              >
-                {t("os.confirmProof")}
-              </button>
-              <button
-                className="od-aim-secondary"
-                type="button"
-                disabled={props.disabled || row.completed}
-                onClick={() => props.onBreakDown(row.milestone)}
-              >
-                {t("os.breakDown")}
+                {primaryAction.label}
               </button>
             </div>
 
-            {activeProofId === row.milestone.id ? (
+            <div className="od-execute-secondary-actions" aria-label={t("execute.secondaryActionsLabel")}>
+              {showSecondaryRun ? (
+                <button className="od-aim-secondary" type="button" disabled={props.disabled} onClick={() => props.onRunAgent(selectedRow.milestone)}>
+                  {t("os.runAgent")}
+                </button>
+              ) : null}
+              {showSecondaryProof ? (
+                <button className="od-aim-secondary" type="button" disabled={props.disabled} onClick={() => openProof(selectedRow.milestone)}>
+                  {t("os.submitProof")}
+                </button>
+              ) : null}
+              {!selectedRow.completed ? (
+                <button className="od-aim-secondary" type="button" disabled={props.disabled} onClick={() => props.onBreakDown(selectedRow.milestone)}>
+                  {t("os.breakDown")}
+                </button>
+              ) : null}
+            </div>
+
+            {activeProofId === selectedRow.milestone.id ? (
               <EvidenceSubmissionForm
-                milestone={row.milestone}
-                draft={proofDraftFor(row.milestone)}
+                milestone={selectedRow.milestone}
+                draft={proofDraftFor(selectedRow.milestone)}
                 disabled={props.disabled}
-                pickingFiles={pickingFilesFor === row.milestone.id}
-                onChange={(next) => updateProofDraft(row.milestone, () => next)}
-                onPickFiles={() => void pickProofFiles(row.milestone)}
+                pickingFiles={pickingFilesFor === selectedRow.milestone.id}
+                onChange={(next) => updateProofDraft(selectedRow.milestone, () => next)}
+                onPickFiles={() => void pickProofFiles(selectedRow.milestone)}
                 onCancel={() => setActiveProofId(null)}
-                onSubmit={() => void submitProof(row.milestone)}
+                onSubmit={() => void submitProof(selectedRow.milestone)}
               />
             ) : null}
           </article>
-        ))}
-      </div>
+        </div>
+      ) : (
+        <div className="od-empty-inline">{t("execute.emptySubAims")}</div>
+      )}
     </section>
   );
 }
@@ -1850,10 +1992,6 @@ function eyebrowStyle(): CSSProperties {
     textTransform: "uppercase",
     letterSpacing: 0,
   };
-}
-
-function mutedTextStyle(): CSSProperties {
-  return { color: C.muted, fontSize: TYPE.body, lineHeight: 1.45, margin: "4px 0 0" };
 }
 
 function donutWrapStyle(): CSSProperties {

@@ -5,9 +5,9 @@ import { describe, expect, it } from "vitest";
 
 import { routingRecommendationForPlanNode, type RoutingRuntimeAgentOption } from "@core/domain";
 import type { AimProgressReadModel, DecompositionOutput, Goal, Milestone } from "@core/types";
-import type { ContextSourceStatus, ProviderStatus, WebResearchStatus } from "../shared/ipc";
+import type { ContextSourceStatus, GoalDetail, ProviderStatus, WebResearchStatus } from "../shared/ipc";
 
-import { App, buildSettingsModel, EvidenceSubmissionForm, SettingsPanel } from "./App";
+import { App, buildSettingsModel, EvidenceSubmissionForm, ExecutePanel, SettingsPanel } from "./App";
 import { CockpitShell } from "./CockpitShell";
 import { I18nProvider, translate, type I18n } from "./i18n";
 import { LocalAgentExecutionSummary } from "./stages/execute/LocalAgentExecutionSummary";
@@ -150,6 +150,187 @@ const routingAgents: RoutingRuntimeAgentOption[] = [
   },
 ];
 
+const AGENT_MILESTONE = "00000000-0000-4000-8000-000000000071";
+const HUMAN_MILESTONE = "00000000-0000-4000-8000-000000000072";
+const COMPLETE_MILESTONE = "00000000-0000-4000-8000-000000000073";
+const LOW_TRUST_MILESTONE = "00000000-0000-4000-8000-000000000074";
+const AGENT_ACTOR = "00000000-0000-4000-8000-000000000075";
+
+function executeMilestone(id: string, title: string, owner: "agent" | "human", status: Milestone["status"] = "pending"): Milestone {
+  return {
+    ...milestone,
+    id,
+    title,
+    status,
+    completed_at: status === "completed" ? "2026-07-07T09:00:00.000Z" : null,
+    metadata: {
+      ...milestone.metadata,
+      routing_override: owner === "agent"
+        ? {
+          owner: "agent",
+          agent_id: "codex",
+          agent_label: "Codex CLI",
+          run_mode: "local_cli",
+          model: "gpt-5",
+          model_label: "GPT-5",
+          reason: "Use the local coding agent.",
+        }
+        : {
+          owner: "human",
+          agent_id: null,
+          agent_label: null,
+          run_mode: null,
+          model: null,
+          model_label: null,
+          reason: "The user must provide proof.",
+        },
+    },
+  };
+}
+
+function executeRow(input: {
+  id: string;
+  title: string;
+  owner: "agent" | "human";
+  completed?: boolean;
+  lowTrust?: boolean;
+}): AimProgressReadModel["milestones"][number] {
+  const completed = input.completed ?? false;
+  const lowTrust = input.lowTrust ?? false;
+  const currentMilestone = executeMilestone(input.id, input.title, input.owner, completed ? "completed" : "pending");
+  return {
+    milestone: currentMilestone,
+    assignment: {
+      id: `00000000-0000-4000-8000-0000000001${input.id.slice(-2)}`,
+      owner_id: OWNER,
+      goal_id: GOAL,
+      milestone_id: input.id,
+      actor_kind: input.owner,
+      actor_id: input.owner === "agent" ? AGENT_ACTOR : null,
+      status: "assigned",
+      source: "routing",
+      reason: input.owner === "agent" ? "Agent-routed software work." : "Human proof is required.",
+      capability_tags: input.owner === "agent" ? ["code"] : [],
+      created_at: "2026-07-07T09:00:00.000Z",
+      updated_at: "2026-07-07T09:00:00.000Z",
+    },
+    latest_run: input.owner === "agent" ? {
+      id: `00000000-0000-4000-8000-0000000002${input.id.slice(-2)}`,
+      owner_id: OWNER,
+      goal_id: GOAL,
+      milestone_id: input.id,
+      assignment_id: `00000000-0000-4000-8000-0000000001${input.id.slice(-2)}`,
+      actor_kind: "agent",
+      actor_id: AGENT_ACTOR,
+      kind: "agent",
+      status: completed || lowTrust ? "completed" : "queued",
+      attempt: 1,
+      workspace_root: "/Users/jenson/project",
+      sandbox: "read-only",
+      network_enabled: false,
+      model: "gpt-5",
+      reasoning: "high",
+      summary: "Agent run summarized.",
+      error: null,
+      queued_at: "2026-07-07T09:00:00.000Z",
+      started_at: "2026-07-07T09:00:05.000Z",
+      finished_at: completed || lowTrust ? "2026-07-07T09:04:00.000Z" : null,
+      created_at: "2026-07-07T09:00:00.000Z",
+    } : null,
+    child_relations: [],
+    eval_review: {
+      passed: completed,
+      matched_evidence_ids: completed ? ["00000000-0000-4000-8000-000000000081"] : [],
+      trust_score: completed ? 0.92 : lowTrust ? 0.54 : 0,
+      reason: completed ? "Eval passed." : lowTrust ? "Evidence is below the trust floor." : "",
+      next_action: lowTrust ? "Review low-trust evidence in Eval." : completed ? "Review the completed evidence in Eval." : "",
+    },
+    evaluator_results: [],
+    evidence: lowTrust || completed ? [{
+      evidence: {
+        id: lowTrust ? "00000000-0000-4000-8000-000000000082" : "00000000-0000-4000-8000-000000000081",
+        owner_id: OWNER,
+        goal_id: GOAL,
+        milestone_id: input.id,
+        emitter_id: null,
+        kind: "mcp_report",
+        source_event_id: `execute-test:${input.id}`,
+        occurred_at: "2026-07-07T09:04:00.000Z",
+        summary: lowTrust ? "Agent self-report needs review." : "Trusted proof was recorded.",
+        payload: {
+          agent_id: "codex",
+          model: "gpt-5",
+          events: [
+            { type: "agent.run.started", summary: "Codex CLI started." },
+            { type: "agent.message.delta", summary: "Raw message delta should stay hidden." },
+            { type: "agent.raw", summary: "Raw stream event should stay hidden." },
+            { type: "agent.run.completed", summary: "Local agent completed." },
+          ],
+        },
+        trust_score: lowTrust ? 0.54 : 0.92,
+        created_at: "2026-07-07T09:04:00.000Z",
+      },
+      rule_matches: completed ? [{ clause_index: 0, evaluator: "manual_confirm" }] : [],
+      status: lowTrust ? "low_trust" : "matched",
+      review_note: lowTrust ? "Trust is below the floor." : "Matches rule 1.",
+    }] : [],
+    evidence_count: lowTrust || completed ? 1 : 0,
+    completed,
+    blocked: false,
+    next_action: completed ? "Completed." : lowTrust ? "Review low-trust evidence." : "Run the next work.",
+  };
+}
+
+function executeProgress(rows: AimProgressReadModel["milestones"]): AimProgressReadModel {
+  return {
+    goal: savedGoal,
+    milestones: rows,
+    actors: [{
+      id: AGENT_ACTOR,
+      owner_id: OWNER,
+      kind: "agent",
+      display_name: "Codex CLI",
+      capabilities: ["code"],
+      status: "active",
+      agent_kind: "local_cli",
+      run_mode: "local_cli",
+      model: "gpt-5",
+      connection_ref: null,
+      created_at: "2026-07-07T09:00:00.000Z",
+    }],
+    assignments: rows.flatMap((row) => row.assignment ? [row.assignment] : []),
+    runs: rows.flatMap((row) => row.latest_run ? [row.latest_run] : []),
+    sub_aim_relations: [],
+    context_candidates: [],
+    completion_recap: null,
+    completed_milestones: rows.filter((row) => row.completed).length,
+    total_milestones: rows.length,
+    blocked_count: rows.filter((row) => row.blocked).length,
+    next_action: "Continue selected work.",
+  };
+}
+
+function renderExecute(rows: AimProgressReadModel["milestones"]): string {
+  const detail: GoalDetail = {
+    goal: savedGoal,
+    milestones: rows.map((row) => row.milestone),
+  };
+  return renderToStaticMarkup(
+    <I18nProvider>
+      <ExecutePanel
+        detail={detail}
+        progress={executeProgress(rows)}
+        disabled={false}
+        onRunAgent={noop}
+        onConfirm={asyncNoop}
+        onPickFiles={async () => []}
+        onBreakDown={noop}
+        onReviewEval={noop}
+      />
+    </I18nProvider>,
+  );
+}
+
 describe("EvidenceSubmissionForm", () => {
   it("renders proof note, URL, file, and required evidence controls", () => {
     const html = renderToStaticMarkup(
@@ -178,6 +359,78 @@ describe("EvidenceSubmissionForm", () => {
     expect(html).toContain("Local file references");
     expect(html).toContain("Approval note.");
     expect(html).toContain("Submit proof");
+  });
+});
+
+describe("ExecutePanel", () => {
+  it("renders a selected-work surface with a compact sub-aim selector", () => {
+    const html = renderExecute([
+      executeRow({ id: AGENT_MILESTONE, title: "Run implementation agent", owner: "agent" }),
+      executeRow({ id: HUMAN_MILESTONE, title: "Submit launch approval", owner: "human" }),
+    ]);
+
+    expect(html).toContain('class="od-execute-layout"');
+    expect(html).toContain('aria-label="Sub-aims"');
+    expect(html).toContain('aria-label="Selected work detail"');
+    expect(html).toContain("Run implementation agent");
+    expect(html).toContain("Agent route");
+    expect(html).toContain("Human route");
+    expect(html).toContain("Selected sub-aim");
+    expect(html).toContain("Primary action");
+  });
+
+  it("shows one dominant Run agent primary action for an agent-routed incomplete sub-aim", () => {
+    const html = renderExecute([
+      executeRow({ id: AGENT_MILESTONE, title: "Run implementation agent", owner: "agent" }),
+      executeRow({ id: HUMAN_MILESTONE, title: "Submit launch approval", owner: "human" }),
+    ]);
+
+    expect(html.match(/class="od-aim-primary od-execute-primary-button"/g) ?? []).toHaveLength(1);
+    expect(html).toContain('<button class="od-aim-primary od-execute-primary-button" type="button">Run agent</button>');
+    expect(html).toContain('class="od-execute-secondary-actions"');
+    expect(html).toContain('<button class="od-aim-secondary" type="button">Submit proof</button>');
+    expect(html).toContain('<button class="od-aim-secondary" type="button">Break down</button>');
+    expect(html).not.toContain('class="od-aim-primary od-execute-primary-button" type="button">Break down</button>');
+  });
+
+  it("shows Submit proof as the primary action for a human-routed incomplete sub-aim", () => {
+    const html = renderExecute([
+      executeRow({ id: HUMAN_MILESTONE, title: "Submit launch approval", owner: "human" }),
+    ]);
+
+    expect(html.match(/class="od-aim-primary od-execute-primary-button"/g) ?? []).toHaveLength(1);
+    expect(html).toContain('<button class="od-aim-primary od-execute-primary-button" type="button">Submit proof</button>');
+    expect(html).toContain("Submit human proof with the required evidence checklist.");
+    expect(html).toContain('<button class="od-aim-secondary" type="button">Break down</button>');
+    expect(html).not.toContain('<button class="od-aim-secondary" type="button">Run agent</button>');
+  });
+
+  it("routes completed and low-trust selected work to Eval review instead of expanding evidence detail", () => {
+    const completedHtml = renderExecute([
+      executeRow({ id: COMPLETE_MILESTONE, title: "Review completed proof", owner: "agent", completed: true }),
+    ]);
+    const lowTrustHtml = renderExecute([
+      executeRow({ id: LOW_TRUST_MILESTONE, title: "Inspect low-trust report", owner: "agent", lowTrust: true }),
+    ]);
+
+    expect(completedHtml).toContain('<button class="od-aim-primary od-execute-primary-button" type="button">Review in Eval</button>');
+    expect(lowTrustHtml).toContain('<button class="od-aim-primary od-execute-primary-button" type="button">Review in Eval</button>');
+    expect(lowTrustHtml).toContain("Low-trust evidence needs review");
+    expect(lowTrustHtml).not.toContain("Trust is below the floor.");
+    expect(lowTrustHtml).not.toContain('class="od-evidence-review');
+  });
+
+  it("keeps Break Down secondary and raw agent deltas hidden", () => {
+    const html = renderExecute([
+      executeRow({ id: LOW_TRUST_MILESTONE, title: "Inspect low-trust report", owner: "agent", lowTrust: true }),
+    ]);
+
+    expect(html).toContain('class="od-execute-secondary-actions"');
+    expect(html).toContain('<button class="od-aim-secondary" type="button">Break down</button>');
+    expect(html).not.toContain('class="od-aim-primary od-execute-primary-button" type="button">Break down</button>');
+    expect(html).toContain("Activity");
+    expect(html).not.toContain("Raw message delta");
+    expect(html).not.toContain("Raw stream event");
   });
 });
 

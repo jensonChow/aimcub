@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -128,6 +130,10 @@ describe("ContextStage", () => {
     expect(secondarySourceTag).not.toContain("open");
     expect(html).toContain("Add source material");
     expect(html).toContain("Generate plan");
+    expect(html).toContain('class="od-ui-button od-context-clarify-action"');
+    expect(html).toContain('data-variant="primary"');
+    expect(html).toContain('class="od-ui-button od-ui-button-card od-context-choice"');
+    expect(html).toContain('class="od-ui-field od-context-other-field"');
     expect(html).not.toContain("Continue to Plan");
     expect(html).not.toContain("Aim text is captured");
   });
@@ -157,5 +163,18 @@ describe("ContextStage", () => {
     expect(html).toContain('data-od-id="context-workbench-sources"');
     expect(html).not.toContain("Continue to Plan");
     expect(html).not.toContain('class="od-context-continue"');
+  });
+
+  it("keeps context polish on shared primitives instead of inline style helpers", () => {
+    const clarifySource = readFileSync(new URL("./ContextClarifyPanel.tsx", import.meta.url), "utf8");
+    const sourcesSource = readFileSync(new URL("../../ContextSourcesPanel.tsx", import.meta.url), "utf8");
+    const css = readFileSync(new URL("../../cockpit.css", import.meta.url), "utf8");
+
+    expect(clarifySource).toContain('import { Button, Panel, Pill, TextArea, TextField } from "../../ui";');
+    expect(clarifySource).not.toMatch(/primaryButton|secondaryButton|style=\{/);
+    expect(sourcesSource).toContain('import { Button, Panel } from "./ui";');
+    expect(sourcesSource).not.toMatch(/primaryButton|inputStyle|style=\{/);
+    expect(css).toMatch(/\.od-context-clarify\.od-ui-panel\[data-variant="plain"\]\s*{[^}]*gap:\s*12px;/s);
+    expect(css).toMatch(/\.od-context-sources-panel\.od-ui-panel:not\(\[data-compact="true"\]\)\s*{[^}]*padding:\s*16px;/s);
   });
 });

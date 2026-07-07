@@ -328,7 +328,7 @@ Status: addressed on 2026-07-07. Plan cards now default to a summary-first contr
 - Make Run agent / Submit proof / Review in Eval the single state-dependent primary action.
 - Move Break Down and activity details to secondary treatment.
 
-Status: backlog. This integration did not change Execute selected-work behavior.
+Status: addressed on 2026-07-07. Execute now uses a compact sub-aim selector plus one selected detail surface. The selected row exposes one primary action based on work state: Run agent for agent-routed incomplete work, Submit proof for human-routed incomplete work, Review in Eval for completed or low-trust work, and a blocker/recovery summary for blocked work. Break Down and alternate run/proof actions stay secondary, runtime metadata remains below the selected detail, and detailed evidence review stays in Eval.
 
 ### Batch 5: Eval Trust Summary
 
@@ -344,7 +344,7 @@ Status: addressed on 2026-07-07. Eval keeps milestone evidence and evaluator det
 - Use shared UI primitives where they match the local surface.
 - Recheck 4px spacing, text fit, focus states, dark/light appearance, and narrow widths.
 
-Status: backlog. This integration kept the polish focused on stage hierarchy and did not run a broad primitive or inline-style cleanup.
+Status: partially addressed on 2026-07-07. `ContextClarifyPanel`, the Context source workbench/settings panel shell, and locked stage panels now use shared primitives and class-based stage CSS for the low-risk button, panel, field, and spacing cleanup. Broader Aim composer and Settings inline helper cleanup remains backlog.
 
 ## Verification Notes For Next Pass
 

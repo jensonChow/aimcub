@@ -1,9 +1,7 @@
-import type { CSSProperties } from "react";
-
 import type { ClarifyOutput } from "@core/llm";
 
 import { useI18n } from "../../i18n";
-import { C, TYPE, WEIGHT, inputStyle, primaryButton, secondaryButton } from "../../styles";
+import { Button, Panel, Pill, TextArea, TextField } from "../../ui";
 import type { ClarifyPhase, ContextAnswerMap } from "./types";
 
 interface ContextClarifyPanelProps {
@@ -55,22 +53,26 @@ export function ContextClarifyPanel(props: ContextClarifyPanelProps) {
       ? t("os.clarifyBody")
       : t("os.noQuestionsBody");
   return (
-    <section className="od-context-clarify" data-od-id={intake ? "context-blocking-question" : "context-draft-refinement"} style={panelStyle()}>
-      <div style={sectionHeaderStyle()}>
+    <Panel variant="plain" className="od-context-clarify" data-od-id={intake ? "context-blocking-question" : "context-draft-refinement"}>
+      <div className="od-stage-panel-head od-context-clarify-head">
         <div>
-          <div style={eyebrowStyle()}>{t(intake ? "os.contextIntakeEyebrow" : "os.draftRefinementEyebrow")}</div>
-          <h2 style={sectionTitleStyle()}>
+          <div className="od-stage-kicker">{t(intake ? "os.contextIntakeEyebrow" : "os.draftRefinementEyebrow")}</div>
+          <h2>
             {intake ? t("os.contextIntakeHeading") : questions.length ? t("os.clarifyHeading") : t("os.noQuestionsHeading")}
           </h2>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          {props.onSkip && !primaryAcceptsDraft ? <button type="button" onClick={props.onSkip} style={{ ...secondaryButton(), marginTop: 0 }}>{secondaryLabel}</button> : null}
-          <button type="button" onClick={primaryAction} disabled={primaryDisabled} style={{ ...primaryButton(primaryDisabled), marginTop: 0 }}>
+        <div className="od-context-clarify-actions">
+          {props.onSkip && !primaryAcceptsDraft ? (
+            <Button variant="secondary" size="lg" className="od-context-clarify-action" onClick={props.onSkip}>
+              {secondaryLabel}
+            </Button>
+          ) : null}
+          <Button variant="primary" size="lg" className="od-context-clarify-action" onClick={primaryAction} disabled={primaryDisabled}>
             {primaryLabel}
-          </button>
+          </Button>
         </div>
       </div>
-      <p style={mutedTextStyle()}>{body}</p>
+      <p className="od-context-clarify-body">{body}</p>
       {intake && questions.length > 0 ? (
         <div className="od-context-step-progress">
           <span>
@@ -80,22 +82,25 @@ export function ContextClarifyPanel(props: ContextClarifyPanelProps) {
           </span>
         </div>
       ) : null}
-      <div style={{ display: "grid", gap: 12 }}>
+      <div className="od-context-question-list">
         {visibleQuestions.map((question) => {
           const answer = props.answers[question.id] ?? { labels: [], other: "" };
           const multi = question.selection_mode === "multiple";
           return (
-            <div key={question.id} style={questionStyle()}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline" }}>
-                <div style={{ fontWeight: WEIGHT.strong }}>{question.question}</div>
-                <span style={badgeStyle(C.page, C.muted)}>{t(multi ? "os.multiSelect" : "os.singleSelect")}</span>
+            <Panel key={question.id} variant="warm" className="od-context-question">
+              <div className="od-context-question-head">
+                <strong>{question.question}</strong>
+                <Pill>{t(multi ? "os.multiSelect" : "os.singleSelect")}</Pill>
               </div>
-              <div style={{ color: C.muted, fontSize: TYPE.body, marginTop: 4 }}>{question.why_high_impact}</div>
-              <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+              <p>{question.why_high_impact}</p>
+              <div className="od-context-choice-list">
                 {question.options.map((option) => (
-                  <button
-                    type="button"
+                  <Button
                     key={option.label}
+                    variant="secondary"
+                    className="od-ui-button-card od-context-choice"
+                    selected={answer.labels.includes(option.label)}
+                    aria-pressed={answer.labels.includes(option.label)}
                     onClick={() => {
                       const selected = answer.labels.includes(option.label);
                       const labels = multi
@@ -105,111 +110,39 @@ export function ContextClarifyPanel(props: ContextClarifyPanelProps) {
                         : [option.label];
                       props.onAnswer(question.id, { ...answer, labels });
                     }}
-                    style={choiceStyle(answer.labels.includes(option.label))}
                   >
                     <strong>{option.label}</strong>
                     <span>{option.tradeoff}</span>
-                  </button>
+                  </Button>
                 ))}
               </div>
-              <input
+              <TextField
+                aria-label={t("os.otherAnswer")}
                 value={answer.other}
                 onChange={(event) => props.onAnswer(question.id, { ...answer, other: event.target.value })}
                 placeholder={t("os.otherAnswer")}
-                style={{ ...inputStyle(), marginTop: 10 }}
+                fieldClassName="od-context-other-field"
               />
-            </div>
+            </Panel>
           );
         })}
         {intake && props.conversationEnabled ? (
-          <div style={questionStyle()}>
-            <div style={{ fontWeight: WEIGHT.strong }}>{t("os.contextConversation")}</div>
-            <div style={{ color: C.muted, fontSize: TYPE.body, marginTop: 4 }}>{t("os.contextConversationBody")}</div>
-            <textarea
+          <Panel variant="warm" className="od-context-question">
+            <div className="od-context-question-head">
+              <strong>{t("os.contextConversation")}</strong>
+            </div>
+            <p>{t("os.contextConversationBody")}</p>
+            <TextArea
+              aria-label={t("os.contextConversation")}
               value={props.contextNote}
               onChange={(event) => props.onContextNote(event.target.value)}
               placeholder={t("os.contextConversationPlaceholder")}
               rows={3}
-              style={{ ...inputStyle(), marginTop: 10, resize: "vertical" }}
+              fieldClassName="od-context-note-field"
             />
-          </div>
+          </Panel>
         ) : null}
       </div>
-    </section>
+    </Panel>
   );
-}
-
-function panelStyle(): CSSProperties {
-  return {
-    background: C.surface,
-    border: "none",
-    borderRadius: 0,
-    padding: 0,
-  };
-}
-
-function sectionHeaderStyle(): CSSProperties {
-  return {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: 16,
-    marginBottom: 14,
-  };
-}
-
-function sectionTitleStyle(): CSSProperties {
-  return { margin: "4px 0 0", fontSize: TYPE.title, letterSpacing: 0 };
-}
-
-function eyebrowStyle(): CSSProperties {
-  return {
-    color: C.accent,
-    fontSize: TYPE.meta,
-    fontWeight: WEIGHT.strong,
-    textTransform: "uppercase",
-    letterSpacing: 0,
-  };
-}
-
-function mutedTextStyle(): CSSProperties {
-  return { color: C.muted, fontSize: TYPE.body, lineHeight: 1.45, margin: "4px 0 0" };
-}
-
-function questionStyle(): CSSProperties {
-  return {
-    border: `1px solid ${C.border}`,
-    borderRadius: 8,
-    padding: 14,
-    background: C.surfaceWarm,
-  };
-}
-
-function choiceStyle(active: boolean): CSSProperties {
-  return {
-    border: `1px solid ${active ? C.accent : C.border}`,
-    background: active ? C.accentBg : C.surface,
-    borderRadius: 8,
-    padding: 12,
-    display: "grid",
-    gap: 4,
-    textAlign: "left",
-    color: C.text,
-    cursor: "pointer",
-  };
-}
-
-function badgeStyle(bg: string, fg: string): CSSProperties {
-  return {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: 22,
-    borderRadius: 999,
-    padding: "2px 8px",
-    background: bg,
-    color: fg,
-    fontSize: TYPE.meta,
-    fontWeight: WEIGHT.strong,
-  };
 }

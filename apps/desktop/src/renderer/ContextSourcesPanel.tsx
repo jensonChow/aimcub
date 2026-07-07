@@ -1,8 +1,8 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState } from "react";
 
 import type { ContextSourceConfig, ContextSourceStatus } from "../shared/ipc";
 import { useI18n } from "./i18n";
-import { C, TYPE, WEIGHT, inputStyle, primaryButton } from "./styles";
+import { Button, Panel } from "./ui";
 
 type OnlineSource = ContextSourceConfig["online"]["sources"][number];
 type OnlineProvider = OnlineSource["provider"];
@@ -333,23 +333,23 @@ export function ContextSourcesPanel({
       : t("context.workbench.localEmpty");
 
     return (
-      <section className="od-context-workbench-panel" data-od-id="context-workbench-sources">
+      <Panel variant="warm" className="od-context-workbench-panel" data-od-id="context-workbench-sources">
         <div className="od-context-workbench-head">
           <div>
-            <div style={eyebrowStyle()}>{t("context.workbench.eyebrow")}</div>
+            <div className="od-stage-kicker">{t("context.workbench.eyebrow")}</div>
             <h2>{t("context.workbench.title")}</h2>
             <p>{t("context.workbench.body")}</p>
           </div>
           {hasUnsavedChanges ? (
-            <button disabled={disabled || saving} onClick={() => void save()} style={{ ...primaryButton(disabled || saving), marginTop: 0 }}>
+            <Button variant="primary" size="lg" className="od-context-save-button" disabled={disabled || saving} onClick={() => void save()}>
               {saving ? t("context.sources.saving") : t("context.workbench.save")}
-            </button>
+            </Button>
           ) : (
             <span className={`od-pill ${localActive ? "success" : ""}`}>{localActive ? t("intake.ready") : t("context.sources.status.optional")}</span>
           )}
         </div>
 
-        {error ? <div style={{ ...mutedTextStyle(), color: C.danger }}>{error}</div> : null}
+        {error ? <div className="od-context-source-error" role="status">{error}</div> : null}
 
         <div className="od-context-workbench-steps">
           <div className="od-context-workbench-step od-context-workbench-step-local">
@@ -408,23 +408,23 @@ export function ContextSourcesPanel({
             )}
           </div>
         </div>
-      </section>
+      </Panel>
     );
   }
 
   return (
-    <section className="od-context-sources-panel" data-compact={compact ? "true" : "false"} style={panelStyle(compact)}>
-      <div style={headerStyle()}>
+    <Panel variant={compact ? "plain" : "surface"} className="od-context-sources-panel" data-compact={compact ? "true" : "false"}>
+      <div className="od-stage-panel-head od-context-source-header">
         <div>
-          <div style={eyebrowStyle()}>{t("context.sources.title")}</div>
-          <h2 style={titleStyle()}>{t("context.sources.heading")}</h2>
+          <div className="od-stage-kicker">{t("context.sources.title")}</div>
+          <h2>{t("context.sources.heading")}</h2>
         </div>
-        <button disabled={disabled || saving} onClick={() => void save()} style={{ ...primaryButton(disabled || saving), marginTop: 0 }}>
+        <Button variant="primary" size="lg" className="od-context-save-button" disabled={disabled || saving} onClick={() => void save()}>
           {saving ? t("context.sources.saving") : t("context.sources.save")}
-        </button>
+        </Button>
       </div>
 
-      {error ? <div style={{ ...mutedTextStyle(), color: C.danger }}>{error}</div> : null}
+      {error ? <div className="od-context-source-error" role="status">{error}</div> : null}
 
       <div className="od-context-source-summary" data-od-id="context-source-summary">
         <div className="od-context-source-summary-head">
@@ -502,7 +502,7 @@ export function ContextSourcesPanel({
                 local: { ...current.local, workspaceRoot: event.target.value || undefined },
               }))}
               placeholder={t("context.sources.folderPlaceholder")}
-              style={inputStyle()}
+              className="od-ui-input"
             />
           </label>
           <div className="od-context-attached-list">
@@ -567,7 +567,7 @@ export function ContextSourcesPanel({
                   value={source.provider}
                   disabled={disabled || saving}
                   onChange={(event) => updateOnlineSource(source.id, { provider: event.target.value as OnlineProvider })}
-                  style={selectStyle()}
+                  className="od-ui-select od-context-provider-select"
                 >
                   {PROVIDERS.map((provider) => <option key={provider} value={provider}>{provider}</option>)}
                 </select>
@@ -576,14 +576,14 @@ export function ContextSourcesPanel({
                   disabled={disabled || saving}
                   onChange={(event) => updateOnlineSource(source.id, { label: event.target.value })}
                   placeholder={t("context.sources.labelPlaceholder")}
-                  style={inputStyle()}
+                  className="od-ui-input"
                 />
                 <input
                   value={source.reference}
                   disabled={disabled || saving}
                   onChange={(event) => updateOnlineSource(source.id, { reference: event.target.value })}
                   placeholder={t("context.sources.referencePlaceholder")}
-                  style={inputStyle()}
+                  className="od-ui-input"
                 />
                 <label className="od-context-inline-toggle">
                   <input
@@ -687,43 +687,6 @@ export function ContextSourcesPanel({
           </div>
         </section>
       </div>
-    </section>
+    </Panel>
   );
-}
-
-function panelStyle(compact: boolean): CSSProperties {
-  if (compact) {
-    return {
-      background: "transparent",
-      border: "0",
-      borderRadius: 0,
-      padding: 0,
-    };
-  }
-  return {
-    background: C.surface,
-    border: `1px solid ${C.border}`,
-    borderRadius: 8,
-    padding: compact ? 14 : 18,
-  };
-}
-
-function headerStyle(): CSSProperties {
-  return { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 14 };
-}
-
-function eyebrowStyle(): CSSProperties {
-  return { color: C.accent, fontSize: TYPE.meta, fontWeight: WEIGHT.strong, textTransform: "uppercase", letterSpacing: 0 };
-}
-
-function titleStyle(): CSSProperties {
-  return { margin: "4px 0 0", fontSize: TYPE.title, letterSpacing: 0 };
-}
-
-function selectStyle(): CSSProperties {
-  return { ...inputStyle(), height: 42 };
-}
-
-function mutedTextStyle(): CSSProperties {
-  return { color: C.muted, fontSize: TYPE.meta, lineHeight: 1.45, overflowWrap: "anywhere" };
 }
