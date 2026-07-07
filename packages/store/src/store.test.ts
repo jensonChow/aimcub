@@ -25,6 +25,11 @@ import {
   type ContextSourceSettings,
   type WebResearchSettings,
 } from "./index";
+import {
+  LOCAL_ALPHA_DEMO_GOAL_TITLE,
+  resolveLocalAlphaDemoTarget,
+  seedLocalAlphaDemo,
+} from "./local-alpha-demo";
 
 const CONTRACT = {
   why: "Scaffolding creates a runnable base before feature work starts.",
@@ -886,6 +891,136 @@ describe("createJsonFileStore · local alpha golden loop", () => {
       status: "active",
       scope: "aim",
     }));
+  });
+});
+
+describe("local alpha demo seed", () => {
+  function seededDir(): string {
+    return mkdtempSync(join(tmpdir(), "aimcub-local-alpha-demo-test-"));
+  }
+
+  it("seeds a deterministic isolated store and can be repeated idempotently", async () => {
+    const dir = seededDir();
+    const first = await seedLocalAlphaDemo(dir);
+    const store = createJsonFileStore(dir);
+    const firstSnapshot = await store.exportData();
+
+    const second = await seedLocalAlphaDemo(dir);
+    const secondSnapshot = await createJsonFileStore(dir).exportData();
+
+    expect(first.title).toBe(LOCAL_ALPHA_DEMO_GOAL_TITLE);
+    expect(second.goalId).toBe(first.goalId);
+    expect(second.imported).toMatchObject({
+      goals: 1,
+      milestones: 4,
+      evidence: 2,
+      completions: 1,
+    });
+    expect(secondSnapshot).toEqual(firstSnapshot);
+    expect((await store.listGoals()).map((goal) => goal.title)).toEqual([LOCAL_ALPHA_DEMO_GOAL_TITLE]);
+    expect(firstSnapshot.contextIntakeSessions).toContainEqual(expect.objectContaining({
+      goal_id: first.goalId,
+      status: "ready",
+      can_continue: true,
+    }));
+  });
+
+  it("covers routing, evidence trust, context candidates, and Execute/Eval read-model states", async () => {
+    const dir = seededDir();
+    const result = await seedLocalAlphaDemo(dir);
+    const store = createJsonFileStore(dir);
+    const progress = await store.getAimProgress(result.goalId);
+
+    expect(progress).not.toBeNull();
+    expect(progress!.total_milestones).toBe(4);
+    expect(progress!.completed_milestones).toBe(1);
+    expect(progress!.completion_recap).toBeNull();
+    expect(progress!.assignments.map((assignment) => assignment.actor_kind)).toEqual(expect.arrayContaining(["agent", "human"]));
+
+    const row = (key: string) => {
+      const found = progress!.milestones.find((item) => item.milestone.metadata.plan_key === key);
+      if (!found) throw new Error(`Missing seeded row ${key}`);
+      return found;
+    };
+    const completed = row("context-contract");
+    const agentIncomplete = row("agent-seed-fixture");
+    const humanIncomplete = row("human-demo-review");
+    const lowTrust = row("low-trust-proof-review");
+
+    expect(completed.completed).toBe(true);
+    expect(completed.assignment).toMatchObject({ actor_kind: "agent", status: "completed" });
+    expect(completed.evidence).toContainEqual(expect.objectContaining({
+      status: "matched",
+      rule_matches: [{ clause_index: 0, evaluator: "commit_pattern" }],
+    }));
+    expect(completed.eval_review).toMatchObject({ passed: true, trust_score: 1 });
+
+    expect(agentIncomplete.completed).toBe(false);
+    expect(agentIncomplete.assignment).toMatchObject({ actor_kind: "agent" });
+    expect(agentIncomplete.evidence_count).toBe(0);
+    expect(agentIncomplete.eval_review.reason).toBe("No evidence has been recorded for this sub-aim yet.");
+    expect(agentIncomplete.next_action).toBe("Run the assigned agent.");
+
+    expect(humanIncomplete.completed).toBe(false);
+    expect(humanIncomplete.assignment).toMatchObject({ actor_kind: "human" });
+    expect(humanIncomplete.evidence_count).toBe(0);
+    expect(humanIncomplete.next_action).toBe("Collect human proof and confirm completion.");
+
+    expect(lowTrust.completed).toBe(false);
+    expect(lowTrust.assignment).toMatchObject({ actor_kind: "agent" });
+    expect(lowTrust.latest_run).toMatchObject({ status: "completed", model: "gpt-5" });
+    expect(lowTrust.evidence).toContainEqual(expect.objectContaining({
+      status: "low_trust",
+      evidence: expect.objectContaining({
+        kind: "mcp_report",
+        trust_score: 0.55,
+      }),
+    }));
+    expect(lowTrust.eval_review.reason).toContain("trust floor");
+    expect(lowTrust.eval_review.next_action).toContain("Add trusted");
+
+    expect(progress!.context_candidates).toContainEqual(expect.objectContaining({
+      status: "pending",
+      category: "procedure",
+    }));
+    expect(await store.listMemories(result.goalId)).toContainEqual(expect.objectContaining({
+      status: "active",
+      category: "eval_signal",
+      content: "Eval signal: Demo readiness requires trusted proof, low-trust review, and visible no-evidence gaps.",
+    }));
+    expect(await store.listMemories()).toContainEqual(expect.objectContaining({
+      status: "active",
+      category: "constraint",
+      goal_id: null,
+    }));
+  });
+
+  it("requires an explicit safe target and refuses the real home store by default", () => {
+    expect(() => resolveLocalAlphaDemoTarget({
+      env: {},
+      cwd: "/tmp",
+      homeDir: "/Users/example",
+    })).toThrow(/--target/);
+    expect(() => resolveLocalAlphaDemoTarget({
+      targetDir: "/Users/example/.aimcub",
+      cwd: "/tmp",
+      homeDir: "/Users/example",
+    })).toThrow(/dangerous/);
+    expect(() => resolveLocalAlphaDemoTarget({
+      targetDir: "/Users/example/.aimcub/demo",
+      cwd: "/tmp",
+      homeDir: "/Users/example",
+    })).toThrow(/dangerous/);
+    expect(resolveLocalAlphaDemoTarget({
+      targetDir: "aimcub-demo",
+      cwd: "/tmp",
+      homeDir: "/Users/example",
+    })).toBe("/tmp/aimcub-demo");
+    expect(resolveLocalAlphaDemoTarget({
+      env: { AIMCUB_HOME: "/tmp/aimcub-demo-env" },
+      cwd: "/tmp",
+      homeDir: "/Users/example",
+    })).toBe("/tmp/aimcub-demo-env");
   });
 });
 

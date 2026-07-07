@@ -325,6 +325,13 @@ export interface AimStore {
   importData(snapshot: LocalStore, mode?: "merge" | "replace"): Promise<ImportStoreResult>;
 }
 
+export interface JsonFileStoreOptions {
+  /** Optional deterministic id source for tests and seed builders. Defaults to random UUIDs. */
+  idFactory?: () => string;
+  /** Optional deterministic clock for tests and seed builders. Defaults to the current time. */
+  now?: () => string;
+}
+
 /** Default data dir: `$AIMCUB_HOME` or `~/.aimcub` (shared by desktop + CLI). */
 export function defaultDataDir(): string {
   const override = process.env.AIMCUB_HOME?.trim();
@@ -695,11 +702,12 @@ export function materialize(
   goalId: string,
   ownerId: string,
   statuses: MilestoneStatus[] = [],
+  idFactory: () => string = randomUUID,
 ): Milestone[] {
   const plan = parseDecomposition(decomposition);
 
   const idByKey = new Map<string, string>();
-  for (const node of plan.nodes) idByKey.set(node.key, randomUUID());
+  for (const node of plan.nodes) idByKey.set(node.key, idFactory());
   const dependsOn = new Map<string, string>(); // to -> from id
   for (const edge of plan.edges) {
     const fromId = idByKey.get(edge.from);
@@ -744,6 +752,7 @@ export function mergeMilestones(
   goalId: string,
   ownerId: string,
   next: DecompositionOutput,
+  idFactory: () => string = randomUUID,
 ): Milestone[] {
   const plan = parseDecomposition(next);
 
@@ -758,7 +767,7 @@ export function mergeMilestones(
   // new plan's edges can resolve to milestone ids.
   const idByKey = new Map<string, string>();
   for (const item of merged) {
-    if (item.nodeKey) idByKey.set(item.nodeKey, item.existingId ?? randomUUID());
+    if (item.nodeKey) idByKey.set(item.nodeKey, item.existingId ?? idFactory());
   }
   const dependsOn = new Map<string, string>(); // node key (`to`) -> prerequisite milestone id
   for (const edge of plan.edges) {
@@ -956,10 +965,11 @@ function insertCompletion(
   decidedBy: MilestoneCompletion["decided_by"],
   triggeringEvidenceIds: string[],
   now: string,
+  idFactory: () => string = randomUUID,
 ): MilestoneCompletion | null {
   if (hasCompletion(store, milestone.id)) return null;
   const completion: MilestoneCompletion = {
-    id: randomUUID(),
+    id: idFactory(),
     milestone_id: milestone.id,
     owner_id: milestone.owner_id,
     decided_by: decidedBy,
@@ -979,7 +989,12 @@ function insertCompletion(
   return completion;
 }
 
-function evaluateGoal(store: LocalStore, goalId: string, now: string): MilestoneCompletion[] {
+function evaluateGoal(
+  store: LocalStore,
+  goalId: string,
+  now: string,
+  idFactory: () => string = randomUUID,
+): MilestoneCompletion[] {
   const created: MilestoneCompletion[] = [];
   const milestones = store.milestonesByGoal[goalId] ?? [];
   for (const milestone of milestones) {
@@ -999,6 +1014,7 @@ function evaluateGoal(store: LocalStore, goalId: string, now: string): Milestone
         hasManual ? "user_confirm" : "rule_auto",
         result.matchedEvidenceIds,
         now,
+        idFactory,
       );
       if (completion) created.push(completion);
       continue;
@@ -1013,6 +1029,7 @@ function evaluateGoal(store: LocalStore, goalId: string, now: string): Milestone
         "user_confirm",
         manualResult.matchedEvidenceIds,
         now,
+        idFactory,
       );
       if (completion) created.push(completion);
     }
@@ -1075,8 +1092,10 @@ function normalizeMemoryRow(row: Memory): Memory {
  * Each operation loads → mutates → saves; fine for a single user. (If concurrent desktop +
  * CLI writes ever become real, move to SQLite — last-writer-wins is the known limitation.)
  */
-export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStore {
+export function createJsonFileStore(dataDir: string = defaultDataDir(), options: JsonFileStoreOptions = {}): AimStore {
   const file = join(dataDir, "store.json");
+  const nextId = options.idFactory ?? randomUUID;
+  const nowIso = options.now ?? (() => new Date().toISOString());
 
   function load(): LocalStore {
     try {
@@ -1122,9 +1141,9 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
 
     async createGoal(input: CreateGoalInput): Promise<{ goal: Goal; milestones: Milestone[] }> {
       const store = load();
-      const now = new Date().toISOString();
+      const now = nowIso();
       const ownerId = input.ownerId ?? store.ownerId ?? DEFAULT_OWNER;
-      const goalId = randomUUID();
+      const goalId = nextId();
 
       const goal: Goal = {
         id: goalId,
@@ -1139,12 +1158,12 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
         created_at: now,
       };
 
-      const milestones = materialize(input.plan, goalId, ownerId);
+      const milestones = materialize(input.plan, goalId, ownerId, [], nextId);
       const routedAssignments: Assignment[] = routeMilestones({
         milestones,
         actors: store.actors,
       }).map((assignment) => ({
-        id: randomUUID(),
+        id: nextId(),
         owner_id: ownerId,
         goal_id: assignment.goalId,
         milestone_id: assignment.milestoneId,
@@ -1161,7 +1180,7 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
       const memories: Memory[] = (input.memories ?? [])
         .filter((m) => m.content.trim().length > 0)
         .map((m) => ({
-          id: randomUUID(),
+          id: nextId(),
           owner_id: ownerId,
           goal_id: goalId,
           kind: m.kind ?? "semantic",
@@ -1193,7 +1212,7 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
           throw new Error("Parent aim or sub-aim not found.");
         }
         store.subAimRelations.push({
-          id: randomUUID(),
+          id: nextId(),
           owner_id: ownerId,
           parent_goal_id: parentGoalId,
           parent_milestone_id: parentMilestoneId,
@@ -1215,7 +1234,7 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
       if (!goal) return null;
 
       const existing = store.milestonesByGoal[input.id] ?? [];
-      const milestones = mergeMilestones(existing, goal.id, goal.owner_id, input.plan);
+      const milestones = mergeMilestones(existing, goal.id, goal.owner_id, input.plan, nextId);
 
       const title = input.title?.trim();
       if (title) goal.title = title;
@@ -1224,7 +1243,7 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
       if (input.metadata) goal.metadata = { ...goal.metadata, ...input.metadata };
 
       store.milestonesByGoal[goal.id] = milestones;
-      const assignmentNow = new Date().toISOString();
+      const assignmentNow = nowIso();
       const existingAssignmentMilestoneIds = new Set(
         store.assignments.filter((assignment) => assignment.goal_id === goal.id).map((assignment) => assignment.milestone_id),
       );
@@ -1232,7 +1251,7 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
         milestones: milestones.filter((milestone) => !existingAssignmentMilestoneIds.has(milestone.id) && milestone.status !== "skipped"),
         actors: store.actors,
       }).map((assignment) => ({
-        id: randomUUID(),
+        id: nextId(),
         owner_id: goal.owner_id,
         goal_id: assignment.goalId,
         milestone_id: assignment.milestoneId,
@@ -1297,9 +1316,9 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
         }
       }
 
-      const now = new Date().toISOString();
+      const now = nowIso();
       const evidence: Evidence = {
-        id: randomUUID(),
+        id: nextId(),
         owner_id: input.ownerId ?? goal.owner_id ?? store.ownerId,
         goal_id: input.goalId,
         milestone_id: input.milestoneId ?? null,
@@ -1323,11 +1342,11 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
             ? store.assignments.find((row) => row.milestone_id === input.milestoneId) ?? null
             : null;
       store.evidenceAttributions.push({
-        id: randomUUID(),
+        id: nextId(),
         ...attributeEvidence({ evidence, assignment, run }),
         created_at: now,
       });
-      const completions = evaluateGoal(store, input.goalId, now);
+      const completions = evaluateGoal(store, input.goalId, now, nextId);
       save(store);
       return { evidence, deduped: false, completions };
     },
@@ -1347,10 +1366,10 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
         };
       }
 
-      const now = new Date().toISOString();
+      const now = nowIso();
       const manualEvidence = normalizeManualEvidence(input, milestone);
       const evidence: Evidence = {
-        id: randomUUID(),
+        id: nextId(),
         owner_id: input.ownerId ?? milestone.owner_id,
         goal_id: input.goalId,
         milestone_id: milestone.id,
@@ -1366,7 +1385,7 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
       store.evidence.push(evidence);
       const assignment = store.assignments.find((row) => row.milestone_id === milestone.id) ?? null;
       store.evidenceAttributions.push({
-        id: randomUUID(),
+        id: nextId(),
         ...attributeEvidence({
           evidence,
           assignment,
@@ -1374,7 +1393,7 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
         }),
         created_at: now,
       });
-      const completions = evaluateGoal(store, input.goalId, now);
+      const completions = evaluateGoal(store, input.goalId, now, nextId);
       const completion = completions.find((c) => c.milestone_id === milestone.id) ?? null;
       save(store);
       return { evidence, completion, alreadyCompleted: false };
@@ -1414,9 +1433,9 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
         }
         return duplicate;
       }
-      const now = new Date().toISOString();
+      const now = nowIso();
       const memory: Memory = {
-        id: randomUUID(),
+        id: nextId(),
         owner_id: input.ownerId ?? store.ownerId,
         goal_id: goalId,
         kind: input.kind ?? "semantic",
@@ -1452,9 +1471,9 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
       const goalId = input.goalId ?? null;
       const duplicate = findDuplicateMemory(store, content, goalId);
       if (duplicate) return duplicate;
-      const now = new Date().toISOString();
+      const now = nowIso();
       const memory: Memory = {
-        id: randomUUID(),
+        id: nextId(),
         owner_id: input.ownerId ?? store.ownerId,
         goal_id: goalId,
         kind: input.kind ?? "semantic",
@@ -1555,11 +1574,11 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
 
     async addActor(input: AddActorInput): Promise<Actor> {
       const store = load();
-      const now = new Date().toISOString();
+      const now = nowIso();
       const ownerId = input.ownerId ?? store.ownerId;
       const actor: Actor = input.kind === "human"
         ? {
-            id: randomUUID(),
+            id: nextId(),
             owner_id: ownerId,
             kind: "human",
             display_name: input.displayName,
@@ -1569,7 +1588,7 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
             created_at: now,
           }
         : {
-            id: randomUUID(),
+            id: nextId(),
             owner_id: ownerId,
             kind: "agent",
             display_name: input.displayName,
@@ -1600,7 +1619,7 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
       if (input.actorId && !store.actors.some((actor) => actor.id === input.actorId && actor.kind === input.actorKind)) {
         throw new Error(`Actor ${input.actorId} not found.`);
       }
-      const now = new Date().toISOString();
+      const now = nowIso();
       const existing = store.assignments.find((assignment) => assignment.milestone_id === milestone.id);
       if (existing) {
         existing.actor_kind = input.actorKind;
@@ -1614,7 +1633,7 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
         return existing;
       }
       const assignment: Assignment = {
-        id: randomUUID(),
+        id: nextId(),
         owner_id: input.ownerId ?? goal.owner_id,
         goal_id: goal.id,
         milestone_id: milestone.id,
@@ -1653,11 +1672,11 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
       const assignment = input.assignmentId
         ? store.assignments.find((row) => row.id === input.assignmentId)
         : store.assignments.find((row) => row.milestone_id === milestone.id);
-      const now = new Date().toISOString();
+      const now = nowIso();
       const attempt = store.runs.filter((run) => run.milestone_id === milestone.id).length + 1;
       const status = input.status ?? "queued";
       const run: Run = {
-        id: randomUUID(),
+        id: nextId(),
         owner_id: input.ownerId ?? goal.owner_id,
         goal_id: goal.id,
         milestone_id: milestone.id,
@@ -1685,7 +1704,7 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
         assignment.updated_at = now;
       }
       store.runEvents.push({
-        id: randomUUID(),
+        id: nextId(),
         owner_id: run.owner_id,
         run_id: run.id,
         type: status === "running" ? "run.started" : "run.queued",
@@ -1702,13 +1721,13 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
       const run = store.runs.find((row) => row.id === input.runId);
       if (!run) return null;
       const event: RunEvent = {
-        id: randomUUID(),
+        id: nextId(),
         owner_id: input.ownerId ?? run.owner_id,
         run_id: run.id,
         type: input.type,
         summary: input.summary ?? "",
         payload: input.payload ?? {},
-        created_at: new Date().toISOString(),
+        created_at: nowIso(),
       };
       store.runEvents.push(event);
       save(store);
@@ -1719,7 +1738,7 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
       const store = load();
       const run = store.runs.find((row) => row.id === input.runId);
       if (!run) return null;
-      const now = new Date().toISOString();
+      const now = nowIso();
       run.status = input.status;
       run.summary = input.summary ?? run.summary;
       run.error = input.error ?? null;
@@ -1731,7 +1750,7 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
         assignment.updated_at = now;
       }
       store.runEvents.push({
-        id: randomUUID(),
+        id: nextId(),
         owner_id: run.owner_id,
         run_id: run.id,
         type: input.status === "completed" ? "run.completed" : input.status === "cancelled" ? "run.cancelled" : "run.failed",
@@ -1745,9 +1764,9 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
 
     async recordToolTrace(input: RecordToolTraceInput): Promise<ToolTrace> {
       const store = load();
-      const now = new Date().toISOString();
+      const now = nowIso();
       const trace: ToolTrace = {
-        id: randomUUID(),
+        id: nextId(),
         owner_id: input.ownerId ?? store.ownerId,
         session_id: input.sessionId ?? null,
         tool_name: input.toolName,
@@ -1766,7 +1785,7 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
 
     async createContextIntakeSession(input: CreateContextIntakeSessionInput): Promise<ContextIntakeSession> {
       const store = load();
-      const now = new Date().toISOString();
+      const now = nowIso();
       const traceIds = new Set(input.toolTraceIds ?? []);
       const decision = decideContextIntakeSession({
         aimTitle: input.aimTitle,
@@ -1778,7 +1797,7 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
         toolTraces: store.toolTraces.filter((trace) => traceIds.has(trace.id)),
       });
       const session: ContextIntakeSession = {
-        id: randomUUID(),
+        id: nextId(),
         owner_id: input.ownerId ?? store.ownerId,
         ...decision,
         started_at: now,
@@ -1813,7 +1832,7 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
           continue;
         }
         const memory: Memory = {
-          id: randomUUID(),
+          id: nextId(),
           owner_id: goal.owner_id,
           goal_id: scopedGoalId,
           kind: candidate.category === "procedure" ? "procedural" : "semantic",
@@ -1823,7 +1842,7 @@ export function createJsonFileStore(dataDir: string = defaultDataDir()): AimStor
           source: "evidence_derived",
           status: "pending",
           superseded_by: null,
-          created_at: new Date().toISOString(),
+          created_at: nowIso(),
         };
         store.memories.push(memory);
         created.push(memory);
