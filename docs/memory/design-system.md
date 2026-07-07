@@ -99,6 +99,7 @@ Reference links:
 - Cards: use cards only for repeated items, forms, modals, and genuinely framed tools. Do not put cards inside cards, and do not turn whole page sections into floating cards.
 - Tables/grids: use explicit grid tracks with `minmax(0, 1fr)` so long text truncates or wraps intentionally.
 - Responsive behavior: start from the smallest viable window and scale up. At narrow widths, collapse the sidebar, wrap stage controls, stack multi-column grids, and preserve all functionality.
+- Workflow stage navigation must respect the native titlebar/sidebar-toggle safe area at compact desktop widths. Solve overlap from stage/workspace layout (`.od-main`, `.od-stage-nav`, `.od-workspace`) by centering on normal widths and wrapping or compressing labels at narrow widths, without changing shell/sidebar/window-chrome selectors.
 - Large windows: do not let controls drift apart. Use max-width containers and local alignment groups so related labels, inputs, and actions remain visually connected.
 
 ## Typography
