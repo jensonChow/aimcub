@@ -34,6 +34,12 @@ The renderer was reset from the old debug-heavy cockpit into a compact Aim OS co
 
 Desktop UI changes must follow `docs/memory/design-system.md` for layout, typography, spacing, color, controls, accessibility, and interaction states. If the user gives a new frontend design requirement, update that memory in the same change.
 
+## Renderer Structure
+
+`apps/desktop/src/renderer/App.tsx` should stay orchestration-focused: state, IPC calls, stage routing, and handoffs between stage surfaces. Stage-owned view structure lives under `apps/desktop/src/renderer/stages/<stage>/`, currently `context`, `plan`, `eval`, and `execute`. Do not reintroduce large inline Context, Plan/Contracts, Eval, or Execute component bodies into `App.tsx`.
+
+Shared renderer primitives live under `apps/desktop/src/renderer/ui/`. Reuse or extend those primitives for low-risk workbench/helper surfaces before adding new one-off control styling, while keeping the protected shell/sidebar/window-chrome framework unchanged.
+
 ## Context Collection
 
 Desktop context collection is a first-class setup layer. `context-sources.json` records linked local folders, explicit local files, online connector references, web/deep-research preference, dedicated context session toggle, and choice-question toggle.

@@ -14,6 +14,7 @@ Branch: `main`
 - Merged `1d18c905` (`Clarify local agent execution UX`) via `93b966a9`.
 - Added the local alpha contract and golden-loop tests, Desktop UI primitives, Context/Plan/Eval stage components, and Execute local-agent summary.
 - Preserved the Desktop shell/sidebar/window-chrome framework. `CockpitShell.tsx` was not edited; `cockpit.css` changes are scoped to stage content and responsive stage selectors.
+- Ran the `memory-refresh` audit after integration and promoted the Desktop renderer stage-folder/shared-primitive convention into `docs/memory/desktop.md`.
 
 ## Conflict Resolutions
 
@@ -35,11 +36,13 @@ Passed:
 - `git diff --check`
 - `ELECTRON_BUILDER_CACHE=/private/tmp/aimcub-electron-builder-cache COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm desktop:pack`
 - `ditto apps/desktop/dist/mac-arm64/Aimcub.app Aimcub.app`
+- `python3 /Users/jenson/.codex/skills/memory-refresh/scripts/audit_project_memory.py /Users/jenson/Desktop/Aimcub`
 
 Notes:
 
 - MCP worker tests logged the expected missing-Supabase opaque-error path while passing.
 - Root `Aimcub.app` was refreshed from `apps/desktop/dist/mac-arm64/Aimcub.app`.
+- Memory-refresh audit reported root memory line budgets OK and `main` aligned with `origin/main` before the memory refresh update.
 
 ## Commit And Push Status
 
@@ -47,6 +50,7 @@ Notes:
 - Final integration commit before push: `1447ee89` (`Stabilize local alpha desktop loop`).
 - `git push origin main` succeeded during this session, publishing `b2db1577..1447ee89`.
 - This handoff status update records the successful push and was pushed as the final status commit.
+- The memory-refresh update follows the integration push; final branch state is authoritative in `git status --short --branch` and `git log --oneline -3`.
 
 ## Next Session Prompt
 
