@@ -51,9 +51,9 @@ Packaged app inspection used the refreshed root `Aimcub.app` with isolated state
 
 ## Commit And Push Status
 
-- Current local `main` is ahead of `origin/main` by the integration merge history plus this final handoff/audit update once committed.
-- Final integration commit message planned: `Polish desktop stage first viewport`.
-- Push to `origin/main` is the remaining step after this handoff/audit update is committed.
+- Final integration commit: `ee67363f` (`Polish desktop stage first viewport`).
+- Pushed `main` to `origin/main` after the final integration commit.
+- This status-only handoff update records the push outcome and should be the final session commit.
 
 ## Next Session Prompt
 
