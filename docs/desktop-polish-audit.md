@@ -302,6 +302,8 @@ If a sidebar/window conflict appears unavoidable, stop and record the conflict i
 - Verify 960x680, 760x600, and 640x520.
 - Keep shell/sidebar/window selectors untouched.
 
+Status: addressed in the stage/workspace CSS pass on 2026-07-07. `.od-main` now owns the compact-width titlebar safe-area offset, and `.od-stage-nav` centers, wraps, and compresses labels without changing the protected shell/sidebar/window selectors. Verification in this parallel worktree is CSS/test based per the no-GUI/no-packaging constraints.
+
 ### Batch 2: Context Primary Task Cleanup
 
 - Make blocking intake the sole dominant task.

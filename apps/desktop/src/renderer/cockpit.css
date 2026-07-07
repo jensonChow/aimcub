@@ -1255,6 +1255,7 @@ kbd {
 }
 
 .od-main {
+  --stage-nav-titlebar-safe-top: 0px;
   grid-column: 2;
   min-width: 0;
   min-height: 0;
@@ -1278,6 +1279,7 @@ kbd {
   margin: 0 auto;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
 }
 
@@ -1293,6 +1295,7 @@ kbd {
   background: var(--od-surface-warm);
   color: var(--od-muted);
   padding: 0 12px;
+  max-width: 164px;
   cursor: pointer;
 }
 
@@ -4849,8 +4852,14 @@ kbd {
     box-shadow: var(--od-shadow-peek);
   }
 
+  .od-main:not(.od-main-aim):not(.od-main-settings) {
+    --stage-nav-titlebar-safe-top: calc(var(--titlebar-toggle-top) + var(--titlebar-toggle-size) + 16px);
+    padding-top: max(16px, var(--stage-nav-titlebar-safe-top));
+  }
+
   .od-stage-nav {
     flex-wrap: wrap;
+    row-gap: 8px;
   }
 }
 
@@ -4888,6 +4897,16 @@ kbd {
 
   .od-stage-nav {
     flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .od-stage-nav button {
+    flex: 0 1 128px;
+    padding: 0 10px;
+  }
+
+  .od-stage-title {
+    max-width: 84px;
   }
 
   .od-context-source-status-list,

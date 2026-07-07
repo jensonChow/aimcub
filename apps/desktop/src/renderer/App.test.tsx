@@ -758,6 +758,34 @@ describe("CockpitShell", () => {
     expect(main).toContain("minHeight: MIN_WINDOW_HEIGHT");
   });
 
+  it("keeps workflow stage navigation clear of titlebar controls at compact widths", () => {
+    const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
+    const stageSafeAreaRule = css.match(
+      /\.od-main:not\(\.od-main-aim\):not\(\.od-main-settings\)\s*{[^}]*}/s,
+    )?.[0] ?? "";
+
+    expect(css).toMatch(/\.od-main\s*{[^}]*--stage-nav-titlebar-safe-top:\s*0px;/s);
+    expect(stageSafeAreaRule).toContain("--stage-nav-titlebar-safe-top: calc(var(--titlebar-toggle-top) + var(--titlebar-toggle-size) + 16px);");
+    expect(stageSafeAreaRule).toContain("padding-top: max(16px, var(--stage-nav-titlebar-safe-top));");
+    expect(stageSafeAreaRule).not.toContain("data-sidebar-state");
+    expect(stageSafeAreaRule).not.toMatch(/\.od-sidebar|\.od-user-menu-|\.od-window-drag-strip/);
+    expect(css).toMatch(/\.od-stage-nav\s*{[^}]*justify-content:\s*center;[^}]*gap:\s*8px;/s);
+    expect(css).toMatch(/\.od-stage-nav button\s*{[^}]*max-width:\s*164px;/s);
+  });
+
+  it("wraps and compresses workflow stage navigation without shell selector changes", () => {
+    const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
+    const compactStageNavRule = css.match(/@media \(max-width: 1040px\)\s*{[\s\S]*?\.od-stage-nav\s*{[^}]*}/)?.[0] ?? "";
+    const narrowStageNavButtonRule = css.match(/\.od-stage-nav button\s*{[^}]*flex:\s*0 1 128px;[^}]*}/s)?.[0] ?? "";
+    const narrowStageTitleRule = css.match(/\.od-stage-title\s*{[^}]*max-width:\s*84px;[^}]*}/s)?.[0] ?? "";
+
+    expect(compactStageNavRule).toMatch(/\.od-stage-nav\s*{[^}]*flex-wrap:\s*wrap;[^}]*row-gap:\s*8px;/s);
+    expect(narrowStageNavButtonRule).toMatch(/\.od-stage-nav button\s*{[^}]*flex:\s*0 1 128px;[^}]*padding:\s*0 10px;/s);
+    expect(narrowStageTitleRule).toMatch(/\.od-stage-title\s*{[^}]*max-width:\s*84px;/s);
+    expect(narrowStageNavButtonRule).not.toMatch(/\.od-sidebar|\.od-user-menu-|\.od-window-drag-strip|data-sidebar-state/);
+    expect(narrowStageTitleRule).not.toMatch(/\.od-sidebar|\.od-user-menu-|\.od-window-drag-strip|data-sidebar-state/);
+  });
+
   it("replaces the primary left sidebar with settings navigation on settings stage", () => {
     const html = renderToStaticMarkup(
       <I18nProvider>
