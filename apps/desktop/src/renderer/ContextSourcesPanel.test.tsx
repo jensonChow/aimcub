@@ -89,6 +89,7 @@ describe("ContextSourcesPanel", () => {
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
 
     expect(css).toMatch(/\.od-context-workbench-step\s*{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) auto;/s);
+    expect(css).toMatch(/\.od-context-secondary-sources summary\s*{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) auto;/s);
     expect(css).toMatch(/\.od-context-review-grid\s*{[^}]*grid-template-columns:\s*repeat\(auto-fit, minmax\(220px, 1fr\)\);/s);
     expect(css).toMatch(/\.od-context-continue\s*{[^}]*justify-content:\s*flex-end;/s);
   });

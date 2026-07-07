@@ -10,6 +10,7 @@ interface ContextAimSummaryPanelProps {
   title: string;
   description: string | undefined | null;
   saved: boolean;
+  compact?: boolean;
   onEdit?: () => void;
 }
 
@@ -17,25 +18,34 @@ export function ContextAimSummaryPanel({
   title,
   description,
   saved,
+  compact = false,
   onEdit,
 }: ContextAimSummaryPanelProps) {
   const { t } = useI18n();
   const descriptionText = description?.trim();
+  const descriptionPreview = descriptionText
+    ? shortText(descriptionText, compact ? 120 : 220)
+    : compact
+      ? ""
+      : t("aimContext.noDescription");
+  const showActions = !compact || Boolean(onEdit);
   return (
-    <section className="od-aim-context-summary">
+    <section className="od-aim-context-summary" data-compact={compact ? "true" : undefined}>
       <div>
         <div className="od-aim-kicker">{saved ? t("shell.savedAim") : t("os.stepContext")}</div>
         <h2>{title}</h2>
-        <p>{descriptionText ? shortText(descriptionText, 220) : t("aimContext.noDescription")}</p>
+        {descriptionPreview ? <p>{descriptionPreview}</p> : null}
       </div>
-      <div className="od-aim-context-actions">
-        <span>{t(saved ? "aimContext.savedBody" : "aimContext.body")}</span>
-        {onEdit ? (
-          <button className="od-aim-secondary" type="button" onClick={onEdit}>
-            {t("aimContext.edit")}
-          </button>
-        ) : null}
-      </div>
+      {showActions ? (
+        <div className="od-aim-context-actions">
+          {compact ? null : <span>{t(saved ? "aimContext.savedBody" : "aimContext.body")}</span>}
+          {onEdit ? (
+            <button className="od-aim-secondary" type="button" onClick={onEdit}>
+              {t("aimContext.edit")}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   );
 }
