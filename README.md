@@ -1,119 +1,146 @@
 # Aimcub
 
-> A universal **aim-management** layer for the harness era: humans and agents are
-> interchangeable tools for reaching a goal, and aimcub is the architecture that
-> holds the aim, routes the work, and accrues the **context** + **eval** that make
-> the system intelligent.
+Aimcub is an aim-management layer for coordinating people and agents around an
+outcome. It holds the aim, gathers context, decomposes work, routes sub-aims to
+humans or agents, records evidence, derives progress through eval, and lets
+useful context become reusable memory.
 
-You set an aim, whether long-term vision or short-term task; the system
-decomposes it, ingests real evidence of progress, and judges completion
-automatically. As you and your agents work, a durable context forms: your
-new-era resume.
+The current project is the open-source local Aim OS agent harness. It is a local
+alpha, not the hosted multiplayer platform.
 
-**Core positioning**: Aimcub is being built first as a local **Aim OS agent
-harness**. Coding agents such as Codex and Claude Code are local runtimes inside
-that harness; MCP, GitHub, and CI are evidence/extension channels. The online
-product is the multiplayer Aim platform and future Aim Share network. The
-desktop app is the fixed local entry for planning, context, provider/model setup,
-agent orchestration, evidence, and eval. See [`docs/vision.md`](docs/vision.md)
-for the full direction.
+## Local Alpha
 
-## Open-source posture
+The local alpha is the inspectable single-user loop that runs on one machine:
 
-Aimcub is intended to be open source as a local-first planning and agent
-orchestration product. The local desktop loop and shared `@core` packages should
-remain usable, inspectable, and hackable without relying on a closed hosted
-service.
-
-The brand boundary is: **open-source local Aim OS agent harness, online Aim
-platform**. The local product should own planning, local agent management,
-provider configuration, context capture, evidence, and eval transparency. The
-online product should own multi-user collaboration, cross-device sync, team
-permissions, managed infrastructure, and the future Aim Share platform.
-The alpha contract for the local open-source loop is defined in
-[`docs/local-alpha.md`](docs/local-alpha.md).
-
-Hosted Supabase-backed surfaces can add networked value, but the core
-aim/context/eval architecture should stay transparent. License choice is
-intentionally TBD before public release.
-
-## Architecture principles
-
-- **The hosted backend's single source of truth = Supabase** (Postgres + Auth + RLS + Realtime + Storage).
-- **Evidence is append-only + idempotent**; milestone completion is derived from the evidence stream via `evaluate()`, never written directly.
-- **`@core/*` is the single logic source for active surfaces** (pure TS, zero platform dependencies, unit-testable). Each app shell handles only I/O, rendering, and platform bridging.
-- Lean-first: a jobs table + pg_cron (not pgmq), linear milestones (not a DAG), a single-table memory (no vectors). Complexity is added back only when a trigger condition demands it.
-
-## Monorepo layout
-
-```
-packages/
-  core/        @core/domain      Pure TS kernel: evaluate / planMerge / normalizeEvidence / validatePlan
-  types/       @core/types       zod domain models (single source of truth)
-  db/          @core/db          Supabase migrations + RLS + Edge Functions
-  api/         @core/api-client  supabase-js wrapper
-  llm/         @core/llm         Claude gateway (model routing + metering) + goal decomposition
-  store/       @core/store       local Aim OS store and planning-context persistence
-apps/
-  desktop/    Electron desktop app           - active local Aim OS harness
-  cli/         Node CLI                       - active scriptable/debuggable companion
-  mcp/         MCP server (Streamable HTTP)  - active
+```text
+Aim -> Context -> Plan/contracts -> Execute -> Evidence -> Eval -> Context reuse
 ```
 
-## Live deployment
+Today this means:
 
-| Surface | Where | Notes |
-|---|---|---|
-| MCP server | `https://mcp.aimcub.com` | Cloudflare Workers; OAuth 2.1 resource server (Supabase AS, Path A); RFC 9728 metadata at `/.well-known/oauth-protected-resource` |
-| Database | Supabase `gtasruxwmcsxicyujlfu` (us-west-1) | migrations 0001-0013; RLS verified (users cannot forge milestones) |
-| Evidence ingest | Edge Functions `ingest` (emitter tokens) + `github-webhook` (HMAC) | both feed the same idempotent `handleIngest` pipeline |
-| Judging | Edge Function `jobs-worker`, pg_cron every minute | `claim_jobs` batch -> `evaluate()` -> auto-completion; goal-level evidence fans out across open milestones |
-| Passive evidence | GitHub App [Aimcub](https://github.com/apps/aimcub) | push / workflow_run events; secrets in Vault |
-| Goal decomposition | Claude Sonnet 4.6 structured output | all-required + nullable schema (the optional-property grammar blowup is real); deterministic local fallback |
+- Desktop is the primary local product surface for aim intake, context review,
+  provider/local-agent setup, execution handoff, evidence, eval, and context
+  inbox review.
+- CLI is the scriptable and debuggable companion over the same local store.
+- `@core/*` packages own the domain logic. App shells perform I/O, rendering,
+  and platform bridging.
+- Local state is local-store first. By default it lives under `~/.aimcub`; use
+  `AIMCUB_HOME` to isolate a development or demo store.
+- Provider APIs and local CLI agents are optional helpers for planning and
+  execution. The local alpha should remain understandable without treating any
+  hosted service as required product state.
+
+See [`docs/open-source-local-alpha.md`](docs/open-source-local-alpha.md) for the
+developer/contributor guide and [`docs/local-alpha.md`](docs/local-alpha.md) for
+the narrower alpha contract. For a provider-free deterministic walkthrough, see
+[`examples/local-alpha/README.md`](examples/local-alpha/README.md).
+
+## Not In The Local Alpha
+
+These are future hosted or later-platform concerns, not local-alpha promises:
+
+- sync and cross-device continuity
+- hosted multiplayer, teams, permissions, and org governance
+- Aim Share
+- iOS, browser extension, and hosted web product surfaces
+- cloud agent runner
+- vector memory
+
+Supabase remains the hosted source of truth for the existing MCP evidence spine
+and the future online platform. It is intentionally separate from the local
+store-first alpha path.
+
+## Where To Start
+
+For product direction:
+
+- [`docs/vision.md`](docs/vision.md) explains the long-term product thesis.
+- [`docs/v1-spec.md`](docs/v1-spec.md) explains the active local harness scope.
+- [`docs/local-alpha.md`](docs/local-alpha.md) defines the local alpha contract.
+
+For contributor context:
+
+- [`AGENTS.md`](AGENTS.md) is the root project contract.
+- [`docs/handoff.md`](docs/handoff.md) is the latest session transfer.
+- [`docs/memory/README.md`](docs/memory/README.md) maps durable module memory.
+- [`docs/open-source-local-alpha.md`](docs/open-source-local-alpha.md) gives the
+  local alpha onboarding path.
+
+## Architecture Map
+
+| Path | Role |
+| --- | --- |
+| `packages/types` | Zod domain models and shared TypeScript types. |
+| `packages/core` | Pure domain kernel: eval, plan merge, evidence normalization, planning reviews, and aim learning. |
+| `packages/store` | Local AimStore implementation, provider/settings files, context-source settings, import/export, and `AIMCUB_HOME` data-root handling. |
+| `packages/llm` | Provider catalog, LLM gateways, structured decomposition, planning context selection, and first-party tool contracts. |
+| `packages/api` | Supabase API client layer for hosted evidence/platform surfaces. Not required for the local store-first loop. |
+| `apps/desktop` | Electron local harness. Primary product surface for the local alpha. |
+| `apps/cli` | Headless companion for planning, saved aims, evidence, context, setup, config, import/export, and diagnostics. |
+| `apps/mcp` | Hosted Streamable HTTP MCP evidence server. External extension boundary, not the local tool substrate. |
+| `packages/db` | Hosted Supabase schema, migrations, RLS, Edge Functions, and hosted judging infrastructure. |
 
 ## Development
+
+Requirements are declared in [`package.json`](package.json): Node `>=22.13` and
+`pnpm@11.10.0`.
 
 ```bash
 corepack enable pnpm
 pnpm install
-pnpm desktop      # fixed local desktop entry
-pnpm build        # turbo full build
-pnpm test         # workspace test suite
-pnpm core:purity  # verify core has zero platform dependencies
+pnpm build
+pnpm test
+pnpm typecheck
+pnpm lint
+pnpm core:purity
 ```
 
-Desktop-specific commands should be launched from the repo root:
+Desktop-specific commands are run from the repo root:
 
 ```bash
-pnpm desktop        # run the current Electron desktop app
-pnpm desktop:build  # build the current desktop app
+pnpm desktop        # run the Electron desktop app
+pnpm desktop:build  # build the desktop app
 pnpm desktop:pack   # produce a local macOS app directory
 ```
 
-Optional live provider smoke tests:
+CLI commands use the shared local store:
 
 ```bash
-# Runs real structured-output requests against selected providers.
-# Omit AIMCUB_LIVE_PROVIDERS to require all built-ins:
-# anthropic, openai, deepseek, minimax, zai, google, qwen.
-AIMCUB_LIVE_PROVIDERS=deepseek,qwen \
-DEEPSEEK_API_KEY=... \
-QWEN_API_KEY=... \
-pnpm test:live-providers
+pnpm --filter @app/cli build
+AIMCUB_HOME=/tmp/aimcub-local-alpha pnpm --filter @app/cli exec aimcub config
+AIMCUB_HOME=/tmp/aimcub-local-alpha pnpm --filter @app/cli exec aimcub new "Ship a small local tool"
+AIMCUB_HOME=/tmp/aimcub-local-alpha pnpm --filter @app/cli exec aimcub board <aim-id>
+AIMCUB_HOME=/tmp/aimcub-local-alpha pnpm --filter @app/cli exec aimcub context review
 ```
 
-Provider-specific model/base URL overrides use
-`AIMCUB_LIVE_<PROVIDER>_MODEL` and `AIMCUB_LIVE_<PROVIDER>_BASE_URL`, for
-example `AIMCUB_LIVE_DEEPSEEK_MODEL=deepseek-v4-flash`.
+For isolated local data during development:
 
-## Roadmap (with falsifiable gates)
+```bash
+AIMCUB_HOME=/tmp/aimcub-local-alpha pnpm --filter @app/cli exec aimcub config
+```
 
-- **v0** Complete: Foundation: monorepo + `@core` + Supabase evidence spine. DoD = core imported by the active app/evidence surfaces + zero-dependency build passes.
-- **v1** Local Aim OS agent harness: Desktop-first aim intake, context gathering, decomposition, routing, local agent runs, evidence, eval, and context inbox. The old v1a/v1b labels are now validation history, not the active roadmap.
-- **v2** Online multiplayer Aim platform: reintroduce the hosted app when Supabase parity, sync, teams, permissions, and per-person context routing need a product surface.
-- **v3** Aim Share: cross-org aim sharing and a paid network for goals, specialized context, and capability signals. Calendar remains a time-management component throughout.
+Do not commit secrets. Provider keys are read from environment variables or saved
+local settings files under the selected Aimcub data directory.
 
-See [`docs/vision.md`](docs/vision.md) for the full direction,
-[`docs/v1-spec.md`](docs/v1-spec.md) for the current local harness plan,
-[`docs/local-alpha.md`](docs/local-alpha.md) for the local alpha contract, and
-[`docs/memory/README.md`](docs/memory/README.md) for the agent memory map.
+## Hosted Surfaces
+
+The hosted spine is still part of the repo, but it is not required to understand
+or run the local alpha path.
+
+| Surface | Current role |
+| --- | --- |
+| MCP server | Cloudflare Worker for external agents to report evidence and read goal status. |
+| Supabase database | Hosted Postgres/Auth/RLS/Realtime/Storage source of truth for MCP evidence and future platform state. |
+| Edge Functions and pg_cron | Hosted evidence ingest and judging jobs. |
+| GitHub App | Passive evidence channel for hosted GitHub/CI events. |
+
+## Roadmap Boundary
+
+- v0 is complete: monorepo foundation, `@core` kernel, and Supabase evidence
+  spine.
+- v1 is current: local Aim OS agent harness with Desktop-first aim intake,
+  context, decomposition, routing, evidence, eval, and context reuse.
+- v2 is the online multiplayer Aim platform.
+- v3 is Aim Share.
+
+License choice is intentionally undecided before public release.

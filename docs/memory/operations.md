@@ -67,6 +67,22 @@ Local desktop state is not held in project memory. The current local store path 
 
 If the local store grows too large, the intended compaction behavior is: back up `store.json`, remove or truncate long debug traces and rejected/obsolete context candidates, and preserve goals, milestones, evidence, accepted context, assignments, runs, and eval state.
 
+## Local Alpha Demo Seed
+
+The deterministic local alpha seed lives under `examples/local-alpha/`. Build it with:
+
+```bash
+pnpm --filter @app/cli exec esbuild ../../examples/local-alpha/seed-local-alpha-demo.ts --bundle --platform=node --format=esm --target=node22 --outfile=/tmp/aimcub-local-alpha-demo-seed.mjs
+```
+
+Run it only against an isolated directory, for example:
+
+```bash
+node /tmp/aimcub-local-alpha-demo-seed.mjs --target /tmp/aimcub-local-alpha-demo
+```
+
+The seed refuses `~`, `~/.aimcub`, paths under `~/.aimcub`, and filesystem root by default. Use `AIMCUB_HOME=/tmp/aimcub-local-alpha-demo` when launching Desktop for seeded visual QA, and confirm the real `~/.aimcub` store was not modified.
+
 ## Handoff Protocol
 
 At the end of a repo-changing session, update `docs/handoff.md` with:

@@ -2,6 +2,8 @@
 
 This example creates a deterministic local Aimcub store for dogfooding and visual QA of the open-source local loop. It does not call an LLM provider, web research, hosted Supabase, or a real local agent.
 
+For the product contract behind this seed, see [`../../docs/local-alpha.md`](../../docs/local-alpha.md). For contributor onboarding, see [`../../docs/open-source-local-alpha.md`](../../docs/open-source-local-alpha.md).
+
 ## What It Contains
 
 The seeded aim is `Dogfood the local alpha open-source loop`.

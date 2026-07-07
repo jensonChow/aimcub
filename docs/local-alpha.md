@@ -15,6 +15,14 @@ context in later work.
 The local alpha product is credible only if `@core/*` owns the aim logic and the
 local store can replay the loop without a hosted service.
 
+## Deterministic Demo Seed
+
+Use [`../examples/local-alpha/README.md`](../examples/local-alpha/README.md) to
+seed an isolated provider-free demo workspace for Desktop dogfooding and visual
+QA. The documented path uses `AIMCUB_HOME=/tmp/aimcub-local-alpha-demo` or an
+explicit `--target` directory so it does not write to the real `~/.aimcub`
+store.
+
 ## Golden Path
 
 ```text
