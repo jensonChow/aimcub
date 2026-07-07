@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import type { RoutingRuntimeAgentOption } from "@core/domain";
+import { routingRecommendationForPlanNode, type RoutingRuntimeAgentOption } from "@core/domain";
 import type { AimProgressReadModel, DecompositionOutput, Goal, Milestone } from "@core/types";
 import type { ContextSourceStatus, ProviderStatus, WebResearchStatus } from "../shared/ipc";
 
@@ -11,7 +11,9 @@ import { App, buildSettingsModel, EvidenceSubmissionForm, SettingsPanel } from "
 import { CockpitShell } from "./CockpitShell";
 import { I18nProvider, translate, type I18n } from "./i18n";
 import { LocalAgentExecutionSummary } from "./stages/execute/LocalAgentExecutionSummary";
+import { PlanContractCard } from "./stages/plan/PlanContractCard";
 import { PlanPanel } from "./stages/plan/PlanPanel";
+import { editableContractForNode, formatAcceptanceRule } from "./stages/plan/planContract";
 
 const OWNER = "00000000-0000-4000-8000-000000000001";
 const GOAL = "00000000-0000-4000-8000-000000000010";
@@ -343,22 +345,79 @@ describe("PlanPanel", () => {
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
 
     expect(html).toContain("Execution contracts");
-    expect(html).toContain("Review what each sub-aim means");
+    expect(html).toContain("Review each sub-aim, owner, proof, and route.");
+    expect(html).toContain("Sub-aim title");
     expect(html).toContain("Why this exists");
+    expect(html).toContain("Done when");
+    expect(html).toContain("Evidence needed");
+    expect(html).toContain("Eval signal");
     expect(html).toContain("The user needs a clear agreement before execution starts.");
     expect(html).toContain("Every sub-aim has a clear owner and evidence standard.");
     expect(html).toContain("Reviewed contract notes.");
     expect(html).toContain("The saved aim contains reviewed contract terms.");
     expect(html).toContain("Suggested owner");
     expect(html).toContain("Selected owner");
+    expect(html).toContain("Routing rationale");
+    expect(html).toContain("Acceptance check");
+    expect(html).toContain("You confirm it is done");
+    expect(html).toContain("Structure edits");
     expect(html).toContain("Developer details");
     expect(html).toContain("Save aim");
     expect(html).not.toContain("Acceptance rule");
     expect(html).not.toContain("completion_mode");
+    expect(html).not.toContain("auto_then_confirm");
+    expect(html).not.toContain("manual_confirm");
     expect(html).not.toContain("clauses");
     expect(css).toMatch(/\.od-plan-contract-card\s*{[^}]*border:\s*1px solid var\(--od-border-soft\);[^}]*padding:\s*12px 14px;/s);
     expect(css).toMatch(/\.od-plan-routing-summary\s*{[^}]*border-top:\s*1px solid var\(--od-border-soft\);[^}]*border-bottom:\s*1px solid var\(--od-border-soft\);/s);
     expect(css).toMatch(/\.od-plan-advanced-body\s*{[^}]*border-top:\s*1px solid var\(--od-border-soft\);/s);
+    expect(css).toMatch(/\.od-plan-structure-details\s*{[^}]*border-top:\s*1px solid var\(--od-border-soft\);/s);
+  });
+
+  it("keeps acceptance rule editing inside Developer details", () => {
+    const node = contractPlan.nodes[0]!;
+    const html = renderToStaticMarkup(
+      <I18nProvider>
+        <PlanContractCard
+          node={node}
+          index={0}
+          nodeCount={contractPlan.nodes.length}
+          editable
+          disabled={false}
+          contract={editableContractForNode(node)}
+          recommendation={routingRecommendationForPlanNode(node)}
+          owner="agent"
+          selectedAgent={routingAgents[0]!}
+          selectedModel="gpt-5"
+          readyAgents={routingAgents}
+          nodeIssues={[]}
+          overrideActive={false}
+          ruleText={formatAcceptanceRule(node.acceptance_rule)}
+          advancedOpen
+          onNode={noop}
+          onContract={noop}
+          onMoveUp={noop}
+          onMoveDown={noop}
+          onMergeUp={noop}
+          onMergeDown={noop}
+          onSplit={noop}
+          onOwner={noop}
+          onAgent={noop}
+          onModel={noop}
+          onRoutingReset={noop}
+          onAdvancedToggle={noop}
+          onRuleText={noop}
+          onRuleCommit={noop}
+        />
+      </I18nProvider>,
+    );
+
+    expect(html).toContain("Hide developer details");
+    expect(html).toContain("Acceptance rule");
+    expect(html).toContain("Apply rule");
+    expect(html).toContain("completion_mode");
+    expect(html).toContain("auto_then_confirm");
+    expect(html).toContain("clauses");
   });
 });
 

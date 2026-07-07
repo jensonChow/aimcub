@@ -3123,7 +3123,7 @@ kbd {
 .od-plan-contract-head {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   align-items: start;
 }
@@ -3155,6 +3155,36 @@ kbd {
   justify-content: flex-end;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+.od-plan-structure-details {
+  min-width: 0;
+  border-top: 1px solid var(--od-border-soft);
+  padding-top: 2px;
+}
+
+.od-plan-structure-details summary {
+  width: max-content;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--od-radius-pill);
+  color: var(--od-muted);
+  padding: 0 2px;
+  font-size: var(--od-type-meta);
+  line-height: var(--od-line-meta);
+  font-weight: var(--od-font-weight-semibold);
+  cursor: pointer;
+}
+
+.od-plan-structure-details summary:hover,
+.od-plan-structure-details summary:focus-visible {
+  color: var(--od-fg);
+}
+
+.od-plan-structure-details .od-plan-actions {
+  justify-content: flex-start;
+  margin-top: 8px;
 }
 
 .od-plan-actions button,
@@ -3309,6 +3339,12 @@ kbd {
   white-space: nowrap;
 }
 
+.od-plan-rule-summary strong {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
 .od-plan-routing-summary small {
   overflow: hidden;
   color: var(--od-meta);
@@ -3329,8 +3365,8 @@ kbd {
 .od-plan-rule-summary {
   min-width: 0;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, max-content));
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
 }
 
 .od-plan-advanced-body {

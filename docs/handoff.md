@@ -6,11 +6,13 @@ Branch: `main`
 ## Current Integration Session
 
 - Integrating the next local alpha/Desktop polish worktrees into `main`.
-- Merged `4189eb79` (`Audit desktop local alpha polish`) via `Merge desktop polish audit`.
+- Merged `4189eb79` (`Audit desktop local alpha polish`) via `777449e4` (`Merge desktop polish audit`).
+- Merged `d1b9e1f6` (`Thin desktop renderer controller`) via `f2e7a315` (`Merge desktop renderer controller thinning`).
+- Resolving `8de1c787` (`Polish plan and context stages`) via `Merge plan and context stage polish`.
 - Added `docs/desktop-polish-audit.md` with the Desktop local alpha polish audit and stage-level recommendations.
-- Resolving `d1b9e1f6` (`Thin desktop renderer controller`) via `Merge desktop renderer controller thinning`.
-- The controller-thinning branch moves side-effect-free workflow transforms from `App.tsx` into `apps/desktop/src/renderer/workflow/`, adds focused helper tests, and keeps `App.tsx` oriented around state, IPC calls, stage routing, and shell handoffs.
-- Preserved the Desktop shell/sidebar/window-chrome framework so far. `CockpitShell.tsx` was not edited, and no sidebar/window-chrome CSS selectors were changed by the merged branches.
+- Moved side-effect-free workflow transforms from `App.tsx` into `apps/desktop/src/renderer/workflow/`, added focused helper tests, and kept `App.tsx` oriented around state, IPC calls, stage routing, and shell handoffs.
+- Polished Context and Plan/Contracts stage content: Context avoids an irrelevant empty context bundle review in the default ready flow; Plan keeps contract review primary, moves structure edits behind a secondary disclosure, and keeps raw `acceptance_rule` JSON behind Developer details.
+- Preserved the Desktop shell/sidebar/window-chrome framework so far. `CockpitShell.tsx` was not edited, and `cockpit.css` changes remain scoped to non-sidebar stage content.
 
 ## Conflict Resolutions
 
