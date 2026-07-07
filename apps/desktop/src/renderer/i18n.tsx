@@ -1188,6 +1188,7 @@ export const STRINGS = {
   "plan.mergeUp": { en: "Merge up", zh: "向上合并" },
   "plan.mergeDown": { en: "Merge down", zh: "向下合并" },
   "plan.split": { en: "Split", zh: "拆分" },
+  "plan.contractDetails": { en: "Contract details", zh: "契约详情" },
   "plan.contextCandidates_one": { en: "{n} context candidate pending review", zh: "{n} 条上下文候选待审查" },
   "plan.contextCandidates_other": { en: "{n} context candidates pending review", zh: "{n} 条上下文候选待审查" },
   "subAim.title": { en: "Sub-aim title", zh: "子目标标题" },

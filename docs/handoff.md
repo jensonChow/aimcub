@@ -6,9 +6,10 @@ Branch: `main`
 ## Current Session
 
 - Integration session in progress for the next Desktop stage polish batch.
-- Merged `613d2a44` (`Fix desktop stage navigation safe area`) with merge commit `pending`.
-- Merged `aff2943c` (`Focus context blocking question flow`) with merge commit `pending`.
-- Pending merges: Plan contract density and Eval trust disclosure.
+- Merged `613d2a44` (`Fix desktop stage navigation safe area`).
+- Merged `aff2943c` (`Focus context blocking question flow`) via `130c53a` (`Merge context blocking question polish`).
+- Merged `76b70044` (`Reduce plan contract card density`) with merge commit `pending`.
+- Pending merge: Eval trust disclosure.
 - Preserved the tuned Desktop shell/sidebar/window-chrome framework so far. `CockpitShell.tsx` has not been edited, and CSS changes are scoped to stage/workspace content selectors rather than protected sidebar/window selectors.
 
 ## Conflict Resolutions

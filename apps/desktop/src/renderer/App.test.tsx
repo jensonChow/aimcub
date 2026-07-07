@@ -361,7 +361,7 @@ describe("App first-run workspace", () => {
 });
 
 describe("PlanPanel", () => {
-  it("renders contract review fields by default without raw acceptance JSON", () => {
+  it("renders summary-first contract cards by default without raw acceptance JSON", () => {
     const html = renderToStaticMarkup(
       <I18nProvider>
         <PlanPanel
@@ -379,35 +379,106 @@ describe("PlanPanel", () => {
       </I18nProvider>,
     );
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
+    const titleIndex = html.indexOf("Sub-aim title");
+    const routeIndex = html.indexOf("recommend human");
+    const doneIndex = html.indexOf("Done when");
+    const evidenceIndex = html.indexOf("Evidence needed");
+    const rationaleIndex = html.indexOf("Routing rationale");
+    const detailsIndex = html.indexOf("Contract details");
 
     expect(html).toContain("Execution contracts");
     expect(html).toContain("Review each sub-aim, owner, proof, and route.");
-    expect(html).toContain("Sub-aim title");
-    expect(html).toContain("Why this exists");
-    expect(html).toContain("Done when");
-    expect(html).toContain("Evidence needed");
-    expect(html).toContain("Eval signal");
-    expect(html).toContain("The user needs a clear agreement before execution starts.");
+    expect(titleIndex).toBeGreaterThanOrEqual(0);
+    expect(routeIndex).toBeGreaterThan(titleIndex);
+    expect(doneIndex).toBeGreaterThan(routeIndex);
+    expect(evidenceIndex).toBeGreaterThan(doneIndex);
+    expect(rationaleIndex).toBeGreaterThan(evidenceIndex);
     expect(html).toContain("Every sub-aim has a clear owner and evidence standard.");
     expect(html).toContain("Reviewed contract notes.");
-    expect(html).toContain("The saved aim contains reviewed contract terms.");
-    expect(html).toContain("Suggested owner");
-    expect(html).toContain("Selected owner");
-    expect(html).toContain("Routing rationale");
-    expect(html).toContain("Acceptance check");
-    expect(html).toContain("You confirm it is done");
+    expect(html).toContain("Selected owner.");
+    expect(html).toContain("The eval rule requires manual confirmation, so Aimcub recommends a human route.");
+    expect(detailsIndex).toBeGreaterThan(rationaleIndex);
+    expect(html.indexOf("Sub-aim body")).toBeGreaterThan(detailsIndex);
+    expect(html.indexOf("Why this exists")).toBeGreaterThan(detailsIndex);
+    expect(html.indexOf("Eval signal")).toBeGreaterThan(detailsIndex);
+    expect(html).toContain("Routing controls");
     expect(html).toContain("Structure edits");
     expect(html).toContain("Developer details");
     expect(html).toContain("Save aim");
+    expect(html).not.toContain("Acceptance check");
     expect(html).not.toContain("Acceptance rule");
     expect(html).not.toContain("completion_mode");
     expect(html).not.toContain("auto_then_confirm");
     expect(html).not.toContain("manual_confirm");
     expect(html).not.toContain("clauses");
     expect(css).toMatch(/\.od-plan-contract-card\s*{[^}]*border:\s*1px solid var\(--od-border-soft\);[^}]*padding:\s*12px 14px;/s);
-    expect(css).toMatch(/\.od-plan-routing-summary\s*{[^}]*border-top:\s*1px solid var\(--od-border-soft\);[^}]*border-bottom:\s*1px solid var\(--od-border-soft\);/s);
+    expect(css).toMatch(/\.od-plan-contract-summary,\s*\.od-plan-contract-review\s*{[^}]*border-top:\s*1px solid var\(--od-border-soft\);/s);
+    expect(css).toMatch(/\.od-plan-edit-details,\s*\.od-plan-routing-details,\s*\.od-plan-structure-details\s*{[^}]*border-top:\s*1px solid var\(--od-border-soft\);/s);
+    expect(css).toMatch(/\.od-plan-route-chip\s*{[^}]*min-height:\s*26px;[^}]*border:\s*1px solid var\(--od-border-soft\);/s);
     expect(css).toMatch(/\.od-plan-advanced-body\s*{[^}]*border-top:\s*1px solid var\(--od-border-soft\);/s);
-    expect(css).toMatch(/\.od-plan-structure-details\s*{[^}]*border-top:\s*1px solid var\(--od-border-soft\);/s);
+  });
+
+  it("keeps contract, routing, and structure controls collapsed but reachable", () => {
+    const node = contractPlan.nodes[0]!;
+    const html = renderToStaticMarkup(
+      <I18nProvider>
+        <PlanContractCard
+          node={node}
+          index={1}
+          nodeCount={3}
+          editable
+          disabled={false}
+          contract={editableContractForNode(node)}
+          recommendation={routingRecommendationForPlanNode(node)}
+          owner="agent"
+          selectedAgent={routingAgents[0]!}
+          selectedModel="gpt-5"
+          readyAgents={routingAgents}
+          nodeIssues={["Codex CLI needs authentication."]}
+          overrideActive
+          ruleText={formatAcceptanceRule(node.acceptance_rule)}
+          advancedOpen={false}
+          onNode={noop}
+          onContract={noop}
+          onMoveUp={noop}
+          onMoveDown={noop}
+          onMergeUp={noop}
+          onMergeDown={noop}
+          onSplit={noop}
+          onOwner={noop}
+          onAgent={noop}
+          onModel={noop}
+          onRoutingReset={noop}
+          onAdvancedToggle={noop}
+          onRuleText={noop}
+          onRuleCommit={noop}
+        />
+      </I18nProvider>,
+    );
+
+    expect(html).toContain('<details class="od-plan-edit-details">');
+    expect(html).toContain('<details class="od-plan-routing-details">');
+    expect(html).toContain('<details class="od-plan-structure-details">');
+    expect(html).not.toContain('<details class="od-plan-edit-details" open');
+    expect(html).not.toContain('<details class="od-plan-routing-details" open');
+    expect(html).not.toContain('<details class="od-plan-structure-details" open');
+    expect(html).toContain("Sub-aim body");
+    expect(html).toContain("Why this exists");
+    expect(html).toContain("Done when");
+    expect(html).toContain("Evidence needed");
+    expect(html).toContain("Eval signal");
+    expect(html).toContain("Human");
+    expect(html).toContain("Agent");
+    expect(html).toContain("Codex CLI");
+    expect(html).toContain("GPT-5");
+    expect(html).toContain("Use recommendation");
+    expect(html).toContain('aria-label="Move up"');
+    expect(html).toContain('aria-label="Move down"');
+    expect(html).toContain('aria-label="Merge up"');
+    expect(html).toContain('aria-label="Merge down"');
+    expect(html).toContain('aria-label="Split"');
+    expect(html).toContain("Route needs attention");
+    expect(html).toContain("Codex CLI needs authentication.");
   });
 
   it("keeps acceptance rule editing inside Developer details", () => {
@@ -449,6 +520,8 @@ describe("PlanPanel", () => {
     );
 
     expect(html).toContain("Hide developer details");
+    expect(html).toContain("Acceptance check");
+    expect(html).toContain("You confirm it is done");
     expect(html).toContain("Acceptance rule");
     expect(html).toContain("Apply rule");
     expect(html).toContain("completion_mode");
