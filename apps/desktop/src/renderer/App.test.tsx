@@ -7,9 +7,11 @@ import { routingRecommendationForPlanNode, type RoutingRuntimeAgentOption } from
 import type { AimProgressReadModel, DecompositionOutput, Goal, Milestone } from "@core/types";
 import type { ContextSourceStatus, GoalDetail, ProviderStatus, WebResearchStatus } from "../shared/ipc";
 
-import { App, buildSettingsModel, EvidenceSubmissionForm, ExecutePanel, SettingsPanel } from "./App";
+import { App, buildSettingsModel, SettingsPanel } from "./App";
 import { CockpitShell } from "./CockpitShell";
 import { I18nProvider, translate, type I18n } from "./i18n";
+import { EvidenceSubmissionForm } from "./stages/execute/EvidenceSubmissionForm";
+import { ExecutePanel } from "./stages/execute/ExecutePanel";
 import { LocalAgentExecutionSummary } from "./stages/execute/LocalAgentExecutionSummary";
 import { PlanContractCard } from "./stages/plan/PlanContractCard";
 import { PlanPanel } from "./stages/plan/PlanPanel";
@@ -363,6 +365,15 @@ describe("EvidenceSubmissionForm", () => {
 });
 
 describe("ExecutePanel", () => {
+  it("keeps the Execute stage out of the App controller body", () => {
+    const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+
+    expect(source).not.toContain("export function ExecutePanel");
+    expect(source).not.toContain("function ExecutePanel");
+    expect(source).not.toContain('className="od-execute-layout"');
+    expect(source).not.toContain("activeProofId");
+  });
+
   it("renders a selected-work surface with a compact sub-aim selector", () => {
     const html = renderExecute([
       executeRow({ id: AGENT_MILESTONE, title: "Run implementation agent", owner: "agent" }),
