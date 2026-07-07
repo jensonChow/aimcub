@@ -797,8 +797,6 @@ function AimOsApp() {
     + contextReview.decompositionRisks.length;
   const shouldShowContextReviewInContext = clarifyPhase !== "intake"
     && (contextReviewItemCount > 0
-      || Boolean(currentPlanningContext)
-      || Boolean(currentPlanningTools)
       || (mode === "contexting" && Boolean(busy))
       || mode === "drafting");
 

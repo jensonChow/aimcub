@@ -98,7 +98,10 @@ describe("ContextStage", () => {
     });
 
     expect(html).toContain("Continue to Plan");
+    expect(html.match(/Continue to Plan/g)).toHaveLength(1);
     expect(html).toContain('data-od-id="context-workbench-sources"');
     expect(html).not.toContain('data-od-id="context-blocking-question"');
+    expect(html).not.toContain('data-od-id="context-bundle-review"');
+    expect(html).not.toContain("Review context before planning");
   });
 });

@@ -3,6 +3,7 @@ import type { DecompositionContract, PlanNode, PlanRoutingOwner } from "@core/ty
 
 import { useI18n } from "../../i18n";
 import { decompositionOwnerLabel } from "../../labels";
+import { summarizeRule } from "../../summarize";
 
 interface PlanContractCardProps {
   node: PlanNode;
@@ -51,12 +52,8 @@ function RuleSummary({ node }: { node: PlanNode }) {
   return (
     <div className="od-plan-rule-summary">
       <div>
-        <span>{t("plan.ruleMode")}</span>
-        <strong>{node.acceptance_rule.completion_mode}</strong>
-      </div>
-      <div>
-        <span>{t("plan.ruleEvaluators")}</span>
-        <strong>{node.acceptance_rule.clauses.map((clause) => clause.evaluator).join(" + ")}</strong>
+        <span>{t("plan.acceptanceSummary")}</span>
+        <strong>{summarizeRule(node.acceptance_rule)}</strong>
       </div>
     </div>
   );
@@ -83,26 +80,6 @@ export function PlanContractCard(props: PlanContractCardProps) {
               <h3>{props.node.title}</h3>
             </div>
           )}
-
-          {props.editable ? (
-            <div className="od-plan-actions" aria-label={t("plan.structureActions")}>
-              <button type="button" onClick={props.onMoveUp} disabled={props.index === 0}>
-                {t("plan.moveUp")}
-              </button>
-              <button type="button" onClick={props.onMoveDown} disabled={props.index >= props.nodeCount - 1}>
-                {t("plan.moveDown")}
-              </button>
-              <button type="button" onClick={props.onMergeUp} disabled={props.index === 0}>
-                {t("plan.mergeUp")}
-              </button>
-              <button type="button" onClick={props.onMergeDown} disabled={props.index >= props.nodeCount - 1}>
-                {t("plan.mergeDown")}
-              </button>
-              <button type="button" onClick={props.onSplit} disabled={props.nodeCount >= 15}>
-                {t("plan.split")}
-              </button>
-            </div>
-          ) : null}
         </div>
 
         {props.editable ? (
@@ -235,6 +212,29 @@ export function PlanContractCard(props: PlanContractCardProps) {
             </button>
           ) : null}
         </div>
+
+        {props.editable ? (
+          <details className="od-plan-structure-details">
+            <summary>{t("plan.structureActions")}</summary>
+            <div className="od-plan-actions" aria-label={t("plan.structureActions")}>
+              <button type="button" onClick={props.onMoveUp} disabled={props.index === 0}>
+                {t("plan.moveUp")}
+              </button>
+              <button type="button" onClick={props.onMoveDown} disabled={props.index >= props.nodeCount - 1}>
+                {t("plan.moveDown")}
+              </button>
+              <button type="button" onClick={props.onMergeUp} disabled={props.index === 0}>
+                {t("plan.mergeUp")}
+              </button>
+              <button type="button" onClick={props.onMergeDown} disabled={props.index >= props.nodeCount - 1}>
+                {t("plan.mergeDown")}
+              </button>
+              <button type="button" onClick={props.onSplit} disabled={props.nodeCount >= 15}>
+                {t("plan.split")}
+              </button>
+            </div>
+          </details>
+        ) : null}
 
         <div className="od-plan-developer-row">
           <RuleSummary node={props.node} />

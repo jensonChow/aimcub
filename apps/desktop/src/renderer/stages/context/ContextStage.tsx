@@ -4,7 +4,7 @@ import type { ContextSourceStatus } from "../../../shared/ipc";
 import { ContextSourcesPanel } from "../../ContextSourcesPanel";
 import type { ContextBundleReview } from "../../contextReview";
 import { useI18n } from "../../i18n";
-import { primaryButton } from "../../styles";
+import { Button } from "../../ui";
 import { ContextAimSummaryPanel } from "./ContextAimSummaryPanel";
 import { ContextReviewPanel } from "./ContextReviewPanel";
 import type { ClarifyPhase } from "./types";
@@ -71,9 +71,9 @@ export function ContextStage({
       {!hasBlockingQuestion ? clarifyPanel : null}
       {showContinue ? (
         <div className="od-context-continue">
-          <button type="button" disabled={disabled} onClick={onContinueToPlan} style={{ ...primaryButton(disabled), marginTop: 0 }}>
+          <Button variant="primary" size="lg" disabled={disabled} onClick={onContinueToPlan}>
             {t("context.stage.continue")}
-          </button>
+          </Button>
         </div>
       ) : null}
     </>

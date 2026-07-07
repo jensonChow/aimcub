@@ -1,59 +1,49 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-07
-Branch: `main`
+Branch: `codex/polish-plan-context-stages`
 
 ## Current Session
 
-- Integrated the first local alpha/Desktop stabilization batch into `main`.
-- Merged `e8ee7e22` (`Define local alpha contract and golden loop tests`) via `17418a0a`.
-- Merged `0cd2458d` (`Add desktop UI primitives`) via `927dd74e`.
-- Merged `5dbdee93` (`Productize plan contract review`) via `d7cc1960`.
-- Merged `f8cd9f42` (`Simplify context stage flow`) via `352affac`.
-- Merged `c7b75222` (`Clarify eval evidence review`) via `87ed1ff6`.
-- Merged `1d18c905` (`Clarify local agent execution UX`) via `93b966a9`.
-- Added the local alpha contract and golden-loop tests, Desktop UI primitives, Context/Plan/Eval stage components, and Execute local-agent summary.
-- Preserved the Desktop shell/sidebar/window-chrome framework. `CockpitShell.tsx` was not edited; `cockpit.css` changes are scoped to stage content and responsive stage selectors.
-- Ran the `memory-refresh` audit after integration and promoted the Desktop renderer stage-folder/shared-primitive convention into `docs/memory/desktop.md`.
+- Polished only the Desktop Context and Plan/Contracts stage content for the local alpha flow.
+- Preserved the Desktop shell/sidebar/window-chrome framework. `CockpitShell.tsx` was not edited; `cockpit.css` changes are scoped to Plan/Context stage content.
+- Plan/Contracts now keeps sub-aim contract review as the default product surface: sub-aim title, why it exists, done when, evidence needed, eval signal, selected owner, suggested owner, and route rationale stay visible.
+- Plan structure edits are secondary behind a small `Structure edits` disclosure. Move, merge, split, routing overrides, and acceptance-rule editing behavior remain available.
+- Raw `acceptance_rule` JSON stays hidden by default and remains editable under Developer details.
+- Context now avoids showing an irrelevant empty context bundle review in the default ready flow and uses the shared UI button primitive for the single Continue to Plan action.
+- No durable new design rule emerged, so `docs/memory/desktop.md` and `docs/memory/design-system.md` were not changed.
 
-## Conflict Resolutions
+## Changed Files
 
-- `docs/handoff.md`: replaced branch-local handoffs with this integration handoff.
-- `apps/desktop/src/renderer/App.tsx`: kept the stage-folder convention and removed obsolete inline Context, Plan, and Eval component bodies. `App.tsx` is now 2,298 lines versus 3,550 on `origin/main`.
-- `apps/desktop/src/renderer/i18n.tsx`: kept Plan's `Execution contracts` heading while adding Context, Eval, and Execute strings.
-- `apps/desktop/src/renderer/App.test.tsx`: kept Plan contract coverage and local-agent execution summary coverage.
-- `apps/desktop/src/renderer/cockpit.css`: combined Context, Plan, Eval, and Execute responsive selectors without touching sidebar/window-chrome selectors.
+- `apps/desktop/src/renderer/App.tsx`
+- `apps/desktop/src/renderer/stages/context/ContextStage.tsx`
+- `apps/desktop/src/renderer/stages/context/ContextStage.test.tsx`
+- `apps/desktop/src/renderer/stages/plan/PlanContractCard.tsx`
+- `apps/desktop/src/renderer/App.test.tsx`
+- `apps/desktop/src/renderer/cockpit.css`
+- `apps/desktop/src/renderer/i18n.tsx`
+- `docs/handoff.md`
 
 ## Verification
 
 Passed:
 
-- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
-- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
-- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck`
-- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm lint`
-- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm core:purity`
+- `pnpm --filter @app/desktop typecheck`
+- `pnpm --filter @app/desktop test`
 - `git diff --check`
-- `ELECTRON_BUILDER_CACHE=/private/tmp/aimcub-electron-builder-cache COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm desktop:pack`
-- `ditto apps/desktop/dist/mac-arm64/Aimcub.app Aimcub.app`
-- `python3 /Users/jenson/.codex/skills/memory-refresh/scripts/audit_project_memory.py /Users/jenson/Desktop/Aimcub`
 
 Notes:
 
-- MCP worker tests logged the expected missing-Supabase opaque-error path while passing.
-- Root `Aimcub.app` was refreshed from `apps/desktop/dist/mac-arm64/Aimcub.app`.
-- Memory-refresh audit reported root memory line budgets OK and `main` aligned with `origin/main` before the memory refresh update.
+- The first typecheck command hydrated dependencies in this worktree before running `tsc`.
+- Per the explicit parallel-worktree instruction, this session intentionally did not run `pnpm desktop:pack`, did not refresh root `Aimcub.app`, did not push, and did not merge. The integration session will handle full verification and packaging.
 
-## Commit And Push Status
+## Commit Status
 
-- Verification is complete.
-- Final integration commit before push: `1447ee89` (`Stabilize local alpha desktop loop`).
-- `git push origin main` succeeded during this session, publishing `b2db1577..1447ee89`.
-- This handoff status update records the successful push and was pushed as the final status commit.
-- The memory-refresh update follows the integration push; final branch state is authoritative in `git status --short --branch` and `git log --oneline -3`.
+- Intended focused commit message: `Polish plan and context stages`.
+- This handoff is included before the focused commit is created; read the final commit hash from `git log -1 --oneline` after commit creation. A commit cannot contain its own final hash.
 
 ## Next Session Prompt
 
 ```text
-Continue from `main`. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md, then load only task-relevant module memory. Inspect `git status --short --branch` and `git log --oneline -8` first. If push was blocked, request explicit approval before retrying `git push origin main`. Preserve the Desktop shell/sidebar/window-chrome framework exactly unless the user explicitly approves a sidebar change.
+Continue from `codex/polish-plan-context-stages`. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md, then load only task-relevant module memory. Inspect `git status --short --branch` and `git log --oneline -5` first. Do not push, merge, or refresh root Aimcub.app from this parallel worktree unless the user explicitly changes that instruction. Preserve the Desktop shell/sidebar/window-chrome framework exactly unless the user explicitly approves a sidebar change.
 ```
