@@ -302,7 +302,7 @@ If a sidebar/window conflict appears unavoidable, stop and record the conflict i
 - Verify 960x680, 760x600, and 640x520.
 - Keep shell/sidebar/window selectors untouched.
 
-Status: addressed in the stage/workspace CSS pass on 2026-07-07. `.od-main` now owns the compact-width titlebar safe-area offset, and `.od-stage-nav` centers, wraps, and compresses labels without changing the protected shell/sidebar/window selectors. Verification in this parallel worktree is CSS/test based per the no-GUI/no-packaging constraints.
+Status: addressed in the stage/workspace CSS pass on 2026-07-07. `.od-main` now owns the compact-width titlebar safe-area offset, and `.od-stage-nav` centers, wraps, and compresses labels without changing the protected shell/sidebar/window selectors. Final visual inspection remains part of the integration verification.
 
 ### Batch 2: Context Primary Task Cleanup
 
@@ -311,6 +311,8 @@ Status: addressed in the stage/workspace CSS pass on 2026-07-07. `.od-main` now 
 - Move source material and Settings handoff below the active question or behind secondary disclosure.
 - Keep context review only when it supports the current planning state.
 
+Status: addressed on 2026-07-07. Blocking intake now keeps the active question dominant, renders the aim summary compactly, moves source material behind a secondary disclosure, and hides context review while the blocking question is active.
+
 ### Batch 3: Plan Density Pass
 
 - Collapse repeated sub-aim card details into a scannable summary plus expansion.
@@ -318,11 +320,15 @@ Status: addressed in the stage/workspace CSS pass on 2026-07-07. `.od-main` now 
 - Keep Save Aim as the primary action.
 - Keep raw JSON behind Developer details.
 
+Status: addressed on 2026-07-07. Plan cards now default to a summary-first contract review with route, validation, definition of done, required evidence, and rationale visible; detailed edits, routing controls, structure actions, and raw acceptance rules stay behind disclosures.
+
 ### Batch 4: Execute Selected-Work Pattern
 
 - Introduce selected sub-aim detail behavior.
 - Make Run agent / Submit proof / Review in Eval the single state-dependent primary action.
 - Move Break Down and activity details to secondary treatment.
+
+Status: backlog. This integration did not change Execute selected-work behavior.
 
 ### Batch 5: Eval Trust Summary
 
@@ -330,11 +336,15 @@ Status: addressed in the stage/workspace CSS pass on 2026-07-07. `.od-main` now 
 - Collapse detailed evaluator/evidence rows by default when there is no blocker.
 - Hide or compress empty Context Inbox state.
 
+Status: addressed on 2026-07-07. Eval keeps milestone evidence and evaluator details behind secondary disclosures by default, preserves pending Context Inbox review, and omits the large empty inbox block when there are no candidates.
+
 ### Batch 6: Primitive And Grid Cleanup
 
 - Convert newly touched stage content away from inline style helpers.
 - Use shared UI primitives where they match the local surface.
 - Recheck 4px spacing, text fit, focus states, dark/light appearance, and narrow widths.
+
+Status: backlog. This integration kept the polish focused on stage hierarchy and did not run a broad primitive or inline-style cleanup.
 
 ## Verification Notes For Next Pass
 
