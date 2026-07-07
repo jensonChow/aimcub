@@ -3338,6 +3338,48 @@ kbd {
   gap: 8px;
 }
 
+.od-eval-stage-stack,
+.od-eval-panel {
+  max-width: 940px;
+}
+
+.od-eval-stage-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.od-eval-review-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.od-eval-review-stat {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-sm);
+  background: var(--od-surface-warm);
+  padding: 10px 12px;
+}
+
+.od-eval-review-stat span {
+  overflow: hidden;
+  color: var(--od-muted);
+  font-size: var(--od-type-meta);
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.od-eval-review-stat strong {
+  color: var(--od-fg);
+  font-size: var(--od-type-title);
+  line-height: 1.35;
+  font-weight: var(--od-font-weight-strong);
+}
+
 .od-eval-summary {
   display: grid;
   gap: 8px;
@@ -3376,6 +3418,27 @@ kbd {
   border-radius: var(--od-radius-sm);
   background: var(--od-surface-warm);
   padding: 10px;
+}
+
+.od-eval-review-section {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--od-border-soft);
+  padding-top: 10px;
+}
+
+.od-eval-card-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.od-eval-card-section-title span {
+  color: var(--od-muted);
+  font-size: var(--od-type-meta);
+  line-height: 1.35;
+  font-weight: var(--od-font-weight-semibold);
 }
 
 .od-evaluator-head {
@@ -4461,6 +4524,7 @@ kbd {
   .od-recap-grid,
   .od-work-card,
   .od-eval-summary,
+  .od-eval-review-strip,
   .od-work-detail-grid,
   .od-plan-card,
   .od-plan-card-head,

@@ -1,55 +1,47 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-07
-Branch: `main`
+Branch: detached parallel worktree
 
 ## Current Session
 
-- Continued moving Desktop Settings toward the Codex settings reference.
-- Added a Codex-like inline magnifying-glass icon to the Settings sidebar search field, aligned to the shared sidebar icon column.
-- Updated the Settings search input height, radius, and left padding so placeholder text aligns with Settings nav labels.
-- Restyled Settings detail row groups into thin bordered rounded control panels with internal dividers, matching the Codex control-panel pattern without adding decorative cards.
-- Changed selected Settings nav rows to a quiet Codex-like gray fill and removed the blue active rail while preserving readiness status dots.
-- Expanded the Settings workspace to a Codex-like 1080 px control-panel width while leaving header copy width constrained.
-- Reduced Settings detail row visual noise by rendering status as muted text plus a tiny readiness dot and turning row actions into quiet gray control surfaces.
-- Added renderer CSS assertions for the Settings search icon, search text alignment, bordered row groups, row padding, final-row divider removal, muted status-dot row controls, rail-free selected nav state, and wider Settings workspace.
-- Updated `docs/memory/design-system.md` and `docs/memory/desktop.md` with the durable Codex-like Settings search, row-group, selected-nav, row-control, and workspace-width requirements.
-- Refreshed root `Aimcub.app` from the latest Electron 43 folder-style Desktop build after verification.
-- Ran the project memory refresh audit and corrected the next-session prompt to reflect the current local ahead/push-approval state.
+- Refactored the Desktop Eval stage out of `apps/desktop/src/renderer/App.tsx` into `apps/desktop/src/renderer/stages/eval/EvalStage.tsx`.
+- Kept the shell/sidebar/window-chrome framework untouched. CSS changes are scoped to Eval, evidence, recap, and context-review stage surfaces.
+- Added an Eval review strip for missing rule matches, low-trust evidence, and pending context candidates.
+- Split Eval rendering into focused components for milestone review, evaluator/rule matches, evidence review rows, completion recap, and context candidate review.
+- Preserved evidence row details: summary/title, kind, timestamp, trust score, matched rule/evaluator indexes, matched/unmatched/low-trust status, and review note.
+- Kept Context Inbox in the Eval flow, including after a completion recap appears, so pending candidates still support accept/reject/edit/scope review.
+- Kept completion recap factual and compact: final outcome, completed sub-aims, passing evidence, eval result, learned context, and future reuse.
+- Updated `apps/desktop/src/renderer/i18n.tsx` with Eval review labels.
+- Updated `docs/memory/design-system.md` with the durable Eval trust-center requirement.
+- Added `apps/desktop/src/renderer/stages/eval/EvalStage.test.tsx` for Eval evidence/trust/context rendering and scoped CSS assertions.
 
-## Current State
+## Changed Files
 
-- Work happened directly on `main`; no separate feature branch merge is needed.
-- Local `main` is ahead of `origin/main` by 1 focused commit: `Refine settings controls toward Codex`; inspect `git log` for the exact hash.
-- Push to `origin/main` was blocked by approval review because publishing to the external default branch needs explicit user approval. Do not retry push until the user approves it.
-- Root `Aimcub.app`, `apps/desktop/out`, and `apps/desktop/dist` were refreshed locally and remain ignored build artifacts.
+- `apps/desktop/src/renderer/App.tsx`
+- `apps/desktop/src/renderer/stages/eval/EvalStage.tsx`
+- `apps/desktop/src/renderer/stages/eval/EvalStage.test.tsx`
+- `apps/desktop/src/renderer/cockpit.css`
+- `apps/desktop/src/renderer/i18n.tsx`
+- `docs/memory/design-system.md`
+- `docs/handoff.md`
 
 ## Verification
 
 Passed:
 
-- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop test`
-- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop typecheck`
-- `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
-- `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
-- `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck`
-- `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm lint`
-- `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm core:purity`
+- `pnpm --filter @app/desktop typecheck`
+- `pnpm --filter @app/desktop test`
 - `git diff --check`
-- `ELECTRON_BUILDER_CACHE=/private/tmp/aimcub-electron-builder-cache COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm desktop:pack`
-- `ditto apps/desktop/dist/mac-arm64/Aimcub.app Aimcub.app`
 
 Notes:
 
-- MCP worker tests logged the expected missing-Supabase opaque-error path while passing.
-- The first `pnpm build` attempt hit a Corepack registry timeout inside the sandbox; rerunning with approved network escalation succeeded.
-- The first `pnpm desktop:pack` attempt was blocked by sandboxed Electron cache writes under `~/Library/Caches/electron`; rerunning with approved escalation succeeded.
-- The latest `pnpm desktop:pack` run completed without additional escalation.
-- `git push origin main` was attempted once and blocked by approval review. The local focused commit remains unpushed.
+- The first desktop typecheck caught that Execute still used the compact evidence review list. `EvidenceReviewList` is now exported from the Eval stage module and reused by Execute.
+- The user explicitly opted out of push, merge, and root `Aimcub.app` refresh in this parallel worktree. Do not push, merge, or run `pnpm desktop:pack`; the integration session will handle full verification and packaging.
+- Local commit message planned: `Clarify eval evidence review`. The final commit hash is produced after this handoff is committed and should be reported by the session that creates it.
 
 ## Next Session Prompt
 
 ```text
-Continue from `main`. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md, then load only task-relevant module memory. For repo-changing sessions, run the full verification suite, refresh root Aimcub.app from the packaged Desktop output, update docs/handoff.md, create a focused commit, push, and merge completed branch work into main unless the user explicitly opts out.
-Current `main` is expected to be ahead of `origin/main` by 1 local commit, `Refine settings controls toward Codex`, unless the user has explicitly approved and completed the push. Do not retry `git push origin main` without explicit user approval; inspect `git status --short --branch` and `git log --oneline -3` before continuing.
+Continue from this detached parallel worktree. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md, then load only task-relevant memory. This worktree intentionally did not push, merge, or refresh root Aimcub.app because integration will handle it. Verify the focused Eval-stage commit, then integrate from the resulting local commit as needed.
 ```
