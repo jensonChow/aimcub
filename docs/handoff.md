@@ -5,6 +5,10 @@ Branch: `main`
 
 ## Current Session
 
+- Ran the `memory-refresh` workflow after the Desktop polish integration.
+- `python3 /Users/jenson/.codex/skills/memory-refresh/scripts/audit_project_memory.py /Users/jenson/Desktop/Aimcub` reported root memory line budgets OK and identified `docs/memory/desktop.md` plus `docs/memory/operations.md` as candidate memories.
+- Promoted the integrated stage polish defaults into `docs/memory/desktop.md`: Context ready-flow behavior, Plan/Contracts structure and Developer details treatment, Execute next-action/runtime detail split, Eval trust-summary/detail disclosure behavior, and `docs/desktop-polish-audit.md` as the current polish backlog.
+- No `docs/memory/operations.md` change was needed; its verification, packaging, and handoff protocol still matches the current repo process.
 - Integrated the next local alpha/Desktop polish worktrees into `main`.
 - Merged `4189eb79` (`Audit desktop local alpha polish`) via `777449e4` (`Merge desktop polish audit`).
 - Merged `d1b9e1f6` (`Thin desktop renderer controller`) via `f2e7a315` (`Merge desktop renderer controller thinning`).
@@ -20,6 +24,7 @@ Branch: `main`
 - `docs/handoff.md`: replaced parallel branch-local handoffs with this integration handoff in each merge.
 - No renderer code conflicts remained after Git auto-merged `App.tsx`, `App.test.tsx`, `i18n.tsx`, and `cockpit.css`.
 - Sidebar/window-chrome protection check passed: no `CockpitShell.tsx` diff, no `.od-sidebar*`, `.od-user-menu-*`, `.od-window-drag-strip`, `.od-sidebar-hover-zone`, `.od-sidebar-peek-trigger`, `.od-sidebar-toggle`, or `.od-sidebar-resizer` selector changes.
+- Memory refresh added only durable Desktop memory and this handoff update.
 
 ## Verification
 
@@ -34,12 +39,14 @@ Passed:
 - `ELECTRON_BUILDER_CACHE=/private/tmp/aimcub-electron-builder-cache COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm desktop:pack`
 - `ditto apps/desktop/dist/mac-arm64/Aimcub.app Aimcub.app`
 - `plutil -p Aimcub.app/Contents/Info.plist`
+- `python3 /Users/jenson/.codex/skills/memory-refresh/scripts/audit_project_memory.py /Users/jenson/Desktop/Aimcub`
 
 Notes:
 
 - MCP worker tests logged the expected missing-Supabase opaque-error path while passing.
 - Root `Aimcub.app` was refreshed from `apps/desktop/dist/mac-arm64/Aimcub.app`.
 - Visual app launch/resizing was not run in this integration session; the packaged app bundle was inspected through `Info.plist`.
+- Memory-refresh verification passed after the latest docs update: build, test, typecheck, lint, core purity, `git diff --check`, memory audit, `desktop:pack`, and root app refresh.
 
 ## Commit And Push Status
 
@@ -47,6 +54,7 @@ Notes:
 - Integration handoff commit before push: `5f281f12` (`Refresh desktop polish integration handoff`).
 - `git push origin main` succeeded, publishing `a632a3d5..5f281f12`.
 - This handoff status update records the successful push and should be the final status commit for this integration round.
+- Memory-refresh commit/push is pending after the latest docs update.
 - Final branch state is authoritative in `git status --short --branch` and `git log --oneline -6`.
 
 ## Next Session Prompt
