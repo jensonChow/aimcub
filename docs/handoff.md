@@ -5,22 +5,15 @@ Branch: `main`
 
 ## Current Session
 
-- Completed the Desktop stage polish integration on `main`; branch work was merged locally and is ready for push after the final handoff/audit commit.
-- Merged `613d2a44` (`Fix desktop stage navigation safe area`) via `77a643a7`.
-- Merged `aff2943c` (`Focus context blocking question flow`) via `130c53a0`.
-- Merged `76b70044` (`Reduce plan contract card density`) via `8f7ac89c`.
-- Merged `5053e57d` (`Refine eval trust disclosure`) via `660d9f4c`.
-- Preserved the tuned Desktop shell/sidebar/window-chrome framework. `CockpitShell.tsx` was not edited, and CSS changes stayed scoped to stage/workspace content selectors rather than protected sidebar/window selectors.
-- Updated `docs/desktop-polish-audit.md` to mark batches 1, 2, 3, and 5 addressed; batches 4 and 6 remain backlog.
-
-## Conflict Resolutions
-
-- `docs/handoff.md`: replaced parallel worktree transfer notes with this integration handoff.
-- `docs/memory/desktop.md`: combined the Plan summary-first durable rule with the Eval empty-inbox durable rule so both decisions remain documented.
+- Ran the `memory-refresh` audit after the Desktop stage-polish integration landed on `main`.
+- Confirmed root memory files remain within contract: `AGENTS.md` is 34 lines and `CLAUDE.md` is 34 lines.
+- Confirmed durable stage-polish decisions are already recorded in `docs/memory/desktop.md` and `docs/memory/design-system.md`.
+- Replaced the prior integration transfer note with this current memory-refresh handoff so `docs/handoff.md` stays session-scoped.
+- No code changes were made in this memory-refresh session.
 
 ## Verification
 
-Passed in this integration session:
+Passed in this memory-refresh session:
 
 - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
 - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
@@ -30,30 +23,21 @@ Passed in this integration session:
 - `git diff --check`
 - `ELECTRON_BUILDER_CACHE=/private/tmp/aimcub-electron-builder-cache COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm desktop:pack`
 - `ditto apps/desktop/dist/mac-arm64/Aimcub.app Aimcub.app`
-- `plutil -p Aimcub.app/Contents/Info.plist`
 
 Notes:
 
-- The test suite emitted the expected MCP worker opaque-error log for the missing Supabase path while still passing.
-- The packaged bundle identifies as `com.aimcub.desktop`, version `0.0.0`, with Electron asar integrity present.
-- The first live packaged-app Context attempt used the local Codex gateway and failed with `Local CLI returned no output`; the visual flow was then inspected with an isolated deterministic mock through `CODEX_BIN` and `AIMCUB_HOME=/tmp/aimcub-integration-visual`.
-
-## Visual Inspection
-
-Packaged app inspection used the refreshed root `Aimcub.app` with isolated state under `/tmp/aimcub-integration-visual`.
-
-- Shell/sidebar/window chrome: native traffic lights, sidebar toggle, pinned sidebar, and sidebar expansion remained intact. Expanding the sidebar pushed workspace content rather than overlaying it.
-- Stage navigation: no collision with titlebar controls at approximately 960x680, 760x600, or 640x520. The stage pills wrapped into centered rows at compact widths without horizontal overflow.
-- Context: the active blocking question was the dominant task; source material and settings stayed secondary. The ready state exposed the expected continue-to-Plan action after the saved aim reloaded.
-- Plan: summary-first contract cards were scannable at compact width. Owner, completion condition, required evidence, and routing rationale stayed visible; contract details, routing controls, structure edits, and developer details stayed collapsed.
-- Execute: existing selected-work behavior was not changed. The seeded goal showed trusted, low-trust, and missing evidence states without introducing shell or navigation regressions.
-- Eval: compact review cards showed trust, rule status, pass/fail reasoning, and next action. Pending context candidates rendered as an inbox; after rejecting the isolated candidates, the no-pending state omitted the large empty inbox block and the candidate metric read `0`.
+- The test suite replayed the expected MCP missing-Supabase opaque-error logs while still passing.
+- Desktop packaging used Electron 43.0.0, the default Electron icon, and unsigned directory packaging.
 
 ## Commit And Push Status
 
-- Final integration commit: `ee67363f` (`Polish desktop stage first viewport`).
-- Pushed `main` to `origin/main` after the final integration commit.
-- This status-only handoff update records the push outcome and should be the final session commit.
+- Working directly on `main`; no separate branch merge is needed.
+- Commit and push are pending for this handoff-only memory refresh.
+
+## Open Items
+
+- Desktop polish backlog remains in `docs/desktop-polish-audit.md`: Execute selected-work pattern and primitive/grid cleanup are still backlog.
+- The last packaged-app visual run used a deterministic mock because the local Codex gateway returned no output in the isolated visual profile.
 
 ## Next Session Prompt
 
