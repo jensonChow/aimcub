@@ -156,6 +156,102 @@ const ROUTED_PLAN = {
   ],
 } as DecompositionOutput;
 
+type PlanAcceptanceRule = DecompositionOutput["nodes"][number]["acceptance_rule"];
+type PlanContract = NonNullable<DecompositionOutput["nodes"][number]["decomposition_contract"]>;
+type PlanNode = DecompositionOutput["nodes"][number];
+
+function commitRule(messagePattern: string, minFiles = 1): PlanAcceptanceRule {
+  return {
+    logic: "all",
+    threshold: 1,
+    completion_mode: "auto_then_confirm",
+    clauses: [{ evaluator: "commit_pattern", auto_verifiable: true, match: { message_pattern: messagePattern, min_files: minFiles } }],
+  };
+}
+
+function manualRule(): PlanAcceptanceRule {
+  return {
+    logic: "all",
+    threshold: 1,
+    completion_mode: "manual",
+    clauses: [{ evaluator: "manual_confirm", auto_verifiable: false, match: {} }],
+  };
+}
+
+function localAlphaContract(input: {
+  why: string;
+  definitionOfDone: string;
+  requiredEvidence: string[];
+  likelyOwner: PlanContract["likely_owner"];
+  evalSignal: string;
+}): PlanContract {
+  return {
+    why: input.why,
+    definition_of_done: input.definitionOfDone,
+    required_evidence: input.requiredEvidence,
+    likely_owner: input.likelyOwner,
+    context_gaps: [],
+    eval_signal: input.evalSignal,
+  };
+}
+
+function localAlphaNode(input: {
+  key: string;
+  title: string;
+  description: string;
+  acceptanceRule: PlanAcceptanceRule;
+  contract: PlanContract;
+  effort?: PlanNode["est_effort"];
+  xp?: number;
+}): PlanNode {
+  return {
+    key: input.key,
+    title: input.title,
+    description: input.description,
+    est_effort: input.effort ?? "m",
+    xp_reward: input.xp ?? 10,
+    acceptance_rule: input.acceptanceRule,
+    decomposition_contract: input.contract,
+  };
+}
+
+function localAlphaPlan(): DecompositionOutput {
+  return {
+    goal_summary: "Ship the local alpha contract and proof loop",
+    domain: "software",
+    rationale: "First lock the docs and tests, then require human scope approval.",
+    nodes: [
+      localAlphaNode({
+        key: "lock-loop",
+        title: "Lock the local alpha golden loop",
+        description: "Update docs and tests that prove the local alpha loop.",
+        acceptanceRule: commitRule("local alpha", 2),
+        contract: localAlphaContract({
+          why: "Docs and tests are local, digital work that a local agent can produce.",
+          definitionOfDone: "The local alpha contract exists and core/store tests cover the golden loop.",
+          requiredEvidence: ["Trusted commit touching docs and tests."],
+          likelyOwner: "agent",
+          evalSignal: "Done means trusted code evidence proves the local alpha loop is locked.",
+        }),
+      }),
+      localAlphaNode({
+        key: "approve-scope",
+        title: "Approve local alpha scope",
+        description: "Confirm the alpha non-goals and proof are acceptable.",
+        acceptanceRule: manualRule(),
+        contract: localAlphaContract({
+          why: "The final scope call depends on human judgment.",
+          definitionOfDone: "The user approves the alpha contract, non-goals, and proof.",
+          requiredEvidence: ["Approval note."],
+          likelyOwner: "human",
+          evalSignal: "Done means human approval is recorded as manual proof.",
+        }),
+      }),
+    ],
+    edges: [{ from: "lock-loop", to: "approve-scope" }],
+  };
+}
+
 function freshStore() {
   const dir = mkdtempSync(join(tmpdir(), "aimcub-store-"));
   return createJsonFileStore(dir);
@@ -625,6 +721,171 @@ describe("createJsonFileStore · memories/context", () => {
     expect(active.status).toBe("active");
     expect(active.confidence).toBe(1);
     expect((await store.listMemories()).map((m) => m.id)).toContain(memory.id);
+  });
+});
+
+describe("createJsonFileStore · local alpha golden loop", () => {
+  it("replays one local aim from context intake through reusable memory", async () => {
+    const store = freshStore();
+    const agent = await store.addActor({
+      kind: "agent",
+      displayName: "Codex CLI",
+      capabilities: ["software"],
+      model: "gpt-5",
+    });
+    const human = await store.addActor({
+      kind: "human",
+      displayName: "Jenson",
+      capabilities: ["human_judgment"],
+    });
+
+    const trace = await store.recordToolTrace({
+      toolName: "local.scan_workspace",
+      status: "succeeded",
+      summary: "Read local alpha docs and core/store surfaces.",
+      sources: [{ path: "docs/v1-spec.md" }, { path: "packages/store/src/index.ts" }],
+    });
+    const intake = await store.createContextIntakeSession({
+      aimTitle: "Ship local alpha contract",
+      aimDescription: "Make the open-source alpha loop explicit and tested.",
+      readiness: "ready",
+      toolTraceIds: [trace.id],
+    });
+
+    expect(intake.status).toBe("ready");
+    expect(intake.can_continue).toBe(true);
+    expect(intake.tool_trace_ids).toEqual([trace.id]);
+
+    const { goal, milestones } = await store.createGoal({
+      title: "Ship local alpha contract",
+      description: "Make the open-source local alpha contract explicit and tested.",
+      plan: localAlphaPlan(),
+      memories: [{
+        content: "Constraint: Local alpha must not depend on hosted sync or vector memory.",
+        category: "constraint",
+      }],
+    });
+    const [agentMilestone, humanMilestone] = milestones;
+    expect(agentMilestone?.metadata.decomposition_contract).toMatchObject({
+      required_evidence: ["Trusted commit touching docs and tests."],
+      likely_owner: "agent",
+    });
+    expect(humanMilestone?.metadata.decomposition_contract).toMatchObject({
+      required_evidence: ["Approval note."],
+      likely_owner: "human",
+    });
+
+    const assignments = await store.listAssignments(goal.id);
+    const agentAssignment = assignments.find((row) => row.milestone_id === agentMilestone?.id);
+    const humanAssignment = assignments.find((row) => row.milestone_id === humanMilestone?.id);
+    expect(agentAssignment).toMatchObject({
+      actor_kind: "agent",
+      actor_id: agent.id,
+      source: "routing",
+    });
+    expect(humanAssignment).toMatchObject({
+      actor_kind: "human",
+      actor_id: human.id,
+      source: "routing",
+    });
+
+    const run = await store.createRun({
+      goalId: goal.id,
+      milestoneId: agentMilestone!.id,
+      assignmentId: agentAssignment!.id,
+      actorKind: "agent",
+      actorId: agent.id,
+      status: "running",
+      sandbox: "workspace-write",
+      model: "gpt-5",
+      summary: "Codex is updating docs and tests.",
+    });
+    await store.appendRunEvent({
+      runId: run.id,
+      type: "tool.finished",
+      summary: "Narrow alpha tests completed.",
+      payload: { command: "pnpm --filter @core/store test" },
+    });
+    await store.finishRun({
+      runId: run.id,
+      status: "completed",
+      summary: "Updated the local alpha contract and golden-loop tests.",
+    });
+    const auto = await store.addEvidence({
+      goalId: goal.id,
+      milestoneId: agentMilestone!.id,
+      emitterId: "00000000-0000-4000-8000-0000000000aa",
+      kind: "git_commit",
+      sourceEventId: "local-alpha-proof",
+      summary: "local alpha docs and tests",
+      payload: {
+        sha: "local-alpha-proof",
+        message: "local alpha docs and tests",
+        files: ["docs/local-alpha.md", "packages/store/src/store.test.ts"],
+      },
+      trustScore: 1,
+      runId: run.id,
+      assignmentId: agentAssignment!.id,
+    });
+
+    expect(auto.deduped).toBe(false);
+    expect(auto.completions).toMatchObject([{ milestone_id: agentMilestone!.id, decided_by: "rule_auto" }]);
+
+    const afterAgent = await store.getAimProgress(goal.id);
+    const agentRow = afterAgent?.milestones.find((row) => row.milestone.id === agentMilestone!.id);
+    expect(afterAgent?.next_action).toBe("Collect human proof and confirm completion.");
+    expect(agentRow?.evidence[0]).toMatchObject({
+      evidence: { id: auto.evidence.id, summary: "local alpha docs and tests" },
+      status: "matched",
+      rule_matches: [{ clause_index: 0, evaluator: "commit_pattern" }],
+    });
+
+    const manual = await store.confirmMilestone({
+      goalId: goal.id,
+      milestoneId: humanMilestone!.id,
+      proofNote: "Reviewed and approved the local alpha contract, non-goals, and proof loop.",
+      requiredEvidence: [{ text: "Approval note.", satisfied: true }],
+    });
+    const saved = await store.getGoal(goal.id);
+
+    expect(manual?.evidence?.kind).toBe("manual_check");
+    expect(manual?.completion).toMatchObject({ milestone_id: humanMilestone!.id, decided_by: "user_confirm" });
+    expect(saved?.milestones.every((milestone) => milestone.status === "completed")).toBe(true);
+
+    const candidates = await store.sedimentContextFromGoal(goal.id);
+    expect(candidates).toEqual(expect.arrayContaining([
+      expect.objectContaining({ status: "pending", category: "eval_signal" }),
+      expect.objectContaining({ status: "pending", category: "procedure", goal_id: goal.id }),
+    ]));
+
+    const withCandidates = await store.getAimProgress(goal.id);
+    expect(withCandidates?.context_candidates.length).toBeGreaterThanOrEqual(2);
+
+    const reusable = candidates.find((candidate) => candidate.goal_id === null && candidate.category === "eval_signal")!;
+    const scopedProcedure = candidates.find((candidate) => candidate.goal_id === goal.id && candidate.category === "procedure")!;
+    const acceptedGlobal = await store.acceptMemoryCandidate({
+      id: reusable.id,
+      content: "Eval signal: Local alpha work is complete only when docs, tests, and human proof agree.",
+      goalId: null,
+    });
+    const acceptedProcedure = await store.acceptMemoryCandidate({
+      id: scopedProcedure.id,
+      content: "Procedure: For local alpha changes, update docs and golden-loop tests before handoff.",
+      goalId: goal.id,
+    });
+    const complete = await store.getAimProgress(goal.id);
+
+    expect(await store.listMemories()).toContainEqual(expect.objectContaining({
+      id: acceptedGlobal!.id,
+      goal_id: null,
+      status: "active",
+    }));
+    expect(complete?.next_action).toBe("Aim is complete.");
+    expect(complete?.completion_recap?.learned_context).toContainEqual(expect.objectContaining({
+      id: acceptedProcedure!.id,
+      status: "active",
+      scope: "aim",
+    }));
   });
 });
 
