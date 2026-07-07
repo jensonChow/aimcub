@@ -3,17 +3,12 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 import {
   validateExecutablePlan,
   validatePlanRouting,
-  type AimIntakeReport,
   type AimProgressReadModel,
-  type PlanRoutingValidation,
-  type RoutingRuntimeAgentOption,
 } from "@core/domain";
-import type { ClarifyAnswer, ClarifyOutput, ClarifyQuestion, ClarifySelectionMode } from "@core/llm";
+import type { ClarifyAnswer, ClarifyOutput } from "@core/llm";
 import type {
-  ContextCategory,
   DecompositionOutput,
   Goal,
-  ManualEvidenceRequiredItem,
   Memory,
   Milestone,
 } from "@core/types";
@@ -61,278 +56,42 @@ import { EvalStage, EvidenceReviewList } from "./stages/eval/EvalStage";
 import { WebResearchForm } from "./WebResearchForm";
 import { LocalAgentExecutionSummary } from "./stages/execute/LocalAgentExecutionSummary";
 import { PlanPanel } from "./stages/plan/PlanPanel";
+import { Button, Panel } from "./ui";
 import { C, TYPE, WEIGHT, inputStyle, primaryButton } from "./styles";
+import {
+  emptyEvidenceDraft,
+  evidenceDraftIsSubmittable,
+  evidenceSubmissionPayload,
+  proofUrlsFromDraft,
+  type EvidenceSubmissionDraft,
+} from "./workflow/evidenceSubmission";
+import {
+  answersFor,
+  buildDescriptionWithContext,
+  hasCjkText,
+  intakeToClarifyOutput,
+  shouldBlockForIntake,
+} from "./workflow/intakeClarify";
+import { createPlanningRunId, latestLiveValue } from "./workflow/planningLiveEvents";
+import { formatRoutingValidation, routingAgentsFromDetections } from "./workflow/routingAgents";
+import {
+  cockpitStageFor,
+  pct,
+  planNodeForMilestone,
+  progressRows,
+  type AppMode,
+} from "./workflow/stageRouting";
+import {
+  buildSettingsModel,
+  settingsSectionForFocus,
+  type SettingsHelper,
+  type SettingsHelperTone,
+  type SettingsModel,
+  type SettingsSectionId,
+} from "./workflow/settingsModel";
+import { shortText } from "./workflow/text";
 
-type AppMode = "cockpit" | "contexting" | "drafting" | "answering" | "reviewing" | "settings";
-type ProgressMilestoneRow = AimProgressReadModel["milestones"][number];
-type EvidenceSubmissionDraft = {
-  proofNote: string;
-  url: string;
-  filePaths: string[];
-  requiredEvidence: ManualEvidenceRequiredItem[];
-};
-
-function shortText(value: string | undefined | null, max = 120): string {
-  const cleaned = (value ?? "").replace(/\s+/g, " ").trim();
-  if (cleaned.length <= max) return cleaned;
-  return `${cleaned.slice(0, max - 1).trim()}…`;
-}
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
-}
-
-function stringArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
-}
-
-function requiredEvidenceForMilestone(milestone: Milestone): string[] {
-  const contract = asRecord(milestone.metadata?.decomposition_contract);
-  return stringArray(contract?.required_evidence);
-}
-
-function emptyEvidenceDraft(milestone: Milestone): EvidenceSubmissionDraft {
-  return {
-    proofNote: "",
-    url: "",
-    filePaths: [],
-    requiredEvidence: requiredEvidenceForMilestone(milestone).map((text) => ({ text, satisfied: false })),
-  };
-}
-
-function proofUrlsFromDraft(url: string): string[] {
-  return url.split(/[\n,]+/).map((item) => item.trim()).filter(Boolean);
-}
-
-function evidenceDraftIsSubmittable(draft: EvidenceSubmissionDraft): boolean {
-  const hasProof = draft.proofNote.trim().length > 0 || proofUrlsFromDraft(draft.url).length > 0 || draft.filePaths.length > 0;
-  const requiredOk = draft.requiredEvidence.length === 0 || draft.requiredEvidence.some((item) => item.satisfied);
-  return hasProof && requiredOk;
-}
-
-function evidenceSubmissionPayload(
-  draft: EvidenceSubmissionDraft,
-): Omit<ConfirmMilestoneRequest, "goalId" | "milestoneId"> {
-  return {
-    proofNote: draft.proofNote.trim(),
-    urls: proofUrlsFromDraft(draft.url),
-    filePaths: draft.filePaths,
-    requiredEvidence: draft.requiredEvidence,
-  };
-}
-
-function pct(done: number, total: number): number {
-  return total <= 0 ? 0 : Math.round((done / total) * 100);
-}
-
-function planNodeForMilestone(plan: DecompositionOutput | null | undefined, milestone: Milestone) {
-  const key = typeof milestone.metadata?.plan_key === "string" ? milestone.metadata.plan_key : null;
-  return plan?.nodes.find((node) => node.key === key) ?? plan?.nodes.find((node) => node.title === milestone.title) ?? null;
-}
-
-function createPlanningRunId(): string {
-  return globalThis.crypto?.randomUUID?.() ?? `renderer:${Date.now()}:${Math.random().toString(36).slice(2)}`;
-}
-
-function hasCjkText(value: string): boolean {
-  return /[\u3400-\u9fff]/.test(value);
-}
-
-function intakeQuestionKind(category: ContextCategory): ClarifyQuestion["kind"] {
-  if (category === "capability") return "capability";
-  if (category === "constraint") return "constraint";
-  if (category === "preference") return "scope";
-  return "assumption";
-}
-
-function intakeQuestionDimension(category: ContextCategory): ClarifyQuestion["source_dimension"] {
-  if (category === "eval_signal" || category === "procedure") return "verifiability";
-  if (category === "constraint") return "granularity";
-  return "context_fit";
-}
-
-function intakeQuestionSelectionMode(category: ContextCategory): ClarifySelectionMode {
-  return category === "preference" ? "single" : "multiple";
-}
-
-function intakeOptions(category: ContextCategory, zh: boolean): ClarifyQuestion["options"] {
-  if (zh) {
-    switch (category) {
-      case "eval_signal":
-        return [
-          { label: "自动证据", tradeoff: "后续进度可以尽量由 CI、文件或运行结果证明。" },
-          { label: "人工确认", tradeoff: "保留主观验收，但需要你最终确认。" },
-          { label: "可交付物", tradeoff: "用明确产物作为完成标准。" },
-        ];
-      case "constraint":
-        return [
-          { label: "账号/权限前置", tradeoff: "会先处理开发者账号、授权、凭证或审批。" },
-          { label: "平台/工具限制", tradeoff: "会影响技术路线和执行方式。" },
-          { label: "时间/预算限制", tradeoff: "会影响里程碑粒度和取舍。" },
-          { label: "隐私/质量限制", tradeoff: "会影响验收标准和可委派范围。" },
-        ];
-      case "procedure":
-        return [
-          { label: "已有工作流", tradeoff: "计划会复用现有步骤和命令。" },
-          { label: "已有材料", tradeoff: "需要先读材料再拆目标。" },
-          { label: "需要新流程", tradeoff: "计划会包含流程定义。" },
-        ];
-      case "capability":
-        return [
-          { label: "agent 可执行", tradeoff: "数字化工作优先交给 agent。" },
-          { label: "我有领域经验", tradeoff: "计划会复用你的经验、品味和判断。" },
-          { label: "需要你决策", tradeoff: "关键选择会保留给人。" },
-          { label: "需要外部专家/素材", tradeoff: "计划会先处理专业输入、access 或素材。" },
-        ];
-      case "project_fact":
-        return [
-          { label: "用户/场景明确", tradeoff: "可以围绕真实使用场景拆分。" },
-          { label: "目标范围已明确", tradeoff: "可以更快拆分。" },
-          { label: "当前状态需要检查", tradeoff: "先收集现状再拆分。" },
-          { label: "交付形式待定", tradeoff: "需要先确定产物。" },
-        ];
-      case "preference":
-        return [
-          { label: "速度优先", tradeoff: "计划会偏向较小可交付版本。" },
-          { label: "质量优先", tradeoff: "计划会加入更多验证步骤。" },
-        ];
-    }
-  }
-
-  switch (category) {
-    case "eval_signal":
-      return [
-        { label: "Automated evidence", tradeoff: "Progress can be proven by CI, files, or run results." },
-        { label: "Manual approval", tradeoff: "Subjective acceptance stays with you." },
-        { label: "Deliverable artifact", tradeoff: "Completion is tied to a concrete artifact." },
-      ];
-    case "constraint":
-      return [
-        { label: "Account/access prerequisites", tradeoff: "Developer accounts, credentials, approvals, or permissions become prerequisites." },
-        { label: "Platform/tool limits", tradeoff: "Changes the technical route and execution surface." },
-        { label: "Time/budget limits", tradeoff: "Changes milestone size and tradeoffs." },
-        { label: "Privacy/quality limits", tradeoff: "Changes acceptance rules and delegation." },
-      ];
-    case "procedure":
-      return [
-        { label: "Existing workflow", tradeoff: "The plan should reuse known steps and commands." },
-        { label: "Existing materials", tradeoff: "Aimcub should inspect source material before planning." },
-        { label: "New procedure needed", tradeoff: "The plan should include defining the workflow." },
-      ];
-    case "capability":
-      return [
-        { label: "Agent can execute", tradeoff: "Digital work should route to an agent first." },
-        { label: "I have domain expertise", tradeoff: "The plan should reuse your experience, taste, and judgment." },
-        { label: "You must decide", tradeoff: "Key decisions should stay human-owned." },
-        { label: "External expert/material needed", tradeoff: "Expert input, access, assets, or vendors become prerequisites." },
-      ];
-    case "project_fact":
-      return [
-        { label: "User/scenario is clear", tradeoff: "The plan can decompose around the real usage situation." },
-        { label: "Scope is clear", tradeoff: "Aimcub can decompose faster." },
-        { label: "Current state needs inspection", tradeoff: "Context should be gathered before decomposition." },
-        { label: "Deliverable is undecided", tradeoff: "The plan should first pin down the artifact." },
-      ];
-    case "preference":
-      return [
-        { label: "Move fast", tradeoff: "The plan favors a smaller deliverable." },
-        { label: "Optimize quality", tradeoff: "The plan adds more verification." },
-      ];
-  }
-}
-
-function intakeToClarifyOutput(intake: AimIntakeReport, zh: boolean): ClarifyOutput {
-  return {
-    questions: intake.questions.map((question): ClarifyQuestion => ({
-      id: `intake_${question.id}`,
-      question: question.prompt,
-      why_high_impact: question.whyHighImpact ?? question.reason,
-      kind: intakeQuestionKind(question.category),
-      source_dimension: intakeQuestionDimension(question.category),
-      why_asked: [{
-        code: "aim_intake",
-        detail: question.reason,
-        category: question.category,
-        priority: question.priority,
-        ...(question.gapSource ? { gapSource: question.gapSource } : {}),
-        ...(question.nodeKey ? { nodeKey: question.nodeKey } : {}),
-        ...(question.nodeTitle ? { nodeTitle: question.nodeTitle } : {}),
-      }],
-      capture: question.capture,
-      allow_other: true,
-      selection_mode: question.selectionMode ?? intakeQuestionSelectionMode(question.category),
-      options: question.options?.length ? question.options : intakeOptions(question.category, zh),
-    })),
-    assumptions: [],
-  };
-}
-
-function shouldBlockForIntake(intake: AimIntakeReport): boolean {
-  return intake.loop.shouldContinue || intake.questions.some((question) => question.priority === "high" || question.priority === "medium");
-}
-
-function answerText(answer: ClarifyAnswer): string {
-  const selected = Array.isArray(answer.selected_labels) && answer.selected_labels.length > 0
-    ? answer.selected_labels.join("; ")
-    : answer.selected_label ?? "";
-  return [selected, answer.other_text ?? ""].filter((part) => part.trim().length > 0).join(selected ? "; " : "");
-}
-
-function cockpitStageFor(mode: AppMode, selected: Goal | null, activePlan: DecompositionOutput | null): CockpitStage {
-  if (mode === "settings") return "settings";
-  if (mode === "contexting" || mode === "answering") return "context";
-  if (mode === "reviewing" || (!selected && activePlan)) return "contracts";
-  if (selected) return "run";
-  return "aim";
-}
-
-function progressRows(detail: GoalDetail, progress: AimProgressReadModel | null): ProgressMilestoneRow[] {
-  return progress?.milestones ?? detail.milestones.map((milestone): ProgressMilestoneRow => ({
-    milestone,
-    assignment: null,
-    latest_run: null,
-    child_relations: [],
-    eval_review: {
-      passed: milestone.status === "completed",
-      matched_evidence_ids: [],
-      trust_score: 0,
-      reason: "",
-      next_action: "",
-    },
-    evaluator_results: [],
-    evidence: [],
-    evidence_count: 0,
-    completed: milestone.status === "completed",
-    blocked: milestone.status === "blocked",
-    next_action: "",
-  }));
-}
-
-function routingAgentsFromDetections(agents: readonly LocalAgentDetection[]): RoutingRuntimeAgentOption[] {
-  return agents.map((agent) => ({
-    id: agent.id,
-    label: agent.name,
-    available: agent.available,
-    authenticated: agent.authStatus !== "missing",
-    models: agent.models,
-    unavailableReason: agent.authMessage ?? agent.diagnostics[0] ?? null,
-  }));
-}
-
-function formatRoutingValidation(validation: PlanRoutingValidation): string {
-  return validation.issues.map((issue) => `${issue.title}: ${issue.message}`).join("\n");
-}
-
-function latestLiveValue<T>(
-  events: readonly PlanningLiveEvent[],
-  pick: (event: PlanningLiveEvent) => T | null | undefined,
-): T | null {
-  for (let index = events.length - 1; index >= 0; index -= 1) {
-    const value = pick(events[index]!);
-    if (value !== null && value !== undefined) return value;
-  }
-  return null;
-}
+export { buildSettingsModel };
 
 export function App() {
   return (
@@ -476,37 +235,13 @@ function AimOsApp() {
     setError(null);
   }
 
-  function answersFor(output: ClarifyOutput | null, answerMap: ContextAnswerMap): ClarifyAnswer[] {
-    const questions = output?.questions ?? [];
-    return questions.flatMap((question) => {
-      const answer = answerMap[question.id];
-      const labels = answer?.labels.map((label) => label.trim()).filter(Boolean) ?? [];
-      const selectedLabel = labels[0] ?? null;
-      const other = answer?.other.trim() || null;
-      if (labels.length === 0 && !other) return [];
-      return [{
-        question_id: question.id,
-        selected_label: selectedLabel,
-        selected_labels: labels,
-        other_text: other,
-      }];
-    });
-  }
-
   function descriptionWithContext(): string | undefined {
-    const base = aimDescription.trim();
-    const contextLines: string[] = [];
-    const intakeQuestions = new Map((intakeClarify?.questions ?? []).map((question) => [question.id, question.question]));
-    for (const answer of answersFor(intakeClarify, intakeAnswers)) {
-      const text = answerText(answer);
-      if (!text) continue;
-      contextLines.push(`- ${intakeQuestions.get(answer.question_id) ?? answer.question_id}: ${text}`);
-    }
-    if (contextNote.trim()) contextLines.push(`- Additional context: ${contextNote.trim()}`);
-    const contextBlock = contextLines.length > 0
-      ? ["Context collected before decomposition:", ...contextLines].join("\n")
-      : "";
-    return [base, contextBlock].filter((part) => part.trim().length > 0).join("\n\n") || undefined;
+    return buildDescriptionWithContext({
+      baseDescription: aimDescription,
+      intakeClarify,
+      intakeAnswers,
+      contextNote,
+    });
   }
 
   async function startDraft(options: { skipIntakeGate?: boolean } = {}) {
@@ -1373,18 +1108,18 @@ function LockedStagePanel(props: {
   onAction: () => void;
 }) {
   return (
-    <section style={panelStyle()}>
+    <Panel variant="plain" style={panelStyle()}>
       <div style={sectionHeaderStyle()}>
         <div>
           <div style={eyebrowStyle()}>{props.eyebrow}</div>
           <h2 style={sectionTitleStyle()}>{props.title}</h2>
         </div>
-        <button type="button" onClick={props.onAction} style={{ ...primaryButton(false), marginTop: 0 }}>
+        <Button variant="primary" size="lg" onClick={props.onAction} style={{ marginTop: 0 }}>
           {props.action}
-        </button>
+        </Button>
       </div>
       <p style={mutedTextStyle()}>{props.body}</p>
-    </section>
+    </Panel>
   );
 }
 
@@ -1792,135 +1527,12 @@ export function SettingsPanel(props: {
   }
 
   return (
-    <section style={panelStyle()}>
+    <Panel variant="plain" style={panelStyle()}>
       <div className="od-settings-detail" aria-live="polite" aria-label={activeHelper.title}>
         {detailPane}
       </div>
-    </section>
+    </Panel>
   );
-}
-
-type SettingsSectionId = "overview" | "provider" | "local" | "web" | "context";
-
-function settingsSectionForFocus(focus: AimHelperProfile["settingsFocus"]): SettingsSectionId {
-  if (focus === "local") return "local";
-  if (focus === "web") return "web";
-  if (focus === "context") return "context";
-  return "provider";
-}
-
-interface SettingsModelInput {
-  provider: ProviderStatus | null;
-  webResearch: WebResearchStatus | null;
-  contextSources: ContextSourceStatus | null;
-  localAgents: LocalAgentDetection[];
-}
-
-interface SettingsModel {
-  navItems: SettingsHelper[];
-  helpers: SettingsHelper[];
-  overviewHelper: SettingsHelper;
-  providerHelper: SettingsHelper;
-  localAgentHelper: SettingsHelper;
-  webResearchHelper: SettingsHelper;
-  contextHelper: SettingsHelper;
-  planningReady: boolean;
-  overallNext: string;
-}
-
-export function buildSettingsModel(input: SettingsModelInput, t: I18n["t"]): SettingsModel {
-  const providerReady = Boolean(input.provider?.configured);
-  const readyLocalAgents = input.localAgents.filter((agent) => agent.available && agent.authStatus !== "missing");
-  const availableLocalAgents = input.localAgents.filter((agent) => agent.available);
-  const localAgentReady = readyLocalAgents.length > 0;
-  const planningReady = providerReady || localAgentReady;
-  const webResearchReady = Boolean(input.webResearch?.configured);
-  const webResearchEnabled = input.webResearch?.enabled ?? false;
-  const contextSourceCount = activeContextSourceCount(input.contextSources);
-  const contextReady = contextSourceCount >= 4;
-  const contextHasAnySource = contextSourceCount > 0;
-  const providerRuntime = [input.provider?.provider, input.provider?.model].filter(Boolean).join(" / ");
-
-  const providerHelper = {
-    id: "provider",
-    title: t("settings.helper.provider.title"),
-    body: t("settings.helper.provider.body"),
-    status: providerReady ? t("intake.ready") : localAgentReady ? t("context.sources.status.optional") : t("os.blocked"),
-    tone: providerReady ? "success" : localAgentReady ? "" : "warn",
-    next: providerReady
-      ? t("settings.provider.next.ready", { provider: providerRuntime || t("settings.provider.saved") })
-      : localAgentReady
-        ? t("settings.provider.next.optional")
-        : t("settings.provider.next.blocked"),
-  } satisfies SettingsHelper;
-
-  const localAgentHelper = {
-    id: "local",
-    title: t("settings.helper.local.title"),
-    body: t("settings.helper.local.body"),
-    status: localAgentReady ? t("intake.ready") : providerReady ? t("context.sources.status.optional") : t("os.blocked"),
-    tone: localAgentReady ? "success" : providerReady ? "" : "warn",
-    next: localAgentReady
-      ? t("settings.local.next.ready", { n: readyLocalAgents.length })
-      : availableLocalAgents.length > 0
-        ? t("settings.local.next.auth")
-        : t("settings.local.next.install"),
-  } satisfies SettingsHelper;
-
-  const webResearchHelper = {
-    id: "web",
-    title: t("settings.helper.web.title"),
-    body: t("settings.helper.web.body"),
-    status: webResearchReady ? t("intake.ready") : webResearchEnabled ? t("os.blocked") : t("context.sources.status.optional"),
-    tone: webResearchReady ? "success" : webResearchEnabled ? "warn" : "",
-    next: webResearchReady
-      ? t("settings.web.next.ready")
-      : webResearchEnabled
-        ? t("settings.web.next.blocked")
-        : t("settings.web.next.optional"),
-  } satisfies SettingsHelper;
-
-  const contextHelper = {
-    id: "context",
-    title: t("settings.helper.context.title"),
-    body: t("settings.helper.context.body"),
-    status: contextReady ? t("intake.ready") : contextHasAnySource ? t("settings.status.partial") : t("os.blocked"),
-    tone: contextReady ? "success" : "warn",
-    next: contextReady
-      ? t("settings.context.next.ready")
-      : contextHasAnySource
-        ? t("settings.context.next.partial")
-        : t("settings.context.next.blocked"),
-  } satisfies SettingsHelper;
-
-  const helpers = [providerHelper, localAgentHelper, webResearchHelper, contextHelper];
-  const overallNext = !planningReady
-    ? t("settings.overall.next.runtime")
-    : !contextReady
-      ? t("settings.overall.next.context")
-      : !webResearchReady
-        ? t("settings.overall.next.web")
-        : t("settings.overall.next.aim");
-  const overviewHelper = {
-    id: "overview",
-    title: t("settings.nav.overview"),
-    body: t("settings.nav.overview.body"),
-    status: planningReady ? t("settings.status.readyToPlan") : t("os.blocked"),
-    tone: planningReady ? "success" : "warn",
-    next: overallNext,
-  } satisfies SettingsHelper;
-
-  return {
-    navItems: [overviewHelper, ...helpers],
-    helpers,
-    overviewHelper,
-    providerHelper,
-    localAgentHelper,
-    webResearchHelper,
-    contextHelper,
-    planningReady,
-    overallNext,
-  };
 }
 
 function SettingsPrimarySidebar(props: {
@@ -2193,28 +1805,6 @@ function SettingsAimContextPanel(props: {
       </div>
     </section>
   );
-}
-
-type SettingsHelperTone = "success" | "warn" | "blue" | "";
-
-interface SettingsHelper {
-  id: SettingsSectionId;
-  title: string;
-  body: string;
-  status: string;
-  tone: SettingsHelperTone;
-  next: string;
-}
-
-function activeContextSourceCount(status: ContextSourceStatus | null): number {
-  if (!status) return 0;
-  const localActive = status.local.configured;
-  const onlineActive = status.online.enabled && status.online.enabledCount > 0;
-  const webActive = status.research.webEnabled;
-  const deepActive = status.research.deepResearch && webActive && localActive;
-  const sessionActive = status.userSession.enabled;
-  const questionnaireActive = status.questionnaire.enabled;
-  return [localActive, onlineActive, webActive, deepActive, sessionActive, questionnaireActive].filter(Boolean).length;
 }
 
 function ProgressDonut({ done, total }: { done: number; total: number }) {
