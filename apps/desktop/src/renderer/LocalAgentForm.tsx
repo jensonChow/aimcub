@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { LocalAgentDetection, LocalAgentId, LocalAgentRunResult } from "../shared/ipc";
 
 import { useI18n } from "./i18n";
-import { C, TYPE, WEIGHT, linkButton, secondaryButton } from "./styles";
+import { Button, EmptyState, Panel, Row } from "./ui";
 
 interface LocalAgentFormProps {
   agents: LocalAgentDetection[] | null;
@@ -55,13 +55,13 @@ export function LocalAgentForm({ agents, onRefresh }: LocalAgentFormProps) {
   }
 
   return (
-    <div className="od-preference-card">
+    <Panel variant="plain" className="od-preference-card">
       <div className="od-form-head">
         <div>
           <div className="od-form-title">{t("laf.title")}</div>
           <div className="od-form-body">{t("laf.blurb")}</div>
         </div>
-        <button onClick={refresh} style={linkButton()}>{refreshing ? t("laf.scanning") : t("laf.rescan")}</button>
+        <Button variant="ghost" size="sm" onClick={refresh}>{refreshing ? t("laf.scanning") : t("laf.rescan")}</Button>
       </div>
 
       <div style={{ display: "grid", gap: 8, marginTop: 14 }}>
@@ -69,57 +69,56 @@ export function LocalAgentForm({ agents, onRefresh }: LocalAgentFormProps) {
           const test = tests[agent.id];
           const ready = agent.available && agent.authStatus !== "missing";
           return (
-            <div
+            <Panel
+              as="article"
               key={agent.id}
-              style={{
-                border: `1px solid ${ready ? C.border : C.warnBorder}`,
-                borderRadius: 8,
-                padding: 12,
-                background: ready ? C.surface : C.warnBg,
-                display: "grid",
-                gap: 8,
-              }}
+              tone={ready ? "neutral" : "warn"}
+              style={{ display: "grid", gap: 8 }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "start" }}>
+              <Row
+                trailing={(
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => runSmokeTest(agent)}
+                    disabled={!ready || test?.busy}
+                  >
+                    {test?.busy ? t("laf.testing") : t("laf.test")}
+                  </Button>
+                )}
+              >
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: WEIGHT.strong }}>{agent.name}</div>
-                  <div style={{ color: C.muted, fontSize: TYPE.meta, marginTop: 2 }}>
+                  <div style={{ fontWeight: "var(--od-font-weight-strong)" }}>{agent.name}</div>
+                  <div className="od-ui-status-text" style={{ marginTop: 2 }}>
                     {agent.available ? t("laf.installed") : t("laf.notInstalled")}
                     {agent.version ? ` · ${agent.version}` : ""}
                     {agent.authStatus !== "unknown" ? ` · ${t(authLabelKey(agent.authStatus))}` : ""}
                   </div>
                 </div>
-                <button
-                  onClick={() => runSmokeTest(agent)}
-                  disabled={!ready || test?.busy}
-                  style={{ ...secondaryButton(), padding: "7px 10px", opacity: ready && !test?.busy ? 1 : 0.55 }}
-                >
-                  {test?.busy ? t("laf.testing") : t("laf.test")}
-                </button>
-              </div>
-              <div style={{ color: C.muted, fontSize: TYPE.meta, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              </Row>
+              <div className="od-ui-status-text" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {agent.path ?? agent.diagnostics[0] ?? t("laf.noPath")}
               </div>
-              <div style={{ color: C.muted, fontSize: TYPE.meta }}>
+              <div className="od-ui-status-text">
                 {t("laf.models", { n: agent.models.length, source: agent.modelsSource })}
               </div>
               {agent.authMessage && agent.authStatus !== "ok" && (
-                <div style={{ color: C.danger, fontSize: TYPE.meta }}>{agent.authMessage}</div>
+                <div className="od-ui-status-text" data-tone="danger">{agent.authMessage}</div>
               )}
               {test?.result && (
-                <div style={{ color: test.result.ok ? C.success : C.danger, fontSize: TYPE.meta }}>
+                <div className="od-ui-status-text" data-tone={test.result.ok ? "success" : "danger"}>
                   {test.result.ok ? t("laf.testOk", { ms: test.result.durationMs }) : test.result.error ?? t("laf.testFailed")}
                 </div>
               )}
               {test?.error && !test.result && (
-                <div style={{ color: C.danger, fontSize: TYPE.meta }}>{test.error}</div>
+                <div className="od-ui-status-text" data-tone="danger">{test.error}</div>
               )}
-            </div>
+            </Panel>
           );
         })}
-        {agents && agents.length === 0 && <div style={{ color: C.muted, fontSize: TYPE.body }}>{t("laf.empty")}</div>}
-        {!agents && <div style={{ color: C.muted, fontSize: TYPE.body }}>{t("laf.loading")}</div>}
+        {agents && agents.length === 0 && <EmptyState style={{ minHeight: 96 }} title={t("laf.empty")} />}
+        {!agents && <EmptyState style={{ minHeight: 96 }} title={t("laf.loading")} />}
       </div>
-    </div>
+    </Panel>
   );
 }

@@ -20,7 +20,7 @@ import {
   providerFormStateForProvider,
   providerOrDefault,
 } from "./providerFormState";
-import { C, TYPE, WEIGHT, inputStyle, labelStyle, linkButton, optionButton, primaryButton, secondaryButton } from "./styles";
+import { Button, Panel, Select, TextField } from "./ui";
 
 const PROVIDER_OPTIONS = LLM_PROVIDER_CATALOG;
 
@@ -112,44 +112,52 @@ export function ProviderForm({ status, onSaved, onClose }: ProviderFormProps) {
   const selectedModelHelp = providerDef.models.find((item) => item.id === selectedModelId)?.description;
 
   return (
-    <div className="od-preference-card">
+    <Panel variant="plain" className="od-preference-card">
       <div className="od-form-head">
         <div>
           <div className="od-form-title">{t("pf.title")}</div>
           <div className="od-form-body">{t("pf.blurb")}</div>
         </div>
-        {onClose ? <button onClick={onClose} style={{ ...linkButton() }}>{t("common.close")}</button> : null}
+        {onClose ? <Button variant="ghost" size="sm" onClick={onClose}>{t("common.close")}</Button> : null}
       </div>
 
-      <label style={labelStyle()}>{t("pf.providerLabel")}</label>
-      <div className="od-option-grid">
-        {PROVIDER_OPTIONS.map((provider) => (
-          <button key={provider.id} onClick={() => selectProvider(provider.id)} style={optionButton(providerKind === provider.id)}>
-            <div style={{ fontWeight: WEIGHT.medium }}>{provider.label}</div>
-            <div style={{ color: C.muted, fontSize: TYPE.meta, marginTop: 2 }}>{provider.description}</div>
-          </button>
-        ))}
+      <div className="od-ui-field">
+        <span className="od-ui-field-label">{t("pf.providerLabel")}</span>
+        <div className="od-option-grid">
+          {PROVIDER_OPTIONS.map((provider) => (
+            <Button
+              key={provider.id}
+              className="od-ui-button-card"
+              selected={providerKind === provider.id}
+              onClick={() => selectProvider(provider.id)}
+              aria-pressed={providerKind === provider.id}
+            >
+              <strong>{provider.label}</strong>
+              <span>{provider.description}</span>
+            </Button>
+          ))}
+        </div>
       </div>
 
-      <label style={{ ...labelStyle(), marginTop: 14 }}>{t("pf.model")}</label>
       {providerDef.models.length > 0 && (
-        <select value={selectedModel} onChange={(e) => selectModel(e.target.value)} style={inputStyle()}>
+        <Select label={t("pf.model")} value={selectedModel} onChange={(e) => selectModel(e.target.value)}>
           {providerDef.models.map((item) => (
             <option key={item.id} value={item.id}>{item.label}</option>
           ))}
           <option value={CUSTOM_MODEL}>{t("pf.customModel")}</option>
-        </select>
+        </Select>
       )}
       {hasCustomModelInput && (
-        <input
+        <TextField
           value={model}
           onChange={(e) => setModel(e.target.value)}
           placeholder={t("pf.modelPlaceholder")}
-          style={{ ...inputStyle(), marginTop: providerDef.models.length > 0 ? 8 : 0 }}
+          label={providerDef.models.length > 0 ? undefined : t("pf.model")}
+          aria-label={t("pf.model")}
         />
       )}
       {selectedModelId && (
-        <div style={{ color: C.muted, fontSize: TYPE.meta, marginTop: 6 }}>
+        <div className="od-ui-status-text">
           {t("pf.modelId", { id: selectedModelId })}
           {selectedModelHelp ? ` · ${selectedModelHelp}` : ""}
         </div>
@@ -157,43 +165,39 @@ export function ProviderForm({ status, onSaved, onClose }: ProviderFormProps) {
 
       {usesEndpoint && (
         <>
-          <label style={{ ...labelStyle(), marginTop: 14 }}>{t("pf.endpoint")}</label>
-          <input
+          <TextField
+            label={t("pf.endpoint")}
             value={baseURL}
             onChange={(e) => setBaseURL(e.target.value)}
             placeholder={getDefaultBaseURL(providerKind) || t("pf.endpointPlaceholder")}
-            style={inputStyle()}
+            hint={providerDef.baseURLHint || t("pf.endpointHint")}
           />
-          <div style={{ color: C.muted, fontSize: TYPE.meta, marginTop: 6 }}>
-            {providerDef.baseURLHint || t("pf.endpointHint")}
-          </div>
         </>
       )}
 
-      <label style={{ ...labelStyle(), marginTop: 14 }}>{t("pf.apiKey")}</label>
-      <input
+      <TextField
+        label={t("pf.apiKey")}
         value={apiKey}
         onChange={(e) => setApiKey(e.target.value)}
         placeholder={hasStoredKey ? t("pf.keyKeep") : providerDef.apiKeyPlaceholder}
         type="password"
-        style={inputStyle()}
       />
 
-      {formError && <div style={{ color: C.danger, fontSize: TYPE.body, marginTop: 10 }}>{formError}</div>}
+      {formError && <div className="od-ui-status-text" data-tone="danger">{formError}</div>}
       {testResult && (
-        <div style={{ color: testResult.ok ? C.success : C.danger, fontSize: TYPE.body, marginTop: 10 }}>
+        <div className="od-ui-status-text" data-tone={testResult.ok ? "success" : "danger"}>
           {testResult.message}
         </div>
       )}
 
       <div className="od-form-actions">
-        <button onClick={testConnection} disabled={!canTest} style={{ ...secondaryButton(), opacity: canTest ? 1 : 0.65 }}>
+        <Button variant="secondary" size="lg" onClick={testConnection} disabled={!canTest}>
           {testBusy ? t("pf.testing") : t("pf.testProvider")}
-        </button>
-        <button onClick={save} disabled={!canSave} style={primaryButton(!canSave)}>
+        </Button>
+        <Button variant="primary" size="lg" onClick={save} disabled={!canSave}>
           {busy ? t("pf.saving") : t("pf.saveProvider")}
-        </button>
+        </Button>
       </div>
-    </div>
+    </Panel>
   );
 }

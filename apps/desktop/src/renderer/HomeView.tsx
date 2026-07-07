@@ -17,7 +17,8 @@ import {
   planOf,
   shortUiText,
 } from "./labels";
-import { C, TYPE, WEIGHT, card, linkButton, primaryButton, secondaryButton } from "./styles";
+import { C, TYPE, WEIGHT, card, secondaryButton } from "./styles";
+import { Button, EmptyState, Panel, Row } from "./ui";
 
 interface HomeViewProps {
   goals: Goal[];
@@ -35,31 +36,37 @@ export function HomeView({
   const { t } = useI18n();
   return (
     <section style={{ maxWidth: 960 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 12, flexWrap: "wrap" }}>
+      <Row
+        style={{ marginBottom: 16 }}
+        trailing={<Button variant="primary" size="lg" onClick={onNew}>{t("home.new")}</Button>}
+      >
         <div style={{ minWidth: 0 }}>
           <h2 style={{ margin: 0, fontSize: TYPE.title, letterSpacing: 0 }}>{t("home.recent")}</h2>
           <div style={{ color: C.muted, fontSize: TYPE.body, marginTop: 4 }}>
             {goals.length === 0 ? t("home.none") : t(goals.length === 1 ? "home.aim_one" : "home.aim_other", { n: goals.length })}
           </div>
         </div>
-        <button onClick={onNew} style={{ ...primaryButton(false), marginTop: 0, whiteSpace: "nowrap" }}>{t("home.new")}</button>
-      </div>
+      </Row>
 
       {goals.length === 0 && (
-        <div style={{ ...card(), minHeight: 220, display: "grid", placeItems: "center", textAlign: "center", borderStyle: "dashed" }}>
-          <div style={{ maxWidth: 380 }}>
-            <h3 style={{ margin: 0, fontSize: TYPE.title, letterSpacing: 0 }}>{t("home.emptyTitle")}</h3>
-            <p style={{ color: C.muted, fontSize: TYPE.body, lineHeight: 1.6, margin: "10px 0 18px" }}>{t("home.emptyHelp")}</p>
-            <button onClick={onNew} style={{ ...primaryButton(false), marginTop: 0, whiteSpace: "nowrap" }}>{t("home.new")}</button>
-          </div>
-        </div>
+        <EmptyState
+          style={{ minHeight: 220 }}
+          title={t("home.emptyTitle")}
+          body={t("home.emptyHelp")}
+          actions={<Button variant="primary" size="lg" onClick={onNew}>{t("home.new")}</Button>}
+        />
       )}
 
       {goals.map((goal) => {
         const n = planOf(goal)?.nodes.length ?? 0;
         const description = goal.description?.trim();
         return (
-          <div key={goal.id} style={{ ...card(), display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, cursor: "pointer" }} onClick={() => onOpen(goal)}>
+          <Panel
+            as="article"
+            key={goal.id}
+            style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, cursor: "pointer", marginBottom: 12 }}
+            onClick={() => onOpen(goal)}
+          >
             <div style={{ minWidth: 0 }}>
               <div style={{ fontWeight: WEIGHT.medium, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{goal.title}</div>
               {description ? (
@@ -72,14 +79,15 @@ export function HomeView({
                 {goal.created_at ? ` · ${formatDate(goal.created_at)}` : ""}
               </div>
             </div>
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={(e) => { e.stopPropagation(); onDelete(goal); }}
-              style={{ ...linkButton(), color: C.muted }}
               title={t("common.delete")}
             >
               {t("common.delete")}
-            </button>
-          </div>
+            </Button>
+          </Panel>
         );
       })}
     </section>
