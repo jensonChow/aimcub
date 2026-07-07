@@ -9,7 +9,8 @@ Branch: `main`
 - Merged `e8ee7e22` (`Define local alpha contract and golden loop tests`).
 - Merged `0cd2458d` (`Add desktop UI primitives`).
 - Merged `5dbdee93` (`Productize plan contract review`).
-- Merging `f8cd9f42` (`Simplify context stage flow`).
+- Merged `f8cd9f42` (`Simplify context stage flow`).
+- Merging `c7b75222` (`Clarify eval evidence review`).
 - Preserving the Desktop shell/sidebar/window-chrome framework unchanged.
 
 ## Current State
