@@ -43,9 +43,10 @@ Notes:
 
 ## Commit And Push Status
 
-- Verification is complete and the integration is ready to push.
-- Local `main` is ahead of `origin/main` by the integration merge commits plus this final handoff commit.
-- Push will be attempted after this handoff commit; if approval blocks it, leave the local commits in place and do not retry through another route.
+- Verification is complete.
+- Final integration commit before push: `1447ee89` (`Stabilize local alpha desktop loop`).
+- `git push origin main` succeeded during this session, publishing `b2db1577..1447ee89`.
+- This handoff status update records the successful push and should be pushed as the final status commit.
 
 ## Next Session Prompt
 
