@@ -2933,6 +2933,139 @@ kbd {
   font-size: var(--od-type-body);
 }
 
+.od-execution-summary {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.od-execution-subaim {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.od-execution-subaim-head,
+.od-execution-activity-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.od-execution-subaim-head > span:first-child,
+.od-execution-activity-head span,
+.od-execution-field span,
+.od-execution-evidence span,
+.od-execution-next span {
+  color: var(--od-muted);
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-semibold);
+  line-height: 1.35;
+}
+
+.od-execution-subaim > strong {
+  min-width: 0;
+  color: var(--od-fg);
+  font-size: var(--od-type-title);
+  font-weight: var(--od-font-weight-strong);
+  line-height: 1.35;
+}
+
+.od-execution-subaim p {
+  max-width: 680px;
+  margin: 0;
+  color: var(--od-muted);
+  font-size: var(--od-type-body);
+  line-height: 1.45;
+}
+
+.od-execution-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.od-execution-field,
+.od-execution-evidence,
+.od-execution-next {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-sm);
+  background: var(--od-surface);
+  padding: 10px 12px;
+}
+
+.od-execution-field strong,
+.od-execution-evidence strong,
+.od-execution-next strong,
+.od-execution-activity li strong {
+  min-width: 0;
+  color: var(--od-fg);
+  font-size: var(--od-type-body);
+  font-weight: var(--od-font-weight-semibold);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.od-execution-field strong.is-placeholder {
+  color: var(--od-muted);
+  font-weight: var(--od-font-weight-medium);
+}
+
+.od-execution-field small,
+.od-execution-evidence small,
+.od-execution-activity-head small {
+  min-width: 0;
+  color: var(--od-muted);
+  font-size: var(--od-type-meta);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.od-execution-evidence.warn {
+  border-color: color-mix(in oklab, var(--od-warn), var(--od-bg) 68%);
+  background: color-mix(in oklab, var(--od-warn), var(--od-bg) 94%);
+}
+
+.od-execution-evidence.success {
+  border-color: color-mix(in oklab, var(--od-success), var(--od-bg) 72%);
+  background: color-mix(in oklab, var(--od-success), var(--od-bg) 95%);
+}
+
+.od-execution-activity {
+  display: grid;
+  gap: 8px;
+}
+
+.od-execution-activity ol {
+  display: grid;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.od-execution-activity li {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(88px, max-content) minmax(0, 1fr);
+  gap: 8px;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-sm);
+  background: var(--od-surface-warm);
+  padding: 8px 10px;
+}
+
+.od-execution-activity li span {
+  color: var(--od-muted);
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-semibold);
+  line-height: 1.4;
+}
+
 .od-plan-editor .od-aim-primary {
   margin-top: 0;
 }
@@ -4462,6 +4595,8 @@ kbd {
   .od-work-card,
   .od-eval-summary,
   .od-work-detail-grid,
+  .od-execution-grid,
+  .od-execution-activity li,
   .od-plan-card,
   .od-plan-card-head,
   .od-plan-edit-grid {

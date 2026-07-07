@@ -4,7 +4,6 @@ import {
   AcceptanceRule,
   mergePlanNodes,
   movePlanNode,
-  routingOverrideForMilestone,
   routingRecommendationForPlanNode,
   splitPlanNode,
   updatePlanNode,
@@ -68,6 +67,7 @@ import { Notice } from "./Notice";
 import { mergePlanningDebugTraces } from "./PlanningDebugPanel";
 import { ProviderForm } from "./ProviderForm";
 import { WebResearchForm } from "./WebResearchForm";
+import { LocalAgentExecutionSummary } from "./stages/execute/LocalAgentExecutionSummary";
 import { C, TYPE, WEIGHT, inputStyle, primaryButton, secondaryButton } from "./styles";
 
 type AppMode = "cockpit" | "contexting" | "drafting" | "answering" | "reviewing" | "settings";
@@ -2322,32 +2322,6 @@ function ExecutePanel(props: {
     });
   }
 
-  function actorLabel(row: ProgressMilestoneRow): string {
-    const override = routingOverrideForMilestone(row.milestone);
-    if (override?.owner === "human") return t("os.actorHuman");
-    if (override?.owner === "agent") {
-      const agent = override.agent_label || override.agent_id || t("os.actorAgent");
-      const model = override.model_label || override.model;
-      return model ? `${t("os.actorAgent")} · ${agent} / ${model}` : `${t("os.actorAgent")} · ${agent}`;
-    }
-    if (!row.assignment) return t("os.unassigned");
-    const kind = row.assignment.actor_kind === "human" ? t("os.actorHuman") : t("os.actorAgent");
-    const actor = row.assignment.actor_id
-      ? props.progress?.actors.find((item) => item.id === row.assignment?.actor_id)
-      : null;
-    return actor?.display_name ? `${kind} · ${actor.display_name}` : kind;
-  }
-
-  function assignmentMeta(row: ProgressMilestoneRow): string {
-    if (!row.assignment) return t("os.noAssignment");
-    return [row.assignment.status, row.assignment.source].filter(Boolean).join(" · ");
-  }
-
-  function latestRunSummary(row: ProgressMilestoneRow): string {
-    if (!row.latest_run) return t("os.notStarted");
-    return shortText(row.latest_run.summary || row.latest_run.error || t("os.noRun"), 160);
-  }
-
   return (
     <section className="od-stage-panel">
       <div className="od-stage-panel-head">
@@ -2368,30 +2342,7 @@ function ExecutePanel(props: {
         {rows.map((row) => (
           <article key={row.milestone.id} className={`od-work-card${row.completed ? " is-complete" : ""}`}>
             <div className="od-work-card-main">
-              <div className="od-work-card-head">
-                <div className="od-work-title">
-                  <strong>{row.milestone.title}</strong>
-                  <span className={`od-pill ${row.completed ? "success" : row.blocked ? "danger" : ""}`}>
-                    {row.completed ? t("os.done") : row.milestone.status}
-                  </span>
-                  <span className="od-pill blue">{actorLabel(row)}</span>
-                </div>
-              </div>
-
-              {row.milestone.description ? <p>{shortText(row.milestone.description, 220)}</p> : null}
-
-              <div className="od-work-detail-grid">
-                <div>
-                  <span>{t("os.assignment")}</span>
-                  <strong>{actorLabel(row)}</strong>
-                  <small>{assignmentMeta(row)}</small>
-                </div>
-                <div>
-                  <span>{t("os.latestRun")}</span>
-                  <strong>{row.latest_run?.status ?? t("os.noRun")}</strong>
-                  <small>{latestRunSummary(row)}</small>
-                </div>
-              </div>
+              <LocalAgentExecutionSummary row={row} actors={props.progress?.actors ?? []} />
 
               {row.assignment?.reason ? <div className="od-work-note">{shortText(row.assignment.reason, 220)}</div> : null}
 

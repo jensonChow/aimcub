@@ -3,12 +3,13 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import type { Goal, Milestone } from "@core/types";
+import type { AimProgressReadModel, Goal, Milestone } from "@core/types";
 import type { ContextSourceStatus, ProviderStatus, WebResearchStatus } from "../shared/ipc";
 
 import { App, buildSettingsModel, EvidenceSubmissionForm, SettingsPanel } from "./App";
 import { CockpitShell } from "./CockpitShell";
 import { I18nProvider, translate, type I18n } from "./i18n";
+import { LocalAgentExecutionSummary } from "./stages/execute/LocalAgentExecutionSummary";
 
 const OWNER = "00000000-0000-4000-8000-000000000001";
 const GOAL = "00000000-0000-4000-8000-000000000010";
@@ -132,6 +133,135 @@ describe("EvidenceSubmissionForm", () => {
     expect(html).toContain("Local file references");
     expect(html).toContain("Approval note.");
     expect(html).toContain("Submit proof");
+  });
+});
+
+describe("LocalAgentExecutionSummary", () => {
+  it("shows selected sub-aim, local agent config, low-trust evidence, activity, and next eval action", () => {
+    const row: AimProgressReadModel["milestones"][number] = {
+      milestone: {
+        ...milestone,
+        title: "Implement execution skeleton",
+        description: "Clarify the local-agent run display without adding a durable queue.",
+      },
+      assignment: {
+        id: "00000000-0000-4000-8000-000000000030",
+        owner_id: OWNER,
+        goal_id: GOAL,
+        milestone_id: MILESTONE,
+        actor_kind: "agent",
+        actor_id: "00000000-0000-4000-8000-000000000040",
+        status: "assigned",
+        source: "routing",
+        reason: "Agent-routed software work.",
+        capability_tags: ["code"],
+        created_at: "2026-07-07T01:00:00.000Z",
+        updated_at: "2026-07-07T01:00:00.000Z",
+      },
+      latest_run: {
+        id: "00000000-0000-4000-8000-000000000050",
+        owner_id: OWNER,
+        goal_id: GOAL,
+        milestone_id: MILESTONE,
+        assignment_id: "00000000-0000-4000-8000-000000000030",
+        actor_kind: "agent",
+        actor_id: "00000000-0000-4000-8000-000000000040",
+        kind: "agent",
+        status: "completed",
+        attempt: 1,
+        workspace_root: "/Users/jenson/project",
+        sandbox: "read-only",
+        network_enabled: false,
+        model: "gpt-5",
+        reasoning: "high",
+        summary: "Local agent completed its run.",
+        error: null,
+        queued_at: "2026-07-07T01:00:00.000Z",
+        started_at: "2026-07-07T01:00:05.000Z",
+        finished_at: "2026-07-07T01:02:00.000Z",
+        created_at: "2026-07-07T01:00:00.000Z",
+      },
+      child_relations: [],
+      eval_review: {
+        passed: false,
+        matched_evidence_ids: [],
+        trust_score: 0.6,
+        reason: "1 evidence item is below the auto-verification trust floor.",
+        next_action: "Add trusted webhook or CI evidence, or confirm manually if the proof is sufficient.",
+      },
+      evaluator_results: [],
+      evidence: [{
+        evidence: {
+          id: "00000000-0000-4000-8000-000000000060",
+          owner_id: OWNER,
+          goal_id: GOAL,
+          milestone_id: MILESTONE,
+          emitter_id: null,
+          kind: "mcp_report",
+          source_event_id: "local-agent:codex:1",
+          occurred_at: "2026-07-07T01:02:00.000Z",
+          summary: "Local agent worked on the execution display.",
+          payload: {
+            agent_id: "codex",
+            model: "gpt-5",
+            events: [
+              { type: "agent.run.started", summary: "Codex CLI started." },
+              { type: "agent.tool.started", summary: "shell" },
+              { type: "agent.message.delta", summary: "Verbose assistant output that should not become the default activity list." },
+              { type: "agent.run.completed", summary: "Local agent run completed." },
+            ],
+          },
+          trust_score: 0.6,
+          created_at: "2026-07-07T01:02:00.000Z",
+        },
+        rule_matches: [],
+        status: "low_trust",
+        review_note: "Trust is below the floor for auto-verifiable rules.",
+      }],
+      evidence_count: 1,
+      completed: false,
+      blocked: false,
+      next_action: "Review low-trust evidence.",
+    };
+
+    const html = renderToStaticMarkup(
+      <I18nProvider>
+        <LocalAgentExecutionSummary
+          row={row}
+          actors={[{
+            id: "00000000-0000-4000-8000-000000000040",
+            owner_id: OWNER,
+            kind: "agent",
+            display_name: "Codex CLI",
+            capabilities: ["code"],
+            status: "active",
+            agent_kind: "local_cli",
+            run_mode: "local_cli",
+            model: "gpt-5",
+            connection_ref: null,
+            created_at: "2026-07-07T01:00:00.000Z",
+          }]}
+        />
+      </I18nProvider>,
+    );
+
+    expect(html).toContain("Selected sub-aim");
+    expect(html).toContain("Implement execution skeleton");
+    expect(html).toContain("Codex CLI");
+    expect(html).toContain("Completed");
+    expect(html).toContain("gpt-5");
+    expect(html).toContain("Reasoning: high");
+    expect(html).toContain("/Users/jenson/project");
+    expect(html).toContain("Sandbox read-only");
+    expect(html).toContain("Network off");
+    expect(html).toContain("Low-trust evidence needs review");
+    expect(html).toContain("1/1 evidence item(s) are below the trust floor.");
+    expect(html).toContain("Next human/eval action");
+    expect(html).toContain("Add trusted webhook or CI evidence");
+    expect(html).toContain("Activity");
+    expect(html).toContain("Started");
+    expect(html).toContain("Tool started");
+    expect(html).not.toContain("Verbose assistant output");
   });
 });
 

@@ -1,55 +1,41 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-07
-Branch: `main`
+Branch: `codex/clarify-local-agent-execution`
 
 ## Current Session
 
-- Continued moving Desktop Settings toward the Codex settings reference.
-- Added a Codex-like inline magnifying-glass icon to the Settings sidebar search field, aligned to the shared sidebar icon column.
-- Updated the Settings search input height, radius, and left padding so placeholder text aligns with Settings nav labels.
-- Restyled Settings detail row groups into thin bordered rounded control panels with internal dividers, matching the Codex control-panel pattern without adding decorative cards.
-- Changed selected Settings nav rows to a quiet Codex-like gray fill and removed the blue active rail while preserving readiness status dots.
-- Expanded the Settings workspace to a Codex-like 1080 px control-panel width while leaving header copy width constrained.
-- Reduced Settings detail row visual noise by rendering status as muted text plus a tiny readiness dot and turning row actions into quiet gray control surfaces.
-- Added renderer CSS assertions for the Settings search icon, search text alignment, bordered row groups, row padding, final-row divider removal, muted status-dot row controls, rail-free selected nav state, and wider Settings workspace.
-- Updated `docs/memory/design-system.md` and `docs/memory/desktop.md` with the durable Codex-like Settings search, row-group, selected-nav, row-control, and workspace-width requirements.
-- Refreshed root `Aimcub.app` from the latest Electron 43 folder-style Desktop build after verification.
-- Ran the project memory refresh audit and corrected the next-session prompt to reflect the current local ahead/push-approval state.
+- Improved the Desktop Execute-stage local-agent UX skeleton without adding a durable queue or broad schema fields.
+- Added `apps/desktop/src/renderer/stages/execute/LocalAgentExecutionSummary.tsx` as the scoped display component for selected sub-aim execution state.
+- Updated `apps/desktop/src/renderer/App.tsx` so Execute rows render the new summary while preserving existing run-agent, proof confirmation, and child-breakdown actions.
+- Added Execute-stage i18n strings for selected sub-aim, local agent, run state, model/reasoning, workspace, evidence trust, compact activity, and next human/eval action.
+- Added scoped `.od-execution-*` CSS only; no sidebar, window chrome, user menu, shell grid, resize, hover rail, or toggle selectors were edited.
+- Added renderer coverage for local-agent execution summary rendering and compact activity filtering.
+- Updated `docs/memory/design-system.md` with the durable Execute-stage local-agent summary rule.
 
-## Current State
+## Behavioral Notes
 
-- Work happened directly on `main`; no separate feature branch merge is needed.
-- Local `main` is ahead of `origin/main` by 1 focused commit: `Refine settings controls toward Codex`; inspect `git log` for the exact hash.
-- Push to `origin/main` was blocked by approval review because publishing to the external default branch needs explicit user approval. Do not retry push until the user approves it.
-- Root `Aimcub.app`, `apps/desktop/out`, and `apps/desktop/dist` were refreshed locally and remain ignored build artifacts.
+- Execute now surfaces selected sub-aim title/description, selected local agent when available, run status/timing, model/reasoning/workspace placeholders, evidence trust state, compact activity, and next human/eval action from the existing read model.
+- Local agent output remains evidence only. Low-trust self-reported evidence is shown as review-needed and does not auto-complete auto-verifiable milestones.
+- Raw run events are not shown by default; activity uses compact event summaries and filters verbose agent message deltas.
+- Missing fields use explicit placeholders such as "Model not recorded" and "Workspace not recorded" instead of adding new schema.
 
 ## Verification
 
 Passed:
 
-- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop test`
 - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop typecheck`
-- `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
-- `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
-- `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck`
-- `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm lint`
-- `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm core:purity`
+- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop test`
 - `git diff --check`
-- `ELECTRON_BUILDER_CACHE=/private/tmp/aimcub-electron-builder-cache COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm desktop:pack`
-- `ditto apps/desktop/dist/mac-arm64/Aimcub.app Aimcub.app`
 
 Notes:
 
-- MCP worker tests logged the expected missing-Supabase opaque-error path while passing.
-- The first `pnpm build` attempt hit a Corepack registry timeout inside the sandbox; rerunning with approved network escalation succeeded.
-- The first `pnpm desktop:pack` attempt was blocked by sandboxed Electron cache writes under `~/Library/Caches/electron`; rerunning with approved escalation succeeded.
-- The latest `pnpm desktop:pack` run completed without additional escalation.
-- `git push origin main` was attempted once and blocked by approval review. The local focused commit remains unpushed.
+- The first typecheck invocation hydrated this worktree's dependencies and completed successfully after slow registry downloads.
+- Commit message planned: `Clarify local agent execution UX`. The final commit hash is reported in the assistant final response and can be read with `git log -1 --oneline`; the committed handoff cannot contain its own final hash because the hash changes when the handoff content changes.
+- Per the user's explicit opt-out for this parallel worktree, this branch is intentionally not pushed, not merged, and root `Aimcub.app` was not refreshed with `pnpm desktop:pack`.
 
 ## Next Session Prompt
 
 ```text
-Continue from `main`. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md, then load only task-relevant module memory. For repo-changing sessions, run the full verification suite, refresh root Aimcub.app from the packaged Desktop output, update docs/handoff.md, create a focused commit, push, and merge completed branch work into main unless the user explicitly opts out.
-Current `main` is expected to be ahead of `origin/main` by 1 local commit, `Refine settings controls toward Codex`, unless the user has explicitly approved and completed the push. Do not retry `git push origin main` without explicit user approval; inspect `git status --short --branch` and `git log --oneline -3` before continuing.
+Continue from branch `codex/clarify-local-agent-execution`. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md, then load only task-relevant module memory. This branch improves the Execute-stage local-agent UX skeleton only; it does not add a durable queue, push, merge, or refresh root Aimcub.app. Inspect `git log -1 --oneline`, then integrate or verify from there.
 ```
