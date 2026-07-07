@@ -1,55 +1,46 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-07
-Branch: `main`
+Branch: detached worktree
 
 ## Current Session
 
-- Continued moving Desktop Settings toward the Codex settings reference.
-- Added a Codex-like inline magnifying-glass icon to the Settings sidebar search field, aligned to the shared sidebar icon column.
-- Updated the Settings search input height, radius, and left padding so placeholder text aligns with Settings nav labels.
-- Restyled Settings detail row groups into thin bordered rounded control panels with internal dividers, matching the Codex control-panel pattern without adding decorative cards.
-- Changed selected Settings nav rows to a quiet Codex-like gray fill and removed the blue active rail while preserving readiness status dots.
-- Expanded the Settings workspace to a Codex-like 1080 px control-panel width while leaving header copy width constrained.
-- Reduced Settings detail row visual noise by rendering status as muted text plus a tiny readiness dot and turning row actions into quiet gray control surfaces.
-- Added renderer CSS assertions for the Settings search icon, search text alignment, bordered row groups, row padding, final-row divider removal, muted status-dot row controls, rail-free selected nav state, and wider Settings workspace.
-- Updated `docs/memory/design-system.md` and `docs/memory/desktop.md` with the durable Codex-like Settings search, row-group, selected-nav, row-control, and workspace-width requirements.
-- Refreshed root `Aimcub.app` from the latest Electron 43 folder-style Desktop build after verification.
-- Ran the project memory refresh audit and corrected the next-session prompt to reflect the current local ahead/push-approval state.
+- Added `docs/local-alpha.md` as the concise open-source local alpha contract.
+- Linked the local alpha contract from `README.md` and `docs/v1-spec.md`.
+- Defined the local alpha golden path: New Aim -> Context intake -> Plan/contracts -> Human/agent routing -> Run/manual proof -> Evidence append -> Eval -> Context candidate review -> Future reuse.
+- Made local alpha non-goals explicit: hosted multiplayer, sync, teams, Aim Share, iOS, browser extension, cloud-agent runner, and vector memory.
+- Added `@core/domain` golden-loop coverage for the pure `AimProgressReadModel`: next action, evidence review, completion recap, pending context, accepted global context, and manual proof.
+- Added `@core/store` golden-loop coverage that replays one realistic local aim through context intake, decomposition contracts, routing assignments, agent run/manual proof, evidence append, derived completion, context sedimentation, candidate acceptance, and reusable global memory.
 
 ## Current State
 
-- Work happened directly on `main`; no separate feature branch merge is needed.
-- Local `main` is ahead of `origin/main` by 1 focused commit: `Refine settings controls toward Codex`; inspect `git log` for the exact hash.
-- Push to `origin/main` was blocked by approval review because publishing to the external default branch needs explicit user approval. Do not retry push until the user approves it.
-- Root `Aimcub.app`, `apps/desktop/out`, and `apps/desktop/dist` were refreshed locally and remain ignored build artifacts.
+- One focused local commit will be created after this handoff update: `Define local alpha contract and golden loop tests`.
+- Final commit hash is reported in the session final response after the commit is created.
+- This worktree is intentionally not pushed or merged; the integration session will handle that.
+- Root `Aimcub.app` was not refreshed and `pnpm desktop:pack` was not run because packaging was not changed and the user explicitly opted out for this parallel worktree.
+- Desktop shell/sidebar/window-chrome files were not edited.
 
 ## Verification
 
 Passed:
 
-- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop test`
-- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop typecheck`
-- `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
-- `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
-- `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck`
-- `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm lint`
-- `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm core:purity`
+- `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @core/domain test -- src/aim-os.test.ts`
+- `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @core/store test -- src/store.test.ts`
+- `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @core/domain test`
+- `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @core/store test`
+- `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @core/domain typecheck`
+- `COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @core/store typecheck`
 - `git diff --check`
-- `ELECTRON_BUILDER_CACHE=/private/tmp/aimcub-electron-builder-cache COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm desktop:pack`
-- `ditto apps/desktop/dist/mac-arm64/Aimcub.app Aimcub.app`
 
 Notes:
 
-- MCP worker tests logged the expected missing-Supabase opaque-error path while passing.
-- The first `pnpm build` attempt hit a Corepack registry timeout inside the sandbox; rerunning with approved network escalation succeeded.
-- The first `pnpm desktop:pack` attempt was blocked by sandboxed Electron cache writes under `~/Library/Caches/electron`; rerunning with approved escalation succeeded.
-- The latest `pnpm desktop:pack` run completed without additional escalation.
-- `git push origin main` was attempted once and blocked by approval review. The local focused commit remains unpushed.
+- The first narrow `@core/domain` test run exposed a test-fixture mismatch between the commit-pattern acceptance rule and the synthetic evidence message; the fixture was corrected and the affected test was rerun successfully.
+- The first test commands hydrated this worktree's dependencies and logged slow registry download warnings before tests ran.
 
 ## Next Session Prompt
 
 ```text
-Continue from `main`. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md, then load only task-relevant module memory. For repo-changing sessions, run the full verification suite, refresh root Aimcub.app from the packaged Desktop output, update docs/handoff.md, create a focused commit, push, and merge completed branch work into main unless the user explicitly opts out.
-Current `main` is expected to be ahead of `origin/main` by 1 local commit, `Refine settings controls toward Codex`, unless the user has explicitly approved and completed the push. Do not retry `git push origin main` without explicit user approval; inspect `git status --short --branch` and `git log --oneline -3` before continuing.
+Continue from the local commit created by this session in the detached Aimcub worktree. Start by reading AGENTS.md, docs/handoff.md, docs/memory/README.md, then task-relevant module memory.
+
+This session added docs/local-alpha.md, linked it from README.md and docs/v1-spec.md, and added local alpha golden-loop tests in packages/core/src/aim-os.test.ts and packages/store/src/store.test.ts. It intentionally did not push, merge, run pnpm desktop:pack, or refresh root Aimcub.app. Integration should run the full repo verification/packaging flow and then handle push/merge if approved.
 ```

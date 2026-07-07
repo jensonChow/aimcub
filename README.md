@@ -30,6 +30,8 @@ platform**. The local product should own planning, local agent management,
 provider configuration, context capture, evidence, and eval transparency. The
 online product should own multi-user collaboration, cross-device sync, team
 permissions, managed infrastructure, and the future Aim Share platform.
+The alpha contract for the local open-source loop is defined in
+[`docs/local-alpha.md`](docs/local-alpha.md).
 
 Hosted Supabase-backed surfaces can add networked value, but the core
 aim/context/eval architecture should stay transparent. License choice is
@@ -112,5 +114,6 @@ example `AIMCUB_LIVE_DEEPSEEK_MODEL=deepseek-v4-flash`.
 - **v3** Aim Share: cross-org aim sharing and a paid network for goals, specialized context, and capability signals. Calendar remains a time-management component throughout.
 
 See [`docs/vision.md`](docs/vision.md) for the full direction,
-[`docs/v1-spec.md`](docs/v1-spec.md) for the current local harness plan, and
+[`docs/v1-spec.md`](docs/v1-spec.md) for the current local harness plan,
+[`docs/local-alpha.md`](docs/local-alpha.md) for the local alpha contract, and
 [`docs/memory/README.md`](docs/memory/README.md) for the agent memory map.

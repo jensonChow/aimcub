@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   DecompositionOutput,
+  type Assignment,
   type Evidence,
   type Goal,
   type Memory,
@@ -73,6 +74,132 @@ function goal(id = GOAL): Goal {
     plan_json: null,
     metadata: {},
     created_at: "2026-07-03T00:00:00.000Z",
+  };
+}
+
+function commitAcceptanceRule(messagePattern: string, minFiles = 1): Milestone["acceptance_rule"] {
+  return {
+    logic: "all",
+    threshold: 1,
+    completion_mode: "auto_then_confirm",
+    clauses: [{ evaluator: "commit_pattern", auto_verifiable: true, match: { message_pattern: messagePattern, min_files: minFiles } }],
+  };
+}
+
+function manualAcceptanceRule(): Milestone["acceptance_rule"] {
+  return {
+    logic: "all",
+    threshold: 1,
+    completion_mode: "manual",
+    clauses: [{ evaluator: "manual_confirm", auto_verifiable: false, match: {} }],
+  };
+}
+
+function decompositionContract(input: {
+  why: string;
+  definitionOfDone: string;
+  requiredEvidence: string[];
+  likelyOwner: "agent" | "human";
+  evalSignal: string;
+}): Record<string, unknown> {
+  return {
+    why: input.why,
+    definition_of_done: input.definitionOfDone,
+    required_evidence: input.requiredEvidence,
+    likely_owner: input.likelyOwner,
+    context_gaps: [],
+    eval_signal: input.evalSignal,
+  };
+}
+
+function assignmentRow(input: Partial<Assignment> & Pick<Assignment, "id" | "milestone_id" | "actor_kind">): Assignment {
+  return {
+    id: input.id,
+    owner_id: input.owner_id ?? OWNER,
+    goal_id: input.goal_id !== undefined ? input.goal_id : GOAL,
+    milestone_id: input.milestone_id,
+    actor_kind: input.actor_kind,
+    actor_id: input.actor_id ?? null,
+    status: input.status ?? "assigned",
+    source: input.source ?? "routing",
+    reason: input.reason ?? "Routed by Aim OS.",
+    capability_tags: input.capability_tags ?? [],
+    created_at: input.created_at ?? "2026-07-07T00:00:00.000Z",
+    updated_at: input.updated_at ?? "2026-07-07T00:00:00.000Z",
+  };
+}
+
+function runRow(input: Partial<Run> & Pick<Run, "id" | "milestone_id" | "assignment_id">): Run {
+  const actorKind = input.actor_kind ?? "agent";
+  return {
+    id: input.id,
+    owner_id: input.owner_id ?? OWNER,
+    goal_id: input.goal_id !== undefined ? input.goal_id : GOAL,
+    milestone_id: input.milestone_id,
+    assignment_id: input.assignment_id,
+    actor_kind: actorKind,
+    actor_id: input.actor_id ?? null,
+    kind: input.kind ?? (actorKind === "agent" ? "agent" : "human"),
+    status: input.status ?? "completed",
+    attempt: input.attempt ?? 1,
+    workspace_root: input.workspace_root ?? null,
+    sandbox: input.sandbox ?? "workspace-write",
+    network_enabled: input.network_enabled ?? false,
+    model: input.model ?? "gpt-5",
+    reasoning: input.reasoning ?? null,
+    summary: input.summary ?? "",
+    error: input.error ?? null,
+    queued_at: input.queued_at ?? "2026-07-07T00:00:00.000Z",
+    started_at: input.started_at ?? "2026-07-07T00:00:00.000Z",
+    finished_at: input.finished_at ?? "2026-07-07T01:00:00.000Z",
+    created_at: input.created_at ?? "2026-07-07T00:00:00.000Z",
+  };
+}
+
+function evidenceRow(input: Partial<Evidence> & Pick<Evidence, "id" | "milestone_id" | "kind">): Evidence {
+  return {
+    id: input.id,
+    owner_id: input.owner_id ?? OWNER,
+    goal_id: input.goal_id ?? GOAL,
+    milestone_id: input.milestone_id,
+    emitter_id: input.emitter_id ?? null,
+    kind: input.kind,
+    source_event_id: input.source_event_id ?? null,
+    occurred_at: input.occurred_at ?? "2026-07-07T01:00:00.000Z",
+    summary: input.summary ?? "",
+    payload: input.payload ?? {},
+    trust_score: input.trust_score ?? 1,
+    created_at: input.created_at,
+  };
+}
+
+function completionRow(
+  input: Partial<MilestoneCompletion> & Pick<MilestoneCompletion, "id" | "milestone_id" | "decided_by">,
+): MilestoneCompletion {
+  return {
+    id: input.id,
+    milestone_id: input.milestone_id,
+    owner_id: input.owner_id ?? OWNER,
+    decided_by: input.decided_by,
+    triggering_evidence_ids: input.triggering_evidence_ids ?? [],
+    awarded_xp: input.awarded_xp ?? 10,
+    created_at: input.created_at ?? "2026-07-07T01:00:00.000Z",
+  };
+}
+
+function memoryRow(input: Partial<Memory> & Pick<Memory, "id" | "content" | "category" | "status">): Memory {
+  return {
+    id: input.id,
+    owner_id: input.owner_id ?? OWNER,
+    goal_id: input.goal_id !== undefined ? input.goal_id : GOAL,
+    kind: input.kind ?? "semantic",
+    category: input.category,
+    content: input.content,
+    confidence: input.confidence ?? 0.78,
+    source: input.source ?? "evidence_derived",
+    status: input.status,
+    superseded_by: input.superseded_by ?? null,
+    created_at: input.created_at ?? "2026-07-07T01:00:00.000Z",
   };
 }
 
@@ -307,6 +434,156 @@ describe("Aim OS cockpit read model", () => {
     expect(row.eval_review.reason).toBe("No evidence has been recorded for this sub-aim yet.");
     expect(row.eval_review.next_action).toContain("Run the assigned agent");
     expect(row.evidence).toEqual([]);
+  });
+
+  it("locks the local alpha golden path in the pure progress model", () => {
+    const agentMilestone = milestone({
+      id: "00000000-0000-4000-8000-000000000022",
+      title: "Implement local alpha proof path",
+      description: "Update local alpha docs and core/store tests.",
+      status: "completed",
+      completed_at: "2026-07-07T01:00:00.000Z",
+      acceptance_rule: commitAcceptanceRule("local alpha", 2),
+      metadata: {
+        decomposition_contract: decompositionContract({
+          why: "Digital documentation and tests can be delegated to a local agent.",
+          definitionOfDone: "Docs and tests describe and exercise the local alpha golden path.",
+          requiredEvidence: ["Trusted commit touching docs and tests."],
+          likelyOwner: "agent",
+          evalSignal: "Done means trusted evidence proves the alpha loop is locked.",
+        }),
+      },
+    });
+    const humanMilestone = milestone({
+      id: "00000000-0000-4000-8000-000000000023",
+      title: "Approve local alpha scope",
+      description: "Human reviews the alpha non-goals and proof.",
+      order_index: 1,
+      depends_on_id: agentMilestone.id,
+      acceptance_rule: manualAcceptanceRule(),
+      metadata: {
+        decomposition_contract: decompositionContract({
+          why: "A human owns the final scope call.",
+          definitionOfDone: "The user confirms the local alpha contract and non-goals are correct.",
+          requiredEvidence: ["Approval note."],
+          likelyOwner: "human",
+          evalSignal: "Done means the approval proof is explicit and inspectable.",
+        }),
+      },
+    });
+    const agentAssignment = assignmentRow({
+      id: "00000000-0000-4000-8000-000000000024",
+      milestone_id: agentMilestone.id,
+      actor_kind: "agent",
+      status: "completed",
+      reason: "Agent-owned digital work.",
+      capability_tags: ["software"],
+      updated_at: "2026-07-07T01:00:00.000Z",
+    });
+    const humanAssignment = assignmentRow({
+      id: "00000000-0000-4000-8000-000000000025",
+      milestone_id: humanMilestone.id,
+      actor_kind: "human",
+      reason: "Human-owned approval.",
+      capability_tags: ["human_judgment"],
+    });
+    const run = runRow({
+      id: "00000000-0000-4000-8000-000000000026",
+      milestone_id: agentMilestone.id,
+      assignment_id: agentAssignment.id,
+      summary: "Updated the local alpha contract and golden-loop tests.",
+    });
+    const commitEvidence = evidenceRow({
+      id: "00000000-0000-4000-8000-000000000027",
+      milestone_id: agentMilestone.id,
+      kind: "git_commit",
+      source_event_id: "alpha-proof",
+      summary: "local alpha docs and tests",
+      payload: {
+        sha: "alpha-proof",
+        message: "local alpha docs and tests",
+        files: ["docs/local-alpha.md", "packages/store/src/store.test.ts"],
+      },
+    });
+    const autoCompletion = completionRow({
+      id: "00000000-0000-4000-8000-000000000028",
+      milestone_id: agentMilestone.id,
+      decided_by: "rule_auto",
+      triggering_evidence_ids: [commitEvidence.id],
+    });
+    const candidate = memoryRow({
+      id: "00000000-0000-4000-8000-000000000029",
+      kind: "procedural",
+      category: "procedure",
+      content: "Procedure: Update alpha docs and golden-loop tests together.",
+      status: "pending",
+    });
+
+    const inFlight = buildAimProgressReadModel({
+      goal: goal(),
+      milestones: [agentMilestone, humanMilestone],
+      assignments: [agentAssignment, humanAssignment],
+      runs: [run],
+      evidence: [commitEvidence],
+      completions: [autoCompletion],
+      contextCandidates: [candidate],
+    });
+
+    expect(inFlight.completed_milestones).toBe(1);
+    expect(inFlight.next_action).toBe("Collect human proof and confirm completion.");
+    expect(inFlight.context_candidates).toContainEqual(expect.objectContaining({ id: candidate.id, status: "pending" }));
+    expect(inFlight.milestones[0]?.evidence[0]).toMatchObject({
+      evidence: { id: commitEvidence.id },
+      status: "matched",
+      rule_matches: [{ clause_index: 0, evaluator: "commit_pattern" }],
+    });
+
+    const manualEvidence = evidenceRow({
+      id: "00000000-0000-4000-8000-000000000030",
+      milestone_id: humanMilestone.id,
+      kind: "manual_check",
+      summary: "User approved the local alpha scope.",
+      payload: {
+        confirmed: true,
+        milestone_id: humanMilestone.id,
+        proof_note: "User approved the local alpha scope.",
+        required_evidence: [{ text: "Approval note.", satisfied: true }],
+      },
+    });
+    const manualCompletion = completionRow({
+      id: "00000000-0000-4000-8000-000000000031",
+      milestone_id: humanMilestone.id,
+      decided_by: "user_confirm",
+      triggering_evidence_ids: [manualEvidence.id],
+      created_at: "2026-07-07T01:10:00.000Z",
+    });
+    const acceptedContext = memoryRow({
+      id: "00000000-0000-4000-8000-000000000032",
+      goal_id: null,
+      content: "Eval signal: Local alpha work needs docs, tests, and human approval.",
+      category: "eval_signal",
+      status: "active",
+    });
+    const complete = buildAimProgressReadModel({
+      goal: goal(),
+      milestones: [
+        agentMilestone,
+        { ...humanMilestone, status: "completed", completed_at: "2026-07-07T01:10:00.000Z" },
+      ],
+      assignments: [agentAssignment, { ...humanAssignment, status: "completed" }],
+      runs: [run],
+      evidence: [commitEvidence, manualEvidence],
+      completions: [autoCompletion, manualCompletion],
+      contextCandidates: [candidate],
+      acceptedContext: [acceptedContext],
+    });
+
+    expect(complete.next_action).toBe("Aim is complete.");
+    expect(complete.milestones[1]?.evaluator_results[0]?.matched_evidence_ids).toContain(manualEvidence.id);
+    expect(complete.completion_recap?.learned_context).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: candidate.id, status: "pending", scope: "aim" }),
+      expect.objectContaining({ id: acceptedContext.id, status: "active", scope: "global" }),
+    ]));
   });
 
   it("rolls child aim status back into the parent milestone view", () => {

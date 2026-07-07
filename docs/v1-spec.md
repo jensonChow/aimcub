@@ -21,6 +21,9 @@ The current build focus is the first layer: the open-source local Aim OS agent
 harness. The hosted product should add networked value without turning the local
 harness into a thin client.
 
+See [`local-alpha.md`](local-alpha.md) for the local alpha contract that locks
+the open-source golden path and the explicit non-goals for this phase.
+
 ## What v1 Is
 
 v1 is a Desktop-first local harness for managing aims with agents:
