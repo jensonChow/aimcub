@@ -98,8 +98,9 @@ Visual evidence was written under `/private/tmp`:
 
 ## Commit And Push Status
 
-- Integration changes are staged on local `main`.
-- Commit and push are pending after this handoff update.
+- Integration commit `ccd720a0` (`Extract execute stage and verify desktop polish`) was pushed to `origin/main`.
+- Work happened directly on `main`; no separate branch merge remains.
+- This handoff status update is the only follow-up repo change after the integration push.
 
 ## Open Items
 
