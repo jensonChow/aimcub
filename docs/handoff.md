@@ -44,9 +44,10 @@ Notes:
 ## Commit And Push Status
 
 - Verification is complete.
-- Local `main` is ahead of `origin/main` with the four merge commits.
-- Final handoff/status commit is pending.
-- Push is pending. Push only after the final handoff/status commit lands.
+- Integration handoff commit before push: `5f281f12` (`Refresh desktop polish integration handoff`).
+- `git push origin main` succeeded, publishing `a632a3d5..5f281f12`.
+- This handoff status update records the successful push and should be the final status commit for this integration round.
+- Final branch state is authoritative in `git status --short --branch` and `git log --oneline -6`.
 
 ## Next Session Prompt
 
