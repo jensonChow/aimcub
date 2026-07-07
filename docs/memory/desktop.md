@@ -38,6 +38,8 @@ Desktop UI changes must follow `docs/memory/design-system.md` for layout, typogr
 
 `apps/desktop/src/renderer/App.tsx` should stay orchestration-focused: state, IPC calls, stage routing, and handoffs between stage surfaces. Stage-owned view structure lives under `apps/desktop/src/renderer/stages/<stage>/`, currently `context`, `plan`, `eval`, and `execute`. Do not reintroduce large inline Context, Plan/Contracts, Eval, or Execute component bodies into `App.tsx`.
 
+Pure renderer workflow transforms shared by App orchestration live under `apps/desktop/src/renderer/workflow/`. Keep these helpers side-effect-free and directly unit-tested; leave IPC calls and visible state transitions in `App.tsx` unless a behavior-specific test covers the abstraction.
+
 Shared renderer primitives live under `apps/desktop/src/renderer/ui/`. Reuse or extend those primitives for low-risk workbench/helper surfaces before adding new one-off control styling, while keeping the protected shell/sidebar/window-chrome framework unchanged.
 
 ## Context Collection
