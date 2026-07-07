@@ -8,7 +8,8 @@ Branch: `main`
 - Integration session in progress for the first batch of local alpha and Desktop stabilization work.
 - Merged `e8ee7e22` (`Define local alpha contract and golden loop tests`).
 - Merged `0cd2458d` (`Add desktop UI primitives`).
-- Merging `5dbdee93` (`Productize plan contract review`).
+- Merged `5dbdee93` (`Productize plan contract review`).
+- Merging `f8cd9f42` (`Simplify context stage flow`).
 - Preserving the Desktop shell/sidebar/window-chrome framework unchanged.
 
 ## Current State

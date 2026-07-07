@@ -331,11 +331,6 @@ export function ContextSourcesPanel({
     const localSummary = localActive
       ? t("context.workbench.localReady", { n: localCount })
       : t("context.workbench.localEmpty");
-    const helperSummary = [
-      draft.online.enabled ? t("context.sources.online") : "",
-      draft.research.webEnabled ? t("context.sources.web") : "",
-      draft.research.deepResearch ? t("context.sources.deep") : "",
-    ].filter(Boolean).join(" · ") || t("context.workbench.helpersQuiet");
 
     return (
       <section className="od-context-workbench-panel" data-od-id="context-workbench-sources">
@@ -357,19 +352,7 @@ export function ContextSourcesPanel({
         {error ? <div style={{ ...mutedTextStyle(), color: C.danger }}>{error}</div> : null}
 
         <div className="od-context-workbench-steps">
-          <div className="od-context-workbench-step">
-            <span className="od-context-workbench-index">1</span>
-            <div>
-              <strong>{t("context.workbench.answerTitle")}</strong>
-              <p>{t("context.workbench.answerBody")}</p>
-            </div>
-            <span className={`od-pill ${intakeActive ? "blue" : ""}`}>
-              {intakeActive ? t("context.sources.status.active") : t("context.sources.status.paused")}
-            </span>
-          </div>
-
           <div className="od-context-workbench-step od-context-workbench-step-local">
-            <span className="od-context-workbench-index">2</span>
             <div>
               <strong>{t("context.workbench.localTitle")}</strong>
               <p>{localSummary}</p>
@@ -412,11 +395,9 @@ export function ContextSourcesPanel({
           </div>
 
           <div className="od-context-workbench-step">
-            <span className="od-context-workbench-index">3</span>
             <div>
               <strong>{t("context.workbench.helpersTitle")}</strong>
               <p>{t("context.workbench.helpersBody")}</p>
-              <small>{helperSummary}</small>
             </div>
             {onOpenSettings ? (
               <button type="button" className="od-context-small-button" onClick={onOpenSettings}>

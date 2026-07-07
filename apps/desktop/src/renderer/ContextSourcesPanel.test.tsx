@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
@@ -75,9 +77,19 @@ describe("ContextSourcesPanel", () => {
     expect(html).toContain('data-od-id="context-workbench-sources"');
     expect(html).toContain("Add only what changes this plan");
     expect(html).toContain("Attach local material");
+    expect(html).toContain("Source setup stays in settings");
     expect(html).toContain("Open settings");
     expect(html).not.toContain('data-od-id="context-source-gates"');
+    expect(html).not.toContain("Answer the current question");
     expect(html).not.toContain("Online folders and databases");
     expect(html).not.toContain("Research controls");
+  });
+
+  it("keeps the workbench context layout sparse and stage-scoped", () => {
+    const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
+
+    expect(css).toMatch(/\.od-context-workbench-step\s*{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) auto;/s);
+    expect(css).toMatch(/\.od-context-review-grid\s*{[^}]*grid-template-columns:\s*repeat\(auto-fit, minmax\(220px, 1fr\)\);/s);
+    expect(css).toMatch(/\.od-context-continue\s*{[^}]*justify-content:\s*flex-end;/s);
   });
 });

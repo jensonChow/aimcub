@@ -36,7 +36,7 @@ import { CockpitShell, type CockpitStage, type SidebarAction } from "./CockpitSh
 import { hasCompletionRecap, stageForOpenedAim } from "./completionRecap";
 import { buildContextCandidateAcceptRequest, ContextInbox, type ContextInboxScope } from "./ContextInbox";
 import { ContextSourcesPanel } from "./ContextSourcesPanel";
-import { buildContextBundleReview, type ContextBundleReview, type ContextReviewItem } from "./contextReview";
+import { buildContextBundleReview } from "./contextReview";
 import {
   deriveAimHelperProfile,
   hasPlanningRuntime,
@@ -47,7 +47,6 @@ import {
 import { I18nProvider, useI18n, type I18n } from "./i18n";
 import {
   aimIntakeOf,
-  contextCategoryLabel,
   planningContextOf,
   planningToolsOf,
   reviewOf,
@@ -56,13 +55,15 @@ import { LocalAgentForm } from "./LocalAgentForm";
 import { Notice } from "./Notice";
 import { mergePlanningDebugTraces } from "./PlanningDebugPanel";
 import { ProviderForm } from "./ProviderForm";
+import { ContextClarifyPanel } from "./stages/context/ContextClarifyPanel";
+import { ContextReviewPanel } from "./stages/context/ContextReviewPanel";
+import { ContextStage } from "./stages/context/ContextStage";
+import type { ClarifyPhase, ContextAnswerMap } from "./stages/context/types";
 import { WebResearchForm } from "./WebResearchForm";
 import { PlanPanel } from "./stages/plan/PlanPanel";
-import { C, TYPE, WEIGHT, inputStyle, primaryButton, secondaryButton } from "./styles";
+import { C, TYPE, WEIGHT, inputStyle, primaryButton } from "./styles";
 
 type AppMode = "cockpit" | "contexting" | "drafting" | "answering" | "reviewing" | "settings";
-type ClarifyPhase = "intake" | "postDraft" | null;
-type AnswerMap = Record<string, { labels: string[]; other: string }>;
 type ProgressMilestoneRow = AimProgressReadModel["milestones"][number];
 type ProgressEvidenceReviewItem = ProgressMilestoneRow["evidence"][number];
 type EvalState = "passed" | "failed" | "needs_human" | "unsupported" | "error" | "pending";
@@ -492,10 +493,10 @@ function AimOsApp() {
   const [planningDebugTraces, setPlanningDebugTraces] = useState<PlanningDebugTrace[]>([]);
   const [planningLiveEvents, setPlanningLiveEvents] = useState<PlanningLiveEvent[]>([]);
   const [intakeClarify, setIntakeClarify] = useState<ClarifyOutput | null>(null);
-  const [intakeAnswers, setIntakeAnswers] = useState<AnswerMap>({});
+  const [intakeAnswers, setIntakeAnswers] = useState<ContextAnswerMap>({});
   const [clarifyPhase, setClarifyPhase] = useState<ClarifyPhase>(null);
   const [clarify, setClarify] = useState<ClarifyOutput | null>(null);
-  const [answers, setAnswers] = useState<AnswerMap>({});
+  const [answers, setAnswers] = useState<ContextAnswerMap>({});
   const [contextNote, setContextNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -605,7 +606,7 @@ function AimOsApp() {
     setError(null);
   }
 
-  function answersFor(output: ClarifyOutput | null, answerMap: AnswerMap): ClarifyAnswer[] {
+  function answersFor(output: ClarifyOutput | null, answerMap: ContextAnswerMap): ClarifyAnswer[] {
     const questions = output?.questions ?? [];
     return questions.flatMap((question) => {
       const answer = answerMap[question.id];
@@ -1002,7 +1003,7 @@ function AimOsApp() {
   );
 
   const clarifyPanel = clarify && (mode === "contexting" || mode === "answering" || mode === "reviewing") ? (
-    <ClarifyPanel
+    <ContextClarifyPanel
       clarify={clarify}
       phase={clarifyPhase}
       answers={clarifyPhase === "intake" ? intakeAnswers : answers}
@@ -1093,6 +1094,13 @@ function AimOsApp() {
       onBack={() => openCockpitStage("aim")}
     />
   );
+  const continueContextToPlan = parent ? undefined : () => {
+    if (activePlan || selected) {
+      openCockpitStage("contracts");
+      return;
+    }
+    void startDraft();
+  };
 
   const mainStageContent = (() => {
     if (activeStage === "settings") return settingsPanel;
@@ -1109,28 +1117,23 @@ function AimOsApp() {
         );
       }
       return (
-        <>
-          {parent ? composerPanel : (
-            <ContextAimSummaryPanel
-              title={selected?.title ?? aimTitle}
-              description={selected?.description ?? aimDescription}
-              saved={Boolean(selected)}
-              onEdit={selected ? undefined : () => openCockpitStage("aim")}
-            />
-          )}
-          {clarifyPhase === "intake" ? clarifyPanel : null}
-          <ContextSourcesPanel
-            status={contextSources}
-            disabled={Boolean(busy)}
-            variant="workbench"
-            onOpenSettings={openContextSettings}
-            onSaved={setContextSources}
-          />
-          {shouldShowContextReviewInContext ? (
-            <ContextReviewPanel bundle={contextReview} running={mode === "contexting" && Boolean(busy)} />
-          ) : null}
-          {clarifyPhase !== "intake" ? clarifyPanel : null}
-        </>
+        <ContextStage
+          parentComposer={parent ? composerPanel : null}
+          title={selected?.title ?? aimTitle}
+          description={selected?.description ?? aimDescription}
+          saved={Boolean(selected)}
+          disabled={Boolean(busy)}
+          clarifyPhase={clarifyPhase}
+          clarifyPanel={clarifyPanel}
+          contextSources={contextSources}
+          review={contextReview}
+          showReview={shouldShowContextReviewInContext}
+          reviewRunning={mode === "contexting" && Boolean(busy)}
+          onEditAim={selected ? undefined : () => openCockpitStage("aim")}
+          onOpenSettings={openContextSettings}
+          onContextSources={setContextSources}
+          onContinueToPlan={continueContextToPlan}
+        />
       );
     }
     if (activeStage === "contracts") {
@@ -1236,100 +1239,6 @@ export function InitialWorkspacePanel() {
       </div>
     </section>
   );
-}
-
-function ContextReviewPanel(props: {
-  bundle: ContextBundleReview;
-  running: boolean;
-}) {
-  const { t } = useI18n();
-  const totalItems = props.bundle.usedContext.length
-    + props.bundle.skippedContext.length
-    + props.bundle.permissionGaps.length
-    + props.bundle.decompositionRisks.length;
-  return (
-    <section className="od-context-review">
-      <div className="od-stage-panel-head">
-        <div>
-          <div className="od-stage-kicker">{t("contextReview.eyebrow")}</div>
-          <h2>{t("contextReview.title")}</h2>
-          <p>{t(totalItems === 0 ? "contextReview.emptyBody" : "contextReview.body")}</p>
-        </div>
-        {props.running ? <span className="od-pill blue">{t("debug.pending")}</span> : null}
-      </div>
-
-      <div className="od-stage-metrics" aria-label={t("contextReview.title")}>
-        <StageMetric label={t("contextReview.metric.used")} value={String(props.bundle.usedContext.length)} />
-        <StageMetric label={t("contextReview.metric.skipped")} value={String(props.bundle.skippedContext.length)} />
-        <StageMetric label={t("contextReview.metric.gaps")} value={String(props.bundle.permissionGaps.length)} />
-      </div>
-
-      <div className="od-context-review-grid">
-        <ContextReviewBucket
-          title={t("contextReview.used")}
-          items={props.bundle.usedContext}
-          empty={t("contextReview.empty.used")}
-        />
-        <ContextReviewBucket
-          title={t("contextReview.skipped")}
-          items={props.bundle.skippedContext}
-          empty={t("contextReview.empty.skipped")}
-        />
-        <ContextReviewBucket
-          title={t("contextReview.permissions")}
-          items={props.bundle.permissionGaps}
-          empty={t("contextReview.empty.permissions")}
-        />
-        <ContextReviewBucket
-          title={t("contextReview.risks")}
-          items={props.bundle.decompositionRisks}
-          empty={t("contextReview.empty.risks")}
-        />
-      </div>
-    </section>
-  );
-}
-
-function ContextReviewBucket(props: {
-  title: string;
-  items: ContextReviewItem[];
-  empty: string;
-}) {
-  const { t } = useI18n();
-  const visible = props.items.slice(0, 4);
-  const extra = Math.max(0, props.items.length - visible.length);
-  return (
-    <section className="od-context-review-bucket">
-      <div className="od-card-head">
-        <h3>{props.title}</h3>
-        <span className="od-pill">{String(props.items.length)}</span>
-      </div>
-      {visible.length === 0 ? (
-        <div className="od-empty-inline">{props.empty}</div>
-      ) : (
-        <div className="od-context-review-list">
-          {visible.map((item) => (
-            <article key={item.id} className={`od-context-review-item ${contextReviewToneClass(item.tone)}`}>
-              <div className="od-context-review-item-head">
-                <strong>{item.title}</strong>
-                {item.category ? <span className="od-pill">{contextCategoryLabel(item.category, t)}</span> : null}
-              </div>
-              <p>{shortText(item.body, 220)}</p>
-              {item.meta.length ? <small>{item.meta.filter(Boolean).slice(0, 3).join(" · ")}</small> : null}
-            </article>
-          ))}
-          {extra > 0 ? <div className="od-context-review-more">{t("contextReview.more", { n: extra })}</div> : null}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function contextReviewToneClass(tone: ContextReviewItem["tone"]): string {
-  if (tone === "success") return "success";
-  if (tone === "warn") return "warn";
-  if (tone === "danger") return "danger";
-  return "";
 }
 
 function AimOverviewPanel(props: {
@@ -1585,33 +1494,6 @@ function HelperFact(props: { label: string; value: string }) {
   );
 }
 
-function ContextAimSummaryPanel(props: {
-  title: string;
-  description: string | undefined | null;
-  saved: boolean;
-  onEdit?: () => void;
-}) {
-  const { t } = useI18n();
-  const description = props.description?.trim();
-  return (
-    <section className="od-aim-context-summary">
-      <div>
-        <div className="od-aim-kicker">{props.saved ? t("shell.savedAim") : t("os.stepContext")}</div>
-        <h2>{props.title}</h2>
-        <p>{description ? shortText(description, 260) : t("aimContext.noDescription")}</p>
-      </div>
-      <div className="od-aim-context-actions">
-        <span>{t(props.saved ? "aimContext.savedBody" : "aimContext.body")}</span>
-        {props.onEdit ? (
-          <button className="od-aim-secondary" type="button" onClick={props.onEdit}>
-            {t("aimContext.edit")}
-          </button>
-        ) : null}
-      </div>
-    </section>
-  );
-}
-
 function LockedStagePanel(props: {
   eyebrow: string;
   title: string;
@@ -1674,136 +1556,6 @@ function ComposerPanel(props: {
         rows={4}
         style={{ ...inputStyle(), marginTop: 10, resize: "vertical" }}
       />
-    </section>
-  );
-}
-
-function ClarifyPanel(props: {
-  clarify: ClarifyOutput;
-  phase: ClarifyPhase;
-  answers: AnswerMap;
-  contextNote: string;
-  conversationEnabled: boolean;
-  questionnaireEnabled: boolean;
-  disabled: boolean;
-  onAnswer: (id: string, value: { labels: string[]; other: string }) => void;
-  onContextNote: (value: string) => void;
-  onRefine: () => void;
-  onSkip?: () => void;
-}) {
-  const { t } = useI18n();
-  const intake = props.phase === "intake";
-  const questions = intake && !props.questionnaireEnabled ? [] : props.clarify.questions;
-  const answeredQuestionIds = new Set(Object.entries(props.answers)
-    .filter(([, answer]) => answer.other.trim() || answer.labels.length > 0)
-    .map(([id]) => id));
-  const activeQuestionIndex = intake
-    ? questions.findIndex((question) => !answeredQuestionIds.has(question.id))
-    : -1;
-  const visibleQuestions = intake
-    ? activeQuestionIndex >= 0 ? [questions[activeQuestionIndex]!] : []
-    : questions;
-  const hasQuestionAnswer = Object.values(props.answers).some((answer) => answer.other.trim() || answer.labels.length > 0);
-  const activeQuestion = activeQuestionIndex >= 0 ? questions[activeQuestionIndex] : null;
-  const activeAnswer = activeQuestion ? props.answers[activeQuestion.id] : null;
-  const activeQuestionAnswered = Boolean(activeAnswer && (activeAnswer.other.trim() || activeAnswer.labels.length > 0));
-  const contextNoteProvided = props.conversationEnabled && props.contextNote.trim().length > 0;
-  const hasContextAnswer = (props.conversationEnabled && props.contextNote.trim().length > 0)
-    || hasQuestionAnswer;
-  const primaryAcceptsDraft = !intake && !hasQuestionAnswer && Boolean(props.onSkip);
-  const primaryAction = primaryAcceptsDraft && props.onSkip ? props.onSkip : props.onRefine;
-  const primaryLabel = intake ? t("os.generateFromContext") : primaryAcceptsDraft ? t("os.acceptDraft") : t("os.refineDraft");
-  const secondaryLabel = hasQuestionAnswer ? t("os.acceptDraft") : t("os.skipRefinement");
-  const primaryDisabled = props.disabled || (intake && (
-    activeQuestion
-      ? !activeQuestionAnswered && !contextNoteProvided
-      : !hasContextAnswer
-  ));
-  const body = intake
-    ? t("os.contextIntakeBody")
-    : questions.length
-      ? t("os.clarifyBody")
-      : t("os.noQuestionsBody");
-  return (
-    <section style={panelStyle()}>
-      <div style={sectionHeaderStyle()}>
-        <div>
-          <div style={eyebrowStyle()}>{t(intake ? "os.contextIntakeEyebrow" : "os.draftRefinementEyebrow")}</div>
-          <h2 style={sectionTitleStyle()}>
-            {intake ? t("os.contextIntakeHeading") : questions.length ? t("os.clarifyHeading") : t("os.noQuestionsHeading")}
-          </h2>
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          {props.onSkip && !primaryAcceptsDraft ? <button onClick={props.onSkip} style={{ ...secondaryButton(), marginTop: 0 }}>{secondaryLabel}</button> : null}
-          <button onClick={primaryAction} disabled={primaryDisabled} style={{ ...primaryButton(primaryDisabled), marginTop: 0 }}>
-            {primaryLabel}
-          </button>
-        </div>
-      </div>
-      <p style={mutedTextStyle()}>{body}</p>
-      {intake && questions.length > 0 ? (
-        <div className="od-context-step-progress">
-          <span>
-            {activeQuestionIndex >= 0
-              ? t("os.contextQuestionProgress", { current: activeQuestionIndex + 1, total: questions.length })
-              : t("os.contextQuestionsComplete", { total: questions.length })}
-          </span>
-        </div>
-      ) : null}
-      <div style={{ display: "grid", gap: 12 }}>
-        {visibleQuestions.map((question) => {
-          const answer = props.answers[question.id] ?? { labels: [], other: "" };
-          const multi = question.selection_mode === "multiple";
-          return (
-            <div key={question.id} style={questionStyle()}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline" }}>
-                <div style={{ fontWeight: WEIGHT.strong }}>{question.question}</div>
-                <span style={badgeStyle(C.page, C.muted)}>{t(multi ? "os.multiSelect" : "os.singleSelect")}</span>
-              </div>
-              <div style={{ color: C.muted, fontSize: TYPE.body, marginTop: 4 }}>{question.why_high_impact}</div>
-              <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
-                {question.options.map((option) => (
-                  <button
-                    key={option.label}
-                    onClick={() => {
-                      const selected = answer.labels.includes(option.label);
-                      const labels = multi
-                        ? selected
-                          ? answer.labels.filter((label) => label !== option.label)
-                          : [...answer.labels, option.label]
-                        : [option.label];
-                      props.onAnswer(question.id, { ...answer, labels });
-                    }}
-                    style={choiceStyle(answer.labels.includes(option.label))}
-                  >
-                    <strong>{option.label}</strong>
-                    <span>{option.tradeoff}</span>
-                  </button>
-                ))}
-              </div>
-              <input
-                value={answer.other}
-                onChange={(event) => props.onAnswer(question.id, { ...answer, other: event.target.value })}
-                placeholder={t("os.otherAnswer")}
-                style={{ ...inputStyle(), marginTop: 10 }}
-              />
-            </div>
-          );
-        })}
-        {intake && props.conversationEnabled ? (
-          <div style={questionStyle()}>
-            <div style={{ fontWeight: WEIGHT.strong }}>{t("os.contextConversation")}</div>
-            <div style={{ color: C.muted, fontSize: TYPE.body, marginTop: 4 }}>{t("os.contextConversationBody")}</div>
-            <textarea
-              value={props.contextNote}
-              onChange={(event) => props.onContextNote(event.target.value)}
-              placeholder={t("os.contextConversationPlaceholder")}
-              rows={4}
-              style={{ ...inputStyle(), marginTop: 10, resize: "vertical" }}
-            />
-          </div>
-        ) : null}
-      </div>
     </section>
   );
 }
@@ -3026,44 +2778,6 @@ function eyebrowStyle(): CSSProperties {
 
 function mutedTextStyle(): CSSProperties {
   return { color: C.muted, fontSize: TYPE.body, lineHeight: 1.45, margin: "4px 0 0" };
-}
-
-function questionStyle(): CSSProperties {
-  return {
-    border: `1px solid ${C.border}`,
-    borderRadius: 8,
-    padding: 14,
-    background: C.surfaceWarm,
-  };
-}
-
-function choiceStyle(active: boolean): CSSProperties {
-  return {
-    border: `1px solid ${active ? C.accent : C.border}`,
-    background: active ? C.accentBg : C.surface,
-    borderRadius: 8,
-    padding: 12,
-    display: "grid",
-    gap: 4,
-    textAlign: "left",
-    color: C.text,
-    cursor: "pointer",
-  };
-}
-
-function badgeStyle(bg: string, fg: string): CSSProperties {
-  return {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: 22,
-    borderRadius: 999,
-    padding: "2px 8px",
-    background: bg,
-    color: fg,
-    fontSize: TYPE.meta,
-    fontWeight: WEIGHT.strong,
-  };
 }
 
 function donutWrapStyle(): CSSProperties {
