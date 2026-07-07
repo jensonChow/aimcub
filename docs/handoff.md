@@ -46,7 +46,7 @@ Notes:
 - Verification is complete.
 - Final integration commit before push: `1447ee89` (`Stabilize local alpha desktop loop`).
 - `git push origin main` succeeded during this session, publishing `b2db1577..1447ee89`.
-- This handoff status update records the successful push and should be pushed as the final status commit.
+- This handoff status update records the successful push and was pushed as the final status commit.
 
 ## Next Session Prompt
 
