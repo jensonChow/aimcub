@@ -8,13 +8,14 @@ Branch: `main`
 - Integration session in progress for the next Desktop stage polish batch.
 - Merged `613d2a44` (`Fix desktop stage navigation safe area`).
 - Merged `aff2943c` (`Focus context blocking question flow`) via `130c53a` (`Merge context blocking question polish`).
-- Merged `76b70044` (`Reduce plan contract card density`) with merge commit `pending`.
-- Pending merge: Eval trust disclosure.
+- Merged `76b70044` (`Reduce plan contract card density`) via `8f7ac89` (`Merge plan contract density polish`).
+- Merged `5053e57d` (`Refine eval trust disclosure`) with merge commit `pending`.
 - Preserved the tuned Desktop shell/sidebar/window-chrome framework so far. `CockpitShell.tsx` has not been edited, and CSS changes are scoped to stage/workspace content selectors rather than protected sidebar/window selectors.
 
 ## Conflict Resolutions
 
 - `docs/handoff.md`: replaced branch-local parallel worktree handoffs with this integration handoff. Final verification, visual inspection, commit, and push status will be recorded before session end.
+- `docs/memory/desktop.md`: combined the Plan summary-first durable rule with the Eval empty-inbox durable rule so both decisions remain documented.
 
 ## Verification
 

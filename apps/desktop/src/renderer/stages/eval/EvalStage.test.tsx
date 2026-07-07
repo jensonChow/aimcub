@@ -15,6 +15,7 @@ const MILESTONE = "00000000-0000-4000-8000-000000000020";
 const MATCHED_EVIDENCE = "00000000-0000-4000-8000-000000000030";
 const LOW_TRUST_EVIDENCE = "00000000-0000-4000-8000-000000000031";
 const MEMORY = "00000000-0000-4000-8000-000000000040";
+const ACCEPTED_MEMORY = "00000000-0000-4000-8000-000000000041";
 
 const noop = () => {};
 
@@ -98,7 +99,28 @@ const pendingMemory: Memory = {
   created_at: "2026-07-07T08:10:00.000Z",
 };
 
-function progress(complete = false): AimProgressReadModel {
+const acceptedMemory: Memory = {
+  ...pendingMemory,
+  id: ACCEPTED_MEMORY,
+  content: "Accepted eval context should stay visible in the completion recap.",
+  status: "active",
+  created_at: "2026-07-07T08:12:00.000Z",
+};
+
+interface ProgressOptions {
+  complete?: boolean;
+  contextCandidates?: Memory[];
+  learnedContext?: Memory[];
+  firstEvidenceMatched?: boolean;
+}
+
+function progress(options: boolean | ProgressOptions = {}): AimProgressReadModel {
+  const opts = typeof options === "boolean" ? { complete: options } : options;
+  const complete = opts.complete ?? false;
+  const contextCandidates = opts.contextCandidates ?? [pendingMemory];
+  const learnedContext = opts.learnedContext ?? contextCandidates;
+  const firstEvidenceMatched = opts.firstEvidenceMatched ?? complete;
+
   return {
     goal,
     milestones: [{
@@ -108,7 +130,7 @@ function progress(complete = false): AimProgressReadModel {
       child_relations: [],
       eval_review: {
         passed: complete,
-        matched_evidence_ids: complete ? [MATCHED_EVIDENCE] : [],
+        matched_evidence_ids: firstEvidenceMatched ? [MATCHED_EVIDENCE] : [],
         trust_score: complete ? 0.92 : 0,
         reason: complete
           ? "All acceptance rules passed with 1 matched evidence item."
@@ -120,7 +142,7 @@ function progress(complete = false): AimProgressReadModel {
       evaluator_results: [{
         evaluator: "commit_pattern",
         status: complete ? "passed" : "failed",
-        matched_evidence_ids: complete ? [MATCHED_EVIDENCE] : [],
+        matched_evidence_ids: firstEvidenceMatched ? [MATCHED_EVIDENCE] : [],
         trust_score: complete ? 0.92 : 0,
         explanation: complete ? "commit_pattern accepted 1 evidence item(s)." : "commit_pattern has not received sufficient matching evidence.",
         failure_reason: complete ? null : "not_satisfied",
@@ -129,9 +151,9 @@ function progress(complete = false): AimProgressReadModel {
       evidence: [
         {
           evidence: matchedEvidence,
-          rule_matches: complete ? [{ clause_index: 0, evaluator: "commit_pattern" }] : [],
-          status: complete ? "matched" : "unmatched",
-          review_note: complete ? "Matches rule 1 (commit_pattern)." : "Recorded evidence does not satisfy any current acceptance rule.",
+          rule_matches: firstEvidenceMatched ? [{ clause_index: 0, evaluator: "commit_pattern" }] : [],
+          status: firstEvidenceMatched ? "matched" : "unmatched",
+          review_note: firstEvidenceMatched ? "Matches rule 1 (commit_pattern)." : "Recorded evidence does not satisfy any current acceptance rule.",
         },
         {
           evidence: lowTrustEvidence,
@@ -149,7 +171,7 @@ function progress(complete = false): AimProgressReadModel {
     assignments: [],
     runs: [],
     sub_aim_relations: [],
-    context_candidates: [pendingMemory],
+    context_candidates: contextCandidates,
     completion_recap: complete ? {
       complete: true,
       final_outcome: "Completed 1/1 sub-aims for \"Clarify eval review\".",
@@ -178,15 +200,15 @@ function progress(complete = false): AimProgressReadModel {
         trust_score: 0.92,
         matched_evidence_ids: [MATCHED_EVIDENCE],
       }],
-      learned_context: [{
-        id: MEMORY,
-        content: pendingMemory.content,
-        category: "eval_signal",
-        source: "evidence_derived",
-        status: "pending",
-        scope: "aim",
-        confidence: 0.84,
-      }],
+      learned_context: learnedContext.map((item) => ({
+        id: item.id,
+        content: item.content,
+        category: item.category,
+        source: item.source,
+        status: item.status,
+        scope: item.goal_id ? "aim" : "global",
+        confidence: item.confidence,
+      })),
       evidence_empty_reason: "",
       context_empty_reason: "",
     } : null,
@@ -236,6 +258,25 @@ describe("EvalStage", () => {
     expect(html).toContain("Accepted global context is reused when Aimcub plans future aims.");
   });
 
+  it("does not render a large empty Context Inbox block when no candidates are pending", () => {
+    const html = renderEval(progress({ contextCandidates: [] }));
+
+    expect(html).toContain("Context candidates");
+    expect(html).toContain("<strong>0</strong>");
+    expect(html).not.toContain("Context inbox");
+    expect(html).not.toContain("Pending context candidates");
+    expect(html).not.toContain("No pending context candidates.");
+    expect(html).not.toContain('class="od-eval-context"');
+  });
+
+  it("renders ContextInbox when pending candidates exist", () => {
+    const html = renderEval(progress({ contextCandidates: [pendingMemory] }));
+
+    expect(html).toContain("Context inbox");
+    expect(html).toContain("Eval signal: Evidence review should show rule matches and trust before completion.");
+    expect(html).toContain("Accepted global context is reused when Aimcub plans future aims.");
+  });
+
   it("keeps the completion recap factual and leaves Context Inbox in Eval flow", () => {
     const html = renderEval(progress(true));
 
@@ -247,6 +288,40 @@ describe("EvalStage", () => {
     expect(html).toContain("Context learned");
     expect(html).toContain("Future reuse");
     expect(html).toContain("Context inbox");
+  });
+
+  it("does not duplicate an empty Context Inbox in the completion recap", () => {
+    const html = renderEval(progress({ complete: true, contextCandidates: [acceptedMemory], learnedContext: [acceptedMemory] }));
+
+    expect(html).toContain("Completion recap");
+    expect(html).toContain("Context learned");
+    expect(html).toContain("Accepted eval context should stay visible in the completion recap.");
+    expect(html).not.toContain("Context inbox");
+    expect(html).not.toContain("Pending context candidates");
+    expect(html).not.toContain("No pending context candidates.");
+  });
+
+  it("keeps evidence and evaluator details available behind closed disclosures", () => {
+    const html = renderEval(progress({ contextCandidates: [], firstEvidenceMatched: true }));
+    const matchedTime = new Date(matchedEvidence.occurred_at).toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    expect(html).toContain('class="od-eval-detail-section"');
+    expect(html).not.toContain('class="od-eval-detail-section" open');
+    expect(html).toContain("<summary><span>Evidence review</span>");
+    expect(html).toContain("<summary><span>Rule/evaluator matches</span>");
+    expect(html).toContain("Desktop eval evidence row rendered");
+    expect(html).toContain("git commit");
+    expect(html).toContain(matchedTime);
+    expect(html).toContain("trust 92%");
+    expect(html).toContain("Rules: #1 commit_pattern");
+    expect(html).toContain("matched");
+    expect(html).toContain("Matches rule 1 (commit_pattern).");
+    expect(html).toContain("#1 commit_pattern");
   });
 
   it("keeps Eval CSS scoped to stage content surfaces", () => {
