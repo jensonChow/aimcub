@@ -289,11 +289,15 @@ describe("LocalAgentExecutionSummary", () => {
         />
       </I18nProvider>,
     );
+    const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
 
     expect(html).toContain("Selected sub-aim");
     expect(html).toContain("Implement execution skeleton");
     expect(html).toContain("Codex CLI");
     expect(html).toContain("Completed");
+    expect(html).toContain("Produced evidence");
+    expect(html).toContain("Next human/eval action");
+    expect(html).toContain("Runtime details");
     expect(html).toContain("gpt-5");
     expect(html).toContain("Reasoning: high");
     expect(html).toContain("/Users/jenson/project");
@@ -307,6 +311,38 @@ describe("LocalAgentExecutionSummary", () => {
     expect(html).toContain("Started");
     expect(html).toContain("Tool started");
     expect(html).not.toContain("Verbose assistant output");
+    expect(css).toMatch(/\.od-execution-grid\s*{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\);/s);
+    expect(css).toMatch(/\.od-execution-runtime\s*{[^}]*border-top:\s*1px solid var\(--od-border-soft\);/s);
+
+    const rawOnlyRow: AimProgressReadModel["milestones"][number] = {
+      ...row,
+      latest_run: row.latest_run ? { ...row.latest_run, summary: "" } : null,
+      evidence: [{
+        ...row.evidence[0]!,
+        evidence: {
+          ...row.evidence[0]!.evidence,
+          payload: {
+            agent_id: "codex",
+            model: "gpt-5",
+            events: [
+              { type: "agent.message.delta", summary: "Raw message delta should stay hidden." },
+              { type: "agent.raw", summary: "Raw stream event should stay hidden." },
+            ],
+          },
+        },
+      }],
+    };
+    const rawOnlyHtml = renderToStaticMarkup(
+      <I18nProvider>
+        <LocalAgentExecutionSummary
+          row={rawOnlyRow}
+          actors={[]}
+        />
+      </I18nProvider>,
+    );
+    expect(rawOnlyHtml).not.toContain("Raw message delta");
+    expect(rawOnlyHtml).not.toContain("Raw stream event");
+    expect(rawOnlyHtml).toContain("No run activity has been recorded.");
   });
 });
 

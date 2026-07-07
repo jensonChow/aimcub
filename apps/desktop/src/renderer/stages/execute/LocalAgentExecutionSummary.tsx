@@ -233,9 +233,8 @@ function compactActivity(row: ProgressMilestoneRow): ActivityEvent[] {
     .map(activityEvent)
     .filter((event): event is ActivityEvent => Boolean(event));
   const userFacing = events.filter((event) => event.type !== "agent.raw" && event.type !== "agent.message.delta");
-  const source = userFacing.length ? userFacing : events;
   const deduped: ActivityEvent[] = [];
-  for (const event of source) {
+  for (const event of userFacing) {
     const previous = deduped[deduped.length - 1];
     if (previous?.type === event.type && previous.summary === event.summary) continue;
     deduped.push(event);
@@ -280,6 +279,21 @@ export function LocalAgentExecutionSummary(props: {
           </strong>
           <small>{runTiming(row, t)}</small>
         </div>
+        <div className={`od-execution-evidence${evidence.tone ? ` ${evidence.tone}` : ""}`}>
+          <span>{t("execute.producedEvidence")}</span>
+          <strong>{evidence.title}</strong>
+          <small>{evidence.detail}</small>
+        </div>
+        <div className="od-execution-next">
+          <span>{t("execute.nextHumanEvalAction")}</span>
+          <strong>{nextAction}</strong>
+        </div>
+      </div>
+
+      <div className="od-execution-runtime" aria-label={t("execute.runtimeDetails")}>
+        <div className="od-execution-runtime-head">
+          <span>{t("execute.runtimeDetails")}</span>
+        </div>
         <div className="od-execution-field">
           <span>{t("execute.modelReasoning")}</span>
           <strong className={!modelRecorded ? "is-placeholder" : ""}>{modelText(row, t)}</strong>
@@ -290,17 +304,6 @@ export function LocalAgentExecutionSummary(props: {
           <strong className={!row.latest_run?.workspace_root ? "is-placeholder" : ""}>{workspaceText(row, t)}</strong>
           <small>{permissionText(row, t)}</small>
         </div>
-      </div>
-
-      <div className={`od-execution-evidence${evidence.tone ? ` ${evidence.tone}` : ""}`}>
-        <span>{t("execute.producedEvidence")}</span>
-        <strong>{evidence.title}</strong>
-        <small>{evidence.detail}</small>
-      </div>
-
-      <div className="od-execution-next">
-        <span>{t("execute.nextHumanEvalAction")}</span>
-        <strong>{nextAction}</strong>
       </div>
 
       <div className="od-execution-activity">

@@ -213,13 +213,18 @@ function renderEval(progressModel: AimProgressReadModel): string {
 }
 
 describe("EvalStage", () => {
-  it("renders evidence, rule matches, trust, missing proof, and context candidates", () => {
+  it("renders a summary-first overview while keeping evidence details available", () => {
     const html = renderEval(progress(false));
 
     expect(html).toContain("Evidence and eval review");
-    expect(html).toContain("Missing rule matches");
+    expect(html).toContain('class="od-stage-metrics od-eval-overview-metrics"');
+    expect(html).toContain("Evidence");
+    expect(html).toContain("Satisfied");
+    expect(html).toContain("Needs review");
     expect(html).toContain("Low-trust evidence");
     expect(html).toContain("Context candidates");
+    expect(html).toContain('class="od-eval-detail-section"');
+    expect(html).not.toContain('class="od-eval-detail-section" open');
     expect(html).toContain("Rule/evaluator matches");
     expect(html).toContain("Evidence review");
     expect(html).toContain("Agent self-report needs trusted proof");
@@ -247,8 +252,10 @@ describe("EvalStage", () => {
   it("keeps Eval CSS scoped to stage content surfaces", () => {
     const css = readFileSync(new URL("../../cockpit.css", import.meta.url), "utf8");
 
-    expect(css).toMatch(/\.od-eval-review-strip\s*{[^}]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\);/s);
-    expect(css).toMatch(/\.od-eval-review-section\s*{[^}]*border-top:\s*1px solid var\(--od-border-soft\);/s);
-    expect(css).toMatch(/\.od-eval-review-strip,\s*[\r\n\s]*\.od-work-detail-grid/s);
+    expect(css).toMatch(/\.od-eval-overview-metrics\s*{[^}]*grid-template-columns:\s*repeat\(5, minmax\(0, 1fr\)\);/s);
+    expect(css).toMatch(/\.od-eval-detail-section\s*{[^}]*border:\s*1px solid var\(--od-border-soft\);/s);
+    expect(css).toMatch(/\.od-eval-detail-section summary\s*{[^}]*cursor:\s*pointer;/s);
+    expect(css).toMatch(/\.od-eval-detail-section > \.od-evidence-review,\s*[\r\n\s]*\.od-eval-detail-section > \.od-evaluator-list/s);
+    expect(css).toMatch(/\.od-eval-overview-metrics,\s*[\r\n\s]*\.od-eval-review-strip,\s*[\r\n\s]*\.od-work-detail-grid/s);
   });
 });

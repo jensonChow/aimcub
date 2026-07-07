@@ -172,36 +172,6 @@ function EvalStageMetric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function EvalReviewStrip(props: {
-  rows: EvalStageMilestoneRow[];
-  pendingCandidates: Memory[];
-}) {
-  const { t } = useI18n();
-  const failedEvaluatorCount = props.rows
-    .flatMap((row) => row.evaluator_results)
-    .filter((result) => result.status !== "passed").length;
-  const lowTrustCount = props.rows
-    .flatMap((row) => row.evidence)
-    .filter((item) => item.status === "low_trust").length;
-
-  return (
-    <div className="od-eval-review-strip" aria-label={t("os.evalNeedsReview")}>
-      <div className="od-eval-review-stat">
-        <span>{t("os.evalMissingMatches")}</span>
-        <strong>{String(failedEvaluatorCount)}</strong>
-      </div>
-      <div className="od-eval-review-stat">
-        <span>{t("os.evalLowTrustEvidence")}</span>
-        <strong>{String(lowTrustCount)}</strong>
-      </div>
-      <div className="od-eval-review-stat">
-        <span>{t("os.evalContextCandidates")}</span>
-        <strong>{String(props.pendingCandidates.length)}</strong>
-      </div>
-    </div>
-  );
-}
-
 export function EvidenceReviewList(props: {
   row: EvalStageMilestoneRow;
   limit?: number;
@@ -272,33 +242,28 @@ function EvaluatorMatchList({ row }: { row: EvalStageMilestoneRow }) {
   const { t } = useI18n();
 
   return (
-    <div className="od-eval-review-section">
-      <div className="od-eval-card-section-title">
-        <span>{t("os.evalEvaluatorMatches")}</span>
-      </div>
-      <div className="od-evaluator-list">
-        {row.evaluator_results.length === 0 ? (
-          <div className="od-empty-inline">{t("os.evalNoResults")}</div>
-        ) : row.evaluator_results.map((result, index) => {
-          const matchedEvidence = matchedEvidenceText(row, result.matched_evidence_ids);
-          return (
-            <div key={`${result.evaluator}-${index}`} className="od-evaluator-row">
-              <div className="od-evaluator-head">
-                <strong>{`#${index + 1} ${result.evaluator}`}</strong>
-                <span className={`od-pill ${evalToneClass(result.status)}`}>{evalLabel(t, result.status)}</span>
-              </div>
-              <p>{result.explanation || result.failure_reason || t("os.noEval")}</p>
-              <small>
-                {t("os.evalTrust", { n: formatTrust(result.trust_score) })}
-                {" | "}
-                {t("os.evalMatchedCount", { n: result.matched_evidence_ids.length })}
-                {result.requires_human_confirmation ? ` | ${t("os.evalHumanConfirmation")}` : ""}
-              </small>
-              <small>{matchedEvidence ? t("os.evalMatchedEvidenceDetail", { evidence: matchedEvidence }) : t("os.evalNoMatchedEvidence")}</small>
+    <div className="od-evaluator-list">
+      {row.evaluator_results.length === 0 ? (
+        <div className="od-empty-inline">{t("os.evalNoResults")}</div>
+      ) : row.evaluator_results.map((result, index) => {
+        const matchedEvidence = matchedEvidenceText(row, result.matched_evidence_ids);
+        return (
+          <div key={`${result.evaluator}-${index}`} className="od-evaluator-row">
+            <div className="od-evaluator-head">
+              <strong>{`#${index + 1} ${result.evaluator}`}</strong>
+              <span className={`od-pill ${evalToneClass(result.status)}`}>{evalLabel(t, result.status)}</span>
             </div>
-          );
-        })}
-      </div>
+            <p>{result.explanation || result.failure_reason || t("os.noEval")}</p>
+            <small>
+              {t("os.evalTrust", { n: formatTrust(result.trust_score) })}
+              {" | "}
+              {t("os.evalMatchedCount", { n: result.matched_evidence_ids.length })}
+              {result.requires_human_confirmation ? ` | ${t("os.evalHumanConfirmation")}` : ""}
+            </small>
+            <small>{matchedEvidence ? t("os.evalMatchedEvidenceDetail", { evidence: matchedEvidence }) : t("os.evalNoMatchedEvidence")}</small>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -307,6 +272,10 @@ function EvalMilestoneReviewCard({ row }: { row: EvalStageMilestoneRow }) {
   const { t } = useI18n();
   const state = evalStateOf(row);
   const matchedIds = [...new Set(row.evaluator_results.flatMap((result) => result.matched_evidence_ids))];
+  const evaluatorReviewCount = row.evaluator_results.filter((result) => result.status !== "passed").length;
+  const evidenceReviewCount = row.evidence.filter((item) => item.status !== "matched").length;
+  const lowTrustCount = row.evidence.filter((item) => item.status === "low_trust").length;
+  const reviewCount = evaluatorReviewCount + evidenceReviewCount;
 
   return (
     <article className={`od-work-card od-eval-card${row.completed ? " is-complete" : ""}`}>
@@ -320,7 +289,7 @@ function EvalMilestoneReviewCard({ row }: { row: EvalStageMilestoneRow }) {
           </div>
         </div>
 
-        <div className="od-work-detail-grid">
+        <div className="od-work-detail-grid od-eval-detail-grid">
           <div>
             <span>{t("os.evalRule")}</span>
             <strong>{row.milestone.acceptance_rule.logic}</strong>
@@ -330,6 +299,11 @@ function EvalMilestoneReviewCard({ row }: { row: EvalStageMilestoneRow }) {
             <span>{t("os.evalMatchedEvidence")}</span>
             <strong>{String(matchedIds.length)}</strong>
             <small>{matchedIds.length ? matchedIds.slice(0, 4).map(shortId).join(", ") : t("os.evalNoMatchedEvidence")}</small>
+          </div>
+          <div>
+            <span>{t("os.evalNeedsReview")}</span>
+            <strong>{String(reviewCount)}</strong>
+            <small>{t("os.evalLowTrustSummary", { n: lowTrustCount })}</small>
           </div>
         </div>
 
@@ -344,13 +318,22 @@ function EvalMilestoneReviewCard({ row }: { row: EvalStageMilestoneRow }) {
           </div>
         </div>
 
-        <EvaluatorMatchList row={row} />
+        <div className="od-eval-detail-list">
+          <details className="od-eval-detail-section">
+            <summary>
+              <span>{t("os.evalEvidenceReview")}</span>
+              <span className="od-pill">{t("os.evidenceCount", { n: row.evidence_count })}</span>
+            </summary>
+            <EvidenceReviewList row={row} />
+          </details>
 
-        <div className="od-eval-review-section">
-          <div className="od-eval-card-section-title">
-            <span>{t("os.evalEvidenceReview")}</span>
-          </div>
-          <EvidenceReviewList row={row} />
+          <details className="od-eval-detail-section">
+            <summary>
+              <span>{t("os.evalEvaluatorMatches")}</span>
+              <span className="od-pill">{String(row.evaluator_results.length)}</span>
+            </summary>
+            <EvaluatorMatchList row={row} />
+          </details>
         </div>
       </div>
     </article>
@@ -549,6 +532,7 @@ export function EvalStage(props: EvalStageProps) {
   const evaluatorResults = props.rows.flatMap((row) => row.evaluator_results);
   const satisfiedRows = props.rows.filter((row) => evalStateOf(row) === "passed").length;
   const evidenceReviewItems = props.rows.flatMap((row) => row.evidence).filter((item) => item.status !== "matched").length;
+  const lowTrustCount = props.rows.flatMap((row) => row.evidence).filter((item) => item.status === "low_trust").length;
   const reviewItems = evaluatorResults.filter((result) => result.status !== "passed").length + evidenceReviewItems + pendingCandidates.length;
 
   return (
@@ -561,13 +545,13 @@ export function EvalStage(props: EvalStageProps) {
         </div>
       </div>
 
-      <div className="od-stage-metrics" aria-label={t("os.evalHeading")}>
+      <div className="od-stage-metrics od-eval-overview-metrics" aria-label={t("os.evalHeading")}>
         <EvalStageMetric label={t("os.evalEvidenceTotal")} value={String(evidenceTotal)} />
         <EvalStageMetric label={t("os.evalSatisfied")} value={`${satisfiedRows}/${props.rows.length}`} />
         <EvalStageMetric label={t("os.evalNeedsReview")} value={String(reviewItems)} />
+        <EvalStageMetric label={t("os.evalLowTrustEvidence")} value={String(lowTrustCount)} />
+        <EvalStageMetric label={t("os.evalContextCandidates")} value={String(pendingCandidates.length)} />
       </div>
-
-      <EvalReviewStrip rows={props.rows} pendingCandidates={pendingCandidates} />
 
       <div className="od-work-list">
         {props.rows.map((row) => (
