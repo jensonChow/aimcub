@@ -3,12 +3,14 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import type { Goal, Milestone } from "@core/types";
+import type { RoutingRuntimeAgentOption } from "@core/domain";
+import type { DecompositionOutput, Goal, Milestone } from "@core/types";
 import type { ContextSourceStatus, ProviderStatus, WebResearchStatus } from "../shared/ipc";
 
 import { App, buildSettingsModel, EvidenceSubmissionForm, SettingsPanel } from "./App";
 import { CockpitShell } from "./CockpitShell";
 import { I18nProvider, translate, type I18n } from "./i18n";
+import { PlanPanel } from "./stages/plan/PlanPanel";
 
 const OWNER = "00000000-0000-4000-8000-000000000001";
 const GOAL = "00000000-0000-4000-8000-000000000010";
@@ -104,6 +106,47 @@ const contextSourceStatus: ContextSourceStatus = {
   },
 };
 
+const contractPlan: DecompositionOutput = {
+  goal_summary: "Ship a useful contract review.",
+  domain: "software",
+  rationale: "The aim needs execution contracts before work is saved.",
+  nodes: [
+    {
+      key: "contract-review",
+      title: "Review execution contracts",
+      description: "Check the sub-aim contract before saving.",
+      est_effort: "s",
+      xp_reward: 10,
+      acceptance_rule: {
+        logic: "all",
+        threshold: 1,
+        completion_mode: "auto_then_confirm",
+        clauses: [{ evaluator: "manual_confirm", auto_verifiable: false, match: {} }],
+      },
+      decomposition_contract: {
+        why: "The user needs a clear agreement before execution starts.",
+        definition_of_done: "Every sub-aim has a clear owner and evidence standard.",
+        required_evidence: ["Reviewed contract notes.", "Selected owner."],
+        likely_owner: "agent",
+        context_gaps: [],
+        eval_signal: "The saved aim contains reviewed contract terms.",
+      },
+      routing_override: null,
+    },
+  ],
+  edges: [],
+};
+
+const routingAgents: RoutingRuntimeAgentOption[] = [
+  {
+    id: "codex",
+    label: "Codex CLI",
+    available: true,
+    authenticated: true,
+    models: [{ id: "gpt-5", label: "GPT-5" }],
+  },
+];
+
 describe("EvidenceSubmissionForm", () => {
   it("renders proof note, URL, file, and required evidence controls", () => {
     const html = renderToStaticMarkup(
@@ -146,6 +189,46 @@ describe("App first-run workspace", () => {
     expect(html).not.toContain('id="aim-title"');
     expect(html).not.toContain('id="aim-context"');
     expect(html).not.toContain(">Continue</button>");
+  });
+});
+
+describe("PlanPanel", () => {
+  it("renders contract review fields by default without raw acceptance JSON", () => {
+    const html = renderToStaticMarkup(
+      <I18nProvider>
+        <PlanPanel
+          plan={contractPlan}
+          quality={null}
+          review={null}
+          saved={false}
+          disabled={false}
+          validationErrors={[]}
+          routingAgents={routingAgents}
+          routingValidation={null}
+          onChange={noop}
+          onSave={noop}
+        />
+      </I18nProvider>,
+    );
+    const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
+
+    expect(html).toContain("Execution contracts");
+    expect(html).toContain("Review what each sub-aim means");
+    expect(html).toContain("Why this exists");
+    expect(html).toContain("The user needs a clear agreement before execution starts.");
+    expect(html).toContain("Every sub-aim has a clear owner and evidence standard.");
+    expect(html).toContain("Reviewed contract notes.");
+    expect(html).toContain("The saved aim contains reviewed contract terms.");
+    expect(html).toContain("Suggested owner");
+    expect(html).toContain("Selected owner");
+    expect(html).toContain("Developer details");
+    expect(html).toContain("Save aim");
+    expect(html).not.toContain("Acceptance rule");
+    expect(html).not.toContain("completion_mode");
+    expect(html).not.toContain("clauses");
+    expect(css).toMatch(/\.od-plan-contract-card\s*{[^}]*border:\s*1px solid var\(--od-border-soft\);[^}]*padding:\s*12px 14px;/s);
+    expect(css).toMatch(/\.od-plan-routing-summary\s*{[^}]*border-top:\s*1px solid var\(--od-border-soft\);[^}]*border-bottom:\s*1px solid var\(--od-border-soft\);/s);
+    expect(css).toMatch(/\.od-plan-advanced-body\s*{[^}]*border-top:\s*1px solid var\(--od-border-soft\);/s);
   });
 });
 

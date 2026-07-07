@@ -2942,47 +2942,73 @@ kbd {
   gap: 10px;
 }
 
-.od-plan-card {
+.od-plan-contract-card {
   min-width: 0;
   display: grid;
-  grid-template-columns: 32px minmax(0, 1fr);
+  grid-template-columns: 28px minmax(0, 1fr);
   gap: 12px;
   border: 1px solid var(--od-border-soft);
   border-radius: var(--od-radius-sm);
   background: var(--od-bg);
-  padding: 14px;
+  padding: 12px 14px;
 }
 
-.od-plan-card-index {
-  width: 28px;
-  height: 28px;
+.od-plan-contract-card.has-warning {
+  border-color: color-mix(in oklab, var(--od-warn), var(--od-bg) 70%);
+}
+
+.od-plan-contract-index {
+  width: 26px;
+  height: 26px;
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: color-mix(in oklab, var(--od-accent), var(--od-bg) 92%);
-  color: var(--od-accent);
+  background: var(--od-surface-warm);
+  color: var(--od-muted);
   font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
   font-size: var(--od-type-meta);
   font-weight: var(--od-font-weight-strong);
 }
 
-.od-plan-card-main,
-.od-plan-edit-grid,
+.od-plan-contract-main,
+.od-plan-contract-grid,
 .od-plan-field {
   min-width: 0;
   display: grid;
 }
 
-.od-plan-card-main {
+.od-plan-contract-main {
   gap: 12px;
 }
 
-.od-plan-card-head {
+.od-plan-contract-head {
   min-width: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
   align-items: start;
+}
+
+.od-plan-title-field,
+.od-plan-readonly-title {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.od-plan-readonly-title h3 {
+  margin: 0;
+  color: var(--od-fg);
+  font-size: var(--od-type-title);
+  line-height: 1.35;
+  font-weight: var(--od-font-weight-strong);
+}
+
+.od-plan-title-field span,
+.od-plan-readonly-title span {
+  color: var(--od-muted);
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-strong);
 }
 
 .od-plan-actions {
@@ -2993,7 +3019,8 @@ kbd {
 }
 
 .od-plan-actions button,
-.od-plan-field-head button {
+.od-plan-field-head button,
+.od-plan-advanced-toggle {
   min-height: 32px;
   border: 1px solid var(--od-border-soft);
   border-radius: var(--od-radius-pill);
@@ -3007,14 +3034,16 @@ kbd {
 }
 
 .od-plan-actions button:hover:not(:disabled),
-.od-plan-field-head button:hover {
+.od-plan-field-head button:hover,
+.od-plan-advanced-toggle:hover {
   border-color: transparent;
   background: var(--od-interaction-hover-bg);
   box-shadow: var(--od-interaction-hover-shadow);
 }
 
 .od-plan-actions button:focus-visible,
-.od-plan-field-head button:focus-visible {
+.od-plan-field-head button:focus-visible,
+.od-plan-advanced-toggle:focus-visible {
   border-color: transparent;
   background: var(--od-interaction-hover-bg);
   box-shadow: var(--od-interaction-focus-shadow);
@@ -3026,9 +3055,9 @@ kbd {
   opacity: 0.6;
 }
 
-.od-plan-edit-grid {
+.od-plan-contract-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 10px 12px;
 }
 
 .od-plan-field {
@@ -3046,8 +3075,10 @@ kbd {
   font-weight: var(--od-font-weight-strong);
 }
 
+.od-plan-title-field input,
 .od-plan-field input,
-.od-plan-field textarea {
+.od-plan-field textarea,
+.od-plan-rule-input {
   width: 100%;
   min-width: 0;
   border: 1px solid var(--od-border-soft);
@@ -3060,8 +3091,10 @@ kbd {
   outline: 0;
 }
 
+.od-plan-title-field input:focus,
 .od-plan-field input:focus,
-.od-plan-field textarea:focus {
+.od-plan-field textarea:focus,
+.od-plan-rule-input:focus {
   border-color: color-mix(in oklab, var(--od-accent), var(--od-bg) 48%);
   background: var(--od-bg);
 }
@@ -3075,6 +3108,98 @@ kbd {
   justify-content: space-between;
   align-items: center;
   gap: 10px;
+}
+
+.od-plan-contract-review {
+  display: grid;
+  border-top: 1px solid var(--od-border-soft);
+}
+
+.od-contract-text-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 136px minmax(0, 1fr);
+  gap: 12px;
+  border-bottom: 1px solid var(--od-border-soft);
+  padding: 8px 0;
+}
+
+.od-contract-text-row span,
+.od-plan-routing-summary span,
+.od-plan-rule-summary span {
+  color: var(--od-muted);
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-strong);
+}
+
+.od-contract-text-row p,
+.od-plan-routing-summary p {
+  min-width: 0;
+  margin: 0;
+  color: var(--od-fg-2);
+  font-size: var(--od-type-body);
+  line-height: 1.45;
+}
+
+.od-plan-routing-summary {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 0.75fr) minmax(0, 0.75fr) minmax(0, 1.6fr);
+  gap: 12px;
+  border-top: 1px solid var(--od-border-soft);
+  border-bottom: 1px solid var(--od-border-soft);
+  padding: 9px 0;
+}
+
+.od-plan-routing-summary > div,
+.od-plan-rule-summary > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.od-plan-routing-summary strong,
+.od-plan-rule-summary strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--od-fg);
+  font-size: var(--od-type-body);
+  line-height: 1.35;
+  font-weight: var(--od-font-weight-strong);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.od-plan-routing-summary small {
+  overflow: hidden;
+  color: var(--od-meta);
+  font-size: var(--od-type-meta);
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.od-plan-developer-row {
+  min-width: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.od-plan-rule-summary {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, max-content));
+  gap: 12px;
+}
+
+.od-plan-advanced-body {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--od-border-soft);
+  padding-top: 10px;
 }
 
 .od-plan-rule-input {
@@ -4462,9 +4587,11 @@ kbd {
   .od-work-card,
   .od-eval-summary,
   .od-work-detail-grid,
-  .od-plan-card,
-  .od-plan-card-head,
-  .od-plan-edit-grid {
+  .od-plan-contract-card,
+  .od-plan-contract-head,
+  .od-plan-contract-grid,
+  .od-plan-routing-summary,
+  .od-contract-text-row {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -4515,6 +4642,15 @@ kbd {
 
   .od-plan-actions button {
     flex: 1 1 120px;
+  }
+
+  .od-plan-developer-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .od-plan-rule-summary {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .od-proof-head,
