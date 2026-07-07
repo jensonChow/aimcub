@@ -488,17 +488,9 @@ function EvalContextReviewSection(props: {
   onAcceptContextCandidate: (candidate: Memory, content: string, scope: ContextInboxScope) => void;
   onRejectContextCandidate: (candidate: Memory) => void;
 }) {
-  const { t } = useI18n();
+  if (props.candidates.length === 0) return null;
 
-  return props.candidates.length === 0 ? (
-    <div className="od-eval-context">
-      <div className="od-card-head">
-        <h3>{t("os.evalPendingCandidates")}</h3>
-        <span className="od-pill">{String(props.candidates.length)}</span>
-      </div>
-      <div className="od-empty-inline">{t("os.evalNoPendingCandidates")}</div>
-    </div>
-  ) : (
+  return (
     <ContextInbox
       candidates={props.candidates}
       currentAimTitle={props.goalTitle}
