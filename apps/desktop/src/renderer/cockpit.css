@@ -2952,7 +2952,8 @@ kbd {
 }
 
 .od-execution-subaim-head,
-.od-execution-activity-head {
+.od-execution-activity-head,
+.od-execution-runtime-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2961,6 +2962,7 @@ kbd {
 
 .od-execution-subaim-head > span:first-child,
 .od-execution-activity-head span,
+.od-execution-runtime-head span,
 .od-execution-field span,
 .od-execution-evidence span,
 .od-execution-next span {
@@ -3039,6 +3041,22 @@ kbd {
 .od-execution-evidence.success {
   border-color: color-mix(in oklab, var(--od-success), var(--od-bg) 72%);
   background: color-mix(in oklab, var(--od-success), var(--od-bg) 95%);
+}
+
+.od-execution-runtime {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  border-top: 1px solid var(--od-border-soft);
+  padding-top: 10px;
+}
+
+.od-execution-runtime-head {
+  grid-column: 1 / -1;
+}
+
+.od-execution-runtime .od-execution-field {
+  background: var(--od-surface-warm);
 }
 
 .od-execution-activity {
@@ -3612,6 +3630,10 @@ kbd {
   gap: 14px;
 }
 
+.od-eval-overview-metrics {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .od-eval-review-strip {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -3674,6 +3696,14 @@ kbd {
   font-weight: var(--od-font-weight-semibold);
 }
 
+.od-eval-card {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.od-eval-detail-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .od-evaluator-row {
   min-width: 0;
   display: grid;
@@ -3689,6 +3719,62 @@ kbd {
   gap: 8px;
   border-top: 1px solid var(--od-border-soft);
   padding-top: 10px;
+}
+
+.od-eval-detail-list {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--od-border-soft);
+  padding-top: 10px;
+}
+
+.od-eval-detail-section {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-sm);
+  background: var(--od-surface);
+  padding: 0;
+}
+
+.od-eval-detail-section summary {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px;
+  color: var(--od-muted);
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-semibold);
+  line-height: 1.35;
+  cursor: pointer;
+  list-style: none;
+}
+
+.od-eval-detail-section summary::-webkit-details-marker {
+  display: none;
+}
+
+.od-eval-detail-section summary::after {
+  content: "+";
+  color: var(--od-meta);
+  font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
+  font-weight: var(--od-font-weight-medium);
+}
+
+.od-eval-detail-section[open] summary {
+  border-bottom: 1px solid var(--od-border-soft);
+}
+
+.od-eval-detail-section[open] summary::after {
+  content: "-";
+}
+
+.od-eval-detail-section > .od-evidence-review,
+.od-eval-detail-section > .od-evaluator-list {
+  padding: 0 10px 10px;
 }
 
 .od-eval-card-section-title {
@@ -4788,9 +4874,11 @@ kbd {
   .od-recap-grid,
   .od-work-card,
   .od-eval-summary,
+  .od-eval-overview-metrics,
   .od-eval-review-strip,
   .od-work-detail-grid,
   .od-execution-grid,
+  .od-execution-runtime,
   .od-execution-activity li,
   .od-plan-contract-card,
   .od-plan-contract-head,
