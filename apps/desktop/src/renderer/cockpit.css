@@ -3141,9 +3141,9 @@ kbd {
 .od-plan-contract-head {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
-  align-items: start;
+  align-items: center;
 }
 
 .od-plan-title-field,
@@ -3168,19 +3168,72 @@ kbd {
   font-weight: var(--od-font-weight-strong);
 }
 
-.od-plan-actions {
+.od-plan-route-chips {
+  min-width: 0;
   display: flex;
   justify-content: flex-end;
   gap: 6px;
   flex-wrap: wrap;
 }
 
+.od-plan-route-chip {
+  min-width: 0;
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-pill);
+  background: var(--od-surface-warm);
+  color: var(--od-muted);
+  padding: 2px 9px;
+  font-size: var(--od-type-meta);
+  line-height: var(--od-line-meta);
+}
+
+.od-plan-route-chip strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--od-fg);
+  font-weight: var(--od-font-weight-strong);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.od-plan-route-chip small {
+  color: var(--od-meta);
+  font-size: inherit;
+  line-height: inherit;
+  white-space: nowrap;
+}
+
+.od-plan-route-chip.is-warning {
+  border-color: color-mix(in oklab, var(--od-warn), var(--od-bg) 74%);
+  background: color-mix(in oklab, var(--od-warn), var(--od-bg) 94%);
+  color: var(--od-warn);
+}
+
+.od-plan-route-chip.is-warning strong {
+  color: var(--od-warn);
+}
+
+.od-plan-actions {
+  display: flex;
+  justify-content: flex-start;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.od-plan-edit-details,
+.od-plan-routing-details,
 .od-plan-structure-details {
   min-width: 0;
   border-top: 1px solid var(--od-border-soft);
   padding-top: 2px;
 }
 
+.od-plan-edit-details summary,
+.od-plan-routing-details summary,
 .od-plan-structure-details summary {
   width: max-content;
   min-height: 28px;
@@ -3195,9 +3248,19 @@ kbd {
   cursor: pointer;
 }
 
+.od-plan-edit-details summary:hover,
+.od-plan-edit-details summary:focus-visible,
+.od-plan-routing-details summary:hover,
+.od-plan-routing-details summary:focus-visible,
 .od-plan-structure-details summary:hover,
 .od-plan-structure-details summary:focus-visible {
   color: var(--od-fg);
+}
+
+.od-plan-edit-details .od-plan-contract-grid,
+.od-plan-edit-details .od-plan-contract-review,
+.od-plan-routing-details .od-routing-controls {
+  margin-top: 8px;
 }
 
 .od-plan-structure-details .od-plan-actions {
@@ -3240,6 +3303,22 @@ kbd {
   color: var(--od-meta);
   cursor: default;
   opacity: 0.6;
+}
+
+.od-plan-actions .od-plan-icon-action {
+  width: 32px;
+  min-height: 32px;
+  padding: 0;
+}
+
+.od-plan-icon-action svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: var(--od-icon-stroke);
 }
 
 .od-plan-contract-grid {
@@ -3297,6 +3376,7 @@ kbd {
   gap: 10px;
 }
 
+.od-plan-contract-summary,
 .od-plan-contract-review {
   display: grid;
   border-top: 1px solid var(--od-border-soft);
@@ -3311,8 +3391,12 @@ kbd {
   padding: 8px 0;
 }
 
+.od-contract-text-row:last-child {
+  border-bottom: 0;
+}
+
 .od-contract-text-row span,
-.od-plan-routing-summary span,
+.od-plan-routing-context span,
 .od-plan-rule-summary span {
   color: var(--od-muted);
   font-size: var(--od-type-meta);
@@ -3320,7 +3404,7 @@ kbd {
 }
 
 .od-contract-text-row p,
-.od-plan-routing-summary p {
+.od-plan-routing-context p {
   min-width: 0;
   margin: 0;
   color: var(--od-fg-2);
@@ -3328,24 +3412,21 @@ kbd {
   line-height: 1.45;
 }
 
-.od-plan-routing-summary {
+.od-plan-routing-context {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 0.75fr) minmax(0, 0.75fr) minmax(0, 1.6fr);
-  gap: 12px;
-  border-top: 1px solid var(--od-border-soft);
-  border-bottom: 1px solid var(--od-border-soft);
-  padding: 9px 0;
+  gap: 8px;
+  margin-top: 8px;
 }
 
-.od-plan-routing-summary > div,
+.od-plan-routing-context > div,
 .od-plan-rule-summary > div {
   min-width: 0;
   display: grid;
   gap: 3px;
 }
 
-.od-plan-routing-summary strong,
+.od-plan-routing-context strong,
 .od-plan-rule-summary strong {
   min-width: 0;
   overflow: hidden;
@@ -3363,7 +3444,7 @@ kbd {
   white-space: normal;
 }
 
-.od-plan-routing-summary small {
+.od-plan-routing-context small {
   overflow: hidden;
   color: var(--od-meta);
   font-size: var(--od-type-meta);
@@ -3375,7 +3456,7 @@ kbd {
 .od-plan-developer-row {
   min-width: 0;
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 12px;
   align-items: center;
 }
@@ -4919,12 +5000,14 @@ kbd {
   .od-plan-contract-card,
   .od-plan-contract-head,
   .od-plan-contract-grid,
-  .od-plan-routing-summary,
+  .od-plan-contract-summary,
+  .od-plan-routing-context,
   .od-contract-text-row {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .od-plan-node-pills {
+  .od-plan-node-pills,
+  .od-plan-route-chips {
     justify-content: flex-start;
   }
 
@@ -4970,7 +5053,7 @@ kbd {
   }
 
   .od-plan-actions button {
-    flex: 1 1 120px;
+    flex: 0 0 32px;
   }
 
   .od-plan-developer-row {

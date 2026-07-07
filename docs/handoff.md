@@ -1,66 +1,45 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-07
-Branch: `main`
+Branch: detached worktree from `main`
 
 ## Current Session
 
-- Ran the `memory-refresh` workflow after the Desktop polish integration.
-- `python3 /Users/jenson/.codex/skills/memory-refresh/scripts/audit_project_memory.py /Users/jenson/Desktop/Aimcub` reported root memory line budgets OK and identified `docs/memory/desktop.md` plus `docs/memory/operations.md` as candidate memories.
-- Promoted the integrated stage polish defaults into `docs/memory/desktop.md`: Context ready-flow behavior, Plan/Contracts structure and Developer details treatment, Execute next-action/runtime detail split, Eval trust-summary/detail disclosure behavior, and `docs/desktop-polish-audit.md` as the current polish backlog.
-- No `docs/memory/operations.md` change was needed; its verification, packaging, and handoff protocol still matches the current repo process.
-- Integrated the next local alpha/Desktop polish worktrees into `main`.
-- Merged `4189eb79` (`Audit desktop local alpha polish`) via `777449e4` (`Merge desktop polish audit`).
-- Merged `d1b9e1f6` (`Thin desktop renderer controller`) via `f2e7a315` (`Merge desktop renderer controller thinning`).
-- Merged `8de1c787` (`Polish plan and context stages`) via `55746e45` (`Merge plan and context stage polish`).
-- Merged `c136711c` (`Polish eval and execute stages`) via `cfd1a049` (`Merge eval and execute stage polish`).
-- Added `docs/desktop-polish-audit.md` with the Desktop local alpha polish audit and stage-level recommendations.
-- Moved side-effect-free workflow transforms from `App.tsx` into `apps/desktop/src/renderer/workflow/`, added focused helper tests, and kept `App.tsx` oriented around state, IPC calls, stage routing, and shell handoffs.
-- Polished Context, Plan/Contracts, Eval, and Execute stage content without adding new product scope.
-- Preserved the Desktop shell/sidebar/window-chrome framework. `CockpitShell.tsx` was not edited, and `cockpit.css` changes are scoped to non-sidebar stage content.
-
-## Conflict Resolutions
-
-- `docs/handoff.md`: replaced parallel branch-local handoffs with this integration handoff in each merge.
-- No renderer code conflicts remained after Git auto-merged `App.tsx`, `App.test.tsx`, `i18n.tsx`, and `cockpit.css`.
-- Sidebar/window-chrome protection check passed: no `CockpitShell.tsx` diff, no `.od-sidebar*`, `.od-user-menu-*`, `.od-window-drag-strip`, `.od-sidebar-hover-zone`, `.od-sidebar-peek-trigger`, `.od-sidebar-toggle`, or `.od-sidebar-resizer` selector changes.
-- Memory refresh added only durable Desktop memory and this handoff update.
+- Reduced Plan/Contracts sub-aim card density so each card is summary-first by default.
+- `apps/desktop/src/renderer/stages/plan/PlanContractCard.tsx` now leads with title, selected route, validation state when present, definition of done, required evidence, and routing rationale.
+- Description/body, why, full eval signal, detailed routing controls, and structure edits now live behind secondary disclosures. Raw `acceptance_rule` JSON remains available only when Developer details is open.
+- Structure edit actions are compact icon buttons with accessible labels and tooltips instead of repeated default text buttons.
+- Updated Plan card styles in `apps/desktop/src/renderer/cockpit.css`; changes are scoped to active Plan contract/card selectors plus the existing Plan routing controls.
+- Added the `plan.contractDetails` i18n label and strengthened `apps/desktop/src/renderer/App.test.tsx` coverage for summary-first cards, collapsed secondary controls, Developer-only raw acceptance rules, and callback reachability in markup.
+- Updated `docs/memory/desktop.md` and `docs/memory/design-system.md` with the durable summary-first Plan/Contracts rule.
 
 ## Verification
 
 Passed:
 
-- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
-- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
-- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck`
-- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm lint`
-- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm core:purity`
+- `pnpm --filter @app/desktop typecheck`
+- `pnpm --filter @app/desktop test`
 - `git diff --check`
-- `ELECTRON_BUILDER_CACHE=/private/tmp/aimcub-electron-builder-cache COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm desktop:pack`
-- `ditto apps/desktop/dist/mac-arm64/Aimcub.app Aimcub.app`
-- `plutil -p Aimcub.app/Contents/Info.plist`
-- `python3 /Users/jenson/.codex/skills/memory-refresh/scripts/audit_project_memory.py /Users/jenson/Desktop/Aimcub`
 
 Notes:
 
-- MCP worker tests logged the expected missing-Supabase opaque-error path while passing.
-- Root `Aimcub.app` was refreshed from `apps/desktop/dist/mac-arm64/Aimcub.app`.
-- Visual app launch/resizing was not run in this integration session; the packaged app bundle was inspected through `Info.plist`.
-- Memory-refresh verification passed after the latest docs update: build, test, typecheck, lint, core purity, `git diff --check`, memory audit, `desktop:pack`, and root app refresh.
+- Focused check also passed: `pnpm --filter @app/desktop test -- App.test.tsx`.
+- The first focused test run materialized workspace dependencies because `node_modules` was absent. No package manager or dependency files were changed.
+- Per the parallel-worktree prompt, this session did not run GUI/computer-use, `pnpm desktop`, `pnpm desktop:dev`, long-running dev servers, `pnpm desktop:pack`, root `Aimcub.app` refresh, push, merge, pull, worktree pruning, or `git gc`.
+
+## Shell And Sidebar Preservation
+
+- `apps/desktop/src/renderer/CockpitShell.tsx` was not edited.
+- No protected shell/sidebar/window-chrome selectors were edited, including `.od-sidebar*`, `.od-user-menu-*`, `.od-window-drag-strip`, `.od-sidebar-hover-zone`, `.od-sidebar-peek-trigger`, `.od-sidebar-toggle`, `.od-sidebar-resizer`, or shell grid/sidebar state selectors.
+- The Desktop shell/sidebar/window-chrome framework is intentionally preserved.
 
 ## Commit And Push Status
 
-- Verification is complete.
-- Integration handoff commit before push: `5f281f12` (`Refresh desktop polish integration handoff`).
-- `git push origin main` succeeded, publishing `a632a3d5..5f281f12`.
-- This handoff status update records the successful push and should be the final status commit for this integration round.
-- Memory-refresh commit before push: `66c7ca2` (`Refresh desktop polish memory`).
-- `git push origin main` succeeded for memory refresh, publishing `ce61485c..66c7ca25`.
-- This handoff status update records the successful memory-refresh push and should be the final status commit for this memory-refresh round.
-- Final branch state is authoritative in `git status --short --branch` and `git log --oneline -6`.
+- Local commit: to be created from this handoff as `Reduce plan contract card density`; the final assistant response will report the generated hash.
+- Push/merge/root app packaging are intentionally not run in this parallel worktree. Integration will handle them.
 
 ## Next Session Prompt
 
 ```text
-Continue from `main`. Start by reading AGENTS.md, docs/handoff.md, and docs/memory/README.md, then load only task-relevant module memory. Inspect `git status --short --branch` and `git log --oneline -8` first. If push was blocked, request explicit approval before retrying `git push origin main`. Preserve the Desktop shell/sidebar/window-chrome framework exactly unless the user explicitly approves a sidebar change.
+Continue from this detached worktree. Inspect `git status --short --branch` and `git log --oneline -6`. This worktree intentionally has only local Plan/Contracts card-density work and must not be pushed or merged here unless the user explicitly changes that constraint. Preserve the Desktop shell/sidebar/window-chrome framework.
 ```
