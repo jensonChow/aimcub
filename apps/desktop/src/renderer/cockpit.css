@@ -1370,7 +1370,7 @@ kbd {
 }
 
 .od-workspace-settings {
-  width: min(100%, 760px);
+  width: min(100%, 1080px);
 }
 
 .od-helper-intro {
@@ -1470,17 +1470,33 @@ kbd {
 
 .od-settings-search input {
   width: 100%;
-  min-height: 34px;
+  min-height: 36px;
   border: 1px solid var(--od-border-soft);
-  border-radius: var(--od-radius-sm);
+  border-radius: var(--od-radius-md);
   background: var(--od-surface-warm);
   color: var(--od-fg);
-  padding: 0 11px;
+  padding: 0 11px 0 calc(var(--sidebar-row-padding-x) + var(--sidebar-action-icon-slot) + var(--sidebar-action-label-gap));
   font-size: var(--od-type-body);
 }
 
 .od-settings-search input::placeholder {
   color: var(--od-meta);
+}
+
+.od-settings-search-icon {
+  position: absolute;
+  left: var(--sidebar-row-padding-x);
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  color: var(--od-meta);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: var(--od-icon-stroke);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+  transform: translate(var(--sidebar-action-icon-offset-x), -50%);
 }
 
 .od-settings-nav {
@@ -1527,17 +1543,6 @@ kbd {
   transition: background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
 }
 
-.od-settings-nav-item::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 8px;
-  bottom: 8px;
-  width: 2px;
-  border-radius: var(--od-radius-pill);
-  background: transparent;
-}
-
 .od-settings-nav-item:hover {
   background: var(--od-interaction-hover-bg);
   border-color: transparent;
@@ -1551,13 +1556,13 @@ kbd {
 }
 
 .od-settings-nav-item[data-active="true"] {
-  background: var(--od-bg);
-  border-color: var(--od-border-soft);
+  background: var(--od-selection-bg);
+  border-color: transparent;
   box-shadow: none;
 }
 
-.od-settings-nav-item[data-active="true"]::before {
-  background: var(--od-accent);
+.od-settings-nav-item[data-active="true"]:hover {
+  background: var(--od-selection-hover-bg);
 }
 
 .od-settings-nav-icon {
@@ -1574,7 +1579,7 @@ kbd {
 }
 
 .od-settings-nav-item[data-active="true"] .od-settings-nav-icon {
-  color: var(--od-accent);
+  color: currentColor;
 }
 
 .od-settings-nav-label {
@@ -1670,7 +1675,10 @@ kbd {
 }
 
 .od-settings-row-list {
-  border-top: 1px solid var(--od-border-soft);
+  overflow: hidden;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-md);
+  background: var(--od-surface-warm);
 }
 
 .od-settings-row,
@@ -1680,8 +1688,21 @@ kbd {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 16px;
   align-items: center;
-  padding: 14px 0;
+  padding: 14px 16px;
+}
+
+.od-settings-row {
   border-bottom: 1px solid var(--od-border-soft);
+}
+
+.od-settings-row:last-child {
+  border-bottom: 0;
+}
+
+.od-settings-current-aim {
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-md);
+  background: var(--od-surface-warm);
 }
 
 .od-settings-row-copy,
@@ -1728,38 +1749,61 @@ kbd {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--od-border-soft);
+  gap: 6px;
+  border: 1px solid transparent;
   border-radius: var(--od-radius-pill);
-  background: var(--od-surface);
+  background: transparent;
   color: var(--od-muted);
-  padding: 2px 8px;
+  padding: 2px 3px;
   font-size: var(--od-type-meta);
   line-height: 16px;
   font-weight: var(--od-font-weight-medium);
   white-space: nowrap;
 }
 
+.od-settings-status-pill::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border: 1px solid var(--od-border);
+  border-radius: 999px;
+  background: var(--od-meta);
+}
+
+.od-settings-status-pill.success::before {
+  background: var(--od-success);
+  border-color: color-mix(in oklab, var(--od-success), var(--od-bg) 46%);
+}
+
 .od-settings-status-pill.warn {
-  background: color-mix(in oklab, var(--od-warn), var(--od-bg) 94%);
-  color: color-mix(in oklab, var(--od-warn), var(--od-fg) 20%);
-  border-color: color-mix(in oklab, var(--od-warn), var(--od-bg) 72%);
+  color: var(--od-muted);
+}
+
+.od-settings-status-pill.warn::before {
+  background: var(--od-warn);
+  border-color: color-mix(in oklab, var(--od-warn), var(--od-bg) 46%);
 }
 
 .od-settings-status-pill.blue {
-  color: var(--od-accent);
-  border-color: color-mix(in oklab, var(--od-accent), var(--od-bg) 72%);
+  color: var(--od-muted);
+}
+
+.od-settings-status-pill.blue::before {
+  background: var(--od-accent);
+  border-color: color-mix(in oklab, var(--od-accent), var(--od-bg) 46%);
 }
 
 .od-settings-row-button {
-  min-height: 32px;
-  border: 1px solid var(--od-border-soft);
+  min-height: 28px;
+  border: 1px solid transparent;
   border-radius: var(--od-radius-sm);
-  background: var(--od-surface-warm);
+  background: var(--od-surface);
   color: var(--od-fg);
-  padding: 0 10px;
+  padding: 0 9px;
   font-size: var(--od-type-meta);
   line-height: 16px;
-  font-weight: var(--od-font-weight-semibold);
+  font-weight: var(--od-font-weight-medium);
   white-space: nowrap;
   cursor: pointer;
 }

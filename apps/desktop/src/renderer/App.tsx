@@ -3159,6 +3159,7 @@ function SettingsPrimarySidebar(props: {
       </button>
 
       <label className="od-settings-search">
+        <SettingsSearchIcon />
         <span>{t("settings.searchLabel")}</span>
         <input
           value={query}
@@ -3195,6 +3196,15 @@ function SettingsBackIcon() {
     <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
       <path d="M12.5 5.5 8 10l4.5 4.5" />
       <path d="M8.5 10H16" />
+    </svg>
+  );
+}
+
+function SettingsSearchIcon() {
+  return (
+    <svg className="od-settings-search-icon" aria-hidden="true" viewBox="0 0 20 20" focusable="false">
+      <circle cx="8.5" cy="8.5" r="4.75" />
+      <path d="m12.25 12.25 3.25 3.25" />
     </svg>
   );
 }
