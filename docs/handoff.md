@@ -54,7 +54,9 @@ Notes:
 - Integration handoff commit before push: `5f281f12` (`Refresh desktop polish integration handoff`).
 - `git push origin main` succeeded, publishing `a632a3d5..5f281f12`.
 - This handoff status update records the successful push and should be the final status commit for this integration round.
-- Memory-refresh commit/push is pending after the latest docs update.
+- Memory-refresh commit before push: `66c7ca2` (`Refresh desktop polish memory`).
+- `git push origin main` succeeded for memory refresh, publishing `ce61485c..66c7ca25`.
+- This handoff status update records the successful memory-refresh push and should be the final status commit for this memory-refresh round.
 - Final branch state is authoritative in `git status --short --branch` and `git log --oneline -6`.
 
 ## Next Session Prompt
