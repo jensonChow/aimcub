@@ -49,6 +49,7 @@ import { Notice } from "./Notice";
 import { mergePlanningDebugTraces } from "./PlanningDebugPanel";
 import { ProviderForm } from "./ProviderForm";
 import { ContextClarifyPanel } from "./stages/context/ContextClarifyPanel";
+import { buildContextLoopModel } from "./stages/context/contextLoop";
 import { ContextReviewPanel } from "./stages/context/ContextReviewPanel";
 import { ContextStage } from "./stages/context/ContextStage";
 import type { ClarifyPhase, ContextAnswerMap } from "./stages/context/types";
@@ -527,6 +528,31 @@ function AimOsApp() {
     && (contextReviewItemCount > 0
       || (mode === "contexting" && Boolean(busy))
       || mode === "drafting");
+  const contextLoop = useMemo(() => buildContextLoopModel({
+    contextSources,
+    review: contextReview,
+    planningContext: currentPlanningContext,
+    planningTools: currentPlanningTools,
+    intake: currentIntake,
+    liveEvents: planningLiveEvents,
+    running: (mode === "contexting" || mode === "drafting") && Boolean(busy),
+    answeredQuestionCount: builtIntakeAnswers.length + builtAnswers.length,
+    questionCount: clarify?.questions.length ?? currentIntake?.questions.length ?? 0,
+    contextNote,
+  }), [
+    builtAnswers.length,
+    builtIntakeAnswers.length,
+    busy,
+    clarify,
+    contextNote,
+    contextReview,
+    contextSources,
+    currentIntake,
+    currentPlanningContext,
+    currentPlanningTools,
+    mode,
+    planningLiveEvents,
+  ]);
 
   function applyPlanEdit(nextPlan: DecompositionOutput) {
     setFinalPlan(nextPlan);
@@ -725,6 +751,7 @@ function AimOsApp() {
           clarifyPanel={clarifyPanel}
           contextSources={contextSources}
           review={contextReview}
+          loop={contextLoop}
           showReview={shouldShowContextReviewInContext}
           reviewRunning={mode === "contexting" && Boolean(busy)}
           onEditAim={selected ? undefined : () => openCockpitStage("aim")}

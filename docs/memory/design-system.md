@@ -1,6 +1,6 @@
 # Design System Memory
 
-Last updated: 2026-07-07
+Last updated: 2026-07-09
 
 ## Scope
 
@@ -50,6 +50,7 @@ Reference links:
 - Context is a substrate: show context health as concise status, setup controls, and review affordances. Do not turn memory/context into a profile page or a decorative feed.
 - Context source setup must keep one clear summary plus one editable control surface; do not repeat local, online, web, deep research, context-session, or questionnaire controls as separate card, table, and toggle representations. Planning readiness gates may sit under the summary as compact rows when they explain why planning can proceed or what remains blocked.
 - Context stage workbench must be stepwise and sparse. Keep provider setup, web capability, online connectors, and permission configuration in onboarding or Settings; the default Context stage should show one blocking question at a time, with compact current-aim context and source material as a secondary disclosure during that blocking state, then aim-local attachments or notes, then planning/review state only after it is relevant, with a single Continue to Plan action when no question or refinement panel is active.
+- Context stage intake is an iterative context-building loop, not a blocking form. Show automated activity and context sufficiency before targeted clarification, derive the signal from live planning events, planning context/tools, intake, review buckets, answers, notes, and source status, and render source material as secondary while a blocking question is active. Activity copy must summarize tool/action state such as local reads, linked context, web research, distillation, follow-up questions, and access gaps without exposing raw prompts, traces, or chain-of-thought. Blocking questions should read like an assistant/user exchange with selectable reply chips/cards and a short temporary free-form reply lane.
 - Context bundle review is a default product surface before/inside planning. It should separate used context, skipped or unread context, permission/setup gaps, and unresolved decomposition risks without exposing raw prompts, model traces, or chain-of-thought, and it should omit empty buckets so setup gaps and risks appear only when they exist.
 - Evidence is trustworthy UI: completion, progress, warnings, and quality claims must show the evidence or review path behind them without exposing private chain-of-thought.
 - Eval is the trust center for an aim: its default view should make evidence, matched rule/evaluator, trust score, missing or low-trust proof, and learned context review clear without sending users to Settings or debug surfaces. Empty Context Inbox states should not render as a full review block; the overview metric can carry zero, and the full inbox appears only when pending candidates exist.

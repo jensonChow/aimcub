@@ -1,52 +1,55 @@
 # Aimcub Handoff
 
-Last updated: 2026-07-08
-Branch: `main`
+Last updated: 2026-07-09
+Branch: detached worktree HEAD
 
 ## Current Session
 
-- Request: run `memory-refresh`, then commit, push, and merge completed work into `main`.
-- Started from clean `main` at `d55be6678320442e6332949f9d4dbacd7f82516e`, aligned with `origin/main`.
-- Ran the memory-refresh audit. Root memory stayed within the 50-line budget, and the audit pointed to product, architecture, and operations module memory.
-- Read `AGENTS.md`, this handoff, `docs/memory/README.md`, `docs/memory/product.md`, `docs/memory/architecture.md`, `docs/memory/operations.md`, the local alpha seed implementation, seed tests, and the local-alpha docs.
-- Confirmed the prior integration commit `d55be667` is already pushed to `origin/main`; no separate branch merge is pending.
+- Request: redesign the Context stage from a form-like blocking question surface into an iterative context-building loop with activity feedback, chat-like clarification, and a context sufficiency signal.
+- Scope honored: no GUI or computer-use, no Desktop shell/sidebar/window-chrome changes, no `pnpm desktop`, no dev server, no `pnpm desktop:pack`, no root `Aimcub.app` refresh, no push, no merge, and no package manager or dependency file changes.
+- Read the objective file, `AGENTS.md`, this handoff, required module memories, local-alpha docs, Context stage files, `App.tsx`, source panel/review/workflow helpers, i18n, CSS, and relevant tests before editing.
 
 ## Completed Work
 
-- Replaced the stale integration-session handoff that still said commit and push were pending.
-- Kept durable local-alpha seed procedure in `docs/memory/operations.md` instead of duplicating long-lived instructions here.
-- Confirmed the deterministic seed is implemented in `packages/store/src/local-alpha-demo.ts`, exposed through `examples/local-alpha/seed-local-alpha-demo.ts`, and covered by `packages/store/src/store.test.ts`.
-- Confirmed the current docs describe the open-source local alpha path, isolated seed target, local/hosted boundary, and remaining public-release gaps.
+- Added a derived Context loop model from existing renderer signals: planning live events, planning context/tools, intake, review buckets, answers, notes, and source status.
+- Added a Context activity surface for local reads, linked context, optional web research, distillation, follow-up questions, blocked states, and stable no-run placeholders.
+- Added a qualitative sufficiency signal with `Thin`, `Useful`, and `Strong` levels, warning chips, and score changes from stronger/weaker context inputs.
+- Reworked blocking intake into an assistant/user chat-like exchange while preserving one blocking question at a time, single/multi-select choices, custom answers, the context note, and source Settings handoff.
+- Kept source material secondary during active blocking questions through the existing collapsed source disclosure.
+- Updated durable design memory with the new Context loop interaction rule.
+
+## Changed Files
+
+- `apps/desktop/src/renderer/App.tsx`
+- `apps/desktop/src/renderer/cockpit.css`
+- `apps/desktop/src/renderer/i18n.tsx`
+- `apps/desktop/src/renderer/stages/context/ContextActivityPanel.tsx`
+- `apps/desktop/src/renderer/stages/context/ContextClarifyPanel.tsx`
+- `apps/desktop/src/renderer/stages/context/ContextStage.tsx`
+- `apps/desktop/src/renderer/stages/context/ContextStage.test.tsx`
+- `apps/desktop/src/renderer/stages/context/contextLoop.ts`
+- `apps/desktop/src/renderer/stages/context/contextLoop.test.ts`
+- `docs/memory/design-system.md`
+- `docs/handoff.md`
 
 ## Verification
 
-Run before the memory-refresh commit:
-
-- `python3 /Users/jenson/.codex/skills/memory-refresh/scripts/audit_project_memory.py /Users/jenson/Desktop/Aimcub`
-- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
-- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
-- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck`
-- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm lint`
-- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm core:purity`
-- `git diff --check`
-- `ELECTRON_BUILDER_CACHE=/private/tmp/aimcub-electron-builder-cache COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm desktop:pack`
-- `ditto apps/desktop/dist/mac-arm64/Aimcub.app Aimcub.app`
-- `plutil -p Aimcub.app/Contents/Info.plist`
-
-`pnpm test` may log expected opaque MCP startup errors when hosted Supabase environment variables are unset.
+- `pnpm --filter @app/desktop typecheck` passed.
+- `pnpm --filter @app/desktop test` passed: 18 test files, 130 tests.
+- `git diff --check` passed.
 
 ## Commit And Push Status
 
-- This session changes only `docs/handoff.md`.
-- Commit and push for this handoff refresh are pending; the final hash and push result are reported in the Codex response.
+- Commit message: `Make context intake an iterative research loop`.
+- Commit hash: final hash is reported in the Codex response after the commit is created; this handoff is part of that commit.
+- Push/merge/root app refresh: intentionally not run in this parallel worktree. Integration will handle full verification, packaging, push, and merge.
+
+## Shell/Sidebar Preservation
+
+- `apps/desktop/src/renderer/CockpitShell.tsx` was not changed.
+- Protected sidebar/window-chrome behavior was not changed.
+- New CSS is scoped to Context stage/content selectors, not shell/sidebar/window selectors.
 
 ## Open Items
 
-- Public open-source release still needs license selection, `CONTRIBUTING.md`, `SECURITY.md`, and a secrets/env example review.
-- Native macOS traffic lights/window chrome were not directly screenshot-verified in the prior visual pass because full-desktop capture was rejected for privacy, but the protected Desktop shell/sidebar/window-chrome files were unchanged.
-
-## Next Session Prompt
-
-```text
-Continue from main. Read AGENTS.md, docs/handoff.md, and docs/memory/README.md first, then inspect git status. Preserve the Desktop shell/sidebar/window-chrome framework unless the user explicitly approves a shell change. For local alpha demo work, use examples/local-alpha/ with an isolated AIMCUB_HOME such as /tmp/aimcub-local-alpha-demo, never the real ~/.aimcub store.
-```
+- Full repo verification, Desktop packaging, root `Aimcub.app` refresh, push, and merge remain for the integration session by explicit objective scope.

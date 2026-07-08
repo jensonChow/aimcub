@@ -6,7 +6,9 @@ import type { ContextBundleReview } from "../../contextReview";
 import { useI18n } from "../../i18n";
 import { Button } from "../../ui";
 import { ContextAimSummaryPanel } from "./ContextAimSummaryPanel";
+import { ContextActivityPanel } from "./ContextActivityPanel";
 import { ContextReviewPanel } from "./ContextReviewPanel";
+import type { ContextLoopModel } from "./contextLoop";
 import type { ClarifyPhase } from "./types";
 
 interface ContextStageProps {
@@ -19,6 +21,7 @@ interface ContextStageProps {
   clarifyPanel: ReactNode;
   contextSources: ContextSourceStatus | null;
   review: ContextBundleReview;
+  loop: ContextLoopModel;
   showReview: boolean;
   reviewRunning: boolean;
   onEditAim?: () => void;
@@ -37,6 +40,7 @@ export function ContextStage({
   clarifyPanel,
   contextSources,
   review,
+  loop,
   showReview,
   reviewRunning,
   onEditAim,
@@ -70,6 +74,7 @@ export function ContextStage({
           onEdit={onEditAim}
         />
       )}
+      <ContextActivityPanel model={loop} />
       {hasBlockingQuestion ? clarifyPanel : null}
       {hasBlockingQuestion ? (
         <details className="od-context-secondary-sources" data-od-id="context-secondary-sources">
