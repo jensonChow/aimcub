@@ -1,52 +1,69 @@
 # Aimcub Handoff
 
-Last updated: 2026-07-08
-Branch: `main`
+Last updated: 2026-07-09
+Branch: detached HEAD worktree
 
 ## Current Session
 
-- Request: run `memory-refresh`, then commit, push, and merge completed work into `main`.
-- Started from clean `main` at `d55be6678320442e6332949f9d4dbacd7f82516e`, aligned with `origin/main`.
-- Ran the memory-refresh audit. Root memory stayed within the 50-line budget, and the audit pointed to product, architecture, and operations module memory.
-- Read `AGENTS.md`, this handoff, `docs/memory/README.md`, `docs/memory/product.md`, `docs/memory/architecture.md`, `docs/memory/operations.md`, the local alpha seed implementation, seed tests, and the local-alpha docs.
-- Confirmed the prior integration commit `d55be667` is already pushed to `origin/main`; no separate branch merge is pending.
+- Request: fix Desktop product-usage bugs around raw planning errors, stale state, confusing transitions, and brittle plan-generation failure handling.
+- Objective source: `/Users/jenson/.codex/attachments/b4047f6d-80bc-4027-baf9-fa0930140550/goal-objective.md`.
+- Worktree constraints followed: no GUI/computer-use, no packaged app launch, no `pnpm desktop`, no `pnpm desktop:dev`, no `pnpm desktop:pack`, no root `Aimcub.app` refresh, no real `~/.aimcub` writes, no push, no merge.
+- Desktop shell/sidebar/window-chrome preservation: `CockpitShell.tsx`, Desktop shell/sidebar/window-chrome selectors, and packaged app artifacts were not modified. `cockpit.css` changes are scoped to `.od-notice*` planning error disclosure styling.
 
 ## Completed Work
 
-- Replaced the stale integration-session handoff that still said commit and push were pending.
-- Kept durable local-alpha seed procedure in `docs/memory/operations.md` instead of duplicating long-lived instructions here.
-- Confirmed the deterministic seed is implemented in `packages/store/src/local-alpha-demo.ts`, exposed through `examples/local-alpha/seed-local-alpha-demo.ts`, and covered by `packages/store/src/store.test.ts`.
-- Confirmed the current docs describe the open-source local alpha path, isolated seed target, local/hosted boundary, and remaining public-release gaps.
+- Added `docs/desktop-product-bugs.md` with the focused product bug audit and regression cases.
+- Added `apps/desktop/src/renderer/workflow/planningErrors.ts` for product-facing planning error formatting and retry route decisions.
+- Updated Desktop draft/refine/save handling so:
+  - raw validator paths are not shown in the default global error UI
+  - developer details remain available behind an explicit disclosure
+  - draft failures return to Context for regenerate/retry
+  - refine failures keep the previous draft path available
+  - save validation failures stay on Plan/Contracts
+  - active plan validation messages are friendly in `PlanPanel`
+- Updated `Notice` and `.od-notice*` styles for compact product copy plus bounded developer details.
+- Extended LLM raw-plan normalization to repair numeric-string `min_files` values before Zod validation.
+- Added renderer and LLM regression tests for user-facing formatting, developer details, failure routes, stale-state clearing, and `min_files` repair.
+- Added a durable Desktop memory rule that planning/draft/refine/save internals stay behind Developer details.
+
+## Changed Files
+
+- `apps/desktop/src/renderer/App.tsx`
+- `apps/desktop/src/renderer/App.test.tsx`
+- `apps/desktop/src/renderer/Notice.tsx`
+- `apps/desktop/src/renderer/cockpit.css`
+- `apps/desktop/src/renderer/i18n.tsx`
+- `apps/desktop/src/renderer/workflow/planningErrors.ts`
+- `apps/desktop/src/renderer/workflow/workflowHelpers.test.ts`
+- `packages/llm/src/decompose.ts`
+- `packages/llm/src/decompose.test.ts`
+- `docs/desktop-product-bugs.md`
+- `docs/memory/desktop.md`
+- `docs/handoff.md`
 
 ## Verification
 
-Run before the memory-refresh commit:
+- `pnpm --filter @app/desktop typecheck` passed.
+- `pnpm --filter @app/desktop test` passed: 17 files, 131 tests.
+- `pnpm --filter @core/domain test` passed: 14 files, 127 tests.
+- `pnpm --filter @core/types test` passed with no test files.
+- `pnpm --filter @core/llm test` passed: 17 files, 152 tests.
+- `git diff --check` passed.
 
-- `python3 /Users/jenson/.codex/skills/memory-refresh/scripts/audit_project_memory.py /Users/jenson/Desktop/Aimcub`
-- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
-- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
-- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck`
-- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm lint`
-- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm core:purity`
-- `git diff --check`
-- `ELECTRON_BUILDER_CACHE=/private/tmp/aimcub-electron-builder-cache COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm desktop:pack`
-- `ditto apps/desktop/dist/mac-arm64/Aimcub.app Aimcub.app`
-- `plutil -p Aimcub.app/Contents/Info.plist`
-
-`pnpm test` may log expected opaque MCP startup errors when hosted Supabase environment variables are unset.
+Note: the first `pnpm --filter @app/desktop typecheck` run hydrated missing workspace dependencies and found one optional `debugTrace` narrowing error, which was fixed before the passing rerun.
 
 ## Commit And Push Status
 
-- This session changes only `docs/handoff.md`.
-- Commit and push for this handoff refresh are pending; the final hash and push result are reported in the Codex response.
+- Local commit is pending. The final commit hash will be reported in the Codex response after commit creation.
+- This worktree is intentionally not pushed or merged. Integration will handle full verification, packaging, push, merge, and root `Aimcub.app` refresh.
 
 ## Open Items
 
-- Public open-source release still needs license selection, `CONTRIBUTING.md`, `SECURITY.md`, and a secrets/env example review.
-- Native macOS traffic lights/window chrome were not directly screenshot-verified in the prior visual pass because full-desktop capture was rejected for privacy, but the protected Desktop shell/sidebar/window-chrome files were unchanged.
+- Full root verification, packaging, and app refresh are intentionally deferred to integration per objective.
+- No browser/GUI visual pass was run because the objective forbids GUI interaction and packaged app operation in this parallel worktree.
 
 ## Next Session Prompt
 
 ```text
-Continue from main. Read AGENTS.md, docs/handoff.md, and docs/memory/README.md first, then inspect git status. Preserve the Desktop shell/sidebar/window-chrome framework unless the user explicitly approves a shell change. For local alpha demo work, use examples/local-alpha/ with an isolated AIMCUB_HOME such as /tmp/aimcub-local-alpha-demo, never the real ~/.aimcub store.
+Continue from this detached Aimcub worktree or the integration branch. Read AGENTS.md, docs/handoff.md, and docs/memory/README.md first. Preserve Desktop shell/sidebar/window-chrome behavior. This session intentionally committed local Desktop planning error/state fixes without push, merge, desktop packaging, or root Aimcub.app refresh.
 ```

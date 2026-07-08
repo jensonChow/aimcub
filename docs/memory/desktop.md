@@ -8,6 +8,8 @@ Desktop must be product-first, not debug-first. Model calls, tool traces, prompt
 
 The user rejected the prior over-stacked desktop direction. Do not add more default rails, debug cards, runtime strips, or status boxes to the main view.
 
+Planning, draft, refine, and save failures must show concise product language and a recovery action by default. Raw schema paths, Zod messages, validator dumps, and provider internals belong only behind an explicit Developer details disclosure or debug surface.
+
 ## Current Shell
 
 The default desktop shell is a simplified two-column product layout:
