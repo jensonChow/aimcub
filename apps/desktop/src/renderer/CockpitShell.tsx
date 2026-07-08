@@ -8,7 +8,9 @@ import { useI18n, type Lang } from "./i18n";
 import "./cockpit.css";
 
 export type CockpitStage = "aim" | "context" | "contracts" | "run" | "eval" | "settings";
+export type WorkbenchStage = Exclude<CockpitStage, "settings">;
 export type SidebarAction = "home" | "newAim" | null;
+export const WORKBENCH_STAGE_IDS = ["aim", "context", "contracts", "run", "eval"] as const satisfies readonly WorkbenchStage[];
 type SidebarState = "pinned" | "collapsed" | "peek";
 const USER_MENU_ID = "od-sidebar-user-menu";
 const LANGUAGE_MENU_ID = "od-sidebar-language-menu";
@@ -48,8 +50,8 @@ interface CockpitShellProps {
 }
 
 interface StageItem {
-  stage: CockpitStage;
-  index: string;
+  stage: WorkbenchStage;
+  shortcut: string;
   title: string;
 }
 
@@ -126,12 +128,17 @@ export function CockpitShell({
   const appStyle = { "--sidebar-width": `${sidebarWidth}px` } as CSSProperties;
 
   const stages = useMemo<StageItem[]>(() => [
-    { stage: "aim", index: "1", title: t("os.stepAim") },
-    { stage: "context", index: "2", title: t("os.stepContext") },
-    { stage: "contracts", index: "3", title: t("os.stepPlan") },
-    { stage: "run", index: "4", title: t("os.stepExecute") },
-    { stage: "eval", index: "5", title: t("os.stepEval") },
+    { stage: "aim", shortcut: "1", title: t("cockpit.surface.aim") },
+    { stage: "context", shortcut: "2", title: t("cockpit.surface.context") },
+    { stage: "contracts", shortcut: "3", title: t("cockpit.surface.contracts") },
+    { stage: "run", shortcut: "4", title: t("cockpit.surface.run") },
+    { stage: "eval", shortcut: "5", title: t("cockpit.surface.eval") },
   ], [t]);
+  const activeWorkbenchSurface = stages.find((item) => item.stage === activeStage) ?? {
+    stage: "aim",
+    shortcut: "1",
+    title: t("cockpit.surface.aim"),
+  };
 
   const normalizedQuery = query.trim().toLowerCase();
   const visibleGoals = goals
@@ -143,16 +150,28 @@ export function CockpitShell({
     })
     .slice(0, 12);
 
-  const commandItems = useMemo<CockpitCommand[]>(() => commands ?? [
-    { id: "home-panel", label: t("command.homePanel"), detail: t("command.homePanel.detail"), shortcut: "Cmd 0", action: onHome },
-    { id: "new-aim", label: t("command.newAim"), detail: t("command.newAim.detail"), shortcut: "Cmd N", action: onNewAim },
-    { id: "stage-aim", label: t("os.stepAim"), detail: t("command.stageAim.detail"), shortcut: "Cmd 1", action: () => onStage("aim") },
-    { id: "stage-context", label: t("os.stepContext"), detail: t("command.stageContext.detail"), shortcut: "Cmd 2", action: () => onStage("context") },
-    { id: "stage-contracts", label: t("os.stepPlan"), detail: t("command.stagePlan.detail"), shortcut: "Cmd 3", action: () => onStage("contracts") },
-    { id: "stage-run", label: t("os.stepExecute"), detail: t("command.stageRun.detail"), shortcut: "Cmd 4", action: () => onStage("run") },
-    { id: "stage-eval", label: t("os.stepEval"), detail: t("command.stageEval.detail"), shortcut: "Cmd 5", action: () => onStage("eval") },
-    { id: "settings", label: t("os.settings"), detail: t("command.settings.detail"), shortcut: "Cmd ,", action: () => onStage("settings") },
-  ], [commands, onHome, onNewAim, onStage, t]);
+  const commandItems = useMemo<CockpitCommand[]>(() => {
+    const stageCommandDetails = {
+      aim: t("command.stageAim.detail"),
+      context: t("command.stageContext.detail"),
+      contracts: t("command.stagePlan.detail"),
+      run: t("command.stageRun.detail"),
+      eval: t("command.stageEval.detail"),
+    } satisfies Record<WorkbenchStage, string>;
+
+    return commands ?? [
+      { id: "home-panel", label: t("command.homePanel"), detail: t("command.homePanel.detail"), shortcut: "Cmd 0", action: onHome },
+      { id: "new-aim", label: t("command.newAim"), detail: t("command.newAim.detail"), shortcut: "Cmd N", action: onNewAim },
+      ...stages.map((item) => ({
+        id: `stage-${item.stage}`,
+        label: item.title,
+        detail: stageCommandDetails[item.stage],
+        shortcut: `Cmd ${item.shortcut}`,
+        action: () => onStage(item.stage),
+      })),
+      { id: "settings", label: t("os.settings"), detail: t("command.settings.detail"), shortcut: "Cmd ,", action: () => onStage("settings") },
+    ];
+  }, [commands, onHome, onNewAim, onStage, stages, t]);
 
   function clearSidebarRevealTimer() {
     if (revealSidebarTimer.current === null) return;
@@ -421,7 +440,7 @@ export function CockpitShell({
       }
       if (["1", "2", "3", "4", "5"].includes(key)) {
         event.preventDefault();
-        const stage = ["aim", "context", "contracts", "run", "eval"][Number(key) - 1] as CockpitStage | undefined;
+        const stage = WORKBENCH_STAGE_IDS[Number(key) - 1];
         if (stage) onStage(stage);
       }
     }
@@ -610,20 +629,26 @@ export function CockpitShell({
         ) : null}
 
         <main className={`od-main od-main-${activeStage}`} data-od-id="main-delivery-workbench">
-          {activeStage !== "settings" && activeStage !== "aim" ? (
+          {activeStage !== "settings" && (activeStage !== "aim" || selected) ? (
             <nav className="od-stage-nav" aria-label={t("cockpit.workflow")}>
-              {stages.map((item) => (
-                <button
-                  key={item.stage}
-                  className={activeStage === item.stage ? "active" : ""}
-                  type="button"
-                  aria-current={activeStage === item.stage ? "step" : undefined}
-                  onClick={() => onStage(item.stage)}
-                >
-                  <span className="od-stage-index">{item.index}</span>
-                  <span className="od-stage-title">{item.title}</span>
-                </button>
-              ))}
+              <div className="od-stage-current" aria-live="polite">
+                <span className="od-stage-current-label">{t("cockpit.surface.current")}</span>
+                <strong className="od-stage-current-title">{activeWorkbenchSurface.title}</strong>
+              </div>
+              <div className="od-stage-switcher" role="group" aria-label={t("cockpit.surface.switcher")}>
+                {stages.map((item) => (
+                  <button
+                    key={item.stage}
+                    className={activeStage === item.stage ? "active" : ""}
+                    type="button"
+                    aria-current={activeStage === item.stage ? "page" : undefined}
+                    data-stage={item.stage}
+                    onClick={() => onStage(item.stage)}
+                  >
+                    <span className="od-stage-title">{item.title}</span>
+                  </button>
+                ))}
+              </div>
             </nav>
           ) : null}
 
