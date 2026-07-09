@@ -447,8 +447,6 @@ function AimOsApp() {
   }
 
   async function discardAimDraft(draftRow: AimDraft) {
-    const title = draftRow.title.trim() || t("aimDraft.untitled");
-    if (!window.confirm(t("aimDraft.discardConfirm", { title }))) return;
     await window.aimcub.discardAimDraft(draftRow.id);
     if (activeDraftIdRef.current === draftRow.id) resetComposer();
     await refreshAimDrafts();

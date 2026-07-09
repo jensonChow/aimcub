@@ -1,6 +1,8 @@
 import type { AimDraft, AimDraftStatus } from "@core/types";
+import { useRef, useState } from "react";
 
 import { useI18n, type I18n } from "../../i18n";
+import { ActionMenu, ActionMenuItem } from "../../ui/ActionMenu";
 
 function shortText(value: string | undefined | null, max = 80): string {
   const cleaned = (value ?? "").replace(/\s+/g, " ").trim();
@@ -41,18 +43,20 @@ export function AimDraftHomeSection(props: {
         </div>
       </div>
       <div className="od-draft-recovery-list">
-        {props.drafts.slice(0, 4).map((draft) => (
-          <div className="od-draft-recovery-row" key={draft.id}>
-            <button type="button" onClick={() => props.onResume(draft)}>
-              <strong>{shortText(aimDraftDisplayTitle(draft, t("aimDraft.untitled")), 96)}</strong>
-              <span>{t(aimDraftStatusKey(draft.status))}</span>
-              <span className="od-draft-recovery-action">{t("aimDraft.resume")}</span>
-            </button>
-            <button className="od-draft-discard" type="button" onClick={() => props.onDiscard(draft)}>
-              {t("aimDraft.discard")}
-            </button>
-          </div>
-        ))}
+        {props.drafts.slice(0, 4).map((draft) => {
+          const title = aimDraftDisplayTitle(draft, t("aimDraft.untitled"));
+          return (
+            <div className="od-content-entry od-draft-recovery-row" key={draft.id}>
+              <button className="od-content-entry-main" type="button" onClick={() => props.onResume(draft)}>
+                <span className="od-content-entry-copy">
+                  <strong>{shortText(title, 96)}</strong>
+                  <span>{t(aimDraftStatusKey(draft.status))}</span>
+                </span>
+              </button>
+              <DraftActionMenu draft={draft} title={title} onResume={props.onResume} onDiscard={props.onDiscard} />
+            </div>
+          );
+        })}
       </div>
     </section>
   );
@@ -74,35 +78,87 @@ export function AimDraftSidebarRows(props: {
       <div className="od-draft-list">
         {props.drafts.slice(0, 6).map((draft) => {
           const selected = props.activeDraftId === draft.id;
+          const title = aimDraftDisplayTitle(draft, t("aimDraft.untitled"));
           return (
-            <div className={`od-draft-card${selected ? " selected" : ""}`} key={draft.id}>
+            <div className="od-content-entry od-draft-card" data-selected={selected ? "true" : undefined} key={draft.id}>
               <button
-                className="od-draft-card-main"
+                className="od-content-entry-main od-draft-card-main"
                 type="button"
                 aria-current={selected ? "page" : undefined}
                 onClick={() => props.onResume(draft)}
               >
-                <span className="od-aim-row-main">
-                  <strong>{shortText(aimDraftDisplayTitle(draft, t("aimDraft.untitled")), 58)}</strong>
+                <span className="od-content-entry-copy od-aim-row-main">
+                  <strong>{shortText(title, 58)}</strong>
                   <span>{t(aimDraftStatusKey(draft.status))}</span>
                 </span>
               </button>
-              <button
-                className="od-draft-row-discard"
-                type="button"
-                aria-label={t("aimDraft.discardLabel", { title: aimDraftDisplayTitle(draft, t("aimDraft.untitled")) })}
-                title={t("aimDraft.discard")}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  props.onDiscard(draft);
-                }}
-              >
-                {t("aimDraft.discardShort")}
-              </button>
+              <DraftActionMenu draft={draft} title={title} onResume={props.onResume} onDiscard={props.onDiscard} />
             </div>
           );
         })}
       </div>
     </>
+  );
+}
+
+function DraftActionMenu(props: {
+  draft: AimDraft;
+  title: string;
+  onResume: (draft: AimDraft) => void;
+  onDiscard: (draft: AimDraft) => void;
+}) {
+  const { t } = useI18n();
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
+  const cancelRef = useRef<HTMLButtonElement | null>(null);
+
+  function confirmDiscard() {
+    setConfirmingDiscard(true);
+    window.requestAnimationFrame(() => cancelRef.current?.focus());
+  }
+
+  return (
+    <ActionMenu
+      className="od-content-entry-more"
+      label={t("aimDraft.moreActionsFor", { title: props.title })}
+      title={t("aimDraft.moreActions")}
+      onOpenChange={(open) => {
+        if (!open) setConfirmingDiscard(false);
+      }}
+    >
+      {({ closeMenu }) => confirmingDiscard ? (
+        <div className="od-action-menu-confirm" role="presentation">
+          <strong>{t("aimDraft.discardConfirmTitle")}</strong>
+          <p>{t("aimDraft.discardConfirm")}</p>
+          <div className="od-action-menu-confirm-actions">
+            <ActionMenuItem ref={cancelRef} onClick={() => closeMenu(true)}>
+              {t("common.cancel")}
+            </ActionMenuItem>
+            <ActionMenuItem
+              danger
+              onClick={() => {
+                closeMenu();
+                props.onDiscard(props.draft);
+              }}
+            >
+              {t("aimDraft.discardDraft")}
+            </ActionMenuItem>
+          </div>
+        </div>
+      ) : (
+        <>
+          <ActionMenuItem
+            onClick={() => {
+              closeMenu();
+              props.onResume(props.draft);
+            }}
+          >
+            {t("aimDraft.resumeDraft")}
+          </ActionMenuItem>
+          <ActionMenuItem danger onClick={confirmDiscard}>
+            {t("aimDraft.discardDraftMenu")}
+          </ActionMenuItem>
+        </>
+      )}
+    </ActionMenu>
   );
 }

@@ -175,6 +175,7 @@ Reference links:
 - Segmented controls: use for mode switching and mutually exclusive filters. Keep labels short and ensure active state has border/background distinction.
 - Toggles/checkboxes: use for binary settings. Do not use pills as toggles unless the state is explicit.
 - Menus/popovers: use for option sets and overflow commands. They must not hide the primary next action.
+- Content-entry and navigation rows use one primary row action to open, resume, or select content. Put secondary or destructive actions behind a trailing More Actions menu with an accessible label and tooltip. Review task rows may show Accept/Reject, and editor/control rows may show Submit/Cancel, toggles, or remove controls when those controls are the row's purpose. Row overflow menus should use a shared primitive with Escape close, outside-pointer close, keyboard navigation, focus return, and destructive item states.
 - Inputs: 36 px minimum for compact search, 44 to 56 px for main task forms. Labels sit above inputs, not only as placeholders.
 - Command-composer inputs are the one exception to visible label placement: when the composer is the primary task surface, use accessible labels plus clear placeholder text, and keep supporting context visually subordinate.
 - Textareas: use at least 140 to 160 px height for aim/context input, with clear resize or fixed growth behavior.

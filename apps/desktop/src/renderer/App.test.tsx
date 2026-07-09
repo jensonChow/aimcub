@@ -9,7 +9,7 @@ import type { ContextSourceStatus, GoalDetail, ProviderStatus, WebResearchStatus
 
 import { App, buildSettingsModel, InitialWorkspacePanel, SettingsPanel } from "./App";
 import { CockpitShell, WORKBENCH_STAGE_IDS } from "./CockpitShell";
-import { I18nProvider, translate, type I18n } from "./i18n";
+import { I18nProvider, STRINGS, translate, type I18n } from "./i18n";
 import { EvidenceSubmissionForm } from "./stages/execute/EvidenceSubmissionForm";
 import { ExecutePanel } from "./stages/execute/ExecutePanel";
 import { LocalAgentExecutionSummary } from "./stages/execute/LocalAgentExecutionSummary";
@@ -666,7 +666,10 @@ describe("App first-run workspace", () => {
     expect(html).toContain("Resume aim-building work or discard it explicitly.");
     expect(html).toContain("Unfinished local-first aim");
     expect(html).toContain("Save blocked");
-    expect(html).toContain("Resume");
+    expect(html).toContain("More actions for Unfinished local-first aim");
+    expect(html).not.toContain("od-draft-recovery-action");
+    expect(html).not.toContain("od-draft-discard");
+    expect(html).not.toContain(">Discard</button>");
     expect(html).not.toContain("Saved aim");
     expect(html).not.toContain("Saved aims");
   });
@@ -746,7 +749,7 @@ describe("App planning state guards", () => {
     const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
     const discard = source.match(/async function discardAimDraft[\s\S]*?\n {2}useEffect/)?.[0] ?? "";
 
-    expect(discard).toContain("window.confirm");
+    expect(discard).not.toContain("window.confirm");
     expect(discard).toContain("window.aimcub.discardAimDraft(draftRow.id)");
   });
 
@@ -1122,10 +1125,43 @@ describe("CockpitShell", () => {
     expect(html).toContain("Drafts");
     expect(html).toContain("Unfinished local-first aim");
     expect(html).toContain("Save blocked");
-    expect(html).toContain('class="od-draft-card selected"');
+    expect(html).toContain('class="od-content-entry od-draft-card" data-selected="true"');
+    expect(html).toContain("More actions for Unfinished local-first aim");
+    expect(html).not.toContain(">Discard</button>");
     expect(html).toContain("Recent aims");
     expect(html).toContain("Saved aims appear here.");
     expect(html).not.toContain('class="od-aim-card selected"');
+  });
+
+  it("keeps draft row destructive actions inside the contextual menu pattern", () => {
+    const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
+    const actionMenuSource = readFileSync(new URL("./ui/ActionMenu.tsx", import.meta.url), "utf8");
+    const strings = [
+      "aimDraft.moreActions",
+      "aimDraft.moreActionsFor",
+      "aimDraft.resumeDraft",
+      "aimDraft.discardDraft",
+      "aimDraft.discardConfirm",
+    ] as const;
+
+    expect(css).toContain(".od-content-entry");
+    expect(css).toContain(".od-action-menu");
+    expect(css).toMatch(/\.od-action-menu\s*{[^}]*box-shadow:\s*var\(--od-shadow-popover\);/s);
+    expect(css).not.toContain("od-draft-row-discard");
+    expect(css).not.toContain("od-draft-discard");
+    expect(css).not.toContain("od-draft-recovery-action");
+    expect(css).not.toMatch(/\.od-content-entry-main:hover[\s\S]*box-shadow:\s*var\(--od-interaction-hover-shadow\)/);
+    expect(actionMenuSource).toContain('role="menu"');
+    expect(actionMenuSource).toContain('role="menuitem"');
+    expect(actionMenuSource).toContain('document.addEventListener("pointerdown"');
+    expect(actionMenuSource).toContain('event.key !== "Escape"');
+    for (const key of ["ArrowDown", "ArrowUp", "Home", "End", "Enter"]) {
+      expect(actionMenuSource).toContain(key);
+    }
+    for (const key of strings) {
+      expect(STRINGS[key].en.length).toBeGreaterThan(0);
+      expect(STRINGS[key].zh.length).toBeGreaterThan(0);
+    }
   });
 
   it("keeps Desktop typography on three sizes and light shared weights", () => {
@@ -1434,7 +1470,7 @@ describe("CockpitShell", () => {
       /\.od-window-drag-strip\s*{[^}]*left:\s*calc\(var\(--titlebar-toggle-left\) \+ var\(--titlebar-toggle-size\) \+ 8px\);[^}]*height:\s*var\(--window-drag-strip-height\);/s,
     );
     expect(css).toMatch(/\.od-sidebar-toggle\s*{[^}]*app-region:\s*no-drag;[^}]*-webkit-app-region:\s*no-drag;/s);
-    expect(css).toMatch(/\.od-user-menu-anchor,\s*\.od-user-menu-anchor \*\s*{[^}]*app-region:\s*no-drag;[^}]*-webkit-app-region:\s*no-drag;/s);
+    expect(css).toMatch(/\.od-user-menu-anchor,\s*\.od-user-menu-anchor \*,\s*\.od-action-menu-anchor,\s*\.od-action-menu-anchor \*\s*{[^}]*app-region:\s*no-drag;[^}]*-webkit-app-region:\s*no-drag;/s);
   });
 
   it("leaves macOS traffic lights to native window chrome", () => {
