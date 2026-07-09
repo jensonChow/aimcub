@@ -698,7 +698,7 @@ function AimOsApp() {
       quality={planResult?.quality ?? null}
       review={planResult?.review ?? null}
       saved={Boolean(selected)}
-      disabled={Boolean(busy) || activePlanValidation?.ok === false}
+      disabled={Boolean(busy)}
       validationErrors={activePlanValidationMessages}
       routingAgents={routingAgents}
       routingValidation={planRoutingValidation}

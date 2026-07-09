@@ -636,8 +636,8 @@ describe("App planning state guards", () => {
 
   it("clears stale draft, error, and context state for New Aim and opened aims", () => {
     const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
-    const resetComposer = source.match(/function resetComposer[\s\S]*?\n  function descriptionWithContext/)?.[0] ?? "";
-    const openGoal = source.match(/async function openGoal[\s\S]*?\n  async function refreshGoalState/)?.[0] ?? "";
+    const resetComposer = source.match(/function resetComposer[\s\S]*?\n {2}function descriptionWithContext/)?.[0] ?? "";
+    const openGoal = source.match(/async function openGoal[\s\S]*?\n {2}async function refreshGoalState/)?.[0] ?? "";
 
     for (const body of [resetComposer, openGoal]) {
       expect(body).toContain("setDraft(null)");
@@ -656,6 +656,15 @@ describe("App planning state guards", () => {
     expect(resetComposer).toContain("setAimTitle(\"\")");
     expect(resetComposer).toContain("setAimDescription(\"\")");
     expect(openGoal).toContain("setAimComposerOpen(false)");
+  });
+
+  it("keeps plan validation failures repairable instead of disabling contract edits", () => {
+    const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+    const planPanel = source.match(/<PlanPanel[\s\S]*?\/>/)?.[0] ?? "";
+
+    expect(planPanel).toContain("validationErrors={activePlanValidationMessages}");
+    expect(planPanel).toContain("disabled={Boolean(busy)}");
+    expect(planPanel).not.toContain("activePlanValidation?.ok === false");
   });
 });
 

@@ -32,37 +32,61 @@ Branch: `main`
 
 ## Verification
 
-- Pending full required suite:
+- Targeted Desktop verification passed after the merge and repairability fix:
+  - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop typecheck`
+  - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop test`
+- Earlier full integration pass completed before the final handoff update:
   - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
   - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
   - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck`
   - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm lint`
   - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm core:purity`
   - `git diff --check`
-- Pending isolated local-alpha seed smoke check.
-- Pending Desktop packaging, root `Aimcub.app` refresh, and visual inspection.
+- Final required suite rerun passed before commit:
+  - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
+  - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
+  - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck`
+  - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm lint`
+  - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm core:purity`
+  - `git diff --check`
+- Isolated local-alpha seed smoke check passed with `AIMCUB_HOME=/tmp/aimcub-local-alpha-demo`.
+- `pnpm desktop:pack` passed with writable Electron/Corepack caches, then root `Aimcub.app` was refreshed from `apps/desktop/dist/mac-arm64/Aimcub.app`.
+- `Aimcub.app/Contents/Info.plist` opens with `CFBundleName`, `CFBundleDisplayName`, and `CFBundleExecutable` all set to `Aimcub`.
 
 ## Shell And Sidebar Preservation
 
 - Workbench navigation changes in `CockpitShell.tsx` are accepted.
 - Planning-error work did not modify `CockpitShell.tsx`.
-- Protected sidebar/window-chrome behavior has not yet been final-verified after all merges.
+- Protected sidebar/window-chrome behavior was final-verified in the refreshed root app bundle:
+  native traffic lights remained visible, the drag strip stayed intact, the
+  pinned sidebar reserved workspace width, and the collapsed sidebar returned
+  to an icon rail at 640x520.
 
 ## Seeded Visual Inspection Notes
 
-- Pending.
+- Seed command wrote only to `/tmp/aimcub-local-alpha-demo`; `/Users/jenson/.aimcub/store.json` was missing before and after the seed check, so the real local store was not touched.
+- CLI smoke checks passed for the seeded goal `00000000-0000-4000-8000-000000000105` with `aimcub show` and `aimcub board`.
+- At 960x680, the seeded aim opened with native window chrome, compact non-linear workbench navigation, no numbered workflow pills, and no visible horizontal overflow.
+- New Aim opened a compact centered composer without workflow navigation; the primary action stayed disabled until title input.
+- Pinned sidebar behavior preserved recent aims, search/filter, footer/user menu, and workspace width reservation.
+- Saved Context state showed activity rows and sufficiency feedback (`Thin 24/100`) derived from renderer signals, with a clear Continue to Plan path and no raw internals.
+- A live disposable Context run in the isolated store showed active research/activity rows, source/tool progress, and sufficiency (`Strong 81/100`) without exposing raw tool payloads. The run did not reproduce a blocking chat-like intake question visually; that layout remains covered by component/regression tests.
+- Contracts showed summary-first sub-aim cards with route, owner or agent, done criteria, required evidence, rationale, and Developer details collapsed.
+- Work showed the selected-sub-aim pattern, with dominant `Run agent`, `Submit proof`, or `Review in Eval` actions depending on milestone state.
+- Review showed trust metrics, summary-first evaluation cards, matched/low-trust evidence state, and the pending Context Inbox candidate with accept/reject controls.
+- At 760x600 and 640x520, content stacked without visible horizontal overflow. The pinned sidebar still reserved width, and the collapsed 640x520 sidebar returned to an icon rail.
+- No runtime planning-validation fixture was available in the app bundle; the forced validation-error path is covered by desktop unit tests and the repairability regression.
 
 ## Commit And Push Status
 
-- Local `main` is mid-integration and ahead of `origin/main`.
-- Final conflict-resolution/docs-linking commit is pending verification and visual inspection.
-- Push is pending verification, seed smoke test, and visual inspection notes.
+- Local `main` is ahead of `origin/main` by the three merged feature commits plus merge commits.
+- Final integration commit is ready after the last required verification rerun.
+- Push is pending commit.
 
 ## Open Items
 
-- Verify no horizontal overflow at 960x680, 760x600, and 640x520.
-- Verify Context activity, chat-like question flow, sufficiency signal, and friendly planning errors in the refreshed root app bundle.
-- Update `docs/desktop-polish-audit.md`, `docs/desktop-product-bugs.md`, and durable memory docs only where final integration evidence warrants it.
+- Commit with `Fix desktop real-use workflow friction`.
+- Push `main` after the commit if verification remains green.
 
 ## Next Session Prompt
 

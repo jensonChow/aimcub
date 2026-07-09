@@ -1,6 +1,6 @@
 # Desktop Local Alpha Polish Audit
 
-Last updated: 2026-07-07
+Last updated: 2026-07-09
 
 ## Scope
 
@@ -57,6 +57,28 @@ The strongest product state is:
 
 The main remaining problem is not feature absence. It is first-viewport
 prioritization, density, and stage-level hierarchy.
+
+## 2026-07-09 Integration Update
+
+The real-use product bug integration merged the non-linear workbench navigation,
+iterative Context research loop, and planning-error hardening worktrees:
+
+- Numbered workflow pills were replaced with compact non-linear workbench
+  navigation, preserving Cmd/Ctrl+1-5 shortcuts and command-palette stage
+  commands.
+- Context now shows research/activity feedback and a qualitative sufficiency
+  signal derived from existing renderer planning events, tool traces, intake,
+  answers, notes, source status, and review buckets.
+- Blocking Context intake now reads as a one-question assistant/user exchange,
+  with source material kept secondary while the question is active.
+- Planning draft/refine/save failures now use product-facing messages with
+  recovery text; raw schema/validator details are behind Developer details.
+- Plan validation failures disable Save but keep contract-edit controls
+  available so the user can repair the plan in place.
+
+Seeded visual inspection in the refreshed root app at 960x680, 760x600, and
+640x520 confirmed the integrated surfaces avoid visible horizontal overflow,
+preserve native window chrome, and keep the tuned sidebar rail/pinned behavior.
 
 ## Top 10 Issues
 

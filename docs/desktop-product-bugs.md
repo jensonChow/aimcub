@@ -2,6 +2,20 @@
 
 Status: focused audit for planning-error and stale-state fixes, 2026-07-09.
 
+## Integration Status
+
+Merged into the real-use product bug integration on 2026-07-09. The code path
+now formats draft/refine/save failures through product-facing messages with
+recovery actions, keeps raw validator/provider details behind Developer details,
+clears stale draft/context state on New Aim and opened aims, and repairs
+numeric-string `min_files` values before plan validation. Save validation issues
+block Save while leaving Plan/Contracts edit controls available for repair.
+
+Seeded visual inspection in the refreshed app bundle confirmed the default
+Contracts, Work, Review, and active Context surfaces hide raw validation/tool
+details by default. No runtime forced planning-validation fixture is currently
+available; that path remains covered by unit tests.
+
 ## Covered Bugs
 
 1. Raw plan validation paths reached user-facing UI.
