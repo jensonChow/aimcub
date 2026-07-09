@@ -10,6 +10,8 @@ The user rejected the prior over-stacked desktop direction. Do not add more defa
 
 Planning, draft, refine, and save failures must show concise product language and a recovery action by default. Raw schema paths, Zod messages, validator dumps, and provider internals belong only behind an explicit Developer details disclosure or debug surface.
 
+User-entered or expensive generated work must not be silently destroyed by normal Desktop navigation. Aim composer text, Context answers and notes, context source selections, generated or edited plans, child-breakdown drafts, and manual proof drafts need either a recoverable local draft checkpoint or an explicit product-facing discard choice before Home Panel, New Aim, opening another aim, Settings/reload boundaries, Cmd/Ctrl shortcuts, or component unmount paths can clear them.
+
 ## Current Shell
 
 The default desktop shell is a simplified two-column product layout:

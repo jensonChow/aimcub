@@ -1,44 +1,39 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-09
-Branch: `main`
+Branch: detached HEAD at `a14c8774`
 
 ## Current Session
 
-- Request: run `$memory-refresh`, then commit, push, and merge as needed.
-- Skill audit: `python3 /Users/jenson/.codex/skills/memory-refresh/scripts/audit_project_memory.py /Users/jenson/Desktop/Aimcub` passed read-only and found root memory within budget.
-- Repository state at audit start: `main` matched `origin/main` at `b149affe Update integration handoff status`.
+- Request: audit Desktop for silent loss of user-entered or expensive generated work caused by volatile component state and navigation/reset paths.
+- Scope was docs/audit only. User explicitly requested no packaging, no push, and no root `Aimcub.app` refresh.
+- Repository state at audit start: detached HEAD at `a14c8774` in `/Users/jenson/.codex/worktrees/c9c5/Aimcub`.
 
 ## Completed Work
 
-- Confirmed the 2026-07-09 real-use Desktop integration is already merged and pushed to `main`.
-- Promoted the durable Desktop lessons from the integration into `docs/memory/desktop.md`: compact non-linear workbench navigation, Context activity/sufficiency, chat-like blocking intake, product-facing planning errors, Developer details boundaries, and repairable Plan/Contracts validation.
-- Rewrote this handoff to be the current memory-refresh transfer instead of carrying the previous integration session as the active handoff.
+- Created `docs/desktop-draft-lifecycle-audit.md`, a focused audit of Desktop draft-loss risks across App orchestration state, Context answers/notes/sources, Plan/Contracts drafts and Developer-details rule edits, Execute proof drafts, child breakdown, planning failure recovery, CockpitShell navigation callbacks, shortcuts, component unmount/remount, and reload/restart.
+- Updated `docs/desktop-product-bugs.md` to point to the new lifecycle audit while preserving the prior planning-error integration record.
+- Added a durable Desktop memory rule requiring recoverable draft checkpoints or explicit discard choices before normal navigation clears user-entered or expensive generated work.
 
 ## Verification
 
-- Final memory-refresh verification passed:
-  - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
-  - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
-  - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck`
-  - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm lint`
-  - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm core:purity`
+- Passed:
   - `git diff --check`
-  - `ELECTRON_BUILDER_CACHE=/private/tmp/aimcub-electron-builder-cache COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm desktop:pack`
-  - `ditto apps/desktop/dist/mac-arm64/Aimcub.app Aimcub.app`
-  - `plutil -p Aimcub.app/Contents/Info.plist`
+- No docs lint/test command is configured in `package.json`; only repo-wide build/test/typecheck/lint scripts are present.
+- Per user instruction, no packaging, no push, and no root `Aimcub.app` refresh were run.
 
 ## Commit And Push Status
 
-- Memory-refresh changes are verified for a focused commit and push on `main`.
-- No separate merge is needed because the work was done directly on `main`.
+- Branch: `codex/desktop-draft-lifecycle-audit`.
+- Focused audit commit created and pushed to `origin/codex/desktop-draft-lifecycle-audit`.
+- No merge to `main` was performed.
 
 ## Open Items
 
-- None after the focused memory-refresh commit is pushed.
+- Product work remains to design and implement a Desktop draft lifecycle and shared navigation guard. The audit recommends local draft checkpoints before additional orchestration polish.
 
 ## Next Session Prompt
 
 ```text
-Continue from Aimcub main. Read AGENTS.md, docs/handoff.md, and docs/memory/README.md first, then inspect git status. Preserve Desktop shell/sidebar/window-chrome behavior and keep durable project memory under docs/memory/.
+Continue from Aimcub main. Read AGENTS.md, docs/handoff.md, docs/memory/README.md, docs/memory/desktop.md, and docs/desktop-draft-lifecycle-audit.md first. Preserve Desktop shell/sidebar/window-chrome behavior. Implement draft lifecycle fixes narrowly, starting with recoverable local drafts or explicit discard guards for New Aim, Home Panel, opened aims, Cmd/Ctrl shortcuts, reload/restart, and component unmount paths.
 ```
