@@ -547,9 +547,27 @@ function stripNulls(value: unknown): unknown {
   return value;
 }
 
+function normalizeMatchValue(key: string, value: unknown): unknown {
+  if (key === "min_files" && typeof value === "string") {
+    const trimmed = value.trim();
+    if (/^[1-9]\d*$/.test(trimmed)) return Number(trimmed);
+  }
+  return value;
+}
+
+function normalizeMatchRecord(match: Record<string, unknown>): Record<string, unknown> {
+  const normalized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(match)) {
+    normalized[key] = normalizeMatchValue(key, value);
+  }
+  return normalized;
+}
+
 /** Re-nest a flat clause into the domain's `{evaluator, match}` shape (idempotent). */
 function nestClause(clause: Record<string, unknown>): Record<string, unknown> {
-  if (clause.match && typeof clause.match === "object") return clause;
+  if (clause.match && typeof clause.match === "object" && !Array.isArray(clause.match)) {
+    return { ...clause, match: normalizeMatchRecord(clause.match as Record<string, unknown>) };
+  }
   const matchKeys: readonly string[] =
     clause.evaluator === "ci_status" ? CI_MATCH_KEYS :
       clause.evaluator === "manual_confirm" ? [] :
@@ -557,7 +575,7 @@ function nestClause(clause: Record<string, unknown>): Record<string, unknown> {
   const match: Record<string, unknown> = {};
   const rest: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(clause)) {
-    if (matchKeys.includes(k)) match[k] = v;
+    if (matchKeys.includes(k)) match[k] = normalizeMatchValue(k, v);
     else if (!ALL_MATCH_KEYS.includes(k)) rest[k] = v; // drop the other evaluator's strays
   }
   return { ...rest, match };

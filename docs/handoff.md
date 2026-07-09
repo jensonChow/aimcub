@@ -9,16 +9,26 @@ Branch: `main`
 - Objective source: `/Users/jenson/.codex/attachments/81d210d1-ec67-4b6f-af24-dc79d39f8402/goal-objective.md`.
 - Integration constraints: preserve the tuned Desktop shell/sidebar/window-chrome framework, use isolated visual-test data under `/tmp/aimcub-local-alpha-demo`, refresh root `Aimcub.app` only after verification, and push `main` only after the full suite, seed smoke test, and visual notes are complete.
 
-## Merge Progress
+## Merged Work
 
 - Merged `f3458963 Replace linear stage pills with workbench navigation`.
 - Merged `f67db11c Make context intake an iterative research loop`.
-- Pending: `b4901979 Harden desktop planning errors and state transitions`.
+- Merged `b4901979 Harden desktop planning errors and state transitions`.
+
+## Completed Integration Changes
+
+- Replaced numbered workflow pills with compact non-linear workbench navigation: current surface label plus segmented switcher for Aim, Context, Contracts, Work, and Review.
+- Added Context activity and sufficiency surfaces derived from existing renderer signals: planning live events, planning context/tools, intake, review buckets, answers, notes, and source status.
+- Reworked blocking Context intake into an assistant/user chat-like exchange while preserving one blocking question at a time, single/multi-select choices, custom answers, and source Settings handoff.
+- Added product-facing planning error formatting, recovery routes, and opt-in Developer details for draft/refine/save failures.
+- Added `min_files` numeric-string repair during LLM raw-plan normalization before Zod validation.
+- Added `docs/desktop-product-bugs.md` as the focused real-use bug audit artifact.
 
 ## Conflict Notes
 
-- `docs/handoff.md` conflicted between parallel worktree handoff reports and was rewritten as this integration-session handoff.
-- Final conflict-resolution notes will be completed after the planning/error hardening merge.
+- `docs/handoff.md` conflicted between each parallel worktree's local-only handoff report and was rewritten as this integration-session handoff.
+- Code merged automatically for the Context and planning-error commits after the prior navigation merge.
+- Workbench navigation changes in `CockpitShell.tsx` were accepted; no additional shell/sidebar/window-chrome conflict was resolved by editing protected behavior.
 
 ## Verification
 
@@ -35,6 +45,7 @@ Branch: `main`
 ## Shell And Sidebar Preservation
 
 - Workbench navigation changes in `CockpitShell.tsx` are accepted.
+- Planning-error work did not modify `CockpitShell.tsx`.
 - Protected sidebar/window-chrome behavior has not yet been final-verified after all merges.
 
 ## Seeded Visual Inspection Notes
@@ -44,13 +55,14 @@ Branch: `main`
 ## Commit And Push Status
 
 - Local `main` is mid-integration and ahead of `origin/main`.
-- Final commit/push status is pending verification and visual inspection.
+- Final conflict-resolution/docs-linking commit is pending verification and visual inspection.
+- Push is pending verification, seed smoke test, and visual inspection notes.
 
 ## Open Items
 
-- Finish planning/error hardening merge.
 - Verify no horizontal overflow at 960x680, 760x600, and 640x520.
 - Verify Context activity, chat-like question flow, sufficiency signal, and friendly planning errors in the refreshed root app bundle.
+- Update `docs/desktop-polish-audit.md`, `docs/desktop-product-bugs.md`, and durable memory docs only where final integration evidence warrants it.
 
 ## Next Session Prompt
 

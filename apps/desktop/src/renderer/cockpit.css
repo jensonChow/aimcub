@@ -1389,6 +1389,69 @@ kbd {
   align-content: start;
 }
 
+.od-notice {
+  width: 100%;
+  display: grid;
+  gap: 8px;
+}
+
+.od-notice-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.od-notice-copy strong {
+  color: var(--od-fg);
+  font-size: var(--od-type-body);
+  line-height: 1.35;
+  font-weight: var(--od-font-weight-strong);
+}
+
+.od-notice-copy span,
+.od-notice-copy small {
+  color: var(--od-muted);
+  font-size: var(--od-type-meta);
+  line-height: 1.45;
+}
+
+.od-notice-details {
+  min-width: 0;
+}
+
+.od-notice-details summary {
+  width: max-content;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--od-muted);
+  font-size: var(--od-type-meta);
+  line-height: var(--od-line-meta);
+  font-weight: var(--od-font-weight-semibold);
+  cursor: pointer;
+}
+
+.od-notice-details summary:hover,
+.od-notice-details summary:focus-visible {
+  color: var(--od-fg);
+}
+
+.od-notice-details pre {
+  max-height: 140px;
+  overflow: auto;
+  margin: 6px 0 0;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-sm);
+  background: color-mix(in oklab, var(--od-bg), transparent 12%);
+  color: var(--od-muted);
+  padding: 8px 10px;
+  font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
+  font-size: var(--od-type-meta);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .od-workspace-settings {
   width: min(100%, 1080px);
 }

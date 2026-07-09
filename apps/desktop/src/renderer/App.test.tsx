@@ -624,6 +624,41 @@ describe("App first-run workspace", () => {
   });
 });
 
+describe("App planning state guards", () => {
+  it("keeps product error details behind an explicit developer disclosure", () => {
+    const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+
+    expect(source).toContain('className="od-notice-copy"');
+    expect(source).toContain('className="od-notice-details"');
+    expect(source).toContain('summary>{t("plan.developerDetails")}</summary>');
+    expect(source).toContain('props.error.details.join("\\n")');
+  });
+
+  it("clears stale draft, error, and context state for New Aim and opened aims", () => {
+    const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+    const resetComposer = source.match(/function resetComposer[\s\S]*?\n  function descriptionWithContext/)?.[0] ?? "";
+    const openGoal = source.match(/async function openGoal[\s\S]*?\n  async function refreshGoalState/)?.[0] ?? "";
+
+    for (const body of [resetComposer, openGoal]) {
+      expect(body).toContain("setDraft(null)");
+      expect(body).toContain("setFinalPlan(null)");
+      expect(body).toContain("setPlanResult(null)");
+      expect(body).toContain("setPlanningDebugTraces([])");
+      expect(body).toContain("setPlanningLiveEvents([])");
+      expect(body).toContain("setIntakeClarify(null)");
+      expect(body).toContain("setIntakeAnswers({})");
+      expect(body).toContain("setClarify(null)");
+      expect(body).toContain("setAnswers({})");
+      expect(body).toContain("setContextNote(\"\")");
+      expect(body).toContain("setError(null)");
+    }
+
+    expect(resetComposer).toContain("setAimTitle(\"\")");
+    expect(resetComposer).toContain("setAimDescription(\"\")");
+    expect(openGoal).toContain("setAimComposerOpen(false)");
+  });
+});
+
 describe("PlanPanel", () => {
   it("renders summary-first contract cards by default without raw acceptance JSON", () => {
     const html = renderToStaticMarkup(

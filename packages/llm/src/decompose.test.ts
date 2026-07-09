@@ -391,6 +391,18 @@ describe("decompose · happy path", () => {
     expect(result.output?.nodes[0]?.acceptance_rule.completion_mode).toBe("auto_then_confirm");
   });
 
+  it("repairs numeric string min_files values from structured providers", async () => {
+    const plan = validPlan();
+    plan.nodes[0]!.acceptance_rule.clauses[0]!.match.min_files = "2" as unknown as number;
+    const result = await decompose(mockGateway(plan), INPUT);
+
+    expect(result.validation.ok).toBe(true);
+    expect(result.output?.nodes[0]?.acceptance_rule.clauses[0]).toMatchObject({
+      evaluator: "commit_pattern",
+      match: { min_files: 2 },
+    });
+  });
+
   it("normalizes flat manual confirmation clauses for real-world prerequisites", async () => {
     const plan = validPlan();
     plan.nodes[0]!.decomposition_contract!.likely_owner = "human";

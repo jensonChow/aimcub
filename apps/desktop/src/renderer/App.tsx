@@ -76,6 +76,12 @@ import {
   type AppMode,
 } from "./workflow/stageRouting";
 import {
+  formatPlanValidationIssues,
+  formatPlanningFailure,
+  routeAfterPlanningFailure,
+  type ProductError,
+} from "./workflow/planningErrors";
+import {
   buildSettingsModel,
   settingsSectionForFocus,
   type SettingsHelper,
@@ -121,7 +127,7 @@ function AimOsApp() {
   const [clarify, setClarify] = useState<ClarifyOutput | null>(null);
   const [answers, setAnswers] = useState<ContextAnswerMap>({});
   const [contextNote, setContextNote] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | ProductError | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [stageOverride, setStageOverride] = useState<CockpitStage | null>(null);
   const [runtimeGuidanceVisible, setRuntimeGuidanceVisible] = useState(false);
@@ -275,11 +281,17 @@ function AimOsApp() {
       setStageOverride("contracts");
       const req = { title, description: descriptionWithContext(), clientRunId: runId };
       const nextDraft = await window.aimcub.draft(req);
-      if (!nextDraft.ok || !nextDraft.output) throw new Error(nextDraft.errors.join("; ") || t("os.err.draft"));
-      setDraft(nextDraft.output);
-      setFinalPlan(nextDraft.output);
       setPlanResult(nextDraft);
       setPlanningDebugTraces(nextDraft.debugTrace ? [nextDraft.debugTrace] : []);
+      if (!nextDraft.ok || !nextDraft.output) {
+        setError(formatPlanningFailure({ stage: "draft", errors: nextDraft.errors, t, fallback: t("os.err.draft") }));
+        const route = routeAfterPlanningFailure("draft");
+        setMode(route.mode);
+        setStageOverride(route.stageOverride);
+        return;
+      }
+      setDraft(nextDraft.output);
+      setFinalPlan(nextDraft.output);
       const nextClarify: ClarifyIpcResult = await window.aimcub.clarify({ ...req, draft: nextDraft.output }).catch((err: unknown) => ({
         ok: false,
         output: null,
@@ -295,9 +307,15 @@ function AimOsApp() {
       setMode("answering");
       setStageOverride("context");
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setMode("cockpit");
-      setStageOverride("aim");
+      setError(formatPlanningFailure({
+        stage: "draft",
+        errors: [err instanceof Error ? err.message : String(err)],
+        t,
+        fallback: t("os.err.draft"),
+      }));
+      const route = routeAfterPlanningFailure("draft");
+      setMode(route.mode);
+      setStageOverride(route.stageOverride);
     } finally {
       setBusy(null);
     }
@@ -329,7 +347,18 @@ function AimOsApp() {
         answers: builtAnswers,
         clientRunId: runId,
       });
-      if (!refined.ok || !refined.output) throw new Error(refined.errors.join("; ") || t("os.err.refine"));
+      if (!refined.ok || !refined.output) {
+        setPlanResult(refined);
+        const refineTrace = refined.debugTrace;
+        if (refineTrace) {
+          setPlanningDebugTraces((current) => [...current, refineTrace]);
+        }
+        setError(formatPlanningFailure({ stage: "refine", errors: refined.errors, t, fallback: t("os.err.refine") }));
+        const route = routeAfterPlanningFailure("refine");
+        setMode(route.mode);
+        setStageOverride(route.stageOverride);
+        return;
+      }
       setFinalPlan(refined.output);
       setPlanResult(refined);
       const refineTrace = refined.debugTrace;
@@ -339,7 +368,15 @@ function AimOsApp() {
       setMode("reviewing");
       setStageOverride("contracts");
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(formatPlanningFailure({
+        stage: "refine",
+        errors: [err instanceof Error ? err.message : String(err)],
+        t,
+        fallback: t("os.err.refine"),
+      }));
+      const route = routeAfterPlanningFailure("refine");
+      setMode(route.mode);
+      setStageOverride(route.stageOverride);
     } finally {
       setBusy(null);
     }
@@ -350,9 +387,10 @@ function AimOsApp() {
     if (!plan) return;
     const validation = validateExecutablePlan(plan);
     if (!validation.ok) {
-      setError(t("plan.validationFailed", { errors: validation.errors.join("; ") }));
-      setMode("reviewing");
-      setStageOverride("contracts");
+      setError(formatPlanningFailure({ stage: "save", errors: validation.errors, t, fallback: t("plan.validationFailed") }));
+      const route = routeAfterPlanningFailure("save");
+      setMode(route.mode);
+      setStageOverride(route.stageOverride);
       return;
     }
     const routingValidation = validatePlanRouting({
@@ -391,7 +429,12 @@ function AimOsApp() {
       await refreshAll();
       await openGoal(saved.goal);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(formatPlanningFailure({
+        stage: "save",
+        errors: [err instanceof Error ? err.message : String(err)],
+        t,
+        fallback: t("planningError.save.message"),
+      }));
     } finally {
       setBusy(null);
     }
@@ -486,6 +529,9 @@ function AimOsApp() {
 
   const activePlan = (finalPlan ?? draft ?? detail?.goal.plan_json ?? null) as DecompositionOutput | null;
   const activePlanValidation = activePlan ? validateExecutablePlan(activePlan) : null;
+  const activePlanValidationMessages = activePlanValidation?.ok === false
+    ? formatPlanValidationIssues(activePlanValidation.errors, t)
+    : [];
   const routingAgents = useMemo(() => routingAgentsFromDetections(localAgents), [localAgents]);
   const planRoutingValidation = useMemo(
     () => activePlan ? validatePlanRouting({ plan: activePlan, agents: routingAgents, allowHuman: true }) : null,
@@ -653,7 +699,7 @@ function AimOsApp() {
       review={planResult?.review ?? null}
       saved={Boolean(selected)}
       disabled={Boolean(busy) || activePlanValidation?.ok === false}
-      validationErrors={activePlanValidation?.errors ?? []}
+      validationErrors={activePlanValidationMessages}
       routingAgents={routingAgents}
       routingValidation={planRoutingValidation}
       onChange={selected ? undefined : applyPlanEdit}
@@ -845,12 +891,34 @@ function AimOsApp() {
       settingsSidebar={settingsSidebar}
       main={(
         <>
-          {error ? <Notice tone="error">{error}</Notice> : null}
+          {error ? <ProductErrorNotice error={error} /> : null}
           {busy ? <Notice tone="info">{busy}</Notice> : null}
           {mainStageContent}
         </>
       )}
     />
+  );
+}
+
+function ProductErrorNotice(props: { error: string | ProductError }) {
+  const { t } = useI18n();
+  if (typeof props.error === "string") {
+    return <Notice tone="error">{props.error}</Notice>;
+  }
+  return (
+    <Notice tone="error">
+      <div className="od-notice-copy">
+        <strong>{props.error.title}</strong>
+        <span>{props.error.message}</span>
+        <small>{props.error.recovery}</small>
+      </div>
+      {props.error.details.length > 0 ? (
+        <details className="od-notice-details">
+          <summary>{t("plan.developerDetails")}</summary>
+          <pre>{props.error.details.join("\n")}</pre>
+        </details>
+      ) : null}
+    </Notice>
   );
 }
 

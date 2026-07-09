@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { AimIntakeReport } from "@core/domain";
 import type { DecompositionOutput, Goal, Milestone } from "@core/types";
 import type { ContextSourceStatus, GoalDetail, LocalAgentDetection } from "../../shared/ipc";
+import { translate, type I18n } from "../i18n";
 
 import {
   emptyEvidenceDraft,
@@ -16,6 +17,11 @@ import {
   shouldBlockForIntake,
 } from "./intakeClarify";
 import { latestLiveValue } from "./planningLiveEvents";
+import {
+  formatPlanValidationIssues,
+  formatPlanningFailure,
+  routeAfterPlanningFailure,
+} from "./planningErrors";
 import { formatRoutingValidation, routingAgentsFromDetections } from "./routingAgents";
 import { buildSettingsModel } from "./settingsModel";
 import { cockpitStageFor, planNodeForMilestone, progressRows } from "./stageRouting";
@@ -131,6 +137,7 @@ const testT = (key: string, vars?: Record<string, unknown>): string => {
   if (!vars) return key;
   return `${key} ${JSON.stringify(vars)}`;
 };
+const englishT: I18n["t"] = (key, vars) => translate("en", key, vars);
 
 describe("evidence submission helpers", () => {
   it("builds the manual proof draft and payload without IPC side effects", () => {
@@ -269,5 +276,26 @@ describe("planning live event helpers", () => {
       { runId: "a", type: "planning.started", stage: "planning", at: "2026-07-07T00:00:00.000Z", message: "started" },
       { runId: "a", type: "planning.failed", stage: "planning", at: "2026-07-07T00:00:01.000Z" },
     ], (event) => event.message)).toBe("started");
+  });
+});
+
+describe("planning error helpers", () => {
+  it("formats raw validation paths into user-facing save text while keeping developer details", () => {
+    const raw = "nodes.10.acceptance_rule.clauses.0.match.min_files: Invalid input";
+    const issueText = formatPlanValidationIssues([raw], englishT);
+    const error = formatPlanningFailure({ stage: "save", errors: [raw], t: englishT });
+
+    expect(issueText).toEqual(["A sub-aim contract has invalid structured fields."]);
+    expect(error.title).toBe("Plan needs repair before saving");
+    expect(error.message).toBe("A sub-aim contract has invalid structured fields.");
+    expect(error.recovery).toContain("Stay in Plan");
+    expect(`${error.title} ${error.message} ${error.recovery}`).not.toContain("nodes.10");
+    expect(error.details).toEqual([raw]);
+  });
+
+  it("keeps draft and refine failures on retryable Context routes", () => {
+    expect(routeAfterPlanningFailure("draft")).toEqual({ mode: "contexting", stageOverride: "context" });
+    expect(routeAfterPlanningFailure("refine")).toEqual({ mode: "answering", stageOverride: "context" });
+    expect(routeAfterPlanningFailure("save")).toEqual({ mode: "reviewing", stageOverride: "contracts" });
   });
 });
