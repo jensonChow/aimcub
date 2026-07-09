@@ -360,6 +360,76 @@ export const DecompositionOutput = z.object({
 });
 export type DecompositionOutput = z.infer<typeof DecompositionOutput>;
 
+export const AimDraftStage = z.enum(["aim", "context", "contracts"]);
+export type AimDraftStage = z.infer<typeof AimDraftStage>;
+
+export const AimDraftPhase = z.enum(["intake", "post_draft"]).nullable().default(null);
+export type AimDraftPhase = z.infer<typeof AimDraftPhase>;
+
+export const AimDraftStatus = z.enum(["draft", "context_needed", "plan_ready", "save_blocked"]);
+export type AimDraftStatus = z.infer<typeof AimDraftStatus>;
+
+export const AimDraftQuestionOption = z.object({
+  label: z.string(),
+  tradeoff: z.string().default(""),
+});
+export type AimDraftQuestionOption = z.infer<typeof AimDraftQuestionOption>;
+
+export const AimDraftQuestion = z.object({
+  id: z.string(),
+  question: z.string(),
+  why_high_impact: z.string().default(""),
+  kind: z.enum(["scope", "involvement", "assumption", "constraint", "capability"]).default("assumption"),
+  source_dimension: z.enum(["verifiability", "granularity", "distinctness", "context_fit"]).nullable().default(null),
+  allow_other: z.boolean().default(true),
+  selection_mode: z.enum(["single", "multiple"]).nullable().default(null),
+  options: z.array(AimDraftQuestionOption).default([]),
+});
+export type AimDraftQuestion = z.infer<typeof AimDraftQuestion>;
+
+export const AimDraftAnswer = z.object({
+  question_id: z.string(),
+  selected_label: z.string().nullable().default(null),
+  selected_labels: z.array(z.string()).nullable().default(null),
+  other_text: z.string().nullable().default(null),
+});
+export type AimDraftAnswer = z.infer<typeof AimDraftAnswer>;
+
+export const AimDraftSaveBlock = z.object({
+  title: z.string().default(""),
+  message: z.string().default(""),
+  recovery: z.string().default(""),
+  issues: z.array(z.string()).default([]),
+});
+export type AimDraftSaveBlock = z.infer<typeof AimDraftSaveBlock>;
+
+export const AimDraft = z.object({
+  id: DbId,
+  owner_id: DbId,
+  title: z.string().default(""),
+  description: z.string().default(""),
+  parent_goal_id: DbId.nullable().default(null),
+  parent_milestone_id: DbId.nullable().default(null),
+  current_stage: AimDraftStage.default("aim"),
+  phase: AimDraftPhase,
+  status: AimDraftStatus.default("draft"),
+  context_note: z.string().default(""),
+  intake_questions: z.array(AimDraftQuestion).default([]),
+  intake_answers: z.array(AimDraftAnswer).default([]),
+  clarify_questions: z.array(AimDraftQuestion).default([]),
+  clarify_answers: z.array(AimDraftAnswer).default([]),
+  clarify_assumptions: z.array(z.object({
+    statement: z.string(),
+    default_value: z.string().default(""),
+  })).default([]),
+  draft_plan: DecompositionOutput.nullable().default(null),
+  final_plan: DecompositionOutput.nullable().default(null),
+  save_block: AimDraftSaveBlock.nullable().default(null),
+  created_at: z.string().optional(),
+  updated_at: z.string().optional(),
+});
+export type AimDraft = z.infer<typeof AimDraft>;
+
 // ──────────────────────────────────────────────────────────────────────────
 // Emitter / MilestoneCompletion
 // ──────────────────────────────────────────────────────────────────────────

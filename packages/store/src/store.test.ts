@@ -427,6 +427,94 @@ describe("createJsonFileStore · round-trip", () => {
     expect(list.map((g) => g.id)).toContain(goal.id);
   });
 
+  it("persists recoverable aim drafts separately from saved aims", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "aimcub-store-"));
+    const a = createJsonFileStore(dir);
+    const draft = await a.upsertAimDraft({
+      title: "Recover desktop draft",
+      description: "Keep the local-first promise.",
+      currentStage: "context",
+      phase: "intake",
+      status: "context_needed",
+      contextNote: "The user already supplied context before leaving.",
+      intakeQuestions: [{
+        id: "intake_scope",
+        question: "What should survive navigation?",
+        why_high_impact: "It decides the draft recovery path.",
+        kind: "constraint",
+        source_dimension: "context_fit",
+        allow_other: true,
+        selection_mode: "multiple",
+        options: [{ label: "Title", tradeoff: "The draft row can be named." }],
+      }],
+      intakeAnswers: [{
+        question_id: "intake_scope",
+        selected_label: "Title",
+        selected_labels: ["Title"],
+        other_text: "Also keep the context note.",
+      }],
+    });
+
+    expect(await a.listGoals()).toEqual([]);
+
+    const b = createJsonFileStore(dir);
+    const drafts = await b.listAimDrafts();
+    expect(drafts.map((row) => row.id)).toEqual([draft.id]);
+    expect(drafts[0]).toMatchObject({
+      title: "Recover desktop draft",
+      status: "context_needed",
+      current_stage: "context",
+      phase: "intake",
+      context_note: "The user already supplied context before leaving.",
+    });
+    expect((await b.getAimDraft(draft.id))?.intake_answers[0]?.other_text).toBe("Also keep the context note.");
+  });
+
+  it("keeps generated plans and save-blocked state recoverable until explicit discard", async () => {
+    const store = freshStore();
+    const draft = await store.upsertAimDraft({
+      title: "Blocked plan draft",
+      currentStage: "contracts",
+      phase: "post_draft",
+      status: "save_blocked",
+      draftPlan: PLAN,
+      finalPlan: PLAN,
+      saveBlock: {
+        title: "Aim needs a plan repair",
+        message: "One sub-aim needs an executable acceptance rule.",
+        recovery: "Edit the contract, then save again.",
+        issues: ["Acceptance rule needs repair."],
+      },
+    });
+
+    expect(await store.listGoals()).toEqual([]);
+    const recovered = await store.getAimDraft(draft.id);
+    expect(recovered?.final_plan?.nodes.map((node) => node.title)).toEqual(PLAN.nodes.map((node) => node.title));
+    expect(recovered?.save_block?.message).toBe("One sub-aim needs an executable acceptance rule.");
+
+    await store.discardAimDraft(draft.id);
+    expect(await store.listAimDrafts()).toEqual([]);
+  });
+
+  it("keeps child breakdown drafts recoverable with parent references", async () => {
+    const store = freshStore();
+    const { goal, milestones } = await store.createGoal({ title: "Parent aim", plan: PLAN });
+    const draft = await store.upsertAimDraft({
+      title: milestones[0]!.title,
+      description: "Break this sub-aim down.",
+      parentGoalId: goal.id,
+      parentMilestoneId: milestones[0]!.id,
+      currentStage: "aim",
+      status: "draft",
+    });
+
+    expect((await store.getAimDraft(draft.id))?.parent_goal_id).toBe(goal.id);
+    expect((await store.getAimDraft(draft.id))?.parent_milestone_id).toBe(milestones[0]!.id);
+
+    await store.deleteGoal(goal.id);
+    expect(await store.getAimDraft(draft.id)).toBeNull();
+  });
+
   it("drops empty-content memories", async () => {
     const store = freshStore();
     const { goal } = await store.createGoal({ title: "x", plan: PLAN, memories: [{ content: "  " }] });
@@ -1295,15 +1383,19 @@ describe("createJsonFileStore · export/import", () => {
   it("exports and merges a snapshot", async () => {
     const a = freshStore();
     const { goal } = await a.createGoal({ title: "Portable aim", plan: PLAN });
+    const draft = await a.upsertAimDraft({ title: "Portable draft", currentStage: "context", status: "context_needed" });
     const snapshot = await a.exportData();
 
     const b = freshStore();
     const result = await b.importData(snapshot);
     expect(result.goals).toBe(1);
+    expect(result.aimDrafts).toBe(1);
     expect((await b.getGoal(goal.id))?.goal.title).toBe("Portable aim");
+    expect((await b.getAimDraft(draft.id))?.title).toBe("Portable draft");
 
     const second = await b.importData(snapshot);
     expect(second.goals).toBe(0);
+    expect(second.aimDrafts).toBe(0);
   });
 });
 

@@ -32,12 +32,19 @@ import {
 } from "@core/domain";
 // DecompositionOutput is imported as a VALUE (the Zod schema) so the store can re-validate
 // the SHAPE of any plan it is asked to persist — the gatekeeper for untrusted input.
-import { AcceptanceRule, DecompositionOutput, ManualEvidencePayload } from "@core/types";
+import { AcceptanceRule, AimDraft, DecompositionOutput, ManualEvidencePayload } from "@core/types";
 import type {
   ContextCategory,
   Actor,
   ActorKind,
   AgentRunMode,
+  AimDraft as AimDraftRow,
+  AimDraftAnswer,
+  AimDraftPhase,
+  AimDraftQuestion,
+  AimDraftSaveBlock,
+  AimDraftStage,
+  AimDraftStatus,
   AimProgressReadModel,
   Assignment,
   AssignmentSource,
@@ -71,6 +78,7 @@ export const DEFAULT_OWNER = "00000000-0000-4000-8000-000000000001";
 export interface LocalStore {
   ownerId: string;
   goals: Goal[];
+  aimDrafts: AimDraftRow[];
   milestonesByGoal: Record<string, Milestone[]>;
   memories: Memory[];
   evidence: Evidence[];
@@ -122,6 +130,27 @@ export interface UpdateGoalInput {
   metadata?: Record<string, unknown>;
   /** The new decomposition; merged via `planMerge` (completed milestones frozen). */
   plan: DecompositionOutput;
+}
+
+export interface UpsertAimDraftInput {
+  id?: string;
+  ownerId?: string;
+  title?: string;
+  description?: string;
+  parentGoalId?: string | null;
+  parentMilestoneId?: string | null;
+  currentStage?: AimDraftStage;
+  phase?: AimDraftPhase;
+  status?: AimDraftStatus;
+  contextNote?: string;
+  intakeQuestions?: AimDraftQuestion[];
+  intakeAnswers?: AimDraftAnswer[];
+  clarifyQuestions?: AimDraftQuestion[];
+  clarifyAnswers?: AimDraftAnswer[];
+  clarifyAssumptions?: AimDraftRow["clarify_assumptions"];
+  draftPlan?: DecompositionOutput | null;
+  finalPlan?: DecompositionOutput | null;
+  saveBlock?: AimDraftSaveBlock | null;
 }
 
 export interface AddEvidenceInput {
@@ -193,6 +222,7 @@ export interface DeprioritizeMemoryInput {
 
 export interface ImportStoreResult {
   goals: number;
+  aimDrafts: number;
   milestones: number;
   memories: number;
   evidence: number;
@@ -290,6 +320,10 @@ export interface AimStore {
   listGoals(): Promise<Goal[]>;
   getGoal(id: string): Promise<{ goal: Goal; milestones: Milestone[] } | null>;
   createGoal(input: CreateGoalInput): Promise<{ goal: Goal; milestones: Milestone[] }>;
+  listAimDrafts(): Promise<AimDraftRow[]>;
+  getAimDraft(id: string): Promise<AimDraftRow | null>;
+  upsertAimDraft(input: UpsertAimDraftInput): Promise<AimDraftRow>;
+  discardAimDraft(id: string): Promise<void>;
   /**
    * Re-plan an existing aim. Returns the updated goal + milestones, or `null` if no aim
    * has that id. Throws if the new plan is structurally invalid (mirrors `materialize`).
@@ -1041,6 +1075,7 @@ function emptyStore(): LocalStore {
   return {
     ownerId: DEFAULT_OWNER,
     goals: [],
+    aimDrafts: [],
     milestonesByGoal: {},
     memories: [],
     evidence: [],
@@ -1087,6 +1122,15 @@ function normalizeMemoryRow(row: Memory): Memory {
   };
 }
 
+function normalizeAimDraftRow(row: unknown): AimDraftRow | null {
+  const parsed = AimDraft.safeParse(row);
+  return parsed.success ? parsed.data : null;
+}
+
+function sortAimDraftsNewestFirst(rows: AimDraftRow[]): AimDraftRow[] {
+  return rows.slice().sort((a, b) => (b.updated_at ?? b.created_at ?? "").localeCompare(a.updated_at ?? a.created_at ?? ""));
+}
+
 /**
  * A JSON-file-backed {@link AimStore} rooted at `dataDir` (default {@link defaultDataDir}).
  * Each operation loads → mutates → saves; fine for a single user. (If concurrent desktop +
@@ -1104,6 +1148,7 @@ export function createJsonFileStore(dataDir: string = defaultDataDir(), options:
       return {
         ownerId: parsed.ownerId ?? DEFAULT_OWNER,
         goals: parsed.goals ?? [],
+        aimDrafts: (parsed.aimDrafts ?? []).map(normalizeAimDraftRow).filter((row): row is AimDraftRow => row !== null),
         milestonesByGoal: parsed.milestonesByGoal ?? {},
         memories: (parsed.memories ?? []).map(normalizeMemoryRow),
         evidence: parsed.evidence ?? [],
@@ -1137,6 +1182,55 @@ export function createJsonFileStore(dataDir: string = defaultDataDir(), options:
       const goal = store.goals.find((g) => g.id === id);
       if (!goal) return null;
       return { goal, milestones: store.milestonesByGoal[id] ?? [] };
+    },
+
+    async listAimDrafts(): Promise<AimDraftRow[]> {
+      return sortAimDraftsNewestFirst(load().aimDrafts);
+    },
+
+    async getAimDraft(id: string): Promise<AimDraftRow | null> {
+      return load().aimDrafts.find((draft) => draft.id === id) ?? null;
+    },
+
+    async upsertAimDraft(input: UpsertAimDraftInput): Promise<AimDraftRow> {
+      const store = load();
+      const now = nowIso();
+      const existing = input.id ? store.aimDrafts.find((draft) => draft.id === input.id) : undefined;
+      const draft = AimDraft.parse({
+        id: existing?.id ?? input.id ?? nextId(),
+        owner_id: input.ownerId ?? existing?.owner_id ?? store.ownerId ?? DEFAULT_OWNER,
+        title: input.title ?? existing?.title ?? "",
+        description: input.description ?? existing?.description ?? "",
+        parent_goal_id: input.parentGoalId === undefined ? existing?.parent_goal_id ?? null : input.parentGoalId,
+        parent_milestone_id: input.parentMilestoneId === undefined ? existing?.parent_milestone_id ?? null : input.parentMilestoneId,
+        current_stage: input.currentStage ?? existing?.current_stage ?? "aim",
+        phase: input.phase === undefined ? existing?.phase ?? null : input.phase,
+        status: input.status ?? existing?.status ?? "draft",
+        context_note: input.contextNote ?? existing?.context_note ?? "",
+        intake_questions: input.intakeQuestions ?? existing?.intake_questions ?? [],
+        intake_answers: input.intakeAnswers ?? existing?.intake_answers ?? [],
+        clarify_questions: input.clarifyQuestions ?? existing?.clarify_questions ?? [],
+        clarify_answers: input.clarifyAnswers ?? existing?.clarify_answers ?? [],
+        clarify_assumptions: input.clarifyAssumptions ?? existing?.clarify_assumptions ?? [],
+        draft_plan: input.draftPlan === undefined ? existing?.draft_plan ?? null : input.draftPlan,
+        final_plan: input.finalPlan === undefined ? existing?.final_plan ?? null : input.finalPlan,
+        save_block: input.saveBlock === undefined ? existing?.save_block ?? null : input.saveBlock,
+        created_at: existing?.created_at ?? now,
+        updated_at: now,
+      });
+      if (existing) {
+        store.aimDrafts = store.aimDrafts.map((row) => row.id === draft.id ? draft : row);
+      } else {
+        store.aimDrafts.push(draft);
+      }
+      save(store);
+      return draft;
+    },
+
+    async discardAimDraft(id: string): Promise<void> {
+      const store = load();
+      store.aimDrafts = store.aimDrafts.filter((draft) => draft.id !== id);
+      save(store);
     },
 
     async createGoal(input: CreateGoalInput): Promise<{ goal: Goal; milestones: Milestone[] }> {
@@ -1275,6 +1369,7 @@ export function createJsonFileStore(dataDir: string = defaultDataDir(), options:
       const runIds = new Set(store.runs.filter((run) => run.goal_id === id).map((run) => run.id));
       const evidenceIds = new Set(store.evidence.filter((ev) => ev.goal_id === id).map((ev) => ev.id));
       store.goals = store.goals.filter((g) => g.id !== id);
+      store.aimDrafts = store.aimDrafts.filter((draft) => draft.parent_goal_id !== id);
       delete store.milestonesByGoal[id];
       store.memories = store.memories.filter((m) => m.goal_id !== id);
       store.evidence = store.evidence.filter((ev) => ev.goal_id !== id);
@@ -1889,6 +1984,7 @@ export function createJsonFileStore(dataDir: string = defaultDataDir(), options:
       const incoming: LocalStore = {
         ownerId: snapshot.ownerId ?? DEFAULT_OWNER,
         goals: snapshot.goals ?? [],
+        aimDrafts: (snapshot.aimDrafts ?? []).map(normalizeAimDraftRow).filter((row): row is AimDraftRow => row !== null),
         milestonesByGoal: snapshot.milestonesByGoal ?? {},
         memories: (snapshot.memories ?? []).map(normalizeMemoryRow),
         evidence: snapshot.evidence ?? [],
@@ -1906,6 +2002,7 @@ export function createJsonFileStore(dataDir: string = defaultDataDir(), options:
         save(incoming);
         return {
           goals: incoming.goals.length,
+          aimDrafts: incoming.aimDrafts.length,
           milestones: allMilestones(incoming).length,
           memories: incoming.memories.length,
           evidence: incoming.evidence.length,
@@ -1935,6 +2032,7 @@ export function createJsonFileStore(dataDir: string = defaultDataDir(), options:
       };
 
       const goals = mergeRows(store.goals, incoming.goals);
+      const aimDrafts = mergeRows(store.aimDrafts, incoming.aimDrafts);
       const memories = mergeRows(store.memories, incoming.memories);
       const evidence = mergeRows(store.evidence, incoming.evidence);
       const completions = mergeRows(store.completions, incoming.completions);
@@ -1954,6 +2052,7 @@ export function createJsonFileStore(dataDir: string = defaultDataDir(), options:
       save(store);
       return {
         goals,
+        aimDrafts,
         milestones,
         memories,
         evidence,

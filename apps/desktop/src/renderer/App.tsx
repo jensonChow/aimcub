@@ -7,6 +7,8 @@ import {
 } from "@core/domain";
 import type { ClarifyAnswer, ClarifyOutput } from "@core/llm";
 import type {
+  AimDraft,
+  AimDraftSaveBlock,
   DecompositionOutput,
   Goal,
   Memory,
@@ -53,6 +55,7 @@ import { buildContextLoopModel } from "./stages/context/contextLoop";
 import { ContextReviewPanel } from "./stages/context/ContextReviewPanel";
 import { ContextStage } from "./stages/context/ContextStage";
 import type { ClarifyPhase, ContextAnswerMap } from "./stages/context/types";
+import { AimDraftHomeSection } from "./stages/aim/AimDraftRecovery";
 import { EvalStage } from "./stages/eval/EvalStage";
 import { ExecutePanel } from "./stages/execute/ExecutePanel";
 import { WebResearchForm } from "./WebResearchForm";
@@ -75,6 +78,13 @@ import {
   progressRows,
   type AppMode,
 } from "./workflow/stageRouting";
+import {
+  buildAimDraftUpsertRequest,
+  hydrateAimDraft,
+  saveBlockFromProductError,
+  type AimDraftBuildInput,
+  type HydratedAimDraft,
+} from "./workflow/aimDrafts";
 import {
   formatPlanValidationIssues,
   formatPlanningFailure,
@@ -105,6 +115,7 @@ function AimOsApp() {
   const { t } = useI18n();
   const [mode, setMode] = useState<AppMode>("cockpit");
   const [goals, setGoals] = useState<Goal[]>([]);
+  const [aimDrafts, setAimDrafts] = useState<AimDraft[]>([]);
   const [selected, setSelected] = useState<Goal | null>(null);
   const [detail, setDetail] = useState<GoalDetail | null>(null);
   const [progress, setProgress] = useState<AimProgressReadModel | null>(null);
@@ -127,12 +138,20 @@ function AimOsApp() {
   const [clarify, setClarify] = useState<ClarifyOutput | null>(null);
   const [answers, setAnswers] = useState<ContextAnswerMap>({});
   const [contextNote, setContextNote] = useState("");
+  const [draftSaveBlock, setDraftSaveBlock] = useState<AimDraftSaveBlock | null>(null);
   const [error, setError] = useState<string | ProductError | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [stageOverride, setStageOverride] = useState<CockpitStage | null>(null);
   const [runtimeGuidanceVisible, setRuntimeGuidanceVisible] = useState(false);
   const [settingsSection, setSettingsSection] = useState<SettingsSectionId>("overview");
   const planningRunIdRef = useRef<string | null>(null);
+  const activeDraftIdRef = useRef<string | null>(null);
+  const [activeDraftId, setActiveDraftIdState] = useState<string | null>(null);
+
+  function setActiveDraftId(id: string | null) {
+    activeDraftIdRef.current = id;
+    setActiveDraftIdState(id);
+  }
 
   useEffect(() => {
     void refreshAll();
@@ -158,14 +177,16 @@ function AimOsApp() {
   }
 
   async function refreshAll() {
-    const [nextGoals, nextProvider, nextWeb, nextSources, nextAgents] = await Promise.all([
+    const [nextGoals, nextDrafts, nextProvider, nextWeb, nextSources, nextAgents] = await Promise.all([
       window.aimcub.listGoals().catch(() => []),
+      window.aimcub.listAimDrafts().catch(() => []),
       window.aimcub.getProviderConfig().catch(() => null),
       window.aimcub.getWebResearchConfig().catch(() => null),
       window.aimcub.getContextSourceConfig().catch(() => null),
       window.aimcub.listLocalAgents().catch(() => []),
     ]);
     setGoals(nextGoals);
+    setAimDrafts(nextDrafts);
     setProvider(nextProvider);
     setWebResearch(nextWeb);
     setContextSources(nextSources);
@@ -179,10 +200,13 @@ function AimOsApp() {
   }
 
   async function openGoal(goal: Goal) {
+    await persistCurrentDraftNow();
     setSelected(goal);
     setMode("cockpit");
     setAimComposerOpen(false);
+    setActiveDraftId(null);
     setError(null);
+    setDraftSaveBlock(null);
     setDraft(null);
     setFinalPlan(null);
     setPlanResult(null);
@@ -212,6 +236,7 @@ function AimOsApp() {
 
   function resetComposer(options: { openComposer?: boolean } = {}) {
     setStageOverride("aim");
+    setActiveDraftId(null);
     setAimComposerOpen(Boolean(options.openComposer));
     setAimTitle("");
     setAimDescription("");
@@ -229,6 +254,7 @@ function AimOsApp() {
     setAnswers({});
     setRuntimeGuidanceVisible(false);
     setContextNote("");
+    setDraftSaveBlock(null);
     setSelected(null);
     setDetail(null);
     setProgress(null);
@@ -257,6 +283,7 @@ function AimOsApp() {
     }
     setRuntimeGuidanceVisible(false);
     setError(null);
+    setDraftSaveBlock(null);
     setPlanningDebugTraces([]);
     const runId = startPlanningRun();
     try {
@@ -329,6 +356,128 @@ function AimOsApp() {
     return answersFor(intakeClarify, intakeAnswers);
   }, [intakeAnswers, intakeClarify]);
 
+  function currentAimDraftInput(overrides: { saveBlock?: AimDraftSaveBlock | null } = {}): AimDraftBuildInput {
+    return {
+      id: activeDraftIdRef.current,
+      title: aimTitle,
+      description: aimDescription,
+      parent,
+      activeStage: stageOverride ?? cockpitStageFor(mode, selected, (finalPlan ?? draft ?? detail?.goal.plan_json ?? null) as DecompositionOutput | null),
+      phase: clarifyPhase,
+      contextNote,
+      intakeClarify,
+      intakeAnswers: builtIntakeAnswers,
+      clarify: clarifyPhase === "postDraft" ? clarify : null,
+      clarifyAnswers: builtAnswers,
+      draft,
+      finalPlan,
+      saveBlock: overrides.saveBlock !== undefined ? overrides.saveBlock : draftSaveBlock,
+    };
+  }
+
+  async function persistCurrentDraftNow(overrides: { saveBlock?: AimDraftSaveBlock | null } = {}): Promise<AimDraft | null> {
+    if (selected) return null;
+    const req = buildAimDraftUpsertRequest(currentAimDraftInput(overrides));
+    if (!req) return null;
+    try {
+      const saved = await window.aimcub.upsertAimDraft(req);
+      setActiveDraftId(saved.id);
+      setAimDrafts((current) => [saved, ...current.filter((row) => row.id !== saved.id)]
+        .sort((a, b) => (b.updated_at ?? b.created_at ?? "").localeCompare(a.updated_at ?? a.created_at ?? "")));
+      return saved;
+    } catch {
+      return null;
+    }
+  }
+
+  async function refreshAimDrafts() {
+    setAimDrafts(await window.aimcub.listAimDrafts().catch(() => []));
+  }
+
+  function productErrorFromSaveBlock(saveBlock: AimDraftSaveBlock): ProductError {
+    return {
+      title: saveBlock.title,
+      message: saveBlock.message,
+      recovery: saveBlock.recovery,
+      details: [],
+    };
+  }
+
+  function applyHydratedDraft(hydrated: HydratedAimDraft) {
+    setSelected(null);
+    setDetail(null);
+    setProgress(null);
+    setActiveDraftId(hydrated.id);
+    setAimComposerOpen(true);
+    setAimTitle(hydrated.title);
+    setAimDescription(hydrated.description);
+    setParent(hydrated.parent);
+    setDraft(hydrated.draft);
+    setFinalPlan(hydrated.finalPlan);
+    setPlanResult(hydrated.finalPlan || hydrated.draft ? {
+      ok: true,
+      output: hydrated.finalPlan ?? hydrated.draft,
+      errors: [],
+    } : null);
+    setPlanningDebugTraces([]);
+    setPlanningLiveEvents([]);
+    clearPlanningRun();
+    setIntakeClarify(hydrated.intakeClarify);
+    setIntakeAnswers(hydrated.intakeAnswers);
+    setClarifyPhase(hydrated.phase);
+    setClarify(hydrated.phase === "intake"
+      ? hydrated.intakeClarify
+      : hydrated.phase === "postDraft"
+        ? hydrated.clarify ?? { questions: [], assumptions: [] }
+        : hydrated.clarify);
+    setAnswers(hydrated.clarifyAnswers);
+    setContextNote(hydrated.contextNote);
+    setDraftSaveBlock(hydrated.saveBlock);
+    setError(hydrated.saveBlock ? productErrorFromSaveBlock(hydrated.saveBlock) : null);
+    setRuntimeGuidanceVisible(false);
+    setMode(hydrated.stage === "contracts" ? "reviewing" : hydrated.stage === "context" ? "contexting" : "cockpit");
+    setStageOverride(hydrated.stage);
+  }
+
+  async function openAimDraft(draftRow: AimDraft) {
+    await persistCurrentDraftNow();
+    const fresh = await window.aimcub.getAimDraft(draftRow.id).catch(() => null);
+    applyHydratedDraft(hydrateAimDraft(fresh ?? draftRow));
+  }
+
+  async function discardAimDraft(draftRow: AimDraft) {
+    const title = draftRow.title.trim() || t("aimDraft.untitled");
+    if (!window.confirm(t("aimDraft.discardConfirm", { title }))) return;
+    await window.aimcub.discardAimDraft(draftRow.id);
+    if (activeDraftIdRef.current === draftRow.id) resetComposer();
+    await refreshAimDrafts();
+  }
+
+  useEffect(() => {
+    if (selected) return;
+    const timer = window.setTimeout(() => {
+      void persistCurrentDraftNow();
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [
+    activeDraftId,
+    aimDescription,
+    aimTitle,
+    builtAnswers,
+    builtIntakeAnswers,
+    clarify,
+    clarifyPhase,
+    contextNote,
+    draft,
+    draftSaveBlock,
+    finalPlan,
+    detail,
+    mode,
+    parent,
+    selected,
+    stageOverride,
+  ]);
+
   async function continueFromContext() {
     await startDraft({ skipIntakeGate: true });
   }
@@ -337,6 +486,7 @@ function AimOsApp() {
     if (!draft) return;
     setBusy(t("os.busy.refine"));
     setError(null);
+    setDraftSaveBlock(null);
     const runId = startPlanningRun();
     try {
       const refined = await window.aimcub.refine({
@@ -387,7 +537,11 @@ function AimOsApp() {
     if (!plan) return;
     const validation = validateExecutablePlan(plan);
     if (!validation.ok) {
-      setError(formatPlanningFailure({ stage: "save", errors: validation.errors, t, fallback: t("plan.validationFailed") }));
+      const productError = formatPlanningFailure({ stage: "save", errors: validation.errors, t, fallback: t("plan.validationFailed") });
+      const saveBlock = saveBlockFromProductError(productError);
+      setError(productError);
+      setDraftSaveBlock(saveBlock);
+      await persistCurrentDraftNow({ saveBlock });
       const route = routeAfterPlanningFailure("save");
       setMode(route.mode);
       setStageOverride(route.stageOverride);
@@ -399,7 +553,16 @@ function AimOsApp() {
       allowHuman: true,
     });
     if (!routingValidation.ok) {
-      setError(formatRoutingValidation(routingValidation));
+      const message = formatRoutingValidation(routingValidation);
+      const saveBlock: AimDraftSaveBlock = {
+        title: t("planningError.save.title"),
+        message: t("planningError.save.message"),
+        recovery: t("planningError.save.recovery"),
+        issues: routingValidation.issues.slice(0, 3).map((issue) => issue.title),
+      };
+      setError(message);
+      setDraftSaveBlock(saveBlock);
+      await persistCurrentDraftNow({ saveBlock });
       setStageOverride("contracts");
       setMode("reviewing");
       return;
@@ -408,6 +571,7 @@ function AimOsApp() {
     setError(null);
     try {
       const saved = await window.aimcub.saveGoal({
+        draftId: activeDraftIdRef.current ?? undefined,
         title: aimTitle.trim(),
         description: aimDescription.trim() || undefined,
         parentGoalId: parent?.goalId,
@@ -425,6 +589,8 @@ function AimOsApp() {
         answers: [...builtIntakeAnswers, ...builtAnswers],
         assumptions: clarify?.assumptions ?? [],
       });
+      setActiveDraftId(null);
+      setDraftSaveBlock(null);
       resetComposer();
       await refreshAll();
       await openGoal(saved.goal);
@@ -601,6 +767,7 @@ function AimOsApp() {
   ]);
 
   function applyPlanEdit(nextPlan: DecompositionOutput) {
+    setDraftSaveBlock(null);
     setFinalPlan(nextPlan);
     setPlanResult((current) => (current ? { ...current, output: nextPlan } : current));
   }
@@ -627,13 +794,15 @@ function AimOsApp() {
     setMode("cockpit");
   }
 
-  function startNewAim() {
+  async function startNewAim() {
+    await persistCurrentDraftNow();
     resetComposer({ openComposer: true });
     setMode("cockpit");
     setStageOverride("aim");
   }
 
-  function openHomePanel() {
+  async function openHomePanel() {
+    await persistCurrentDraftNow();
     resetComposer();
     setMode("cockpit");
     setStageOverride("aim");
@@ -874,19 +1043,27 @@ function AimOsApp() {
         onKeepEditing={() => setRuntimeGuidanceVisible(false)}
       />
     ) : (
-      <InitialWorkspacePanel />
+      <InitialWorkspacePanel
+        drafts={aimDrafts}
+        onResumeDraft={(draftRow) => void openAimDraft(draftRow)}
+        onDiscardDraft={(draftRow) => void discardAimDraft(draftRow)}
+      />
     );
   })();
 
   return (
     <CockpitShell
       goals={goals}
+      drafts={aimDrafts}
+      activeDraftId={activeDraftId}
       selected={selected}
       activeStage={activeStage}
       activeSidebarAction={activeSidebarAction}
-      onHome={openHomePanel}
-      onNewAim={startNewAim}
+      onHome={() => void openHomePanel()}
+      onNewAim={() => void startNewAim()}
       onOpenGoal={(goal) => void openGoal(goal)}
+      onOpenDraft={(draftRow) => void openAimDraft(draftRow)}
+      onDiscardDraft={(draftRow) => void discardAimDraft(draftRow)}
       onStage={openCockpitStage}
       settingsSidebar={settingsSidebar}
       main={(
@@ -922,14 +1099,26 @@ function ProductErrorNotice(props: { error: string | ProductError }) {
   );
 }
 
-export function InitialWorkspacePanel() {
+export function InitialWorkspacePanel(props: {
+  drafts?: AimDraft[];
+  onResumeDraft?: (draft: AimDraft) => void;
+  onDiscardDraft?: (draft: AimDraft) => void;
+}) {
   const { t } = useI18n();
+  const drafts = props.drafts ?? [];
   return (
     <section className="od-initial-workspace" aria-label={t("initialWorkspace.label")}>
       <div className="od-initial-workspace-copy">
         <h1>{t("initialWorkspace.title")}</h1>
         <p>{t("initialWorkspace.body")}</p>
       </div>
+      {drafts.length > 0 && props.onResumeDraft && props.onDiscardDraft ? (
+        <AimDraftHomeSection
+          drafts={drafts}
+          onResume={props.onResumeDraft}
+          onDiscard={props.onDiscardDraft}
+        />
+      ) : null}
     </section>
   );
 }
