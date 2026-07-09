@@ -1,44 +1,67 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-09
-Branch: `main`
+Branch: detached `HEAD` at `a14c8774`
 
 ## Current Session
 
-- Request: run `$memory-refresh`, then commit, push, and merge as needed.
-- Skill audit: `python3 /Users/jenson/.codex/skills/memory-refresh/scripts/audit_project_memory.py /Users/jenson/Desktop/Aimcub` passed read-only and found root memory within budget.
-- Repository state at audit start: `main` matched `origin/main` at `b149affe Update integration handoff status`.
+- Request: fix the Desktop bug where unfinished New Aim work disappears after leaving the aim-building flow.
+- Scope: local-first Desktop draft persistence and recovery UI. No `desktop:pack`, root `Aimcub.app` refresh, push, or merge because this is not the integration session.
 
 ## Completed Work
 
-- Confirmed the 2026-07-09 real-use Desktop integration is already merged and pushed to `main`.
-- Promoted the durable Desktop lessons from the integration into `docs/memory/desktop.md`: compact non-linear workbench navigation, Context activity/sufficiency, chat-like blocking intake, product-facing planning errors, Developer details boundaries, and repairable Plan/Contracts validation.
-- Rewrote this handoff to be the current memory-refresh transfer instead of carrying the previous integration session as the active handoff.
+- Added a durable `AimDraft` model in `@core/types` and JSON-store support in `@core/store`.
+- Added typed Desktop IPC/preload support for `listAimDrafts`, `getAimDraft`, `upsertAimDraft`, and `discardAimDraft`.
+- Wired Desktop autosave so title, description, child parent references, current stage/phase, context note, intake/refinement questions and answers, draft/final plan, and product-facing save-block state persist before Home/New Aim/open-goal navigation clears renderer state.
+- Added recovery UI in Home and the sidebar with compact Draft rows, Resume, and explicit discard confirmation. Drafts stay separate from saved Recent aims.
+- On successful `saveGoal`, the main process deletes the corresponding draft after the saved aim and context side effects complete.
+- Updated durable memory in `docs/memory/design-system.md` and `docs/memory/desktop.md`.
+
+## Changed Files
+
+- `packages/types/src/index.ts`
+- `packages/store/src/index.ts`
+- `packages/store/src/store.test.ts`
+- `apps/desktop/src/shared/ipc.ts`
+- `apps/desktop/src/main/ipc.ts`
+- `apps/desktop/src/preload/index.ts`
+- `apps/desktop/src/renderer/App.tsx`
+- `apps/desktop/src/renderer/CockpitShell.tsx`
+- `apps/desktop/src/renderer/cockpit.css`
+- `apps/desktop/src/renderer/i18n.tsx`
+- `apps/desktop/src/renderer/stages/aim/AimDraftRecovery.tsx`
+- `apps/desktop/src/renderer/workflow/aimDrafts.ts`
+- `apps/desktop/src/renderer/workflow/aimDrafts.test.ts`
+- `apps/desktop/src/renderer/App.test.tsx`
+- `docs/memory/design-system.md`
+- `docs/memory/desktop.md`
+- `docs/handoff.md`
 
 ## Verification
 
-- Final memory-refresh verification passed:
-  - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
-  - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
-  - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck`
-  - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm lint`
-  - `PATH=/Users/jenson/.local/node/bin:$PATH pnpm core:purity`
-  - `git diff --check`
-  - `ELECTRON_BUILDER_CACHE=/private/tmp/aimcub-electron-builder-cache COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm desktop:pack`
-  - `ditto apps/desktop/dist/mac-arm64/Aimcub.app Aimcub.app`
-  - `plutil -p Aimcub.app/Contents/Info.plist`
+- `AIMCUB_HOME=/tmp/aimcub-draft-recovery PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @core/types typecheck` passed.
+- `AIMCUB_HOME=/tmp/aimcub-draft-recovery PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @core/store test` passed.
+- `AIMCUB_HOME=/tmp/aimcub-draft-recovery PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop typecheck` passed.
+- `AIMCUB_HOME=/tmp/aimcub-draft-recovery PATH=/Users/jenson/.local/node/bin:$PATH pnpm --filter @app/desktop test` passed.
+- `AIMCUB_HOME=/tmp/aimcub-draft-recovery PATH=/Users/jenson/.local/node/bin:$PATH pnpm build` passed.
+- `AIMCUB_HOME=/tmp/aimcub-draft-recovery PATH=/Users/jenson/.local/node/bin:$PATH pnpm test` passed.
+- `AIMCUB_HOME=/tmp/aimcub-draft-recovery PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck` passed.
+- `AIMCUB_HOME=/tmp/aimcub-draft-recovery PATH=/Users/jenson/.local/node/bin:$PATH pnpm lint` passed.
+- `AIMCUB_HOME=/tmp/aimcub-draft-recovery PATH=/Users/jenson/.local/node/bin:$PATH pnpm core:purity` passed.
+- `git diff --check` passed.
 
 ## Commit And Push Status
 
-- Memory-refresh changes are verified for a focused commit and push on `main`.
-- No separate merge is needed because the work was done directly on `main`.
+- No commit created yet; this worktree is detached and has local modifications.
+- No `desktop:pack`, root `Aimcub.app` refresh, push, or merge was run per the objective constraints.
 
-## Open Items
+## Open Risks
 
-- None after the focused memory-refresh commit is pushed.
+- Draft recovery is covered by store, renderer helper, static render, source-wiring, and full test gates. A live Electron visual pass was not run because the objective did not ask for packaging or app launch.
+- `pnpm build`, `pnpm test`, `pnpm typecheck`, and `pnpm lint` emitted non-fatal Turbo cache `Operation not permitted` warnings under the sandbox, but all tasks passed.
 
 ## Next Session Prompt
 
 ```text
-Continue from Aimcub main. Read AGENTS.md, docs/handoff.md, and docs/memory/README.md first, then inspect git status. Preserve Desktop shell/sidebar/window-chrome behavior and keep durable project memory under docs/memory/.
+Continue Aimcub from detached HEAD worktree. Read AGENTS.md, docs/handoff.md, docs/memory/README.md, docs/memory/desktop.md, and docs/memory/design-system.md first. The active work implements durable Desktop Aim drafts; inspect git status and decide whether to commit or hand off for integration. Do not run desktop:pack, refresh root Aimcub.app, push, or merge unless this is the integration session.
 ```

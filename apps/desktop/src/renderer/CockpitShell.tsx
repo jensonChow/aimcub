@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
-import type { Goal } from "@core/types";
+import type { AimDraft, Goal } from "@core/types";
 
 import type { WindowChromeState } from "../shared/ipc";
 import { useI18n, type Lang } from "./i18n";
+import { AimDraftSidebarRows } from "./stages/aim/AimDraftRecovery";
 
 import "./cockpit.css";
 
@@ -37,12 +38,16 @@ export interface CockpitCommand {
 
 interface CockpitShellProps {
   goals: Goal[];
+  drafts?: AimDraft[];
+  activeDraftId?: string | null;
   selected: Goal | null;
   activeStage: CockpitStage;
   activeSidebarAction: SidebarAction;
   onHome: () => void;
   onNewAim: () => void;
   onOpenGoal: (goal: Goal) => void;
+  onOpenDraft?: (draft: AimDraft) => void;
+  onDiscardDraft?: (draft: AimDraft) => void;
   onStage: (stage: CockpitStage) => void;
   main: ReactNode;
   settingsSidebar?: ReactNode;
@@ -92,12 +97,16 @@ function persistSidebarWidth(width: number) {
 
 export function CockpitShell({
   goals,
+  drafts = [],
+  activeDraftId = null,
   selected,
   activeStage,
   activeSidebarAction,
   onHome,
   onNewAim,
   onOpenGoal,
+  onOpenDraft,
+  onDiscardDraft,
   onStage,
   main,
   settingsSidebar,
@@ -571,6 +580,14 @@ export function CockpitShell({
                       </button>
                     </div>
                   </>
+                ) : null}
+                {drafts.length > 0 && onOpenDraft && onDiscardDraft ? (
+                  <AimDraftSidebarRows
+                    drafts={drafts}
+                    activeDraftId={activeDraftId}
+                    onResume={onOpenDraft}
+                    onDiscard={onDiscardDraft}
+                  />
                 ) : null}
                 <div className="od-section-label" data-od-id="sidebar-recent-aims-label">
                   <span>{t("shell.recentAims")}</span>

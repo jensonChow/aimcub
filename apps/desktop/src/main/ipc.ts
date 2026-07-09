@@ -67,6 +67,7 @@ import {
   type RefineRequest,
   type SaveRequest,
   type SavedGoal,
+  type UpsertAimDraftRequest,
   type WebResearchConfig,
   type WebResearchStatus,
   type WebResearchTestResult,
@@ -618,6 +619,14 @@ export function registerIpc(): void {
 
   ipcMain.handle(IPC.deleteGoal, (_e, id: string): Promise<void> => aimStore.deleteGoal(id));
 
+  ipcMain.handle(IPC.listAimDrafts, () => aimStore.listAimDrafts());
+
+  ipcMain.handle(IPC.getAimDraft, (_e, id: string) => aimStore.getAimDraft(id));
+
+  ipcMain.handle(IPC.upsertAimDraft, (_e, req: UpsertAimDraftRequest) => aimStore.upsertAimDraft(req));
+
+  ipcMain.handle(IPC.discardAimDraft, (_e, id: string): Promise<void> => aimStore.discardAimDraft(id));
+
   ipcMain.handle(IPC.listContextCandidates, () => aimStore.listMemoryCandidates());
 
   ipcMain.handle(IPC.listContextHistory, () => aimStore.listMemoryHistory());
@@ -805,15 +814,17 @@ export function registerIpc(): void {
       },
       memories,
     });
+    const contextCandidates = [
+      ...(await recordSedimentationAimContextForStore(aimStore, saved.goal, contextSedimentation)),
+      ...(await recordSedimentationMemoryCandidatesForStore(aimStore, contextSedimentation)),
+      ...(await recordAssumptionContextCandidatesForStore(aimStore, saved.goal, req.assumptions ?? [])),
+      ...(await recordReviewContextCandidatesForStore(aimStore, saved.goal, req.review)),
+    ];
+    if (req.draftId) await aimStore.discardAimDraft(req.draftId);
     return {
       ...saved,
       answerImpact,
-      contextCandidates: [
-        ...(await recordSedimentationAimContextForStore(aimStore, saved.goal, contextSedimentation)),
-        ...(await recordSedimentationMemoryCandidatesForStore(aimStore, contextSedimentation)),
-        ...(await recordAssumptionContextCandidatesForStore(aimStore, saved.goal, req.assumptions ?? [])),
-        ...(await recordReviewContextCandidatesForStore(aimStore, saved.goal, req.review)),
-      ],
+      contextCandidates,
     };
   });
 }

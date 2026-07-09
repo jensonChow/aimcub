@@ -3,10 +3,10 @@
  * Renderer imports these as `import type` only, so this module is erased from the
  * renderer bundle — only main/preload pull in the channel constants at runtime.
  */
-import type { DecompositionOutput, Goal, ManualEvidenceRequiredItem, Memory, Milestone } from "@core/types";
+import type { AimDraft, DecompositionOutput, Goal, ManualEvidenceRequiredItem, Memory, Milestone } from "@core/types";
 import type { AimIntakeReport, AimProgressReadModel, ContextHealthRow, ContextLineageLearningReport, ContextProfileReport, DecompositionLearningReport, DecompositionStrategyReport, PlanQualityReport, PlanReviewReport } from "@core/domain";
 import type { LlmProvider } from "@core/llm/providers";
-import type { ContextSourceSettings } from "@core/store";
+import type { ContextSourceSettings, UpsertAimDraftInput } from "@core/store";
 import type {
   ClarifyOutput,
   ClarifyQuestion,
@@ -47,6 +47,7 @@ export interface RefineRequest {
 }
 
 export interface SaveRequest {
+  draftId?: string;
   title: string;
   description?: string;
   parentGoalId?: string;
@@ -205,6 +206,8 @@ export interface GoalDetail {
   goal: Goal;
   milestones: Milestone[];
 }
+
+export type UpsertAimDraftRequest = UpsertAimDraftInput;
 
 export interface ConfirmMilestoneRequest {
   goalId: string;
@@ -415,6 +418,10 @@ export interface AimcubApi {
   getGoal(id: string): Promise<GoalDetail | null>;
   getAimProgress(id: string): Promise<AimProgressReadModel | null>;
   deleteGoal(id: string): Promise<void>;
+  listAimDrafts(): Promise<AimDraft[]>;
+  getAimDraft(id: string): Promise<AimDraft | null>;
+  upsertAimDraft(req: UpsertAimDraftRequest): Promise<AimDraft>;
+  discardAimDraft(id: string): Promise<void>;
   listContextCandidates(): Promise<Memory[]>;
   listContextHistory(): Promise<Memory[]>;
   listContextProfile(): Promise<ContextProfileReport>;
@@ -457,6 +464,10 @@ export const IPC = {
   getGoal: "aimcub:getGoal",
   getAimProgress: "aimcub:getAimProgress",
   deleteGoal: "aimcub:deleteGoal",
+  listAimDrafts: "aimcub:listAimDrafts",
+  getAimDraft: "aimcub:getAimDraft",
+  upsertAimDraft: "aimcub:upsertAimDraft",
+  discardAimDraft: "aimcub:discardAimDraft",
   listContextCandidates: "aimcub:listContextCandidates",
   listContextHistory: "aimcub:listContextHistory",
   listContextProfile: "aimcub:listContextProfile",

@@ -4,10 +4,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { routingRecommendationForPlanNode, type RoutingRuntimeAgentOption } from "@core/domain";
-import type { AimProgressReadModel, DecompositionOutput, Goal, Milestone } from "@core/types";
+import type { AimDraft, AimProgressReadModel, DecompositionOutput, Goal, Milestone } from "@core/types";
 import type { ContextSourceStatus, GoalDetail, ProviderStatus, WebResearchStatus } from "../shared/ipc";
 
-import { App, buildSettingsModel, SettingsPanel } from "./App";
+import { App, buildSettingsModel, InitialWorkspacePanel, SettingsPanel } from "./App";
 import { CockpitShell, WORKBENCH_STAGE_IDS } from "./CockpitShell";
 import { I18nProvider, translate, type I18n } from "./i18n";
 import { EvidenceSubmissionForm } from "./stages/execute/EvidenceSubmissionForm";
@@ -140,6 +140,34 @@ const contractPlan: DecompositionOutput = {
     },
   ],
   edges: [],
+};
+
+const draftRow: AimDraft = {
+  id: "00000000-0000-4000-8000-000000000090",
+  owner_id: OWNER,
+  title: "Unfinished local-first aim",
+  description: "This work has not been saved as an aim yet.",
+  parent_goal_id: null,
+  parent_milestone_id: null,
+  current_stage: "contracts",
+  phase: "post_draft",
+  status: "save_blocked",
+  context_note: "Keep the context note.",
+  intake_questions: [],
+  intake_answers: [],
+  clarify_questions: [],
+  clarify_answers: [],
+  clarify_assumptions: [],
+  draft_plan: null,
+  final_plan: contractPlan,
+  save_block: {
+    title: "Aim needs a plan repair",
+    message: "Acceptance rule needs repair.",
+    recovery: "Edit the contract, then save again.",
+    issues: ["Acceptance rule needs repair."],
+  },
+  created_at: "2026-07-09T00:00:00.000Z",
+  updated_at: "2026-07-09T00:01:00.000Z",
 };
 
 const routingAgents: RoutingRuntimeAgentOption[] = [
@@ -622,6 +650,26 @@ describe("App first-run workspace", () => {
     expect(html).not.toContain('id="aim-context"');
     expect(html).not.toContain(">Continue</button>");
   });
+
+  it("shows recoverable drafts on the Home panel without calling them saved aims", () => {
+    const html = renderToStaticMarkup(
+      <I18nProvider>
+        <InitialWorkspacePanel
+          drafts={[draftRow]}
+          onResumeDraft={noop}
+          onDiscardDraft={noop}
+        />
+      </I18nProvider>,
+    );
+
+    expect(html).toContain("Drafts in progress");
+    expect(html).toContain("Resume aim-building work or discard it explicitly.");
+    expect(html).toContain("Unfinished local-first aim");
+    expect(html).toContain("Save blocked");
+    expect(html).toContain("Resume");
+    expect(html).not.toContain("Saved aim");
+    expect(html).not.toContain("Saved aims");
+  });
 });
 
 describe("App planning state guards", () => {
@@ -665,6 +713,47 @@ describe("App planning state guards", () => {
     expect(planPanel).toContain("validationErrors={activePlanValidationMessages}");
     expect(planPanel).toContain("disabled={Boolean(busy)}");
     expect(planPanel).not.toContain("activePlanValidation?.ok === false");
+  });
+
+  it("autosaves draft state before Home, New Aim, or opening a saved aim clears the composer", () => {
+    const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+    const openGoal = source.match(/async function openGoal[\s\S]*?\n {2}async function refreshGoalState/)?.[0] ?? "";
+    const startNewAim = source.match(/async function startNewAim[\s\S]*?\n {2}async function openHomePanel/)?.[0] ?? "";
+    const openHomePanel = source.match(/async function openHomePanel[\s\S]*?\n {2}function openSettingsForAim/)?.[0] ?? "";
+
+    expect(openGoal).toContain("await persistCurrentDraftNow();");
+    expect(startNewAim.indexOf("await persistCurrentDraftNow();")).toBeLessThan(startNewAim.indexOf("resetComposer({ openComposer: true })"));
+    expect(openHomePanel.indexOf("await persistCurrentDraftNow();")).toBeLessThan(openHomePanel.indexOf("resetComposer();"));
+    expect(source).toContain("window.aimcub.upsertAimDraft(req)");
+    expect(source).not.toContain("localStorage.setItem(\"aim");
+  });
+
+  it("clears the saved draft only after saveGoal succeeds", () => {
+    const appSource = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+    const mainIpcSource = readFileSync(new URL("../main/ipc.ts", import.meta.url), "utf8");
+
+    expect(appSource).toContain("draftId: activeDraftIdRef.current ?? undefined");
+    expect(mainIpcSource).toContain("if (req.draftId) await aimStore.discardAimDraft(req.draftId);");
+  });
+
+  it("requires an explicit discard path for draft deletion", () => {
+    const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+    const discard = source.match(/async function discardAimDraft[\s\S]*?\n {2}useEffect/)?.[0] ?? "";
+
+    expect(discard).toContain("window.confirm");
+    expect(discard).toContain("window.aimcub.discardAimDraft(draftRow.id)");
+  });
+
+  it("keeps typed draft IPC wired through shared channels and preload", () => {
+    const shared = readFileSync(new URL("../shared/ipc.ts", import.meta.url), "utf8");
+    const preload = readFileSync(new URL("../preload/index.ts", import.meta.url), "utf8");
+    const mainIpc = readFileSync(new URL("../main/ipc.ts", import.meta.url), "utf8");
+
+    for (const channel of ["listAimDrafts", "getAimDraft", "upsertAimDraft", "discardAimDraft"]) {
+      expect(shared).toContain(`${channel}: "aimcub:${channel}"`);
+      expect(preload).toContain(`${channel}:`);
+      expect(mainIpc).toContain(`IPC.${channel}`);
+    }
   });
 });
 
@@ -1000,6 +1089,37 @@ describe("CockpitShell", () => {
 
     expect(html).toContain('<button class="od-sidebar-action od-home-panel" type="button" data-od-id="sidebar-home-panel-action"');
     expect(html).toContain('<button class="od-sidebar-action od-new-aim" type="button" aria-current="page" data-od-id="sidebar-new-aim-action"');
+  });
+
+  it("renders recoverable drafts as draft rows, not saved recent aims", () => {
+    const html = renderToStaticMarkup(
+      <I18nProvider>
+        <CockpitShell
+          goals={[]}
+          drafts={[draftRow]}
+          activeDraftId={draftRow.id}
+          selected={null}
+          activeStage="aim"
+          activeSidebarAction="home"
+          onHome={noop}
+          onNewAim={noop}
+          onOpenGoal={noop}
+          onOpenDraft={noop}
+          onDiscardDraft={noop}
+          onStage={noop}
+          main={<div>Home</div>}
+        />
+      </I18nProvider>,
+    );
+
+    expect(html).toContain('data-od-id="sidebar-drafts-label"');
+    expect(html).toContain("Drafts");
+    expect(html).toContain("Unfinished local-first aim");
+    expect(html).toContain("Save blocked");
+    expect(html).toContain('class="od-draft-card selected"');
+    expect(html).toContain("Recent aims");
+    expect(html).toContain("Saved aims appear here.");
+    expect(html).not.toContain('class="od-aim-card selected"');
   });
 
   it("keeps Desktop typography on three sizes and light shared weights", () => {
