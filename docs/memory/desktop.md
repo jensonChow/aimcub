@@ -10,7 +10,7 @@ The user rejected the prior over-stacked desktop direction. Do not add more defa
 
 Planning, draft, refine, and save failures must show concise product language and a recovery action by default. Raw schema paths, Zod messages, validator dumps, and provider internals belong only behind an explicit Developer details disclosure or debug surface.
 
-Unfinished New Aim work is product data, not a temporary form. Desktop must persist recoverable Aim drafts under the selected local Aimcub data directory before navigation can hide user-entered title, context, answers, generated plan, or save-blocked state. Resume/discard affordances should be quiet and explicit, and drafts must not appear as saved aims until `saveGoal` succeeds.
+Unfinished New Aim work is product data, not a temporary form. Desktop must persist recoverable Aim drafts under the selected local Aimcub data directory before navigation can hide user-entered title, context, answers, generated plan, or save-blocked state. Draft recovery rows in the sidebar and Home panel use one content-entry surface: the row body resumes work, trailing More Actions exposes Resume and Discard, and discard stays menu-gated with inline confirmation instead of visible row text or native dialogs. Drafts must not appear as saved aims until `saveGoal` succeeds.
 
 User-entered or expensive generated work must not be silently destroyed by normal Desktop navigation. Context source selections, manual proof drafts, Settings setup drafts, and any future volatile work surface need either a recoverable local draft checkpoint or an explicit product-facing discard choice before Settings/reload boundaries, Cmd/Ctrl shortcuts, component unmount paths, or other normal navigation can clear them.
 
