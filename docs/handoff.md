@@ -79,14 +79,13 @@ Branch: `main`
 
 ## Commit And Push Status
 
-- Local `main` is ahead of `origin/main` by the three merged feature commits plus merge commits.
-- Final integration commit is ready after the last required verification rerun.
-- Push is pending commit.
+- Product-code integration commit: `6a8b1b4 Fix desktop real-use workflow friction`.
+- `main` was pushed to `origin/main` after the full suite, isolated seed smoke test, root app refresh, and seeded visual inspection passed.
+- This handoff update records the final pushed state; no open integration items remain.
 
 ## Open Items
 
-- Commit with `Fix desktop real-use workflow friction`.
-- Push `main` after the commit if verification remains green.
+- None for this integration session.
 
 ## Next Session Prompt
 
