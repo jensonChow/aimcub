@@ -87,60 +87,91 @@ export function ContextClarifyPanel(props: ContextClarifyPanelProps) {
           const answer = props.answers[question.id] ?? { labels: [], other: "" };
           const multi = question.selection_mode === "multiple";
           return (
-            <Panel key={question.id} variant="warm" className="od-context-question">
-              <div className="od-context-question-head">
+            <div
+              key={question.id}
+              className="od-context-chat-exchange"
+              data-od-id={intake ? "context-chat-exchange" : undefined}
+            >
+              <article className="od-context-message od-context-message-assistant" data-od-id={intake ? "context-assistant-message" : undefined}>
+                <div className="od-context-message-meta">
+                  <span>{t("context.chat.assistant")}</span>
+                  <Pill>{t(multi ? "os.multiSelect" : "os.singleSelect")}</Pill>
+                </div>
                 <strong>{question.question}</strong>
-                <Pill>{t(multi ? "os.multiSelect" : "os.singleSelect")}</Pill>
-              </div>
-              <p>{question.why_high_impact}</p>
-              <div className="od-context-choice-list">
-                {question.options.map((option) => (
-                  <Button
-                    key={option.label}
-                    variant="secondary"
-                    className="od-ui-button-card od-context-choice"
-                    selected={answer.labels.includes(option.label)}
-                    aria-pressed={answer.labels.includes(option.label)}
-                    onClick={() => {
-                      const selected = answer.labels.includes(option.label);
-                      const labels = multi
-                        ? selected
-                          ? answer.labels.filter((label) => label !== option.label)
-                          : [...answer.labels, option.label]
-                        : [option.label];
-                      props.onAnswer(question.id, { ...answer, labels });
-                    }}
-                  >
-                    <strong>{option.label}</strong>
-                    <span>{option.tradeoff}</span>
-                  </Button>
-                ))}
-              </div>
-              <TextField
-                aria-label={t("os.otherAnswer")}
-                value={answer.other}
-                onChange={(event) => props.onAnswer(question.id, { ...answer, other: event.target.value })}
-                placeholder={t("os.otherAnswer")}
-                fieldClassName="od-context-other-field"
-              />
-            </Panel>
+                <p>{question.why_high_impact}</p>
+              </article>
+
+              <article className="od-context-message od-context-message-user" data-od-id={intake ? "context-user-reply" : undefined}>
+                <div className="od-context-message-meta">
+                  <span>{t("context.chat.reply")}</span>
+                </div>
+                <div className="od-context-choice-list">
+                  {question.options.map((option) => (
+                    <Button
+                      key={option.label}
+                      variant="secondary"
+                      className="od-ui-button-card od-context-choice"
+                      selected={answer.labels.includes(option.label)}
+                      aria-pressed={answer.labels.includes(option.label)}
+                      onClick={() => {
+                        const selected = answer.labels.includes(option.label);
+                        const labels = multi
+                          ? selected
+                            ? answer.labels.filter((label) => label !== option.label)
+                            : [...answer.labels, option.label]
+                          : [option.label];
+                        props.onAnswer(question.id, { ...answer, labels });
+                      }}
+                    >
+                      <strong>{option.label}</strong>
+                      <span>{option.tradeoff}</span>
+                    </Button>
+                  ))}
+                </div>
+                <TextField
+                  aria-label={t("os.otherAnswer")}
+                  value={answer.other}
+                  onChange={(event) => props.onAnswer(question.id, { ...answer, other: event.target.value })}
+                  placeholder={t("os.otherAnswer")}
+                  fieldClassName="od-context-other-field"
+                />
+                {intake && props.conversationEnabled ? (
+                  <TextArea
+                    aria-label={t("os.contextConversation")}
+                    value={props.contextNote}
+                    onChange={(event) => props.onContextNote(event.target.value)}
+                    placeholder={t("os.contextConversationPlaceholder")}
+                    rows={3}
+                    fieldClassName="od-context-note-field"
+                  />
+                ) : null}
+              </article>
+            </div>
           );
         })}
-        {intake && props.conversationEnabled ? (
-          <Panel variant="warm" className="od-context-question">
-            <div className="od-context-question-head">
+        {intake && props.conversationEnabled && visibleQuestions.length === 0 ? (
+          <div className="od-context-chat-exchange" data-od-id="context-chat-exchange">
+            <article className="od-context-message od-context-message-assistant" data-od-id="context-assistant-message">
+              <div className="od-context-message-meta">
+                <span>{t("context.chat.assistant")}</span>
+              </div>
               <strong>{t("os.contextConversation")}</strong>
-            </div>
-            <p>{t("os.contextConversationBody")}</p>
-            <TextArea
-              aria-label={t("os.contextConversation")}
-              value={props.contextNote}
-              onChange={(event) => props.onContextNote(event.target.value)}
-              placeholder={t("os.contextConversationPlaceholder")}
-              rows={3}
-              fieldClassName="od-context-note-field"
-            />
-          </Panel>
+              <p>{t("os.contextConversationBody")}</p>
+            </article>
+            <article className="od-context-message od-context-message-user" data-od-id="context-user-reply">
+              <div className="od-context-message-meta">
+                <span>{t("context.chat.reply")}</span>
+              </div>
+              <TextArea
+                aria-label={t("os.contextConversation")}
+                value={props.contextNote}
+                onChange={(event) => props.onContextNote(event.target.value)}
+                placeholder={t("os.contextConversationPlaceholder")}
+                rows={3}
+                fieldClassName="od-context-note-field"
+              />
+            </article>
+          </div>
         ) : null}
       </div>
     </Panel>
