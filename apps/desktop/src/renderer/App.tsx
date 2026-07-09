@@ -145,6 +145,7 @@ function AimOsApp() {
   const [runtimeGuidanceVisible, setRuntimeGuidanceVisible] = useState(false);
   const [settingsSection, setSettingsSection] = useState<SettingsSectionId>("overview");
   const planningRunIdRef = useRef<string | null>(null);
+  const draftPersistencePausedRef = useRef(false);
   const activeDraftIdRef = useRef<string | null>(null);
   const [activeDraftId, setActiveDraftIdState] = useState<string | null>(null);
 
@@ -376,7 +377,7 @@ function AimOsApp() {
   }
 
   async function persistCurrentDraftNow(overrides: { saveBlock?: AimDraftSaveBlock | null } = {}): Promise<AimDraft | null> {
-    if (selected) return null;
+    if (draftPersistencePausedRef.current || selected) return null;
     const req = buildAimDraftUpsertRequest(currentAimDraftInput(overrides));
     if (!req) return null;
     try {
@@ -569,9 +570,11 @@ function AimOsApp() {
     }
     setBusy(t("os.busy.save"));
     setError(null);
+    const savedDraft = await persistCurrentDraftNow();
+    draftPersistencePausedRef.current = true;
     try {
       const saved = await window.aimcub.saveGoal({
-        draftId: activeDraftIdRef.current ?? undefined,
+        draftId: savedDraft?.id ?? activeDraftIdRef.current ?? undefined,
         title: aimTitle.trim(),
         description: aimDescription.trim() || undefined,
         parentGoalId: parent?.goalId,
@@ -602,6 +605,7 @@ function AimOsApp() {
         fallback: t("planningError.save.message"),
       }));
     } finally {
+      draftPersistencePausedRef.current = false;
       setBusy(null);
     }
   }

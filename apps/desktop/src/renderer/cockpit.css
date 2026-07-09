@@ -1346,6 +1346,10 @@ kbd {
   grid-template-rows: minmax(0, 1fr);
 }
 
+.od-main-aim:has(> .od-stage-nav) {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
 .od-main-settings {
   grid-template-rows: minmax(0, 1fr);
 }
@@ -1459,6 +1463,10 @@ kbd {
   align-content: center;
   justify-items: center;
   scrollbar-gutter: stable both-edges;
+}
+
+.od-workspace-aim:has(> .od-aim-overview) {
+  align-content: start;
 }
 
 .od-workspace-aim:has(> .od-notice) {

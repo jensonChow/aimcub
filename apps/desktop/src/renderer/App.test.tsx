@@ -731,8 +731,14 @@ describe("App planning state guards", () => {
   it("clears the saved draft only after saveGoal succeeds", () => {
     const appSource = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
     const mainIpcSource = readFileSync(new URL("../main/ipc.ts", import.meta.url), "utf8");
+    const savePlan = appSource.match(/async function savePlan[\s\S]*?\n {2}async function runAgent/)?.[0] ?? "";
+    const persistCurrentDraftNow = appSource.match(/async function persistCurrentDraftNow[\s\S]*?\n {2}async function refreshAimDrafts/)?.[0] ?? "";
 
-    expect(appSource).toContain("draftId: activeDraftIdRef.current ?? undefined");
+    expect(persistCurrentDraftNow).toContain("if (draftPersistencePausedRef.current || selected) return null;");
+    expect(savePlan.indexOf("const savedDraft = await persistCurrentDraftNow();")).toBeLessThan(savePlan.indexOf("draftPersistencePausedRef.current = true;"));
+    expect(savePlan.indexOf("draftPersistencePausedRef.current = true;")).toBeLessThan(savePlan.indexOf("window.aimcub.saveGoal"));
+    expect(savePlan).toContain("draftId: savedDraft?.id ?? activeDraftIdRef.current ?? undefined");
+    expect(savePlan).toContain("draftPersistencePausedRef.current = false;");
     expect(mainIpcSource).toContain("if (req.draftId) await aimStore.discardAimDraft(req.draftId);");
   });
 
@@ -1130,6 +1136,14 @@ describe("CockpitShell", () => {
     expect(css).not.toMatch(/font-weight:\s*(600|650|700|750|800);/);
     expect(css).toContain("--od-font-weight-strong: 500;");
     expect(css).toContain("--od-font-weight-heavy: var(--od-font-weight-strong);");
+  });
+
+  it("reserves a stage-nav row for saved Aim overview at compact widths", () => {
+    const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
+
+    expect(css).toMatch(/\.od-main-aim\s*{[^}]*grid-template-rows:\s*minmax\(0,\s*1fr\);[^}]*}/s);
+    expect(css).toMatch(/\.od-main-aim:has\(>\s*\.od-stage-nav\)\s*{[^}]*grid-template-rows:\s*auto minmax\(0,\s*1fr\);[^}]*}/s);
+    expect(css).toMatch(/\.od-workspace-aim:has\(>\s*\.od-aim-overview\)\s*{[^}]*align-content:\s*start;[^}]*}/s);
   });
 
   it("uses the New Aim quiet hover treatment for secondary desktop controls", () => {
