@@ -1,6 +1,15 @@
 # Desktop Product Bug Audit
 
-Status: focused audit for planning-error and stale-state fixes, 2026-07-09.
+Status: focused audit index, 2026-07-09.
+
+## Draft Lifecycle Audit
+
+See `docs/desktop-draft-lifecycle-audit.md` for the current Desktop audit of
+silent work-loss risks caused by volatile React state and navigation/reset
+paths. It classifies blocker, major, and minor issues across aim composer,
+Context, Plan/Contracts, Execute proof drafts, child breakdown, planning failure
+recovery, Settings navigation, command shortcuts, reload/restart, and component
+unmount/remount.
 
 ## Integration Status
 

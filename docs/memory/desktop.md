@@ -12,6 +12,8 @@ Planning, draft, refine, and save failures must show concise product language an
 
 Unfinished New Aim work is product data, not a temporary form. Desktop must persist recoverable Aim drafts under the selected local Aimcub data directory before navigation can hide user-entered title, context, answers, generated plan, or save-blocked state. Resume/discard affordances should be quiet and explicit, and drafts must not appear as saved aims until `saveGoal` succeeds.
 
+User-entered or expensive generated work must not be silently destroyed by normal Desktop navigation. Context source selections, manual proof drafts, Settings setup drafts, and any future volatile work surface need either a recoverable local draft checkpoint or an explicit product-facing discard choice before Settings/reload boundaries, Cmd/Ctrl shortcuts, component unmount paths, or other normal navigation can clear them.
+
 ## Current Shell
 
 The default desktop shell is a simplified two-column product layout:
