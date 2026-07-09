@@ -6,6 +6,8 @@ Hosted Supabase is the online source of truth for MCP evidence and the future pl
 
 The local Aim OS harness is local-store first until sync parity is explicitly needed. Current desktop data lives outside the repo under `~/.aimcub/store.json`; provider and context-source settings live beside it under `~/.aimcub/`.
 
+Recoverable `AimDraft` rows are local-store product data, distinct from saved `Goal` rows. `saveGoal` can receive a draft id and should discard that draft only after the saved aim and related side effects have materialized successfully.
+
 Do not reintroduce a hosted Web app until Supabase parity, collaboration, or sync needs a product surface. Do not assume hosted platform tables for local orchestration until Supabase migrations and API adapters are added.
 
 ## Core Boundaries
