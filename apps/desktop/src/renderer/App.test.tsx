@@ -8,7 +8,7 @@ import type { AimProgressReadModel, DecompositionOutput, Goal, Milestone } from 
 import type { ContextSourceStatus, GoalDetail, ProviderStatus, WebResearchStatus } from "../shared/ipc";
 
 import { App, buildSettingsModel, SettingsPanel } from "./App";
-import { CockpitShell } from "./CockpitShell";
+import { CockpitShell, WORKBENCH_STAGE_IDS } from "./CockpitShell";
 import { I18nProvider, translate, type I18n } from "./i18n";
 import { EvidenceSubmissionForm } from "./stages/execute/EvidenceSubmissionForm";
 import { ExecutePanel } from "./stages/execute/ExecutePanel";
@@ -1095,7 +1095,54 @@ describe("CockpitShell", () => {
     expect(main).toContain("minHeight: MIN_WINDOW_HEIGHT");
   });
 
-  it("keeps workflow stage navigation clear of titlebar controls at compact widths", () => {
+  it("renders compact non-linear workbench navigation without numbered stage pills", () => {
+    const html = renderToStaticMarkup(
+      <I18nProvider>
+        <CockpitShell
+          goals={[savedGoal]}
+          selected={savedGoal}
+          activeStage="context"
+          activeSidebarAction={null}
+          onHome={noop}
+          onNewAim={noop}
+          onOpenGoal={noop}
+          onStage={noop}
+          main={<div>Context stage</div>}
+        />
+      </I18nProvider>,
+    );
+
+    expect(html).toContain('aria-label="Workbench navigation"');
+    expect(html).toContain('class="od-stage-current"');
+    expect(html).toContain('<span class="od-stage-current-label">Surface</span>');
+    expect(html).toContain('<strong class="od-stage-current-title">Context</strong>');
+    expect(html).toContain('class="od-stage-switcher" role="group" aria-label="Workbench surfaces"');
+    expect(html).toContain('data-stage="aim"');
+    expect(html).toContain('data-stage="context"');
+    expect(html).toContain('data-stage="contracts"');
+    expect(html).toContain('data-stage="run"');
+    expect(html).toContain('data-stage="eval"');
+    expect(html).toContain('<span class="od-stage-title">Aim</span>');
+    expect(html).toContain('<span class="od-stage-title">Contracts</span>');
+    expect(html).toContain('<span class="od-stage-title">Work</span>');
+    expect(html).toContain('<span class="od-stage-title">Review</span>');
+    expect(html).toContain('<button class="active" type="button" aria-current="page" data-stage="context"');
+    expect(html).not.toContain("od-stage-index");
+    expect(html).not.toContain('aria-current="step"');
+  });
+
+  it("keeps command palette and keyboard stage mappings on the same workbench stages", () => {
+    const source = readFileSync(new URL("./CockpitShell.tsx", import.meta.url), "utf8");
+
+    expect(WORKBENCH_STAGE_IDS).toEqual(["aim", "context", "contracts", "run", "eval"]);
+    expect(source).toContain("const stage = WORKBENCH_STAGE_IDS[Number(key) - 1];");
+    expect(source).toContain("...stages.map((item) => ({");
+    expect(source).toContain("id: `stage-${item.stage}`");
+    expect(source).toContain("shortcut: `Cmd ${item.shortcut}`");
+    expect(source).toContain("action: () => onStage(item.stage)");
+  });
+
+  it("keeps workbench navigation clear of titlebar controls at compact widths", () => {
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
     const stageSafeAreaRule = css.match(
       /\.od-main:not\(\.od-main-aim\):not\(\.od-main-settings\)\s*{[^}]*}/s,
@@ -1106,21 +1153,28 @@ describe("CockpitShell", () => {
     expect(stageSafeAreaRule).toContain("padding-top: max(16px, var(--stage-nav-titlebar-safe-top));");
     expect(stageSafeAreaRule).not.toContain("data-sidebar-state");
     expect(stageSafeAreaRule).not.toMatch(/\.od-sidebar|\.od-user-menu-|\.od-window-drag-strip/);
-    expect(css).toMatch(/\.od-stage-nav\s*{[^}]*justify-content:\s*center;[^}]*gap:\s*8px;/s);
-    expect(css).toMatch(/\.od-stage-nav button\s*{[^}]*max-width:\s*164px;/s);
+    expect(css).toMatch(/\.od-stage-nav\s*{[^}]*justify-content:\s*space-between;[^}]*gap:\s*12px;[^}]*min-height:\s*32px;/s);
+    expect(css).toMatch(/\.od-stage-switcher\s*{[^}]*gap:\s*4px;[^}]*padding:\s*2px;[^}]*border:\s*1px solid var\(--od-border-soft\);/s);
+    expect(css).toMatch(/\.od-stage-nav button\s*{[^}]*max-width:\s*112px;[^}]*min-height:\s*28px;[^}]*background:\s*transparent;/s);
+    expect(css).not.toContain(".od-stage-index");
   });
 
-  it("wraps and compresses workflow stage navigation without shell selector changes", () => {
+  it("wraps and compresses workbench navigation without shell selector changes", () => {
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
     const compactStageNavRule = css.match(/@media \(max-width: 1040px\)\s*{[\s\S]*?\.od-stage-nav\s*{[^}]*}/)?.[0] ?? "";
-    const narrowStageNavButtonRule = css.match(/\.od-stage-nav button\s*{[^}]*flex:\s*0 1 128px;[^}]*}/s)?.[0] ?? "";
-    const narrowStageTitleRule = css.match(/\.od-stage-title\s*{[^}]*max-width:\s*84px;[^}]*}/s)?.[0] ?? "";
+    const compactStageSwitcherRule = css.match(/@media \(max-width: 1040px\)\s*{[\s\S]*?\.od-stage-switcher\s*{[^}]*}/)?.[0] ?? "";
+    const narrowStageCurrentLabelRule = css.match(/\.od-stage-current-label\s*{[^}]*display:\s*none;[^}]*}/s)?.[0] ?? "";
+    const narrowStageSwitcherRule = css.match(/\.od-stage-switcher\s*{[^}]*flex:\s*1 1 320px;[^}]*}/s)?.[0] ?? "";
+    const narrowStageNavButtonRule = css.match(/\.od-stage-nav button\s*{[^}]*flex:\s*1 1 0;[^}]*}/s)?.[0] ?? "";
 
     expect(compactStageNavRule).toMatch(/\.od-stage-nav\s*{[^}]*flex-wrap:\s*wrap;[^}]*row-gap:\s*8px;/s);
-    expect(narrowStageNavButtonRule).toMatch(/\.od-stage-nav button\s*{[^}]*flex:\s*0 1 128px;[^}]*padding:\s*0 10px;/s);
-    expect(narrowStageTitleRule).toMatch(/\.od-stage-title\s*{[^}]*max-width:\s*84px;/s);
+    expect(compactStageSwitcherRule).toMatch(/\.od-stage-switcher\s*{[^}]*flex:\s*0 1 auto;/s);
+    expect(narrowStageCurrentLabelRule).toMatch(/\.od-stage-current-label\s*{[^}]*display:\s*none;/s);
+    expect(narrowStageSwitcherRule).toMatch(/\.od-stage-switcher\s*{[^}]*flex:\s*1 1 320px;/s);
+    expect(narrowStageNavButtonRule).toMatch(/\.od-stage-nav button\s*{[^}]*flex:\s*1 1 0;[^}]*max-width:\s*none;[^}]*padding:\s*0 8px;/s);
     expect(narrowStageNavButtonRule).not.toMatch(/\.od-sidebar|\.od-user-menu-|\.od-window-drag-strip|data-sidebar-state/);
-    expect(narrowStageTitleRule).not.toMatch(/\.od-sidebar|\.od-user-menu-|\.od-window-drag-strip|data-sidebar-state/);
+    expect(narrowStageSwitcherRule).not.toMatch(/\.od-sidebar|\.od-user-menu-|\.od-window-drag-strip|data-sidebar-state/);
+    expect(narrowStageCurrentLabelRule).not.toMatch(/\.od-sidebar|\.od-user-menu-|\.od-window-drag-strip|data-sidebar-state/);
   });
 
   it("replaces the primary left sidebar with settings navigation on settings stage", () => {
@@ -1154,7 +1208,8 @@ describe("CockpitShell", () => {
     expect(html).toContain("Settings detail pane");
     expect(html).toContain('data-od-id="sidebar-user-menu-trigger"');
     expect(html).not.toContain("Search aims");
-    expect(html).not.toContain("Aim OS workflow");
+    expect(html).not.toContain("Workbench navigation");
+    expect(html).not.toContain("Workbench surfaces");
     expect(css).toMatch(/\.od-workspace-settings\s*{[^}]*width:\s*min\(100%, 1080px\);/s);
     expect(css).toMatch(/\.od-settings-sidebar-content\s*{[^}]*width:\s*var\(--sidebar-content-width\);[^}]*justify-self:\s*center;/s);
     expect(css).toMatch(/\.od-settings-back\s*{[^}]*width:\s*100%;[^}]*grid-template-columns:\s*var\(--sidebar-action-icon-slot\) minmax\(0, 1fr\);[^}]*padding:\s*0 var\(--sidebar-row-padding-x\);/s);

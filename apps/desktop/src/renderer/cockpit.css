@@ -1279,23 +1279,58 @@ kbd {
   margin: 0 auto;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 32px;
+}
+
+.od-stage-current {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--od-muted);
+  font-size: var(--od-type-meta);
+  line-height: var(--od-line-meta);
+  white-space: nowrap;
+}
+
+.od-stage-current-label {
+  color: var(--od-meta);
+  font-weight: var(--od-font-weight-medium);
+}
+
+.od-stage-current-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--od-fg);
+  font-weight: var(--od-font-weight-semibold);
+  text-overflow: ellipsis;
+}
+
+.od-stage-switcher {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-sm);
+  background: var(--od-surface-warm);
 }
 
 .od-stage-nav button {
   min-width: 0;
+  max-width: 112px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: 36px;
+  min-height: 28px;
   border: 1px solid transparent;
-  border-radius: var(--od-radius-pill);
-  background: var(--od-surface-warm);
+  border-radius: calc(var(--od-radius-sm) - 2px);
+  background: transparent;
   color: var(--od-muted);
-  padding: 0 12px;
-  max-width: 164px;
+  padding: 0 10px;
   cursor: pointer;
 }
 
@@ -1312,28 +1347,10 @@ kbd {
 }
 
 .od-stage-nav button.active {
-  border-color: var(--od-border);
+  border-color: var(--od-border-soft);
   background: var(--od-bg);
   box-shadow: none;
   color: var(--od-fg);
-}
-
-.od-stage-index {
-  width: 20px;
-  height: 20px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--od-surface);
-  color: var(--od-muted);
-  font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
-  font-size: var(--od-type-meta);
-  font-weight: var(--od-font-weight-semibold);
-}
-
-.od-stage-nav button.active .od-stage-index {
-  background: var(--od-accent);
-  color: var(--od-accent-on);
 }
 
 .od-stage-title {
@@ -5358,6 +5375,10 @@ kbd {
     flex-wrap: wrap;
     row-gap: 8px;
   }
+
+  .od-stage-switcher {
+    flex: 0 1 auto;
+  }
 }
 
 @media (max-width: 760px) {
@@ -5394,16 +5415,29 @@ kbd {
 
   .od-stage-nav {
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 8px;
+  }
+
+  .od-stage-current {
+    flex: 0 1 120px;
+  }
+
+  .od-stage-current-label {
+    display: none;
+  }
+
+  .od-stage-switcher {
+    flex: 1 1 320px;
   }
 
   .od-stage-nav button {
-    flex: 0 1 128px;
-    padding: 0 10px;
+    flex: 1 1 0;
+    max-width: none;
+    padding: 0 8px;
   }
 
   .od-stage-title {
-    max-width: 84px;
+    max-width: 100%;
   }
 
   .od-context-source-status-list,

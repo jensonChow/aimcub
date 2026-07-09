@@ -1,52 +1,49 @@
 # Aimcub Handoff
 
-Last updated: 2026-07-08
-Branch: `main`
+Last updated: 2026-07-09
+Branch: detached HEAD parallel worktree
 
 ## Current Session
 
-- Request: run `memory-refresh`, then commit, push, and merge completed work into `main`.
-- Started from clean `main` at `d55be6678320442e6332949f9d4dbacd7f82516e`, aligned with `origin/main`.
-- Ran the memory-refresh audit. Root memory stayed within the 50-line budget, and the audit pointed to product, architecture, and operations module memory.
-- Read `AGENTS.md`, this handoff, `docs/memory/README.md`, `docs/memory/product.md`, `docs/memory/architecture.md`, `docs/memory/operations.md`, the local alpha seed implementation, seed tests, and the local-alpha docs.
-- Confirmed the prior integration commit `d55be667` is already pushed to `origin/main`; no separate branch merge is pending.
+- Request: replace the large numbered top stage pills with compact non-linear workbench navigation while preserving the Desktop shell/sidebar/window-chrome framework.
+- Scope constraints followed: no GUI/computer-use, no packaged `Aimcub.app`, no `pnpm desktop`, no `pnpm desktop:dev`, no `pnpm desktop:pack`, no root app refresh, no real `~/.aimcub` writes, no push, no pull, no merge.
+- This worktree is intentionally local-only; integration owns push, merge, full verification, and packaging.
 
 ## Completed Work
 
-- Replaced the stale integration-session handoff that still said commit and push were pending.
-- Kept durable local-alpha seed procedure in `docs/memory/operations.md` instead of duplicating long-lived instructions here.
-- Confirmed the deterministic seed is implemented in `packages/store/src/local-alpha-demo.ts`, exposed through `examples/local-alpha/seed-local-alpha-demo.ts`, and covered by `packages/store/src/store.test.ts`.
-- Confirmed the current docs describe the open-source local alpha path, isolated seed target, local/hosted boundary, and remaining public-release gaps.
+- Replaced numbered stage pills in `apps/desktop/src/renderer/CockpitShell.tsx` with compact workbench navigation: current surface label plus quiet segmented switcher.
+- Top navigation labels are now Aim, Context, Contracts, Work, and Review. Internal `CockpitStage` names were preserved.
+- Kept Cmd/Ctrl+1-5 stage shortcuts mapped to Aim, Context, Contracts, Run, and Eval through `WORKBENCH_STAGE_IDS`.
+- Kept command palette stage navigation working by deriving stage command items from the same workbench stage metadata.
+- Scoped CSS changes to `.od-stage-nav` and new stage-navigation descendants in `apps/desktop/src/renderer/cockpit.css`.
+- Updated `apps/desktop/src/renderer/i18n.tsx` and `apps/desktop/src/renderer/App.test.tsx` for the new labels, accessibility, shortcut mapping, and protected-selector assertions.
+- Recorded the durable non-linear workbench navigation rule in `docs/memory/desktop.md` and `docs/memory/design-system.md`.
 
 ## Verification
 
-Run before the memory-refresh commit:
+- `pnpm --filter @app/desktop typecheck` - passed.
+- `pnpm --filter @app/desktop test` - passed, 17 test files and 129 tests.
+- `git diff --check` - passed.
 
-- `python3 /Users/jenson/.codex/skills/memory-refresh/scripts/audit_project_memory.py /Users/jenson/Desktop/Aimcub`
-- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm build`
-- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm test`
-- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm typecheck`
-- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm lint`
-- `PATH=/Users/jenson/.local/node/bin:$PATH pnpm core:purity`
-- `git diff --check`
-- `ELECTRON_BUILDER_CACHE=/private/tmp/aimcub-electron-builder-cache COREPACK_HOME=/private/tmp/aimcub-corepack PATH=/Users/jenson/.local/node/bin:$PATH pnpm desktop:pack`
-- `ditto apps/desktop/dist/mac-arm64/Aimcub.app Aimcub.app`
-- `plutil -p Aimcub.app/Contents/Info.plist`
+The first `pnpm --filter` script invocation hydrated ignored workspace dependencies because this worktree lacked `node_modules`. No `pnpm install` command was run, and no package manager or dependency files were changed.
 
-`pnpm test` may log expected opaque MCP startup errors when hosted Supabase environment variables are unset.
+## Shell And Sidebar Preservation
+
+- Preserved sidebar pinned/collapsed/peek state model, hover reveal rail, toggle behavior, resize behavior and bounds, main sidebar geometry, Settings locked sidebar behavior, footer user menu/language submenu behavior, Home Panel/New Aim actions, recent aims behavior, native traffic lights/window chrome/drag strip behavior, and shell grid push/overlay behavior.
+- Did not modify selectors beginning with or governing `.od-sidebar`, `.od-sidebar-*`, `.od-user-menu-*`, `.od-window-drag-strip`, `.od-sidebar-hover-zone`, `.od-sidebar-peek-trigger`, `.od-sidebar-toggle`, `.od-sidebar-resizer`, or shell grid/sidebar state selectors.
+- Protected-selector preservation is covered by updated CSS assertions in `App.test.tsx`.
 
 ## Commit And Push Status
 
-- This session changes only `docs/handoff.md`.
-- Commit and push for this handoff refresh are pending; the final hash and push result are reported in the Codex response.
+- Local focused commit: created after this handoff update; final hash is reported in the Codex response because a commit cannot contain its own final hash.
+- Not pushed or merged by request. No packaging or root `Aimcub.app` refresh was performed.
 
 ## Open Items
 
-- Public open-source release still needs license selection, `CONTRIBUTING.md`, `SECURITY.md`, and a secrets/env example review.
-- Native macOS traffic lights/window chrome were not directly screenshot-verified in the prior visual pass because full-desktop capture was rejected for privacy, but the protected Desktop shell/sidebar/window-chrome files were unchanged.
+- Integration should perform full visual QA at 960x680, 760x600, and 640x520, then package and refresh root `Aimcub.app` when it owns the final integration pass.
 
 ## Next Session Prompt
 
 ```text
-Continue from main. Read AGENTS.md, docs/handoff.md, and docs/memory/README.md first, then inspect git status. Preserve the Desktop shell/sidebar/window-chrome framework unless the user explicitly approves a shell change. For local alpha demo work, use examples/local-alpha/ with an isolated AIMCUB_HOME such as /tmp/aimcub-local-alpha-demo, never the real ~/.aimcub store.
+Continue from this parallel Aimcub worktree. Read AGENTS.md, docs/handoff.md, and docs/memory/README.md first, then inspect git status. The workbench navigation commit is local-only and intentionally not pushed or merged; integration owns final visual QA, packaging, push, and merge.
 ```
