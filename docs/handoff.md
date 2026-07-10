@@ -1,7 +1,7 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-10
-Branch: `codex/desktop-context-focus`
+Branch: `main`
 
 ## Current Session
 
@@ -42,8 +42,10 @@ Branch: `codex/desktop-context-focus`
 
 ## Commit And Push Status
 
-- Feature commit: pending.
-- Push and merge: pending.
+- Feature commit: `5a74083f` (`Focus desktop work surfaces`).
+- Feature branch: `codex/desktop-context-focus`, pushed to `origin`.
+- Merge commit: `bde28594` (`Merge desktop focused work surfaces`).
+- Merge status: pushed to the verified private `origin/main` remote with admin permission.
 
 ## Open Risks
 
