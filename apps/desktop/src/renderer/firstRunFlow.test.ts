@@ -9,16 +9,27 @@ import {
 
 describe("first-run flow routing", () => {
   it("keeps first-run users in the aim stage instead of settings", () => {
-    expect(routeAfterRefresh({ hasSelectedAim: false, hasGoals: false })).toEqual({
+    expect(routeAfterRefresh({ hasSelectedAim: false, hasActiveDraft: false, hasDrafts: false, hasGoals: false })).toEqual({
       autoOpenFirstGoal: false,
       stageOverride: "aim",
     });
   });
 
   it("opens the first saved aim instead of runtime settings when helpers are missing", () => {
-    expect(routeAfterRefresh({ hasSelectedAim: false, hasGoals: true })).toEqual({
+    expect(routeAfterRefresh({ hasSelectedAim: false, hasActiveDraft: false, hasDrafts: false, hasGoals: true })).toEqual({
       autoOpenFirstGoal: true,
       stageOverride: "aim",
+    });
+  });
+
+  it("keeps recoverable drafts visible instead of opening an arbitrary saved aim", () => {
+    expect(routeAfterRefresh({ hasSelectedAim: false, hasActiveDraft: false, hasDrafts: true, hasGoals: true })).toEqual({
+      autoOpenFirstGoal: false,
+      stageOverride: "aim",
+    });
+    expect(routeAfterRefresh({ hasSelectedAim: false, hasActiveDraft: true, hasDrafts: true, hasGoals: true })).toEqual({
+      autoOpenFirstGoal: false,
+      stageOverride: null,
     });
   });
 

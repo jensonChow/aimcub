@@ -724,10 +724,11 @@ describe("App planning state guards", () => {
     const startNewAim = source.match(/async function startNewAim[\s\S]*?\n {2}async function openHomePanel/)?.[0] ?? "";
     const openHomePanel = source.match(/async function openHomePanel[\s\S]*?\n {2}function openSettingsForAim/)?.[0] ?? "";
 
-    expect(openGoal).toContain("await persistCurrentDraftNow();");
-    expect(startNewAim.indexOf("await persistCurrentDraftNow();")).toBeLessThan(startNewAim.indexOf("resetComposer({ openComposer: true })"));
-    expect(openHomePanel.indexOf("await persistCurrentDraftNow();")).toBeLessThan(openHomePanel.indexOf("resetComposer();"));
-    expect(source).toContain("window.aimcub.upsertAimDraft(req)");
+    expect(openGoal).toContain("await checkpointCurrentDraftBeforeNavigation()");
+    expect(startNewAim.indexOf("await checkpointCurrentDraftBeforeNavigation()")).toBeLessThan(startNewAim.indexOf("resetComposer({ openComposer: true })"));
+    expect(openHomePanel.indexOf("await checkpointCurrentDraftBeforeNavigation()")).toBeLessThan(openHomePanel.indexOf("resetComposer();"));
+    expect(source).toContain("draftPersistence.flushForNavigation(req)");
+    expect(source).toContain('title: t("aimDraft.checkpointErrorTitle")');
     expect(source).not.toContain("localStorage.setItem(\"aim");
   });
 
@@ -737,20 +738,90 @@ describe("App planning state guards", () => {
     const savePlan = appSource.match(/async function savePlan[\s\S]*?\n {2}async function runAgent/)?.[0] ?? "";
     const persistCurrentDraftNow = appSource.match(/async function persistCurrentDraftNow[\s\S]*?\n {2}async function refreshAimDrafts/)?.[0] ?? "";
 
-    expect(persistCurrentDraftNow).toContain("if (draftPersistencePausedRef.current || selected) return null;");
-    expect(savePlan.indexOf("const savedDraft = await persistCurrentDraftNow();")).toBeLessThan(savePlan.indexOf("draftPersistencePausedRef.current = true;"));
-    expect(savePlan.indexOf("draftPersistencePausedRef.current = true;")).toBeLessThan(savePlan.indexOf("window.aimcub.saveGoal"));
-    expect(savePlan).toContain("draftId: savedDraft?.id ?? activeDraftIdRef.current ?? undefined");
-    expect(savePlan).toContain("draftPersistencePausedRef.current = false;");
+    expect(persistCurrentDraftNow).toContain("const discardingCurrentDraft = Boolean(discardInFlightDraftIdRef.current)");
+    expect(persistCurrentDraftNow).toContain("discardingCurrentDraft && !options.allowDuringDiscard");
+    expect(persistCurrentDraftNow).toContain("draftPersistence.enqueue(req)");
+    expect(savePlan.indexOf("const savedDraft = await persistCurrentDraftNow({}, { throwOnError: true });")).toBeLessThan(savePlan.indexOf("draftPersistence.pauseAutosave();"));
+    expect(savePlan.indexOf("draftPersistence.pauseAutosave();")).toBeLessThan(savePlan.indexOf("window.aimcub.saveGoal"));
+    expect(savePlan).toContain("draftId: savedDraft?.id ?? draftPersistence.currentDraftId() ?? activeDraftIdRef.current ?? undefined");
+    expect(savePlan).toContain("await openGoal(saved.goal, { allowDuringSave: true, checkpointDraft: false });");
+    expect(savePlan).toContain("draftPersistence.resumeAutosave();");
+    const saveFinally = savePlan.slice(savePlan.lastIndexOf("} finally {"));
+    expect(saveFinally.indexOf("finishSaveInFlight(navigationConcurrencyRef.current)")).toBeLessThan(
+      saveFinally.indexOf("setBusy(null)"),
+    );
     expect(mainIpcSource).toContain("if (req.draftId) await aimStore.discardAimDraft(req.draftId);");
   });
 
   it("requires an explicit discard path for draft deletion", () => {
     const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+    const openDraft = source.match(/async function openAimDraft[\s\S]*?\n {2}async function discardAimDraft/)?.[0] ?? "";
     const discard = source.match(/async function discardAimDraft[\s\S]*?\n {2}useEffect/)?.[0] ?? "";
 
+    expect(openDraft).toContain("draftActivationTrackerRef.current.capture(draftRow.id)");
+    expect(openDraft).toContain("draftActivationTrackerRef.current.isCurrent(activation)");
+    expect(openDraft).toContain("draftPersistence.resumeAutosave()");
+    expect(openDraft).toContain("beginPendingTargetNavigation(transition, draftRow.id)");
+    expect(openDraft).toContain("finishPendingTargetNavigation(transition)");
     expect(discard).not.toContain("window.confirm");
+    expect(discard).toContain("draftActivationTrackerRef.current.invalidate(draftRow.id)");
+    expect(discard).toContain("cancelPendingTargetNavigation()");
+    expect(discard).toContain("cancelsPendingDraftActivation");
+    expect(discard).toContain("discardInFlightDraftIdRef.current = draftRow.id");
+    expect(discard).toContain("allowDuringDiscard: true");
+    expect(discard.indexOf("draftPersistence.invalidateSession()")).toBeLessThan(discard.indexOf("window.aimcub.discardAimDraft(draftRow.id)"));
+    expect(discard).toContain("discardInFlightDraftIdRef.current = null");
     expect(discard).toContain("window.aimcub.discardAimDraft(draftRow.id)");
+  });
+
+  it("does not let a stale startup list replace drafts created during slower configuration probes", () => {
+    const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+    const refreshAll = source.match(/async function refreshAll[\s\S]*?\n {2}async function openGoal/)?.[0] ?? "";
+
+    expect(refreshAll).toContain("const configurationRefresh = Promise.all([");
+    expect(refreshAll.indexOf("const [nextGoals, nextDrafts] = await Promise.all([")).toBeLessThan(
+      refreshAll.indexOf("await configurationRefresh"),
+    );
+    expect(refreshAll.indexOf("if (!isCurrentWorkspaceTransition(transitionAtStart))")).toBeLessThan(
+      refreshAll.indexOf("setAimDrafts(nextDrafts)"),
+    );
+  });
+
+  it("keeps navigation scoped to the active work target and restores the Settings return surface", () => {
+    const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+    const openCockpitStage = source.match(/function openCockpitStage[\s\S]*?\n {2}async function startNewAim/)?.[0] ?? "";
+    const currentAimDraftInput = source.match(/function currentAimDraftInput[\s\S]*?\n {2}async function persistCurrentDraftNow/)?.[0] ?? "";
+
+    expect(openCockpitStage).toContain("isWorkbenchStageAvailable(workspaceTarget, stage)");
+    expect(openCockpitStage).toContain("settingsReturnStage(");
+    expect(source).toContain("openCockpitStage(settingsReturnStageRef.current)");
+    expect(currentAimDraftInput).toContain('stageOverride === "settings"');
+    expect(currentAimDraftInput).toContain("settingsReturnStageRef.current");
+    expect(source).not.toContain("executePanel ?? planPanel");
+    expect(source).not.toContain("evalPanel ?? planPanel");
+  });
+
+  it("guards async planning and goal responses against later target or surface navigation", () => {
+    const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+    const openGoal = source.match(/async function openGoal[\s\S]*?\n {2}async function refreshGoalState/)?.[0] ?? "";
+    const refreshGoalState = source.match(/async function refreshGoalState[\s\S]*?\n {2}function resetComposer/)?.[0] ?? "";
+    const startDraft = source.match(/async function startDraft[\s\S]*?\n {2}const builtAnswers/)?.[0] ?? "";
+    const checkpoint = source.match(/async function checkpointCurrentDraftBeforeNavigation[\s\S]*?\n {2}async function refreshAimDrafts/)?.[0] ?? "";
+    const openCockpitStage = source.match(/function openCockpitStage[\s\S]*?\n {2}async function startNewAim/)?.[0] ?? "";
+    const runAgent = source.match(/async function runAgent[\s\S]*?\n {2}async function confirmMilestone/)?.[0] ?? "";
+
+    expect(openGoal).toContain("const transition = beginWorkspaceTransition()");
+    expect(openGoal).toContain("canActivateGoal(");
+    expect(openGoal).toContain('options.allowDuringSave ? "save_success" : "external_navigation"');
+    expect(source).toContain("if (!isCurrentWorkspaceTransition(transition)) return;");
+    expect(startDraft).toContain("if (workflowMutationIsLocked()) return;");
+    expect(startDraft).toContain("isCurrentPlanningRun(runId, transition)");
+    expect(refreshGoalState).toContain("isCurrentSurfaceTransition(surfaceTransition)");
+    expect(openCockpitStage).toContain("beginSurfaceTransition()");
+    expect(runAgent).toContain("beginSideEffectOperation(operationId");
+    expect(runAgent).toContain("finishSideEffectOperation(operationId)");
+    expect(checkpoint).toContain("clearPlanningRun()");
+    expect(checkpoint).toContain("setBusy(null)");
   });
 
   it("keeps typed draft IPC wired through shared channels and preload", () => {
@@ -986,9 +1057,8 @@ describe("CockpitShell", () => {
       <I18nProvider>
         <CockpitShell
           goals={[]}
-          selected={null}
           activeStage="aim"
-          activeSidebarAction={null}
+          workspaceTarget={{ kind: "home" }}
           onHome={noop}
           onNewAim={noop}
           onOpenGoal={noop}
@@ -1012,9 +1082,8 @@ describe("CockpitShell", () => {
       <I18nProvider>
         <CockpitShell
           goals={[]}
-          selected={null}
           activeStage="aim"
-          activeSidebarAction="home"
+          workspaceTarget={{ kind: "home" }}
           onHome={noop}
           onNewAim={noop}
           onOpenGoal={noop}
@@ -1084,9 +1153,8 @@ describe("CockpitShell", () => {
       <I18nProvider>
         <CockpitShell
           goals={[]}
-          selected={null}
           activeStage="aim"
-          activeSidebarAction="newAim"
+          workspaceTarget={{ kind: "newAim" }}
           onHome={noop}
           onNewAim={noop}
           onOpenGoal={noop}
@@ -1106,10 +1174,8 @@ describe("CockpitShell", () => {
         <CockpitShell
           goals={[]}
           drafts={[draftRow]}
-          activeDraftId={draftRow.id}
-          selected={null}
           activeStage="aim"
-          activeSidebarAction="home"
+          workspaceTarget={{ kind: "draft", id: draftRow.id }}
           onHome={noop}
           onNewAim={noop}
           onOpenGoal={noop}
@@ -1126,11 +1192,48 @@ describe("CockpitShell", () => {
     expect(html).toContain("Unfinished local-first aim");
     expect(html).toContain("Save blocked");
     expect(html).toContain('class="od-content-entry od-draft-card" data-selected="true"');
+    expect(html).toContain('class="od-content-entry-main od-draft-card-main" type="button" aria-current="page"');
+    expect(html).not.toMatch(/class="od-sidebar-action od-home-panel"[^>]*aria-current="page"/);
+    expect(html).not.toMatch(/class="od-sidebar-action od-new-aim"[^>]*aria-current="page"/);
     expect(html).toContain("More actions for Unfinished local-first aim");
     expect(html).not.toContain(">Discard</button>");
     expect(html).toContain("Recent aims");
     expect(html).toContain("Saved aims appear here.");
     expect(html).not.toContain('class="od-aim-card selected"');
+    expect(html).toContain('aria-label="Workbench navigation"');
+    expect(html).toContain('data-stage="aim"');
+    expect(html).toContain('data-stage="context"');
+    expect(html).toContain('data-stage="contracts"');
+    expect(html).not.toContain('data-stage="run"');
+    expect(html).not.toContain('data-stage="eval"');
+  });
+
+  it("keeps every recoverable draft reachable in the scrolling sidebar", () => {
+    const drafts = Array.from({ length: 7 }, (_, index) => ({
+      ...draftRow,
+      id: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+      title: `Reachable draft ${index + 1}`,
+    }));
+    const html = renderToStaticMarkup(
+      <I18nProvider>
+        <CockpitShell
+          goals={[]}
+          drafts={drafts}
+          activeStage="aim"
+          workspaceTarget={{ kind: "home" }}
+          onHome={noop}
+          onNewAim={noop}
+          onOpenGoal={noop}
+          onOpenDraft={noop}
+          onDiscardDraft={noop}
+          onStage={noop}
+          main={<div>Home</div>}
+        />
+      </I18nProvider>,
+    );
+
+    expect(html).toContain("Reachable draft 1");
+    expect(html).toContain("Reachable draft 7");
   });
 
   it("keeps draft row destructive actions inside the contextual menu pattern", () => {
@@ -1205,9 +1308,8 @@ describe("CockpitShell", () => {
       <I18nProvider>
         <CockpitShell
           goals={[]}
-          selected={null}
           activeStage="aim"
-          activeSidebarAction={null}
+          workspaceTarget={{ kind: "home" }}
           onHome={noop}
           onNewAim={noop}
           onOpenGoal={noop}
@@ -1245,9 +1347,8 @@ describe("CockpitShell", () => {
       <I18nProvider>
         <CockpitShell
           goals={[savedGoal]}
-          selected={savedGoal}
           activeStage="aim"
-          activeSidebarAction={null}
+          workspaceTarget={{ kind: "goal", id: savedGoal.id }}
           onHome={noop}
           onNewAim={noop}
           onOpenGoal={noop}
@@ -1268,9 +1369,8 @@ describe("CockpitShell", () => {
       <I18nProvider>
         <CockpitShell
           goals={[]}
-          selected={null}
           activeStage="aim"
-          activeSidebarAction={null}
+          workspaceTarget={{ kind: "home" }}
           onHome={noop}
           onNewAim={noop}
           onOpenGoal={noop}
@@ -1314,9 +1414,8 @@ describe("CockpitShell", () => {
       <I18nProvider>
         <CockpitShell
           goals={[savedGoal]}
-          selected={savedGoal}
           activeStage="context"
-          activeSidebarAction={null}
+          workspaceTarget={{ kind: "goal", id: savedGoal.id }}
           onHome={noop}
           onNewAim={noop}
           onOpenGoal={noop}
@@ -1350,10 +1449,11 @@ describe("CockpitShell", () => {
 
     expect(WORKBENCH_STAGE_IDS).toEqual(["aim", "context", "contracts", "run", "eval"]);
     expect(source).toContain("const stage = WORKBENCH_STAGE_IDS[Number(key) - 1];");
-    expect(source).toContain("...stages.map((item) => ({");
+    expect(source).toContain("...availableStages.map((item) => ({");
     expect(source).toContain("id: `stage-${item.stage}`");
     expect(source).toContain("shortcut: `Cmd ${item.shortcut}`");
     expect(source).toContain("action: () => onStage(item.stage)");
+    expect(source).toContain("isWorkbenchStageAvailable(workspaceTarget, stage)");
   });
 
   it("keeps workbench navigation clear of titlebar controls at compact widths", () => {
@@ -1396,9 +1496,8 @@ describe("CockpitShell", () => {
       <I18nProvider>
         <CockpitShell
           goals={[]}
-          selected={null}
           activeStage="settings"
-          activeSidebarAction={null}
+          workspaceTarget={{ kind: "home" }}
           onHome={noop}
           onNewAim={noop}
           onOpenGoal={noop}
@@ -1445,9 +1544,8 @@ describe("CockpitShell", () => {
       <I18nProvider>
         <CockpitShell
           goals={[]}
-          selected={null}
           activeStage="aim"
-          activeSidebarAction={null}
+          workspaceTarget={{ kind: "home" }}
           onHome={noop}
           onNewAim={noop}
           onOpenGoal={noop}
@@ -1536,9 +1634,8 @@ describe("CockpitShell", () => {
       <I18nProvider>
         <CockpitShell
           goals={[]}
-          selected={null}
           activeStage="aim"
-          activeSidebarAction={null}
+          workspaceTarget={{ kind: "home" }}
           onHome={noop}
           onNewAim={noop}
           onOpenGoal={noop}

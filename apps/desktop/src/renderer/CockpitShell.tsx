@@ -5,13 +5,20 @@ import type { AimDraft, Goal } from "@core/types";
 import type { WindowChromeState } from "../shared/ipc";
 import { useI18n, type Lang } from "./i18n";
 import { AimDraftSidebarRows } from "./stages/aim/AimDraftRecovery";
+import {
+  availableWorkbenchStages,
+  hasWorkbenchNavigation,
+  isWorkbenchStageAvailable,
+  WORKBENCH_STAGE_IDS,
+  type CockpitStage,
+  type WorkbenchStage,
+  type WorkspaceTarget,
+} from "./workflow/workspaceNavigation";
 
 import "./cockpit.css";
 
-export type CockpitStage = "aim" | "context" | "contracts" | "run" | "eval" | "settings";
-export type WorkbenchStage = Exclude<CockpitStage, "settings">;
-export type SidebarAction = "home" | "newAim" | null;
-export const WORKBENCH_STAGE_IDS = ["aim", "context", "contracts", "run", "eval"] as const satisfies readonly WorkbenchStage[];
+export { WORKBENCH_STAGE_IDS };
+export type { CockpitStage, WorkbenchStage, WorkspaceTarget };
 type SidebarState = "pinned" | "collapsed" | "peek";
 const USER_MENU_ID = "od-sidebar-user-menu";
 const LANGUAGE_MENU_ID = "od-sidebar-language-menu";
@@ -39,10 +46,8 @@ export interface CockpitCommand {
 interface CockpitShellProps {
   goals: Goal[];
   drafts?: AimDraft[];
-  activeDraftId?: string | null;
-  selected: Goal | null;
   activeStage: CockpitStage;
-  activeSidebarAction: SidebarAction;
+  workspaceTarget: WorkspaceTarget;
   onHome: () => void;
   onNewAim: () => void;
   onOpenGoal: (goal: Goal) => void;
@@ -98,10 +103,8 @@ function persistSidebarWidth(width: number) {
 export function CockpitShell({
   goals,
   drafts = [],
-  activeDraftId = null,
-  selected,
   activeStage,
-  activeSidebarAction,
+  workspaceTarget,
   onHome,
   onNewAim,
   onOpenGoal,
@@ -129,7 +132,10 @@ export function CockpitShell({
   const suppressSidebarPeekUntilExit = useRef(false);
   const usingSettingsSidebar = activeStage === "settings" && Boolean(settingsSidebar);
   const hasGoals = goals.length > 0;
-  const firstRunAim = activeStage === "aim" && !selected && !hasGoals;
+  const firstRunAim = activeStage === "aim"
+    && workspaceTarget.kind !== "draft"
+    && workspaceTarget.kind !== "goal"
+    && !hasGoals;
   const sidebarState: SidebarState = usingSettingsSidebar ? "pinned" : sidebarPinned ? "pinned" : sidebarPeeking ? "peek" : "collapsed";
   const sidebarVisible = sidebarState !== "collapsed";
   const sidebarToggleLabel = sidebarPinned ? t("sidebar.collapse") : t("sidebar.expand");
@@ -143,6 +149,8 @@ export function CockpitShell({
     { stage: "run", shortcut: "4", title: t("cockpit.surface.run") },
     { stage: "eval", shortcut: "5", title: t("cockpit.surface.eval") },
   ], [t]);
+  const availableStageIds = availableWorkbenchStages(workspaceTarget);
+  const availableStages = stages.filter((item) => availableStageIds.includes(item.stage));
   const activeWorkbenchSurface = stages.find((item) => item.stage === activeStage) ?? {
     stage: "aim",
     shortcut: "1",
@@ -171,7 +179,7 @@ export function CockpitShell({
     return commands ?? [
       { id: "home-panel", label: t("command.homePanel"), detail: t("command.homePanel.detail"), shortcut: "Cmd 0", action: onHome },
       { id: "new-aim", label: t("command.newAim"), detail: t("command.newAim.detail"), shortcut: "Cmd N", action: onNewAim },
-      ...stages.map((item) => ({
+      ...availableStages.map((item) => ({
         id: `stage-${item.stage}`,
         label: item.title,
         detail: stageCommandDetails[item.stage],
@@ -180,7 +188,7 @@ export function CockpitShell({
       })),
       { id: "settings", label: t("os.settings"), detail: t("command.settings.detail"), shortcut: "Cmd ,", action: () => onStage("settings") },
     ];
-  }, [commands, onHome, onNewAim, onStage, stages, t]);
+  }, [availableStages, commands, onHome, onNewAim, onStage, t]);
 
   function clearSidebarRevealTimer() {
     if (revealSidebarTimer.current === null) return;
@@ -450,12 +458,12 @@ export function CockpitShell({
       if (["1", "2", "3", "4", "5"].includes(key)) {
         event.preventDefault();
         const stage = WORKBENCH_STAGE_IDS[Number(key) - 1];
-        if (stage) onStage(stage);
+        if (stage && isWorkbenchStageAvailable(workspaceTarget, stage)) onStage(stage);
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onHome, onNewAim, onStage]);
+  }, [onHome, onNewAim, onStage, workspaceTarget]);
 
   return (
     <div className="od-window" data-od-id="desktop-window">
@@ -525,7 +533,7 @@ export function CockpitShell({
                 <button
                   className="od-sidebar-action od-home-panel"
                   type="button"
-                  aria-current={activeSidebarAction === "home" ? "page" : undefined}
+                  aria-current={workspaceTarget.kind === "home" ? "page" : undefined}
                   data-od-id="sidebar-home-panel-action"
                   onClick={onHome}
                 >
@@ -541,7 +549,7 @@ export function CockpitShell({
                 <button
                   className="od-sidebar-action od-new-aim"
                   type="button"
-                  aria-current={activeSidebarAction === "newAim" ? "page" : undefined}
+                  aria-current={workspaceTarget.kind === "newAim" ? "page" : undefined}
                   data-od-id="sidebar-new-aim-action"
                   onClick={onNewAim}
                 >
@@ -584,7 +592,7 @@ export function CockpitShell({
                 {drafts.length > 0 && onOpenDraft && onDiscardDraft ? (
                   <AimDraftSidebarRows
                     drafts={drafts}
-                    activeDraftId={activeDraftId}
+                    activeDraftId={workspaceTarget.kind === "draft" ? workspaceTarget.id : null}
                     onResume={onOpenDraft}
                     onDiscard={onDiscardDraft}
                   />
@@ -600,7 +608,7 @@ export function CockpitShell({
                     </div>
                   ) : null}
                   {visibleGoals.map((goal) => {
-                    const selectedGoal = selected?.id === goal.id;
+                    const selectedGoal = workspaceTarget.kind === "goal" && workspaceTarget.id === goal.id;
                     return (
                       <button
                         key={goal.id}
@@ -646,14 +654,14 @@ export function CockpitShell({
         ) : null}
 
         <main className={`od-main od-main-${activeStage}`} data-od-id="main-delivery-workbench">
-          {activeStage !== "settings" && (activeStage !== "aim" || selected) ? (
+          {activeStage !== "settings" && hasWorkbenchNavigation(workspaceTarget) ? (
             <nav className="od-stage-nav" aria-label={t("cockpit.workflow")}>
               <div className="od-stage-current" aria-live="polite">
                 <span className="od-stage-current-label">{t("cockpit.surface.current")}</span>
                 <strong className="od-stage-current-title">{activeWorkbenchSurface.title}</strong>
               </div>
               <div className="od-stage-switcher" role="group" aria-label={t("cockpit.surface.switcher")}>
-                {stages.map((item) => (
+                {availableStages.map((item) => (
                   <button
                     key={item.stage}
                     className={activeStage === item.stage ? "active" : ""}
