@@ -383,6 +383,12 @@ export const AimDraftQuestion = z.object({
   source_dimension: z.enum(["verifiability", "granularity", "distinctness", "context_fit"]).nullable().default(null),
   allow_other: z.boolean().default(true),
   selection_mode: z.enum(["single", "multiple"]).nullable().default(null),
+  selection_mode_reason: z.enum([
+    "mutually_exclusive",
+    "primary_choice_requested",
+    "compatible_options",
+    "unclear_defaults_multiple",
+  ]).nullable().default(null),
   options: z.array(AimDraftQuestionOption).default([]),
 });
 export type AimDraftQuestion = z.infer<typeof AimDraftQuestion>;

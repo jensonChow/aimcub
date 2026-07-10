@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 
+import { decideChoiceSelection } from "@core/domain";
 import type { ClarifyAnswer, ClarifyOutput } from "@core/llm";
 import type { DecompositionOutput, Goal } from "@core/types";
 
@@ -463,12 +464,18 @@ function QuestionGroup(props: {
       </div>
       {props.output?.questions.slice(0, 8).map((question) => {
         const answer = answerById.get(question.id);
+        const selectionMode = decideChoiceSelection({
+          question: question.question,
+          options: question.options.map((option) => ({ label: option.label, detail: option.tradeoff })),
+          requestedMode: question.selection_mode,
+          requestedReason: question.selection_mode_reason,
+        }).mode;
         return (
           <div key={question.id} style={compactBlockStyle()}>
             <div style={rowHeaderStyle()}>
               <div style={rowTitleStyle()}>{question.question}</div>
-              <span style={pillStyle(question.selection_mode === "multiple" ? C.accent : C.muted)}>
-                {props.t(question.selection_mode === "multiple" ? "os.multiSelect" : "os.singleSelect")}
+              <span style={pillStyle(selectionMode === "multiple" ? C.accent : C.muted)}>
+                {props.t(selectionMode === "multiple" ? "os.multiSelect" : "os.singleSelect")}
               </span>
             </div>
             <div style={mutedTextStyle()}>{shortUiText(question.why_high_impact)}</div>

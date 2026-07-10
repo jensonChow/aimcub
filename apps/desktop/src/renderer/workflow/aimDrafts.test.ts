@@ -47,6 +47,7 @@ const intake: ClarifyOutput = {
     source_dimension: "context_fit",
     allow_other: true,
     selection_mode: "multiple",
+    selection_mode_reason: "compatible_options",
     options: [{ label: "Context answers", tradeoff: "Draft resumes in Context." }],
   }],
   assumptions: [],
@@ -84,6 +85,7 @@ describe("aim draft persistence helpers", () => {
       contextNote: "Keep AIMCUB_HOME under /tmp.",
     });
     expect(req?.intakeQuestions).toHaveLength(1);
+    expect(req?.intakeQuestions?.[0]?.selection_mode_reason).toBe("compatible_options");
     expect(req?.intakeAnswers?.[0]?.other_text).toBe("Also preserve the note.");
   });
 
@@ -155,19 +157,42 @@ describe("aim draft persistence helpers", () => {
       intake_answers: [],
       clarify_questions: [{
         id: "q1",
-        question: "Refine?",
+        question: "Which evidence should be used?",
         why_high_impact: "Improves the plan.",
         kind: "scope",
         source_dimension: null,
         allow_other: true,
         selection_mode: "single",
-        options: [{ label: "Yes", tradeoff: "Use the answer." }],
+        selection_mode_reason: null,
+        options: [
+          { label: "Automated tests", tradeoff: "Repeatable evidence." },
+          { label: " automated tests ", tradeoff: "Duplicate legacy option." },
+          { label: "User review", tradeoff: "Human acceptance evidence." },
+        ],
+      }, {
+        id: "q2",
+        question: "Choose exactly one primary owner.",
+        why_high_impact: "Clarifies final accountability.",
+        kind: "involvement",
+        source_dimension: null,
+        allow_other: true,
+        selection_mode: "multiple",
+        selection_mode_reason: "compatible_options",
+        options: [
+          { label: "Product", tradeoff: "Product owns approval." },
+          { label: "Legal", tradeoff: "Legal owns approval." },
+        ],
       }],
       clarify_answers: [{
         question_id: "q1",
-        selected_label: "Yes",
-        selected_labels: ["Yes"],
+        selected_label: "Automated tests",
+        selected_labels: ["Automated tests", "Automated tests", "Unknown evidence"],
         other_text: "Keep this answer.",
+      }, {
+        question_id: "q2",
+        selected_label: "Product",
+        selected_labels: ["Product", "Legal"],
+        other_text: "Historical ambiguity.",
       }],
       clarify_assumptions: [],
       draft_plan: plan,
@@ -182,7 +207,18 @@ describe("aim draft persistence helpers", () => {
       milestoneId: "00000000-0000-4000-8000-000000000020",
     });
     expect(hydrated.phase).toBe("postDraft");
-    expect(hydrated.clarify?.questions[0]?.question).toBe("Refine?");
-    expect(hydrated.clarifyAnswers.q1?.other).toBe("Keep this answer.");
+    expect(hydrated.clarify?.questions[0]?.question).toBe("Which evidence should be used?");
+    expect(hydrated.clarify?.questions[0]?.selection_mode).toBe("multiple");
+    expect(hydrated.clarify?.questions[0]?.selection_mode_reason).toBe("compatible_options");
+    expect(hydrated.clarify?.questions[0]?.options).toHaveLength(2);
+    expect(hydrated.clarifyAnswers.q1).toEqual({
+      labels: ["Automated tests"],
+      other: "Unknown evidence; Keep this answer.",
+    });
+    expect(hydrated.clarify?.questions[1]?.selection_mode).toBe("single");
+    expect(hydrated.clarifyAnswers.q2).toEqual({
+      labels: [],
+      other: "Product; Legal; Historical ambiguity.",
+    });
   });
 });

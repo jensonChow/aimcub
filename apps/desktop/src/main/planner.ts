@@ -243,7 +243,6 @@ export async function runIntakeQuestions(
     research: input.research,
     researchRequired: input.researchRequired,
     toolSignals: input.toolSignals,
-    maxQuestions: input.intake.questions.length,
   });
   const debugTrace = createDebugTrace("intake", startedAtMs, traced.modelRuns);
   if (!result.validation.ok || !result.report) {

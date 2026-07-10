@@ -1,3 +1,4 @@
+import { decideChoiceSelection } from "@core/domain";
 import type { ClarifyAnswer, ClarifyAssumption, ClarifyOutput, ClarifyQuestion } from "@core/llm";
 import type {
   AimDraft,
@@ -72,6 +73,7 @@ function persistedQuestion(question: ClarifyQuestion): AimDraftQuestion {
     source_dimension: question.source_dimension ?? null,
     allow_other: question.allow_other,
     selection_mode: question.selection_mode ?? null,
+    selection_mode_reason: question.selection_mode_reason ?? null,
     options: question.options.map((option) => ({
       label: option.label,
       tradeoff: option.tradeoff,
@@ -96,6 +98,20 @@ function persistedAssumption(assumption: ClarifyAssumption) {
 }
 
 function restoreQuestion(question: AimDraftQuestion): ClarifyQuestion {
+  const seenOptionLabels = new Set<string>();
+  const options = question.options.flatMap((option) => {
+    const label = option.label.trim();
+    const key = label.toLowerCase();
+    if (!label || seenOptionLabels.has(key)) return [];
+    seenOptionLabels.add(key);
+    return [{ label, tradeoff: option.tradeoff }];
+  });
+  const selection = decideChoiceSelection({
+    question: question.question,
+    options: options.map((option) => ({ label: option.label, detail: option.tradeoff })),
+    requestedMode: question.selection_mode,
+    requestedReason: question.selection_mode_reason,
+  });
   return {
     id: question.id,
     question: question.question,
@@ -103,11 +119,9 @@ function restoreQuestion(question: AimDraftQuestion): ClarifyQuestion {
     kind: question.kind,
     source_dimension: question.source_dimension ?? undefined,
     allow_other: question.allow_other,
-    selection_mode: question.selection_mode ?? undefined,
-    options: question.options.map((option) => ({
-      label: option.label,
-      tradeoff: option.tradeoff,
-    })),
+    selection_mode: selection.mode,
+    selection_mode_reason: selection.reason,
+    options,
   };
 }
 
@@ -125,17 +139,34 @@ function restoreOutput(
   };
 }
 
-function answerMap(answers: readonly AimDraftAnswer[]): Record<string, { labels: string[]; other: string }> {
+function answerMap(
+  answers: readonly AimDraftAnswer[],
+  questions: readonly ClarifyQuestion[],
+): Record<string, { labels: string[]; other: string }> {
   const map: Record<string, { labels: string[]; other: string }> = {};
+  const questionById = new Map(questions.map((question) => [question.id, question]));
   for (const answer of answers) {
-    const labels = answer.selected_labels?.length
+    const rawLabels = answer.selected_labels?.length
       ? answer.selected_labels
       : answer.selected_label
         ? [answer.selected_label]
         : [];
+    const labels = [...new Set(rawLabels.map((label) => label.trim()).filter(Boolean))];
+    const other = answer.other_text ?? "";
+    const question = questionById.get(answer.question_id);
+    const optionLabels = new Set(question?.options.map((option) => option.label) ?? []);
+    const knownLabels = question ? labels.filter((label) => optionLabels.has(label)) : labels;
+    const unknownLabels = question ? labels.filter((label) => !optionLabels.has(label)) : [];
+    if (question?.selection_mode === "single" && (labels.length > 1 || (labels.length > 0 && other.trim()) || unknownLabels.length > 0)) {
+      map[answer.question_id] = {
+        labels: [],
+        other: [...labels, other.trim()].filter(Boolean).join("; "),
+      };
+      continue;
+    }
     map[answer.question_id] = {
-      labels,
-      other: answer.other_text ?? "",
+      labels: question?.selection_mode === "single" ? knownLabels.slice(0, 1) : knownLabels,
+      other: [...unknownLabels, other.trim()].filter(Boolean).join("; "),
     };
   }
   return map;
@@ -191,6 +222,8 @@ export function buildAimDraftUpsertRequest(input: AimDraftBuildInput): UpsertAim
 
 export function hydrateAimDraft(draft: AimDraft): HydratedAimDraft {
   const phase = draft.phase === "post_draft" ? "postDraft" : draft.phase;
+  const intakeClarify = restoreOutput(draft.intake_questions, []);
+  const clarify = restoreOutput(draft.clarify_questions, draft.clarify_assumptions);
   return {
     id: draft.id,
     title: draft.title,
@@ -201,10 +234,10 @@ export function hydrateAimDraft(draft: AimDraft): HydratedAimDraft {
     stage: draft.current_stage,
     phase,
     contextNote: draft.context_note,
-    intakeClarify: restoreOutput(draft.intake_questions, []),
-    intakeAnswers: answerMap(draft.intake_answers),
-    clarify: restoreOutput(draft.clarify_questions, draft.clarify_assumptions),
-    clarifyAnswers: answerMap(draft.clarify_answers),
+    intakeClarify,
+    intakeAnswers: answerMap(draft.intake_answers, intakeClarify?.questions ?? []),
+    clarify,
+    clarifyAnswers: answerMap(draft.clarify_answers, clarify?.questions ?? []),
     draft: draft.draft_plan,
     finalPlan: draft.final_plan,
     saveBlock: draft.save_block,

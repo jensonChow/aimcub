@@ -6,6 +6,8 @@
  * the local substrate the planning engine may ask the runtime to execute.
  */
 
+import { CHOICE_SELECTION_REASONS, type ChoiceSelectionReason } from "@core/domain";
+
 export type AimcubToolName =
   | "local.read"
   | "local.write"
@@ -342,6 +344,7 @@ export interface ContextAskUserInput {
     category?: string;
     choices?: string[];
     selectionMode?: "single" | "multiple";
+    selectionModeReason?: ChoiceSelectionReason;
     captureScope?: "global" | "current_aim" | "none";
   }>;
 }
@@ -943,7 +946,17 @@ export const BUILT_IN_TOOL_CONTRACTS = [
               question: { type: "string" },
               category: { type: "string" },
               choices: { type: "array", items: { type: "string" } },
-              selectionMode: { type: "string", enum: ["single", "multiple"], default: "multiple" },
+              selectionMode: {
+                type: "string",
+                enum: ["single", "multiple"],
+                default: "multiple",
+                description: "Use single only when answers are mutually exclusive or one primary choice is explicitly required.",
+              },
+              selectionModeReason: {
+                type: "string",
+                enum: CHOICE_SELECTION_REASONS,
+                default: "unclear_defaults_multiple",
+              },
               captureScope: { type: "string", enum: ["global", "current_aim", "none"], default: "current_aim" },
             },
           },

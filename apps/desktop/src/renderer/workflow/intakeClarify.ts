@@ -1,5 +1,5 @@
-import type { AimIntakeReport } from "@core/domain";
-import type { ClarifyAnswer, ClarifyOutput, ClarifyQuestion, ClarifySelectionMode } from "@core/llm";
+import { decideChoiceSelection, type AimIntakeReport } from "@core/domain";
+import type { ClarifyAnswer, ClarifyOutput, ClarifyQuestion } from "@core/llm";
 import type { ContextCategory } from "@core/types";
 
 import type { ContextAnswerMap } from "../stages/context/types";
@@ -19,10 +19,6 @@ function intakeQuestionDimension(category: ContextCategory): ClarifyQuestion["so
   if (category === "eval_signal" || category === "procedure") return "verifiability";
   if (category === "constraint") return "granularity";
   return "context_fit";
-}
-
-function intakeQuestionSelectionMode(category: ContextCategory): ClarifySelectionMode {
-  return category === "preference" ? "single" : "multiple";
 }
 
 function intakeOptions(category: ContextCategory, zh: boolean): ClarifyQuestion["options"] {
@@ -113,26 +109,36 @@ function intakeOptions(category: ContextCategory, zh: boolean): ClarifyQuestion[
 
 export function intakeToClarifyOutput(intake: AimIntakeReport, zh: boolean): ClarifyOutput {
   return {
-    questions: intake.questions.map((question): ClarifyQuestion => ({
-      id: `intake_${question.id}`,
-      question: question.prompt,
-      why_high_impact: question.whyHighImpact ?? question.reason,
-      kind: intakeQuestionKind(question.category),
-      source_dimension: intakeQuestionDimension(question.category),
-      why_asked: [{
-        code: "aim_intake",
-        detail: question.reason,
-        category: question.category,
-        priority: question.priority,
-        ...(question.gapSource ? { gapSource: question.gapSource } : {}),
-        ...(question.nodeKey ? { nodeKey: question.nodeKey } : {}),
-        ...(question.nodeTitle ? { nodeTitle: question.nodeTitle } : {}),
-      }],
-      capture: question.capture,
-      allow_other: true,
-      selection_mode: question.selectionMode ?? intakeQuestionSelectionMode(question.category),
-      options: question.options?.length ? question.options : intakeOptions(question.category, zh),
-    })),
+    questions: intake.questions.map((question): ClarifyQuestion => {
+      const options = question.options?.length ? question.options : intakeOptions(question.category, zh);
+      const selection = decideChoiceSelection({
+        question: question.prompt,
+        options: options.map((option) => ({ label: option.label, detail: option.tradeoff })),
+        requestedMode: question.selectionMode,
+        requestedReason: question.selectionModeReason,
+      });
+      return {
+        id: `intake_${question.id}`,
+        question: question.prompt,
+        why_high_impact: question.whyHighImpact ?? question.reason,
+        kind: intakeQuestionKind(question.category),
+        source_dimension: intakeQuestionDimension(question.category),
+        why_asked: [{
+          code: "aim_intake",
+          detail: question.reason,
+          category: question.category,
+          priority: question.priority,
+          ...(question.gapSource ? { gapSource: question.gapSource } : {}),
+          ...(question.nodeKey ? { nodeKey: question.nodeKey } : {}),
+          ...(question.nodeTitle ? { nodeTitle: question.nodeTitle } : {}),
+        }],
+        capture: question.capture,
+        allow_other: true,
+        selection_mode: selection.mode,
+        selection_mode_reason: selection.reason,
+        options,
+      };
+    }),
     assumptions: [],
   };
 }

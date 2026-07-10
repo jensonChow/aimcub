@@ -18,4 +18,5 @@ export * from "./context-lineage";
 export * from "./aim-intake";
 export * from "./aim-learning";
 export * from "./decomposition-learning";
+export * from "./choice-selection";
 export * from "./aim-os";

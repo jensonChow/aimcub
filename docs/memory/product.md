@@ -39,4 +39,6 @@ Durable/global context must be separated from aim-local context. Long-lived pref
 
 Consumer and life aims need real-world context, not only developer/product assumptions. Planning should ask about domain constraints, distribution, access, budget, timeline, skill, taste, legal/IP, audience, and whether the user wants to learn or delegate.
 
+Choice questions preserve context instead of forcing false certainty. A question is single-select only when its answers are mutually exclusive in the same scope or the plan explicitly needs one primary choice; if any pair can be true together, it is multi-select, and uncertainty defaults to multi-select. Question generation must stay grounded in the Aim and relevant collected context, split broad gaps into atomic decision dimensions, and keep a free-text escape hatch. A later priority question may narrow compatible routes, but the initial discovery question must not discard combinations prematurely.
+
 The context inbox is a review queue for candidate memory/eval/context signals, not the primary debug surface. Candidate text should be editable before acceptance, and the UI must show whether acceptance stores global durable context or current-aim context.

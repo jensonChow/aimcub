@@ -35,6 +35,8 @@ const CLARIFY_OUTPUT = {
       why_high_impact: "Decides milestone count.",
       kind: "scope",
       allow_other: true,
+      selection_mode: "single",
+      selection_mode_reason: "mutually_exclusive",
       options: [
         { label: "Prototype", tradeoff: "Faster, looser." },
         { label: "Production", tradeoff: "Strict CI gates." },
@@ -51,6 +53,7 @@ const INTAKE_OUTPUT = {
       question: "Do you already have the Apple Developer access needed to distribute the tarot app?",
       why_high_impact: "This decides whether access setup blocks implementation.",
       selection_mode: "single",
+      selection_mode_reason: "mutually_exclusive",
       options: [
         { label: "Yes", tradeoff: "Planning can continue to product/build work." },
         { label: "No", tradeoff: "Planning must add an access prerequisite first." },
@@ -163,6 +166,7 @@ describe("desktop planner · intake question generation", () => {
     });
     expect(calls[0]!.task).toBe("classify");
     expect(calls[0]!.prompt).toContain("No relevant memory found");
+    expect(calls[0]!.prompt).toContain("Return at most 6 atomic questions");
     expect(result.debugTrace?.stage).toBe("intake");
     expect(result.debugTrace?.modelRuns[0]).toMatchObject({
       stage: "intake",
