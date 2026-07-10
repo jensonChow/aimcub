@@ -6,6 +6,7 @@ import type { DecompositionOutput } from "@core/types";
 import {
   buildAimDraftUpsertRequest,
   hydrateAimDraft,
+  persistedAimSurface,
   saveBlockFromProductError,
 } from "./aimDrafts";
 
@@ -61,6 +62,7 @@ describe("aim draft persistence helpers", () => {
       description: "Use an isolated store.",
       parent: null,
       activeStage: "context",
+      aimSurface: "summary",
       phase: "intake",
       contextNote: "Keep AIMCUB_HOME under /tmp.",
       intakeClarify: intake,
@@ -80,6 +82,7 @@ describe("aim draft persistence helpers", () => {
     expect(req).toMatchObject({
       title: "Plan a local alpha demo",
       currentStage: "context",
+      aimSurface: "summary",
       phase: "intake",
       status: "context_needed",
       contextNote: "Keep AIMCUB_HOME under /tmp.",
@@ -102,6 +105,7 @@ describe("aim draft persistence helpers", () => {
       description: "",
       parent: null,
       activeStage: "contracts",
+      aimSurface: "summary",
       phase: "postDraft",
       contextNote: "",
       intakeClarify: null,
@@ -126,6 +130,7 @@ describe("aim draft persistence helpers", () => {
       description: "",
       parent: null,
       activeStage: "context",
+      aimSurface: "summary",
       phase: null,
       contextNote: "",
       intakeClarify: null,
@@ -150,6 +155,7 @@ describe("aim draft persistence helpers", () => {
       parent_goal_id: "00000000-0000-4000-8000-000000000010",
       parent_milestone_id: "00000000-0000-4000-8000-000000000020",
       current_stage: "context",
+      aim_surface: "summary",
       phase: "post_draft",
       status: "plan_ready",
       context_note: "Recovered note.",
@@ -207,6 +213,7 @@ describe("aim draft persistence helpers", () => {
       milestoneId: "00000000-0000-4000-8000-000000000020",
     });
     expect(hydrated.phase).toBe("postDraft");
+    expect(hydrated.aimSurface).toBe("summary");
     expect(hydrated.clarify?.questions[0]?.question).toBe("Which evidence should be used?");
     expect(hydrated.clarify?.questions[0]?.selection_mode).toBe("multiple");
     expect(hydrated.clarify?.questions[0]?.selection_mode_reason).toBe("compatible_options");
@@ -220,5 +227,54 @@ describe("aim draft persistence helpers", () => {
       labels: [],
       other: "Product; Legal; Historical ambiguity.",
     });
+  });
+
+  it("round-trips an unsubmitted composer without confusing it with a committed aim", () => {
+    const req = buildAimDraftUpsertRequest({
+      id: null,
+      title: "Still composing",
+      description: "",
+      parent: null,
+      activeStage: "aim",
+      aimSurface: "compose",
+      phase: null,
+      contextNote: "",
+      intakeClarify: null,
+      intakeAnswers: [],
+      clarify: null,
+      clarifyAnswers: [],
+      draft: null,
+      finalPlan: null,
+      saveBlock: null,
+    });
+
+    expect(req?.aimSurface).toBe("compose");
+    expect(persistedAimSurface("edit")).toBe("summary");
+  });
+
+  it("fails legacy draft recovery safe to a static summary", () => {
+    const hydrated = hydrateAimDraft({
+      id: "00000000-0000-4000-8000-000000000099",
+      owner_id: "00000000-0000-4000-8000-000000000001",
+      title: "Legacy captured aim",
+      description: "",
+      parent_goal_id: null,
+      parent_milestone_id: null,
+      current_stage: "aim",
+      aim_surface: null,
+      phase: null,
+      status: "draft",
+      context_note: "",
+      intake_questions: [],
+      intake_answers: [],
+      clarify_questions: [],
+      clarify_answers: [],
+      clarify_assumptions: [],
+      draft_plan: null,
+      final_plan: null,
+      save_block: null,
+    });
+
+    expect(hydrated.aimSurface).toBe("summary");
   });
 });

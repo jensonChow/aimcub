@@ -33,6 +33,7 @@ import { buildContextCandidateAcceptRequest, type ContextInboxScope } from "./Co
 import { ContextSourcesPanel } from "./ContextSourcesPanel";
 import { buildContextBundleReview } from "./contextReview";
 import {
+  aimSurfaceAfterSubmit,
   deriveAimHelperProfile,
   hasPlanningRuntime,
   routeAfterAimSubmit,
@@ -83,6 +84,7 @@ import {
 import {
   buildAimDraftUpsertRequest,
   hydrateAimDraft,
+  persistedAimSurface,
   saveBlockFromProductError,
   type AimDraftBuildInput,
   type HydratedAimDraft,
@@ -133,6 +135,14 @@ const MAX_ADAPTIVE_INTAKE_TURNS = 6;
 interface AimEditBuffer {
   title: string;
   description: string;
+}
+
+interface AimDraftPersistenceOverrides {
+  title?: string;
+  description?: string;
+  aimSurface?: AimDraftBuildInput["aimSurface"];
+  resetPlanning?: boolean;
+  saveBlock?: AimDraftSaveBlock | null;
 }
 
 export function App() {
@@ -543,6 +553,17 @@ function AimOsApp() {
     const title = requestedTitle.trim();
     const route = routeAfterAimSubmit({ title, provider, localAgents });
     if (route === "missing_aim") return;
+    const nextAimSurface = aimSurfaceAfterSubmit({
+      action: route,
+      current: aimSurfaceMode === "edit" ? "edit" : "compose",
+    });
+    if (nextAimSurface === "summary" && !(await checkpointSubmittedAim({
+      title: requestedTitle,
+      description: requestedDescription,
+      resetPlanning: Boolean(options.aim),
+    }))) return;
+    setAimSurfaceMode(nextAimSurface);
+    if (nextAimSurface === "summary") setAimEditBuffer(null);
     if (route === "show_helper_guidance") {
       setError(null);
       setRuntimeGuidanceVisible(true);
@@ -555,8 +576,6 @@ function AimOsApp() {
       setAimDescription(options.aim.description);
       resetPlanningForAimUpdate();
     }
-    setAimSurfaceMode("summary");
-    setAimEditBuffer(null);
     setRuntimeGuidanceVisible(false);
     setError(null);
     setDraftSaveBlock(null);
@@ -649,29 +668,37 @@ function AimOsApp() {
     return answersFor(intakeClarify, intakeAnswers);
   }, [intakeAnswers, intakeClarify]);
 
-  function currentAimDraftInput(overrides: { saveBlock?: AimDraftSaveBlock | null } = {}): AimDraftBuildInput {
+  function currentAimDraftInput(overrides: AimDraftPersistenceOverrides = {}): AimDraftBuildInput {
+    const resetPlanning = overrides.resetPlanning === true;
     return {
       id: activeDraftIdRef.current,
-      title: aimTitle,
-      description: aimDescription,
+      title: overrides.title ?? aimTitle,
+      description: overrides.description ?? aimDescription,
       parent,
-      activeStage: stageOverride === "settings"
+      activeStage: resetPlanning
+        ? "aim"
+        : stageOverride === "settings"
         ? settingsReturnStageRef.current
         : stageOverride ?? cockpitStageFor(mode, selected, (finalPlan ?? draft ?? detail?.goal.plan_json ?? null) as DecompositionOutput | null),
-      phase: clarifyPhase,
-      contextNote,
-      intakeClarify,
-      intakeAnswers: builtIntakeAnswers,
-      clarify: clarifyPhase === "intake" ? null : clarify,
-      clarifyAnswers: builtAnswers,
-      draft,
-      finalPlan,
-      saveBlock: overrides.saveBlock !== undefined ? overrides.saveBlock : draftSaveBlock,
+      aimSurface: overrides.aimSurface ?? persistedAimSurface(aimSurfaceMode),
+      phase: resetPlanning ? null : clarifyPhase,
+      contextNote: resetPlanning ? "" : contextNote,
+      intakeClarify: resetPlanning ? null : intakeClarify,
+      intakeAnswers: resetPlanning ? [] : builtIntakeAnswers,
+      clarify: resetPlanning || clarifyPhase === "intake" ? null : clarify,
+      clarifyAnswers: resetPlanning ? [] : builtAnswers,
+      draft: resetPlanning ? null : draft,
+      finalPlan: resetPlanning ? null : finalPlan,
+      saveBlock: overrides.saveBlock !== undefined
+        ? overrides.saveBlock
+        : resetPlanning
+          ? null
+          : draftSaveBlock,
     };
   }
 
   async function persistCurrentDraftNow(
-    overrides: { saveBlock?: AimDraftSaveBlock | null } = {},
+    overrides: AimDraftPersistenceOverrides = {},
     options: { navigation?: boolean; throwOnError?: boolean; allowDuringDiscard?: boolean } = {},
   ): Promise<AimDraft | null> {
     const discardingCurrentDraft = Boolean(discardInFlightDraftIdRef.current)
@@ -723,6 +750,39 @@ function AimOsApp() {
     }
   }
 
+  async function checkpointSubmittedAim(input: {
+    title: string;
+    description: string;
+    resetPlanning: boolean;
+  }): Promise<boolean> {
+    const transition = navigationConcurrencyRef.current.workspace;
+    draftPersistence.pauseAutosave();
+    setBusy(t("os.busy.captureAim"));
+    try {
+      const saved = await persistCurrentDraftNow({
+        title: input.title,
+        description: input.description,
+        aimSurface: "summary",
+        resetPlanning: input.resetPlanning,
+      }, { navigation: true, throwOnError: true });
+      if (!isCurrentWorkspaceTransition(transition)) return false;
+      if (saved) return true;
+      throw new Error("Submitted Aim checkpoint did not persist.");
+    } catch (err) {
+      if (!isCurrentWorkspaceTransition(transition)) return false;
+      setError({
+        title: t("aimDraft.checkpointErrorTitle"),
+        message: t("aimDraft.checkpointErrorMessage"),
+        recovery: t("aimDraft.checkpointErrorRecovery"),
+        details: [err instanceof Error ? err.message : String(err)],
+      });
+      return false;
+    } finally {
+      draftPersistence.resumeAutosave();
+      if (isCurrentWorkspaceTransition(transition)) setBusy(null);
+    }
+  }
+
   async function refreshAimDrafts() {
     setAimDrafts(await window.aimcub.listAimDrafts().catch(() => []));
   }
@@ -744,12 +804,7 @@ function AimOsApp() {
     setDetail(null);
     setProgress(null);
     setActiveDraftId(hydrated.id);
-    const resumeInitialComposition = hydrated.stage === "aim"
-      && !hydrated.phase
-      && !hydrated.draft
-      && !hydrated.finalPlan
-      && !hydrated.saveBlock;
-    setAimSurfaceMode(resumeInitialComposition ? "compose" : "summary");
+    setAimSurfaceMode(hydrated.aimSurface);
     setAimEditBuffer(null);
     setRestoreAimEditFocus(false);
     setAimTitle(hydrated.title);
@@ -862,6 +917,7 @@ function AimOsApp() {
   }, [
     activeDraftId,
     aimDescription,
+    aimSurfaceMode,
     aimTitle,
     builtAnswers,
     builtIntakeAnswers,
@@ -1211,13 +1267,16 @@ function AimOsApp() {
 
   const activePlan = (finalPlan ?? draft ?? detail?.goal.plan_json ?? null) as DecompositionOutput | null;
   const activePlanValidation = activePlan ? validateExecutablePlan(activePlan) : null;
+  const planningRuntimeReady = hasPlanningRuntime(provider, localAgents);
   const draftAimOverviewState = draftSaveBlock
     ? "saveBlocked"
     : activePlanValidation?.ok === false
       ? "needsRepair"
       : activePlan && clarifyPhase === null
         ? "planReady"
-        : "context";
+        : !activePlan && clarifyPhase === null && !planningRuntimeReady
+          ? "helperSetup"
+          : "context";
   const draftAimNextSurface = draftAimOverviewState === "context" ? "context" : "contracts";
   const activePlanValidationMessages = activePlanValidation?.ok === false
     ? formatPlanValidationIssues(activePlanValidation.errors, t)
@@ -1240,10 +1299,9 @@ function AimOsApp() {
   const activeStage = stageOverride ?? cockpitStageFor(mode, selected, activePlan);
   const workspaceTarget = deriveWorkspaceTarget({
     selectedGoalId: selected?.id ?? null,
-    activeDraftId,
+    activeDraftId: aimSurfaceMode === "compose" ? null : activeDraftId,
     showAimComposer: hasTransientAimWork,
   });
-  const planningRuntimeReady = hasPlanningRuntime(provider, localAgents);
   const activeAimTitle = aimSurfaceMode === "edit" && aimEditBuffer
     ? aimEditBuffer.title.trim()
     : selected?.title ?? aimTitle.trim();
@@ -1685,7 +1743,9 @@ function AimOsApp() {
           focusEditAction={restoreAimEditFocus}
           onEditFocusRestored={() => setRestoreAimEditFocus(false)}
           onEdit={beginAimEdit}
-          onContinue={() => openCockpitStage(draftAimNextSurface)}
+          onContinue={draftAimOverviewState === "helperSetup"
+            ? openSettingsForAim
+            : () => openCockpitStage(draftAimNextSurface)}
         />
       );
     }

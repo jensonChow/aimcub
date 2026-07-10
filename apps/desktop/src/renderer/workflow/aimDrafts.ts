@@ -7,6 +7,7 @@ import type {
   AimDraftSaveBlock,
   AimDraftStage,
   AimDraftStatus,
+  AimDraftSurface,
   DecompositionOutput,
 } from "@core/types";
 
@@ -20,6 +21,7 @@ export interface AimDraftBuildInput {
   description: string;
   parent: { goalId: string; milestoneId: string } | null;
   activeStage: CockpitStage;
+  aimSurface: AimDraftSurface;
   phase: "intake" | "postDraft" | null;
   contextNote: string;
   intakeClarify: ClarifyOutput | null;
@@ -37,6 +39,7 @@ export interface HydratedAimDraft {
   description: string;
   parent: { goalId: string; milestoneId: string } | null;
   stage: AimDraftStage;
+  aimSurface: AimDraftSurface;
   phase: "intake" | "postDraft" | null;
   contextNote: string;
   intakeClarify: ClarifyOutput | null;
@@ -62,6 +65,10 @@ export function aimDraftHasContent(input: AimDraftBuildInput): boolean {
       || input.finalPlan
       || input.saveBlock,
   );
+}
+
+export function persistedAimSurface(mode: "idle" | "compose" | "summary" | "edit"): AimDraftSurface {
+  return mode === "compose" ? "compose" : "summary";
 }
 
 function persistedQuestion(question: ClarifyQuestion): AimDraftQuestion {
@@ -206,6 +213,7 @@ export function buildAimDraftUpsertRequest(input: AimDraftBuildInput): UpsertAim
     parentGoalId: input.parent?.goalId ?? null,
     parentMilestoneId: input.parent?.milestoneId ?? null,
     currentStage: aimDraftStage(input),
+    aimSurface: input.aimSurface,
     phase: input.phase === "postDraft" ? "post_draft" : input.phase,
     status: aimDraftStatus(input),
     contextNote: input.contextNote,
@@ -232,6 +240,10 @@ export function hydrateAimDraft(draft: AimDraft): HydratedAimDraft {
       ? { goalId: draft.parent_goal_id, milestoneId: draft.parent_milestone_id }
       : null,
     stage: draft.current_stage,
+    // Drafts created before aim_surface existed should recover into the safe
+    // reading state. Edit remains explicit, while new writes preserve a truly
+    // unsubmitted composer as "compose".
+    aimSurface: draft.aim_surface ?? "summary",
     phase,
     contextNote: draft.context_note,
     intakeClarify,

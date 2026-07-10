@@ -24,6 +24,7 @@ function savedDraft(id: string, title: string): AimDraft {
     parent_goal_id: null,
     parent_milestone_id: null,
     current_stage: "aim",
+    aim_surface: "compose",
     phase: null,
     status: "draft",
     context_note: "",

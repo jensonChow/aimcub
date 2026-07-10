@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  aimSurfaceAfterSubmit,
   deriveAimHelperProfile,
   hasPlanningRuntime,
   routeAfterAimSubmit,
@@ -34,15 +35,28 @@ describe("first-run flow routing", () => {
   });
 
   it("shows helper guidance after aim submit when no provider or local agent is ready", () => {
-    expect(routeAfterAimSubmit({ title: "Launch a local research app", provider: null, localAgents: [] })).toBe("show_helper_guidance");
+    const action = routeAfterAimSubmit({ title: "Launch a local research app", provider: null, localAgents: [] });
+
+    expect(action).toBe("show_helper_guidance");
+    expect(aimSurfaceAfterSubmit({ action, current: "compose" })).toBe("summary");
+  });
+
+  it("keeps an explicit edit buffered when helper setup blocks regeneration", () => {
+    expect(aimSurfaceAfterSubmit({ action: "show_helper_guidance", current: "edit" })).toBe("edit");
+  });
+
+  it("does not commit an empty aim", () => {
+    expect(aimSurfaceAfterSubmit({ action: "missing_aim", current: "compose" })).toBe("compose");
   });
 
   it("starts planning when a provider or authenticated local agent exists", () => {
-    expect(routeAfterAimSubmit({
+    const providerAction = routeAfterAimSubmit({
       title: "Launch a local research app",
       provider: { configured: true },
       localAgents: [],
-    })).toBe("start_planning");
+    });
+    expect(providerAction).toBe("start_planning");
+    expect(aimSurfaceAfterSubmit({ action: providerAction, current: "compose" })).toBe("summary");
     expect(routeAfterAimSubmit({
       title: "Launch a local research app",
       provider: null,

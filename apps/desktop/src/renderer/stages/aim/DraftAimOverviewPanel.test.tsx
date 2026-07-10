@@ -40,6 +40,15 @@ describe("DraftAimOverviewPanel", () => {
     expect(html.match(/Review contracts/g)).toHaveLength(2);
   });
 
+  it("keeps a captured aim readable while helper setup is required", () => {
+    const html = renderOverview("helperSetup");
+
+    expect(html).toContain("Planning helper needed");
+    expect(html.match(/Set up planning helper/g)).toHaveLength(2);
+    expect(html).toContain("Edit aim");
+    expect(html).not.toContain("<textarea");
+  });
+
   it("distinguishes blocked plans from ready plans", () => {
     const html = renderOverview("saveBlocked");
 
