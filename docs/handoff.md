@@ -1,7 +1,7 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-10
-Branch: `codex/unify-aim-layout-state`
+Branch: `main`
 
 ## Current Session
 
@@ -52,8 +52,9 @@ Branch: `codex/unify-aim-layout-state`
 
 ## Commit And Push Status
 
-- Feature commit: pending final review.
-- Push and merge: pending final review.
+- Feature commit: `530150cd` (`Unify desktop aim states and titlebar safety`).
+- Local merge commit: `47135fa8` (`Merge desktop aim state and titlebar safety`).
+- Remote push: not performed. The environment's export safety review rejected the GitHub push and requires fresh explicit user approval; `origin/main` remains at `c15345f8`.
 
 ## Open Risks
 
