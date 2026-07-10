@@ -5,50 +5,46 @@ Branch: `main`
 
 ## Current Session
 
-- Request: restore real single-select questions, deepen user exploration and research coverage, add working network research, and connect local agent CLIs to the Aimcub product loop.
-- Starting state: local `main` at `e84e229f`, seven commits ahead of `origin/main` at `c15345f8`.
-- Implementation branch: `codex/deepen-context-research-cli`.
-- Evidence reviewed: the current intake/clarify normalization path, Desktop planning tools and research settings, local Codex/Claude adapters, CLI/store/eval flows, official Codex CLI/config documentation, live local-agent probes, and the relevant durable project memory.
+- Request: repair the project-root `Aimcub.app`, which failed during Electron main-process startup with `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING` while loading `node_modules/@core/local-agent/src/index.ts`.
+- Starting state: local `main` at `bab4ba39`, ten commits ahead of `origin/main` at `c15345f8`.
+- Implementation branch: `codex/fix-packaged-local-agent-startup`.
+- Root cause: `@core/local-agent` was added as a Desktop runtime dependency but was omitted from Electron's `bundleFromSource` allowlist. Electron Vite therefore left a bare `require("@core/local-agent")` in the main bundle, electron-builder copied the workspace package with its raw-TypeScript entry point, and Electron refused to strip TypeScript under packaged `node_modules`.
 
 ## Completed Work
 
-- Repaired choice normalization with a trust-but-verify rule. An aligned generated `single` plus exclusive/primary reason now survives unless wording or options contain strong additive/coexistence evidence. Compatible routes, evidence, capabilities, plural sets, and uncertainty remain multiple-select.
-- Replaced the pre-draft static question batch with a bounded adaptive interview. Desktop asks one question, returns cumulative visible questions and answers through the same intake run, appends one non-duplicate follow-up, and stops when the model reports sufficient context or six turns are reached.
-- Expanded model exploration across outcome and motivation, baseline, users and stakeholders, resources/access/skills/budget/time, preferences and tradeoffs, authority/delegation, risks and disallowed outcomes, source truth, environment/distribution, and observable completion evidence when those dimensions can change the plan.
-- Added a provider-independent research brief across aim facts, authoritative requirements, alternatives/market, risks/tradeoffs, and user/audience evidence. It preserves URLs and exposes lane coverage, domain diversity, authority, freshness, conflict signals, gaps, and scored sufficiency. Fetch selection is lane-aware, authority-prioritized, and domain-diverse.
-- Added Desktop local-CLI web research fallback. Configured Brave remains the dedicated provider; otherwise an authenticated Codex/Claude CLI builds one bounded live-search corpus that is reused across research lanes, and first-party page fetching verifies selected public sources. Web research is required only for relevant or explicitly enabled aims, not every aim merely because deep mode is on.
-- Extracted shared Codex/Claude discovery, live model selection, permission mapping, current JSONL parsing, and execution into `packages/local-agent`. Codex network runs use `--search`; workspace-write shell network is separately scoped. Claude workspace writes use `acceptEdits`, and network-off runs disallow built-in WebSearch/WebFetch.
-- Connected CLI planning to an authenticated local agent when no API key exists. Added `aimcub agents` and a bounded `aimcub run <id> --workspace <absolute-path>` command that executes one ready agent-owned sub-aim, streams/persists events, records attributed low-trust evidence, re-evaluates progress, and sediments context without writing completion directly.
-- Updated durable product, architecture, Desktop, design-system, v1, tool-contract, local-alpha, vision, and README documentation. The CLI remains explicitly one-run-at-a-time: no daemon, until-blocked loop, retry scheduler, or direct completion claim.
+- Added `@core/local-agent` to the Desktop main/preload source-bundling boundary.
+- Exported the bundling list and added a manifest-parity regression test that requires every Desktop runtime dependency under `@core/*` to be included.
+- Added `apps/desktop/scripts/verify-bundled-core.mjs`, which recursively scans all built main and preload JavaScript chunks and fails when any bare `@core/*` runtime import remains.
+- Wired the bundle verifier into Desktop build, pack, and dist commands so electron-builder cannot silently reproduce this failure.
+- Recorded the raw-TypeScript package boundary and exact-bundle startup requirement in `docs/memory/operations.md`.
+- Rebuilt the macOS arm64 bundle and refreshed the ignored project-root `Aimcub.app`. The old bundle was retained temporarily under `/tmp/Aimcub.app.before-packaging-fix` during the safe replacement.
+- Closed the stale pre-fix crash process after confirming that it had no renderer, then completed final visual QA against a separate isolated instance of the rebuilt root bundle.
 
 ## Verification
 
-- `pnpm install --frozen-lockfile` passed for all 11 workspace projects.
-- The full required gate passed: `pnpm build`, `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm core:purity`, and `git diff --check`.
-- Test result: 88 test files and 900 tests passed. Package totals were Core 176, LLM 170, local-agent 10, CLI 88, Desktop 204, Store 62, API 40, DB 36, and MCP 114. The expected missing-Supabase stderr came only from the MCP hygiene fixture.
-- A real read-only Codex `--search` run used the live compatible model catalog and returned the current official Codex CLI documentation URL through the normalized JSONL parser.
-- Built CLI smoke passed: `aimcub agents --json` detected authenticated Codex CLI `0.142.5` with live models and an installed but unauthenticated Claude Code `2.1.191`.
-- An isolated `AIMCUB_HOME=/tmp/aimcub-cli-plan-smoke` run of built `aimcub plan` completed without an API key through local Codex, including structured decomposition and the quality retry/review path. Its deliberately thin input remained honestly flagged for missing context/research instead of being presented as high-quality evidence.
-- `pnpm desktop:pack` passed with Electron 43.0.0 for macOS arm64, without signing, and the project-root `Aimcub.app` was refreshed. It is `com.aimcub.desktop`, version `0.0.0`; `Resources/app.asar` SHA256 is `089cf0eb76f30c3f217fb184665dc2947b809c6183e74d92df5a275273325d65`.
-- No real `~/.aimcub` state was read or written. Live Aimcub CLI checks used isolated `/tmp` homes; the local-agent smoke was read-only.
+- The final full gate passed: `pnpm build`, `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm core:purity`, and `git diff --check`.
+- Test result: 89 test files and 901 tests passed. Package totals were Core 176, LLM 170, local-agent 10, CLI 88, Desktop 205, Store 62, API 40, DB 36, and MCP 114. The expected missing-Supabase stderr came only from the MCP hygiene fixture.
+- Desktop build transformed 245 main-process modules and the new verifier confirmed that main and preload output contained no external `@core/*` imports.
+- `pnpm desktop:pack` passed with Electron 43.0.0 for macOS arm64, without signing. The project-root bundle exactly matches the current packaged output; `Resources/app.asar` SHA256 is `909663279f1be6ca973816cffefcbbbec9b3a622ff0834359d1eb63e6d3c9700`.
+- Every packaged main/preload chunk extracted from `app.asar` was checked and contained no external `@core/*` runtime import.
+- The exact project-root `Aimcub.app` was launched with isolated `HOME`, `AIMCUB_HOME`, Electron user data, and unavailable CLI paths under `/tmp`. Its main, GPU, network, and renderer processes remained alive, and Computer Use captured the visible Aimcub Home window with Home, New aim, and the aim input surface instead of the JavaScript error dialog.
+- The isolated verification instance was closed after the check. No real `~/.aimcub` data was read or written.
 
 ## Commit And Push Status
 
-- Feature commit: `c25dcf6b` (`Deepen context research and local CLI orchestration`).
-- Local merge commit: `1dd6f9e2` (`Merge deeper context research and CLI orchestration`).
+- Feature commit: `3268aeef` (`Fix packaged desktop startup`).
+- Local merge commit: `e873dd9d` (`Merge packaged desktop startup fix`).
 - This handoff is the only post-merge change and will be finalized in a focused local `main` commit.
-- Local `main` is nine commits ahead of `origin/main` before the handoff commit. Remote push is not performed because the user did not authorize it; `origin/main` remains at `c15345f8`.
+- Local `main` is twelve commits ahead of `origin/main` before the handoff commit. Remote push is not performed because the user did not authorize it; `origin/main` remains at `c15345f8`.
 
 ## Open Risks
 
-- Adaptive intake and source classification still depend on model behavior. Deterministic normalization, bounded turns, source URL preservation, coverage scoring, and focused tests constrain the failure modes, but there is not yet a live benchmark across a broad multilingual Aim corpus.
-- Local-CLI research gathers one bounded corpus per planning context. It is materially deeper and faster than spawning one agent per lane, but difficult or highly dynamic topics may still need a dedicated Brave provider, additional domain-specific queries, or explicit user sources.
-- `aimcub run` handles one ready agent-owned sub-aim per invocation. Durable queues, automatic until-blocked orchestration, retries, resumable sessions, and structured artifact capture remain future work.
-- An open manual-proof draft is protected from normal in-app navigation but is not checkpointed across process termination or a full reload.
-- A deterministic isolated-seed packaged visual pass remains useful for the adaptive question transition and Settings provider label. Component, source-state, build, package, and real CLI regressions passed in this session.
+- The local macOS bundle remains unsigned and uses the default Electron icon; this does not affect the repaired startup path but remains release work.
+- The bundling rule assumes current `@core/*` packages continue to expose raw TypeScript. The manifest-parity test and output scanner now fail early if a new package is omitted; revisit the rule only if those packages gain stable compiled runtime entry points.
+- The packaged startup check is currently a deliberate isolated visual QA step rather than an automated CI window-launch test. The deterministic build verifier covers the exact regression at the artifact boundary.
 
 ## Next Session Prompt
 
 ```text
-Continue from Aimcub main. Read AGENTS.md, docs/handoff.md, docs/memory/README.md, and the module memory for the surface you touch. Preserve trust-but-verify single/multiple normalization, the one-question adaptive intake loop, research coverage/sufficiency honesty, and eval-only completion. Treat packages/local-agent as the shared Codex/Claude runtime boundary. Use isolated AIMCUB_HOME for live or packaged validation. Do not push the local commits until the user gives fresh explicit approval.
+Continue from Aimcub main. Read AGENTS.md, docs/handoff.md, docs/memory/README.md, and the module memory for the surface you touch. Preserve the invariant that every raw-TypeScript @core/* Desktop runtime dependency is bundled and that build/pack/dist contain no external @core imports. Use isolated HOME, AIMCUB_HOME, and Electron user data for packaged QA. The project-root Aimcub.app is the current repaired bundle. Do not push local commits until the user gives fresh explicit approval.
 ```
