@@ -1751,19 +1751,25 @@ export function InitialWorkspacePanel(props: {
 }) {
   const { t } = useI18n();
   const drafts = props.drafts ?? [];
+  const hasRecoverableDrafts = drafts.length > 0 && Boolean(props.onResumeDraft) && Boolean(props.onDiscardDraft);
   return (
-    <section className="od-initial-workspace" aria-label={t("initialWorkspace.label")}>
-      <div className="od-initial-workspace-copy">
-        <h1>{t("initialWorkspace.title")}</h1>
-        <p>{t("initialWorkspace.body")}</p>
-      </div>
-      {drafts.length > 0 && props.onResumeDraft && props.onDiscardDraft ? (
+    <section
+      className="od-initial-workspace"
+      aria-label={hasRecoverableDrafts ? undefined : t("initialWorkspace.label")}
+      data-has-drafts={hasRecoverableDrafts ? "true" : "false"}
+    >
+      {hasRecoverableDrafts && props.onResumeDraft && props.onDiscardDraft ? (
         <AimDraftHomeSection
           drafts={drafts}
           onResume={props.onResumeDraft}
           onDiscard={props.onDiscardDraft}
         />
-      ) : null}
+      ) : (
+        <div className="od-initial-workspace-copy">
+          <h1>{t("initialWorkspace.title")}</h1>
+          <p>{t("initialWorkspace.body")}</p>
+        </div>
+      )}
     </section>
   );
 }

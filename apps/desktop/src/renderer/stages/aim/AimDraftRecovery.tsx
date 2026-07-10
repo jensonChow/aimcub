@@ -3,12 +3,7 @@ import { useRef, useState } from "react";
 
 import { useI18n, type I18n } from "../../i18n";
 import { ActionMenu, ActionMenuItem } from "../../ui/ActionMenu";
-
-function shortText(value: string | undefined | null, max = 80): string {
-  const cleaned = (value ?? "").replace(/\s+/g, " ").trim();
-  if (cleaned.length <= max) return cleaned;
-  return `${cleaned.slice(0, max - 1).trim()}...`;
-}
+import { aimNavigationLabels, type AimNavigationLabels } from "../../workflow/aimNavigationTitle";
 
 export function aimDraftStatusKey(status: AimDraftStatus): Parameters<I18n["t"]>[0] {
   switch (status) {
@@ -23,8 +18,22 @@ export function aimDraftStatusKey(status: AimDraftStatus): Parameters<I18n["t"]>
   }
 }
 
-export function aimDraftDisplayTitle(draft: Pick<AimDraft, "title">, fallback: string): string {
-  return draft.title.trim() || fallback;
+export function aimDraftDisplayTitle(
+  draft: Pick<AimDraft, "title" | "draft_plan" | "final_plan">,
+  fallback: string,
+): string {
+  return aimDraftNavigationLabels(draft, fallback).label;
+}
+
+function aimDraftNavigationLabels(
+  draft: Pick<AimDraft, "title" | "draft_plan" | "final_plan">,
+  fallback: string,
+): AimNavigationLabels {
+  return aimNavigationLabels({
+    title: draft.title,
+    plan: draft.final_plan ?? draft.draft_plan,
+    fallback,
+  });
 }
 
 export function AimDraftHomeSection(props: {
@@ -44,16 +53,22 @@ export function AimDraftHomeSection(props: {
       </div>
       <div className="od-draft-recovery-list">
         {props.drafts.map((draft) => {
-          const title = aimDraftDisplayTitle(draft, t("aimDraft.untitled"));
+          const navigationTitle = aimDraftNavigationLabels(draft, t("aimDraft.untitled"));
           return (
             <div className="od-content-entry od-draft-recovery-row" key={draft.id}>
-              <button className="od-content-entry-main" type="button" onClick={() => props.onResume(draft)}>
+              <button
+                className="od-content-entry-main"
+                type="button"
+                aria-label={navigationTitle.fullLabel}
+                title={navigationTitle.fullLabel}
+                onClick={() => props.onResume(draft)}
+              >
                 <span className="od-content-entry-copy">
-                  <strong>{shortText(title, 96)}</strong>
+                  <strong>{navigationTitle.label}</strong>
                   <span>{t(aimDraftStatusKey(draft.status))}</span>
                 </span>
               </button>
-              <DraftActionMenu draft={draft} title={title} onResume={props.onResume} onDiscard={props.onDiscard} />
+              <DraftActionMenu draft={draft} title={navigationTitle.fullLabel} onResume={props.onResume} onDiscard={props.onDiscard} />
             </div>
           );
         })}
@@ -78,21 +93,22 @@ export function AimDraftSidebarRows(props: {
       <div className="od-draft-list">
         {props.drafts.map((draft) => {
           const selected = props.activeDraftId === draft.id;
-          const title = aimDraftDisplayTitle(draft, t("aimDraft.untitled"));
+          const navigationTitle = aimDraftNavigationLabels(draft, t("aimDraft.untitled"));
           return (
             <div className="od-content-entry od-draft-card" data-selected={selected ? "true" : undefined} key={draft.id}>
               <button
                 className="od-content-entry-main od-draft-card-main"
                 type="button"
                 aria-current={selected ? "page" : undefined}
+                aria-label={navigationTitle.fullLabel}
+                title={navigationTitle.fullLabel}
                 onClick={() => props.onResume(draft)}
               >
                 <span className="od-content-entry-copy od-aim-row-main">
-                  <strong>{shortText(title, 58)}</strong>
-                  <span>{t(aimDraftStatusKey(draft.status))}</span>
+                  <strong>{navigationTitle.label}</strong>
                 </span>
               </button>
-              <DraftActionMenu draft={draft} title={title} onResume={props.onResume} onDiscard={props.onDiscard} />
+              <DraftActionMenu draft={draft} title={navigationTitle.fullLabel} onResume={props.onResume} onDiscard={props.onDiscard} />
             </div>
           );
         })}

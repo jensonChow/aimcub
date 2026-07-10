@@ -160,6 +160,7 @@ describe("decompose · happy path", () => {
     expect(call.task).toBe("decompose");
     expect(call.schema).toBeDefined();
     expect(call.system).toContain("Aimcub");
+    expect(call.system).toContain("goal_summary as a concise navigation label");
     expect(call.system).toContain("decomposition_contract");
     expect(call.system).toContain("Do not reduce goals to a developer checklist");
     expect(call.system).toContain("Apple Developer");
