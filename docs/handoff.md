@@ -1,7 +1,7 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-10
-Branch: `codex/fix-aim-summary-regression`
+Branch: `main`
 
 ## Current Session
 
@@ -27,9 +27,10 @@ Branch: `codex/fix-aim-summary-regression`
 
 ## Commit And Push Status
 
-- Feature commit: pending final review.
-- Local merge to `main`: pending final review.
-- Push: not authorized and not attempted. Require fresh explicit authorization before publishing.
+- Feature commit: `74f792db` (`Fix captured Aim summary persistence`).
+- Local merge commit: `dd2edd43` (`Merge captured Aim summary persistence fix`).
+- This final handoff refresh is the remaining history-only update on local `main`.
+- Push: not authorized and not attempted. Local `main` is ahead of `origin/main`; require fresh explicit authorization before publishing.
 
 ## Open Risks
 
