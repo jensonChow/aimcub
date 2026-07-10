@@ -43,7 +43,8 @@ Branch: `main`
 
 - Feature commit: `697d668dcd4787a2dbb48f36edc7d92b4479a63b` (`Fix desktop draft navigation coherence`).
 - Local `main` merge: `ee7c84045777df52337f5e1d501056f425909e3a` (`Merge desktop draft navigation coherence`).
-- Remote upload was not performed. The push was rejected by the external-data safety review because remote visibility could not be verified; `origin/main` remains `2146ba0d` and no remote feature branch was created. Explicit user approval is required before retrying either push.
+- The user explicitly approved remote upload after the initial safety hold. Read-only verification confirmed `jensonChow/aimcub` is the authenticated user's private repository with `ADMIN` access.
+- `origin/codex/desktop-navigation-coherence` now contains the feature commit, and `main` was pushed with the verified merge plus final handoff commits.
 
 ## Open Risks
 
@@ -53,5 +54,5 @@ Branch: `main`
 ## Next Session Prompt
 
 ```text
-Continue from Aimcub local main. Read AGENTS.md, docs/handoff.md, docs/memory/README.md, docs/memory/desktop.md, and docs/memory/design-system.md first. Local main contains the verified navigation fix but is ahead of origin because remote upload still requires explicit user approval. Preserve the single workspace-target invariant: Home, New Aim, one draft, or one saved aim is current; drafts expose Aim/Context/Contracts only; Settings returns to the originating surface. Check git status and remote state before new work.
+Continue from Aimcub main. Read AGENTS.md, docs/handoff.md, docs/memory/README.md, docs/memory/desktop.md, and docs/memory/design-system.md first. The verified navigation fix is committed, merged, and pushed to origin. Preserve the single workspace-target invariant: Home, New Aim, one draft, or one saved aim is current; drafts expose Aim/Context/Contracts only; Settings returns to the originating surface. Check git status and remote state before new work.
 ```
