@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ClarifyQuestion } from "@core/llm";
 
-import { parseAnswers, answersToIntakeSignals, answersToMemories } from "./answers";
+import { parseAnswers, parseChoiceReply, answersToIntakeSignals, answersToMemories } from "./answers";
 
 const QUESTIONS: ClarifyQuestion[] = [
   {
@@ -18,6 +18,19 @@ const QUESTIONS: ClarifyQuestion[] = [
     ],
   },
 ];
+
+const MULTI_QUESTION: ClarifyQuestion = {
+  ...QUESTIONS[0]!,
+  id: "sources",
+  question: "Which context sources should Aimcub inspect?",
+  selection_mode: "multiple",
+  selection_mode_reason: "compatible_options",
+  options: [
+    { label: "Local files", tradeoff: "Grounds current state." },
+    { label: "Web research", tradeoff: "Adds current facts." },
+    { label: "Notion", tradeoff: "Adds user-owned context." },
+  ],
+};
 
 describe("parseAnswers", () => {
   it("parses a well-formed array and keeps real answers", () => {
@@ -47,6 +60,77 @@ describe("parseAnswers", () => {
   it("throws on non-array or invalid JSON", () => {
     expect(() => parseAnswers("{}")).toThrow(/array/);
     expect(() => parseAnswers("not json")).toThrow(/valid JSON/);
+  });
+
+  it("preserves selected_labels from non-interactive multi-select input", () => {
+    expect(parseAnswers(JSON.stringify([{
+      question_id: "sources",
+      selected_labels: ["Local files", "Web research", "Local files"],
+    }]))).toEqual([{
+      question_id: "sources",
+      selected_label: "Local files",
+      selected_labels: ["Local files", "Web research"],
+      other_text: null,
+    }]);
+  });
+
+  it("keeps an explicit selected_label first and merges it with selected_labels", () => {
+    expect(parseAnswers(JSON.stringify([{
+      question_id: "sources",
+      selected_label: "Notion",
+      selected_labels: ["Local files", "Notion"],
+    }]))).toEqual([{
+      question_id: "sources",
+      selected_label: "Notion",
+      selected_labels: ["Notion", "Local files"],
+      other_text: null,
+    }]);
+  });
+
+  it("rejects multiple or conflicting answers for a known single-select question", () => {
+    expect(() => parseAnswers(JSON.stringify([{
+      question_id: "scope",
+      selected_labels: ["Prototype", "Production"],
+    }]), QUESTIONS)).toThrow(/single-select/);
+
+    expect(() => parseAnswers(JSON.stringify([{
+      question_id: "scope",
+      selected_label: "Prototype",
+      other_text: "A custom alternative",
+    }]), QUESTIONS)).toThrow(/single-select/);
+  });
+});
+
+describe("parseChoiceReply", () => {
+  it("accepts comma-separated indexes for a multi-select question", () => {
+    expect(parseChoiceReply(MULTI_QUESTION, "1, 3")).toEqual({
+      question_id: "sources",
+      selected_label: "Local files",
+      selected_labels: ["Local files", "Notion"],
+      other_text: null,
+    });
+  });
+
+  it("keeps selected options plus a custom answer for multi-select input", () => {
+    expect(parseChoiceReply(MULTI_QUESTION, "1, 2 | Google Drive")).toEqual({
+      question_id: "sources",
+      selected_label: "Local files",
+      selected_labels: ["Local files", "Web research"],
+      other_text: "Google Drive",
+    });
+  });
+
+  it("keeps a single-choice reply to one selected label", () => {
+    expect(parseChoiceReply({
+      ...QUESTIONS[0]!,
+      selection_mode: "single",
+      selection_mode_reason: "mutually_exclusive",
+    }, "2")).toEqual({
+      question_id: "scope",
+      selected_label: "Production",
+      selected_labels: ["Production"],
+      other_text: null,
+    });
   });
 });
 
@@ -151,5 +235,26 @@ describe("answersToIntakeSignals", () => {
         summary: "Production",
       }),
     ]);
+  });
+
+  it("keeps every selected label in the intake progress summary", () => {
+    const signals = answersToIntakeSignals([MULTI_QUESTION], [{
+      question_id: "sources",
+      selected_label: "Local files",
+      selected_labels: ["Local files", "Web research"],
+      other_text: null,
+    }]);
+
+    expect(signals[0]?.summary).toBe("Local files; Web research");
+  });
+
+  it("treats legacy selected_label plus other_text as one custom alternative", () => {
+    const signals = answersToIntakeSignals(QUESTIONS, [{
+      question_id: "scope",
+      selected_label: "Production",
+      other_text: "A demo-quality release",
+    }]);
+
+    expect(signals[0]?.summary).toBe("A demo-quality release");
   });
 });

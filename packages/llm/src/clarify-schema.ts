@@ -1,3 +1,5 @@
+import { CHOICE_SELECTION_REASONS } from "@core/domain";
+
 /**
  * JSON Schema for the clarifying-questions Structured Output (the feedback step).
  *
@@ -52,13 +54,19 @@ const questionSchema = {
       "The plan-quality dimension this question most improves, or null when it is general discovery.",
     ),
     allow_other: { type: ["boolean", "null"], description: "Free-text is always allowed; set true." },
-    selection_mode: nullableEnum(
-      selectionModeEnum,
-      "Use single for mutually exclusive choices; use multiple when several options can be true at the same time.",
-    ),
+    selection_mode: {
+      type: "string",
+      enum: selectionModeEnum,
+      description: "Use single only for mutually exclusive or explicitly primary choices; otherwise use multiple.",
+    },
+    selection_mode_reason: {
+      type: "string",
+      enum: CHOICE_SELECTION_REASONS,
+      description: "The answer relationship that justifies selection_mode.",
+    },
     options: { type: "array", description: ">= 2 hypothesis options with trade-offs.", items: optionSchema },
   },
-  required: ["id", "question", "why_high_impact", "kind", "source_dimension", "allow_other", "selection_mode", "options"],
+  required: ["id", "question", "why_high_impact", "kind", "source_dimension", "allow_other", "selection_mode", "selection_mode_reason", "options"],
 } as const;
 
 /** A low-impact unknown we DEFAULTED rather than asked about (default-and-disclose). */

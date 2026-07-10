@@ -3,6 +3,12 @@ import type {
   AimIntakeQuestionOption,
   AimIntakeReport,
 } from "@core/domain";
+import {
+  CHOICE_SELECTION_REASONS,
+  decideChoiceSelection,
+  type ChoiceSelectionMode,
+  type ChoiceSelectionReason,
+} from "@core/domain";
 
 import type { LlmGateway, LlmResponse, LlmUsage } from "./index";
 import { renderPlanningContext, type PlanningMemory } from "./planning-context";
@@ -35,22 +41,32 @@ export interface AimIntakeQuestionGenerationResult {
   usage: LlmUsage | null;
 }
 
-type SelectionMode = "single" | "multiple";
-
 interface GeneratedQuestion {
   source_question_id: string;
   question: string;
   why_high_impact: string;
-  selection_mode: SelectionMode;
+  selection_mode: ChoiceSelectionMode;
+  selection_mode_reason: ChoiceSelectionReason;
   options: AimIntakeQuestionOption[];
 }
 
 interface GeneratedOutput {
   questions: GeneratedQuestion[];
+  receivedRows: number;
 }
 
-const MAX_PROMPT_CONTEXT_CHARS = 8_000;
 const MAX_QUESTION_COUNT = 6;
+const MAX_MEMORY_CONTEXT_CHARS = 2_400;
+const MAX_RESEARCH_CONTEXT_CHARS = 2_400;
+const MAX_TOOL_CONTEXT_CHARS = 1_600;
+const MAX_GAP_CONTEXT_CHARS = 3_600;
+
+function clampQuestionLimit(value: number | undefined): number {
+  const finiteValue = typeof value === "number" && Number.isFinite(value)
+    ? Math.floor(value)
+    : MAX_QUESTION_COUNT;
+  return Math.max(1, Math.min(finiteValue, MAX_QUESTION_COUNT));
+}
 
 const AIM_INTAKE_SCHEMA = {
   type: "object",
@@ -58,7 +74,7 @@ const AIM_INTAKE_SCHEMA = {
   properties: {
     questions: {
       type: "array",
-      minItems: 1,
+      minItems: 0,
       maxItems: MAX_QUESTION_COUNT,
       items: {
         type: "object",
@@ -79,7 +95,12 @@ const AIM_INTAKE_SCHEMA = {
           selection_mode: {
             type: "string",
             enum: ["single", "multiple"],
-            description: "Use multiple when several options can be true at once.",
+            description: "Use single only for one mutually exclusive or explicitly primary choice; otherwise use multiple.",
+          },
+          selection_mode_reason: {
+            type: "string",
+            enum: CHOICE_SELECTION_REASONS,
+            description: "The answer relationship that justifies the selection mode.",
           },
           options: {
             type: "array",
@@ -96,7 +117,7 @@ const AIM_INTAKE_SCHEMA = {
             },
           },
         },
-        required: ["source_question_id", "question", "why_high_impact", "selection_mode", "options"],
+        required: ["source_question_id", "question", "why_high_impact", "selection_mode", "selection_mode_reason", "options"],
       },
     },
   },
@@ -115,9 +136,25 @@ const SYSTEM_PROMPT = [
   "- If research or local inspection was required but not available, ask for enabling/attaching that context rather than pretending facts are known.",
   "- Never output generic template instructions such as 'Ask for...', 'Ask whether...', or 'Ask what...'.",
   "- Prefer one precise question over broad bundles. It should be obvious why the answer changes the plan.",
+  "- Ask one decision dimension per question. One internal gap may become several atomic questions",
+  "  when audience, outcome, channel, constraints, evidence, or access need separate answers.",
   "- For product/app goals, cover real-world prerequisites such as account access, store distribution, payment, policy, content/source material, audience, and launch path only when relevant.",
   "- For domain-specific goals such as tarot, health, finance, education, legal, coaching, travel, or wellness, ask about the user's actual expertise/source material and what the agent must not invent.",
   "- Options are hypotheses, not labels for the category. They must be concrete and answerable.",
+  "- Decide selection mode from the relationship between the answers, not from option count,",
+  "  question category, or words such as 'which' / '\u54ea\u6761'. Test every option pair: if a",
+  "  reasonable user could truthfully choose both in the same scope, use `multiple`.",
+  "- Use `single` only when choosing one option logically rules out every other option, or",
+  "  when the question explicitly asks for exactly one primary choice. If uncertain, use",
+  "  `multiple` and `selection_mode_reason=unclear_defaults_multiple`.",
+  "- Phrase every single-choice question so its one-current-state, exactly-one, primary,",
+  "  default, or best-fit scope is explicit enough for the runtime to verify.",
+  "- Examples: Summary vs Detailed as one output format is single/mutually_exclusive;",
+  "  Introduction + Conclusion sections, local files + web research, multiple constraints,",
+  "  evidence sources, capabilities, audiences, or compatible routes are multiple.",
+  "- Set `selection_mode_reason` to `mutually_exclusive`, `primary_choice_requested`,",
+  "  `compatible_options`, or `unclear_defaults_multiple`; it must agree with the mode.",
+  "- If proposed options mix compatible and exclusive answers, rewrite or split the question.",
   "- Use the user's language. Keep questions concise.",
 ].join("\n");
 
@@ -125,6 +162,11 @@ function compactText(value: string | undefined, maxLength: number): string {
   const cleaned = (value ?? "").replace(/\s+/g, " ").trim();
   if (cleaned.length <= maxLength) return cleaned;
   return `${cleaned.slice(0, maxLength - 1).trim()}…`;
+}
+
+function compactBlock(value: string, maxLength: number): string {
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, Math.max(0, maxLength - 28)).trim()}\n… [section truncated]`;
 }
 
 function renderResearch(research: ResearchBrief | null | undefined, required: boolean | undefined): string {
@@ -167,33 +209,30 @@ function renderInternalGaps(report: AimIntakeReport): string {
 }
 
 function buildPrompt(input: GenerateAimIntakeQuestionsInput): string {
-  const body = [
-    `Aim title: ${input.title}`,
-    `Aim description: ${input.description?.trim() ? input.description.trim() : "(none provided)"}`,
+  const questionLimit = clampQuestionLimit(input.maxQuestions);
+  return [
+    `Aim title: ${compactText(input.title, 600)}`,
+    `Aim description: ${compactText(input.description, 1_600) || "(none provided)"}`,
     "",
     "Selected planning context:",
-    renderPlanningContext(input.memories),
+    compactBlock(renderPlanningContext(input.memories), MAX_MEMORY_CONTEXT_CHARS),
     "",
     "First-party research evidence:",
-    renderResearch(input.research, input.researchRequired),
+    compactBlock(renderResearch(input.research, input.researchRequired), MAX_RESEARCH_CONTEXT_CHARS),
     "",
     "Tool observations already attempted:",
-    renderToolSignals(input.toolSignals),
+    compactBlock(renderToolSignals(input.toolSignals), MAX_TOOL_CONTEXT_CHARS),
     "",
     "Internal gap signals to rewrite. These are not user-facing copy:",
-    renderInternalGaps(input.intake),
+    compactBlock(renderInternalGaps(input.intake), MAX_GAP_CONTEXT_CHARS),
     "",
-    `Return at most ${Math.min(input.maxQuestions ?? MAX_QUESTION_COUNT, MAX_QUESTION_COUNT)} questions. Prefer fewer if they cover the real blockers.`,
+    `Return at most ${questionLimit} atomic questions. Prefer fewer if they cover the real blockers.`,
+    "A single internal gap may produce multiple questions, but each returned question resolves exactly one listed source_question_id.",
   ].join("\n");
-  return body.length <= MAX_PROMPT_CONTEXT_CHARS ? body : `${body.slice(0, MAX_PROMPT_CONTEXT_CHARS - 1)}…`;
 }
 
 function clean(value: unknown): string {
   return typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
-}
-
-function validSelectionMode(value: unknown): value is SelectionMode {
-  return value === "single" || value === "multiple";
 }
 
 function generatedQuestionFrom(value: unknown): GeneratedQuestion | null {
@@ -203,22 +242,32 @@ function generatedQuestionFrom(value: unknown): GeneratedQuestion | null {
   const sourceId = clean(row.source_question_id);
   const why = clean(row.why_high_impact);
   if (!sourceId || !question || /^ask\b/i.test(question)) return null;
-  if (!validSelectionMode(row.selection_mode)) return null;
+  const seenOptionLabels = new Set<string>();
   const options = Array.isArray(row.options)
     ? row.options.flatMap((option): AimIntakeQuestionOption[] => {
         if (!option || typeof option !== "object" || Array.isArray(option)) return [];
         const optionRow = option as Record<string, unknown>;
         const label = clean(optionRow.label);
         const tradeoff = clean(optionRow.tradeoff);
-        return label && tradeoff ? [{ label, tradeoff }] : [];
+        const key = label.toLowerCase();
+        if (!label || !tradeoff || seenOptionLabels.has(key)) return [];
+        seenOptionLabels.add(key);
+        return [{ label, tradeoff }];
       })
     : [];
   if (options.length < 2) return null;
+  const decision = decideChoiceSelection({
+    question,
+    options: options.map((option) => ({ label: option.label, detail: option.tradeoff })),
+    requestedMode: row.selection_mode,
+    requestedReason: row.selection_mode_reason,
+  });
   return {
     source_question_id: sourceId,
     question,
     why_high_impact: why || "This answer changes the decomposition before work starts.",
-    selection_mode: row.selection_mode,
+    selection_mode: decision.mode,
+    selection_mode_reason: decision.reason,
     options: options.slice(0, 4),
   };
 }
@@ -231,33 +280,81 @@ function parseGeneratedOutput(value: unknown): GeneratedOutput {
     const question = generatedQuestionFrom(row);
     return question ? [question] : [];
   }) : [];
-  return { questions };
+  return { questions, receivedRows: Array.isArray(rows) ? rows.length : -1 };
+}
+
+function reportWithNoUnresolvedQuestions(report: AimIntakeReport): AimIntakeReport {
+  return {
+    ...report,
+    readiness: "ready",
+    score: 100,
+    questions: [],
+    loop: {
+      ...report.loop,
+      shouldContinue: false,
+      nextStepId: null,
+      stopCondition: "No unresolved high-impact user question remains; continue with decomposition and collect evidence during execution.",
+    },
+    nextActions: ["Proceed with decomposition using the collected context."],
+  };
 }
 
 function applyGeneratedQuestions(
   report: AimIntakeReport,
   generated: GeneratedOutput,
+  maxQuestions: number,
 ): AimIntakeReport | null {
   const byId = new Map(report.questions.map((question) => [question.id, question]));
   const next: AimIntakeQuestion[] = [];
-  const seen = new Set<string>();
+  const seenRows = new Set<string>();
+  const sourceCounts = new Map<string, number>();
+  const usedIds = new Set<string>();
   for (const row of generated.questions) {
-    if (seen.has(row.source_question_id)) continue;
+    if (next.length >= maxQuestions) break;
     const source = byId.get(row.source_question_id);
     if (!source) continue;
-    seen.add(row.source_question_id);
+    const rowKey = `${row.source_question_id}\u0000${row.question.toLowerCase()}`;
+    if (seenRows.has(rowKey)) continue;
+    seenRows.add(rowKey);
+    const sourceCount = (sourceCounts.get(source.id) ?? 0) + 1;
+    sourceCounts.set(source.id, sourceCount);
+    let questionId = sourceCount === 1 ? source.id : `${source.id}_${sourceCount}`;
+    while (usedIds.has(questionId) || (questionId !== source.id && byId.has(questionId))) {
+      questionId = `${questionId}_next`;
+    }
+    usedIds.add(questionId);
     next.push({
       ...source,
+      id: questionId,
       prompt: row.question,
       whyHighImpact: row.why_high_impact,
       selectionMode: row.selection_mode,
+      selectionModeReason: row.selection_mode_reason,
       options: row.options,
     });
   }
+  if (next.length === 0 && generated.receivedRows === 0) return reportWithNoUnresolvedQuestions(report);
   if (next.length === 0 && report.questions.length > 0) return null;
+  const highQuestions = next.filter((question) => question.priority === "high").length;
+  const mediumQuestions = next.filter((question) => question.priority === "medium").length;
+  const countAction = highQuestions > 0
+    ? `Answer ${highQuestions} high-priority intake question${highQuestions === 1 ? "" : "s"} before accepting a plan.`
+    : mediumQuestions > 0
+      ? `Answer ${mediumQuestions} targeted intake question${mediumQuestions === 1 ? "" : "s"} if the answer would change scope or evidence.`
+      : null;
+  let replacedCountAction = false;
+  const nextActions = report.nextActions.flatMap((action) => {
+    if (!/^Answer \d+ (?:high-priority|targeted) intake questions?\b/.test(action)) return [action];
+    if (!countAction || replacedCountAction) return [];
+    replacedCountAction = true;
+    return [countAction];
+  });
+  if (countAction && !replacedCountAction) nextActions.unshift(countAction);
   return {
     ...report,
     questions: next,
+    // The loop remains source-acquisition metadata; only its user-facing card count changes.
+    nextActions,
   };
 }
 
@@ -287,7 +384,8 @@ export async function generateAimIntakeQuestions(
   }
 
   const generated = parseGeneratedOutput(raw.output);
-  const report = applyGeneratedQuestions(input.intake, generated);
+  const maxQuestions = clampQuestionLimit(input.maxQuestions);
+  const report = applyGeneratedQuestions(input.intake, generated, maxQuestions);
   if (!report) {
     return {
       report: null,

@@ -14,6 +14,8 @@
  */
 import { type ContextCategory, type DecompositionOutput, type GoalDomain, type MemoryKind, type PlanNode } from "@core/types";
 import {
+  CHOICE_SELECTION_REASONS,
+  decideChoiceSelection,
   contextCaptureForCategory,
   reviewPlan,
   type AimIntakeQuestion,
@@ -24,6 +26,7 @@ import {
   type ContextLineageLearningRecommendation,
   type ContextLineageLearningReport,
   type ContextLineageLearningRow,
+  type ChoiceSelectionReason,
   type DecompositionStrategyFocus,
   type DecompositionStrategyReport,
   type PlanContextGap,
@@ -43,7 +46,7 @@ import { PLANNING_CONTEXT_RULES, planningMemoryCategory, renderPlanningContext }
 import type { PlanningMemory } from "./planning-context";
 
 const DEFAULT_MAX_QUESTIONS = 6;
-const DEFAULT_MIN_CONTEXT_QUESTIONS = 4;
+const DEFAULT_EMPTY_CONTEXT_QUESTIONS = 2;
 const HARD_MAX_QUESTIONS = 7;
 
 export type ClarifyQuestionKind = "scope" | "involvement" | "assumption" | "constraint" | "capability";
@@ -74,6 +77,8 @@ export interface ClarifyQuestion {
   allow_other: boolean;
   /** Whether options are mutually exclusive or several can apply. */
   selection_mode?: ClarifySelectionMode;
+  /** Auditable semantic reason for the selection mode. */
+  selection_mode_reason?: ChoiceSelectionReason;
   options: ClarifyOption[];
 }
 
@@ -140,7 +145,7 @@ export interface ClarifyInput {
   intake?: AimIntakeReport | null;
   /** Optional plan review from the draft. If omitted, clarify computes one from @core/domain. */
   review?: Pick<PlanReviewReport, "quality" | "context"> | null;
-  /** Cap on questions (value-of-information budget). Default 3, hard max 5. */
+  /** Cap on questions (value-of-information budget). Default 6, hard max 7. */
   maxQuestions?: number;
 }
 
@@ -236,8 +241,6 @@ const QUESTION_SOURCE_DIMENSIONS: readonly ClarifyQuestionSourceDimension[] = [
   "distinctness",
   "context_fit",
 ];
-const CLARIFY_SELECTION_MODES: readonly ClarifySelectionMode[] = ["single", "multiple"];
-
 const QUESTION_CONTEXT_CATEGORIES: Record<ClarifyQuestionKind, readonly ContextCategory[]> = {
   scope: ["preference", "constraint", "eval_signal", "project_fact"],
   involvement: ["preference", "capability"],
@@ -299,7 +302,8 @@ const CLARIFY_SYSTEM_PROMPT = [
   "so the next pass is sharper. Be ruthlessly selective.",
   "",
   "Rules:",
-  "- Ask a compact but sufficient context intake set: usually 4-6 questions, never more than 7.",
+  "- Return 0-7 questions. Let the unresolved high-impact context determine the count;",
+  "  never target a fixed form length or add filler questions to reach a minimum.",
   "- Cover BOTH durable context and aim-local context. Durable/global context includes the",
   "  user's stable constraints, preferences, capabilities, and eval standards. Aim-local",
   "  context includes this aim's target surface, source material, workflow, files, commands,",
@@ -316,6 +320,20 @@ const CLARIFY_SYSTEM_PROMPT = [
   "- Set `selection_mode` to `single` only when the options are mutually exclusive.",
   "  Set it to `multiple` when several options can be true together, such as constraints,",
   "  tools, platforms, evidence sources, source materials, or capabilities.",
+  "- Decide from answer relationships, not option count, question kind, or words such as",
+  "  'which' / '\u54ea\u6761'. Test every option pair: if a reasonable user could truthfully choose",
+  "  both in the same scope, the question is `multiple`.",
+  "- A compatible set of routes remains multiple even when the user may later prioritize one.",
+  "  Ask a separate single-choice question only when one primary/first route is required.",
+  "- Phrase every single-choice question so its one-current-state, exactly-one, primary,",
+  "  default, or best-fit scope is explicit enough for the runtime to verify.",
+  "- If uncertain, use `multiple` with `selection_mode_reason=unclear_defaults_multiple`.",
+  "- Set `selection_mode_reason` to one of: `mutually_exclusive`,",
+  "  `primary_choice_requested`, `compatible_options`, `unclear_defaults_multiple`.",
+  "  Only the first two reasons permit `single`; the latter two require `multiple`.",
+  "- Examples: one output format (Summary vs Detailed) is single; report sections, local",
+  "  files + web research, completion evidence, constraints, capabilities, and compatible",
+  "  life/career routes are multiple. Split questions that mix separate decision axes.",
   "- Keep question text short and user-facing. Avoid internal scorecard, contract, ROI,",
   "  lineage, or schema jargon in `question`, option `label`, and option `tradeoff`.",
   "- Option labels should be short natural phrases; put nuance in one concise tradeoff.",
@@ -1068,30 +1086,6 @@ function isQuestionSourceDimension(v: unknown): v is ClarifyQuestionSourceDimens
   return typeof v === "string" && (QUESTION_SOURCE_DIMENSIONS as readonly string[]).includes(v);
 }
 
-function isClarifySelectionMode(v: unknown): v is ClarifySelectionMode {
-  return typeof v === "string" && (CLARIFY_SELECTION_MODES as readonly string[]).includes(v);
-}
-
-function inferSelectionMode(
-  question: string,
-  _kind: ClarifyQuestionKind,
-  options: readonly ClarifyOption[],
-): ClarifySelectionMode {
-  const text = [
-    question,
-    ...options.flatMap((option) => [option.label, option.tradeoff]),
-  ].join(" ").toLowerCase();
-  if (/\b(choose all|all that apply|several|multiple)\b/i.test(text)) return "multiple";
-  if (/\b(which|what)\b.{0,80}\b(constraints|tools|platforms|sources|materials|requirements|capabilities|channels|systems)\b/i.test(text)) {
-    return "multiple";
-  }
-  if (/\b(constraints|tools|platforms|sources|materials|requirements|capabilities)\b.{0,80}\b(apply|required|must|available|usable|unacceptable)\b/i.test(text)) {
-    return "multiple";
-  }
-  if (/哪些|哪几|多选|约束|工具|平台|来源|材料|能力|要求/.test(text)) return "multiple";
-  return "single";
-}
-
 function answerContextCategory(
   question: Pick<ClarifyQuestion, "kind" | "source_dimension"> | undefined,
 ): ContextCategory {
@@ -1185,6 +1179,7 @@ function normalizeClarify(raw: unknown): ClarifyOutput | null {
 
   const questions: ClarifyQuestion[] = (o.questions as unknown[]).map((q, i) => {
     const r = q && typeof q === "object" && !Array.isArray(q) ? (q as Record<string, unknown>) : {};
+    const seenOptionLabels = new Set<string>();
     const options: ClarifyOption[] = (Array.isArray(r.options) ? (r.options as unknown[]) : [])
       .map((opt) => {
         const oo = opt && typeof opt === "object" && !Array.isArray(opt) ? (opt as Record<string, unknown>) : {};
@@ -1193,21 +1188,28 @@ function normalizeClarify(raw: unknown): ClarifyOutput | null {
           tradeoff: typeof oo.tradeoff === "string" ? oo.tradeoff : "",
         };
       })
-      .filter((opt) => opt.label.trim().length > 0);
+      .filter((opt) => {
+        const key = opt.label.trim().toLowerCase();
+        if (!key || seenOptionLabels.has(key)) return false;
+        seenOptionLabels.add(key);
+        return true;
+      });
+    const question = typeof r.question === "string" ? r.question : "";
+    const selection = decideChoiceSelection({
+      question,
+      options: options.map((option) => ({ label: option.label, detail: option.tradeoff })),
+      requestedMode: r.selection_mode,
+      requestedReason: r.selection_mode_reason,
+    });
     return {
       id: typeof r.id === "string" && r.id.trim() ? r.id : `q${i + 1}`,
-      question: typeof r.question === "string" ? r.question : "",
+      question,
       why_high_impact: typeof r.why_high_impact === "string" ? r.why_high_impact : "",
       kind: isQuestionKind(r.kind) ? r.kind : "assumption",
       ...(isQuestionSourceDimension(r.source_dimension) ? { source_dimension: r.source_dimension } : {}),
-      allow_other: typeof r.allow_other === "boolean" ? r.allow_other : true,
-      selection_mode: isClarifySelectionMode(r.selection_mode)
-        ? r.selection_mode
-        : inferSelectionMode(
-          typeof r.question === "string" ? r.question : "",
-          isQuestionKind(r.kind) ? r.kind : "assumption",
-          options,
-        ),
+      allow_other: true,
+      selection_mode: selection.mode,
+      selection_mode_reason: selection.reason,
       options,
     };
   });
@@ -1278,6 +1280,8 @@ interface BaselineContextQuestionTarget {
   source_dimension: ClarifyQuestionSourceDimension;
   question: string;
   why_high_impact: string;
+  selection_mode: ClarifySelectionMode;
+  selection_mode_reason: ChoiceSelectionReason;
   options: ClarifyOption[];
 }
 
@@ -1287,11 +1291,15 @@ const BASELINE_CONTEXT_QUESTION_TARGETS: readonly BaselineContextQuestionTarget[
     category: "project_fact",
     kind: "assumption",
     source_dimension: "context_fit",
-    question: "For this aim specifically, what exact target surface, source material, or existing state should the agent inspect before finalizing the plan?",
+    question: "Which context sources should the agent inspect before finalizing this aim's plan?",
     why_high_impact: "This prevents the plan from guessing the current project state or target artifact.",
+    selection_mode: "multiple",
+    selection_mode_reason: "compatible_options",
     options: [
-      { label: "Inspect local project/context first", tradeoff: "Better grounded plan; requires local context access." },
-      { label: "Proceed from the written aim only", tradeoff: "Faster, but more assumptions may be wrong." },
+      { label: "Local project or files", tradeoff: "Grounds the plan in the current implementation or materials." },
+      { label: "External or current research", tradeoff: "Adds current facts, documentation, or market context." },
+      { label: "User-provided documents", tradeoff: "Uses the user's brief, examples, or source material." },
+      { label: "Connected memory or tools", tradeoff: "Reuses prior preferences, workflows, and accessible systems." },
     ],
   },
   {
@@ -1299,8 +1307,10 @@ const BASELINE_CONTEXT_QUESTION_TARGETS: readonly BaselineContextQuestionTarget[
     category: "eval_signal",
     kind: "constraint",
     source_dimension: "verifiability",
-    question: "What would make this aim count as genuinely complete for you, and what evidence should prove it?",
+    question: "Which kinds of evidence should Aimcub use to verify that this aim is complete?",
     why_high_impact: "This becomes a reusable evaluation signal and sharpens acceptance rules.",
+    selection_mode: "multiple",
+    selection_mode_reason: "compatible_options",
     options: [
       { label: "Automated artifact or test proves it", tradeoff: "Best for agent execution and repeatable eval." },
       { label: "Human review or subjective approval proves it", tradeoff: "Captures taste or judgment, but needs your review." },
@@ -1313,33 +1323,11 @@ const BASELINE_CONTEXT_QUESTION_TARGETS: readonly BaselineContextQuestionTarget[
     source_dimension: "verifiability",
     question: "For this aim, are there existing commands, files, docs, workflows, or external references the agent should follow or research?",
     why_high_impact: "This gives the agent concrete local or web context to use before decomposing work.",
+    selection_mode: "multiple",
+    selection_mode_reason: "compatible_options",
     options: [
       { label: "Use existing local artifacts", tradeoff: "Grounds the plan in current files and workflows." },
       { label: "Research external/current information", tradeoff: "Useful for modern APIs, competitors, or market facts." },
-    ],
-  },
-  {
-    id: "durable_capability_routing",
-    category: "capability",
-    kind: "capability",
-    source_dimension: "context_fit",
-    question: "Which parts should agents handle by default, and what access or tools can they use?",
-    why_high_impact: "This becomes routing context so agent-capable work is not assigned back to you.",
-    options: [
-      { label: "Agents handle all digital work", tradeoff: "You only handle approvals, secrets, and real-world actions." },
-      { label: "Ask before agent execution", tradeoff: "More control, but slower orchestration." },
-    ],
-  },
-  {
-    id: "durable_constraints",
-    category: "constraint",
-    kind: "constraint",
-    source_dimension: "granularity",
-    question: "What non-negotiable constraints should this and future plans remember?",
-    why_high_impact: "Stable constraints prevent plans from violating cost, privacy, deadline, platform, or quality boundaries.",
-    options: [
-      { label: "Strict boundaries are known", tradeoff: "Plan can avoid invalid branches." },
-      { label: "No hard constraints yet", tradeoff: "Plan can optimize for speed and discovery." },
     ],
   },
 ];
@@ -1368,51 +1356,33 @@ function localizeBaselineContextQuestionTarget(
     case "aim_target_context":
       return {
         ...target,
-        question: "这个目标要先查看哪些具体材料、文件夹或现状？",
-        why_high_impact: "这能避免计划凭空猜当前状态。",
+        question: "\u5728\u5b8c\u6210\u8ba1\u5212\u524d\uff0c\u4ee3\u7406\u5e94\u8be5\u67e5\u770b\u54ea\u4e9b\u4e0a\u4e0b\u6587\u6765\u6e90\uff1f",
+        why_high_impact: "\u8fd9\u80fd\u907f\u514d\u8ba1\u5212\u51ed\u7a7a\u731c\u5f53\u524d\u72b6\u6001\u3002",
         options: [
-          { label: "先看本地材料", tradeoff: "计划更贴近现状，但需要读取上下文。" },
-          { label: "先按描述推进", tradeoff: "更快，但可能带着假设。" },
+          { label: "\u672c\u5730\u9879\u76ee\u6216\u6587\u4ef6", tradeoff: "\u8ba9\u8ba1\u5212\u57fa\u4e8e\u5f53\u524d\u5b9e\u73b0\u6216\u5df2\u6709\u6750\u6599\u3002" },
+          { label: "\u5916\u90e8\u6216\u6700\u65b0\u7814\u7a76", tradeoff: "\u8865\u5145\u6700\u65b0\u4e8b\u5b9e\u3001\u6587\u6863\u6216\u5e02\u573a\u4fe1\u606f\u3002" },
+          { label: "\u7528\u6237\u63d0\u4f9b\u7684\u6587\u6863", tradeoff: "\u4f7f\u7528\u7b80\u62a5\u3001\u8303\u4f8b\u6216\u6e90\u6750\u6599\u3002" },
+          { label: "\u5df2\u8fde\u63a5\u7684\u8bb0\u5fc6\u6216\u5de5\u5177", tradeoff: "\u590d\u7528\u5df2\u6709\u504f\u597d\u3001\u6d41\u7a0b\u548c\u53ef\u8bbf\u95ee\u7cfb\u7edf\u3002" },
         ],
       };
     case "durable_eval_signal":
       return {
         ...target,
-        question: "对你来说，什么证据能证明这个目标真的完成了？",
-        why_high_impact: "这会变成可复用的验收标准。",
+        question: "\u5bf9\u4f60\u6765\u8bf4\uff0c\u4ec0\u4e48\u8bc1\u636e\u80fd\u8bc1\u660e\u8fd9\u4e2a\u76ee\u6807\u771f\u7684\u5b8c\u6210\u4e86\uff1f",
+        why_high_impact: "\u8fd9\u4f1a\u53d8\u6210\u53ef\u590d\u7528\u7684\u9a8c\u6536\u6807\u51c6\u3002",
         options: [
-          { label: "自动化结果证明", tradeoff: "适合代理执行和重复评估。" },
-          { label: "人工确认即可", tradeoff: "适合审美和判断，但需要你审查。" },
+          { label: "\u81ea\u52a8\u5316\u7ed3\u679c\u8bc1\u660e", tradeoff: "\u9002\u5408\u4ee3\u7406\u6267\u884c\u548c\u91cd\u590d\u8bc4\u4f30\u3002" },
+          { label: "\u4eba\u5de5\u786e\u8ba4\u5373\u53ef", tradeoff: "\u9002\u5408\u5ba1\u7f8e\u548c\u5224\u65ad\uff0c\u4f46\u9700\u8981\u4f60\u5ba1\u67e5\u3002" },
         ],
       };
     case "aim_procedure_context":
       return {
         ...target,
-        question: "有没有已有命令、文件、文档、流程或外部资料要遵循？",
-        why_high_impact: "这能让代理基于真实材料拆分任务。",
+        question: "\u6709\u6ca1\u6709\u5df2\u6709\u547d\u4ee4\u3001\u6587\u4ef6\u3001\u6587\u6863\u3001\u6d41\u7a0b\u6216\u5916\u90e8\u8d44\u6599\u8981\u9075\u5faa\uff1f",
+        why_high_impact: "\u8fd9\u80fd\u8ba9\u4ee3\u7406\u57fa\u4e8e\u771f\u5b9e\u6750\u6599\u62c6\u5206\u4efb\u52a1\u3002",
         options: [
-          { label: "使用本地资料", tradeoff: "计划会贴合现有文件和流程。" },
-          { label: "需要外部研究", tradeoff: "适合最新 API、竞品或市场信息。" },
-        ],
-      };
-    case "durable_capability_routing":
-      return {
-        ...target,
-        question: "哪些部分默认交给代理做？它能使用哪些访问权限或工具？",
-        why_high_impact: "这会成为之后分配工作的路由上下文。",
-        options: [
-          { label: "数字工作交给代理", tradeoff: "你主要负责授权、密钥和现实动作。" },
-          { label: "执行前先问我", tradeoff: "控制感更强，但推进更慢。" },
-        ],
-      };
-    case "durable_constraints":
-      return {
-        ...target,
-        question: "有哪些这次和未来都要记住的硬约束？",
-        why_high_impact: "稳定约束能避免计划越过成本、隐私、时间或质量边界。",
-        options: [
-          { label: "有明确边界", tradeoff: "计划可以避开无效路线。" },
-          { label: "暂时没有硬约束", tradeoff: "计划可以优先速度和探索。" },
+          { label: "\u4f7f\u7528\u672c\u5730\u8d44\u6599", tradeoff: "\u8ba1\u5212\u4f1a\u8d34\u5408\u73b0\u6709\u6587\u4ef6\u548c\u6d41\u7a0b\u3002" },
+          { label: "\u9700\u8981\u5916\u90e8\u7814\u7a76", tradeoff: "\u9002\u5408\u6700\u65b0 API\u3001\u7ade\u54c1\u6216\u5e02\u573a\u4fe1\u606f\u3002" },
         ],
       };
     default:
@@ -1432,6 +1402,8 @@ function createBaselineContextQuestion(
     kind: localizedTarget.kind,
     source_dimension: localizedTarget.source_dimension,
     allow_other: true,
+    selection_mode: localizedTarget.selection_mode,
+    selection_mode_reason: localizedTarget.selection_mode_reason,
     options: [...localizedTarget.options],
     capture: contextCaptureForCategory(localizedTarget.category, "baseline_context_intake", localizedTarget.source_dimension, {
       source: "clarify",
@@ -1454,8 +1426,8 @@ function ensureContextIntakeCoverage(
   maxQuestions: number,
   outputLanguage?: AimOutputLanguage,
 ): ClarifyOutput {
-  const minQuestions = Math.min(maxQuestions, DEFAULT_MIN_CONTEXT_QUESTIONS);
-  if (maxQuestions <= 0 || output.questions.length >= minQuestions) return output;
+  if (maxQuestions <= 0 || output.questions.length > 0) return output;
+  const minQuestions = Math.min(maxQuestions, DEFAULT_EMPTY_CONTEXT_QUESTIONS);
 
   const questions = [...output.questions];
   const existingIds = new Set(questions.map((question) => question.id));
@@ -1511,6 +1483,14 @@ export function validateClarify(output: ClarifyOutput): ClarifyValidation {
     const ref = q.id || `#${i + 1}`;
     if (!q.question.trim()) errors.push(`question ${ref}: empty question text`);
     if (q.options.length < 2) errors.push(`question ${ref}: needs at least 2 options`);
+    const uniqueOptionLabels = new Set(q.options.map((option) => option.label.trim().toLowerCase()).filter(Boolean));
+    if (uniqueOptionLabels.size !== q.options.length) errors.push(`question ${ref}: option labels must be unique`);
+    if (q.selection_mode !== "single" && q.selection_mode !== "multiple") {
+      errors.push(`question ${ref}: needs an explicit selection mode`);
+    }
+    if (!q.selection_mode_reason || !(CHOICE_SELECTION_REASONS as readonly string[]).includes(q.selection_mode_reason)) {
+      errors.push(`question ${ref}: needs a valid selection mode reason`);
+    }
     if (ids.has(q.id)) errors.push(`duplicate question id: ${q.id}`);
     ids.add(q.id);
   });

@@ -15,6 +15,7 @@ import type {
   PlanReviewReport,
 } from "./plan-quality";
 import type { ContextLineageLearningReport, ContextLineageLearningRow } from "./context-lineage";
+import type { ChoiceSelectionReason } from "./choice-selection";
 
 export type AimIntakeReadiness = "ready" | "needs_targeted_context" | "needs_plan_refinement";
 export type AimIntakeQuestionSource = "aim_text" | "context_profile" | "planning_context" | "draft_review";
@@ -121,6 +122,7 @@ export interface AimIntakeQuestion {
   prompt: string;
   whyHighImpact?: string;
   selectionMode?: "single" | "multiple";
+  selectionModeReason?: ChoiceSelectionReason;
   options?: AimIntakeQuestionOption[];
   capture?: ContextCaptureContract;
   gapSource?: PlanContextGapSource;

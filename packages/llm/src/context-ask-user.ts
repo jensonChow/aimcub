@@ -4,6 +4,7 @@ import type {
   ContextAskUserInput,
   ContextAskUserOutput,
 } from "./tool-contract";
+import { decideChoiceSelection } from "@core/domain";
 
 const DEFAULT_MAX_QUESTIONS = 5;
 
@@ -32,11 +33,6 @@ function uniqueChoices(value: unknown): string[] | undefined {
   return choices.length > 0 ? choices : undefined;
 }
 
-function selectionMode(value: unknown, choices: readonly string[] | undefined): "single" | "multiple" {
-  if (value === "single" || value === "multiple") return value;
-  return choices && choices.length <= 2 ? "single" : "multiple";
-}
-
 function normalizeQuestions(
   questions: unknown,
   maxQuestions: number,
@@ -51,12 +47,19 @@ function normalizeQuestions(
     if (!id || !question) return null;
     const category = cleanText(row.category);
     const choices = uniqueChoices(row.choices);
+    const selection = decideChoiceSelection({
+      question,
+      options: (choices ?? []).map((label) => ({ label })),
+      requestedMode: row.selectionMode,
+      requestedReason: row.selectionModeReason,
+    });
     normalized.push({
       id,
       question,
       ...(category ? { category } : {}),
       ...(choices ? { choices } : {}),
-      selectionMode: selectionMode(row.selectionMode, choices),
+      selectionMode: selection.mode,
+      selectionModeReason: selection.reason,
       captureScope: captureScope(row.captureScope),
     });
   }
@@ -82,8 +85,9 @@ export function createContextAskUserHandler(options: {
       };
     }
     const rawInput = input as Partial<ContextAskUserInput> | null | undefined;
-    const questions = normalizeQuestions(rawInput?.questions, options.maxQuestions ?? DEFAULT_MAX_QUESTIONS);
-    if (!questions) return fail("context.ask_user requires 1-5 valid questions.");
+    const maxQuestions = options.maxQuestions ?? DEFAULT_MAX_QUESTIONS;
+    const questions = normalizeQuestions(rawInput?.questions, maxQuestions);
+    if (!questions) return fail(`context.ask_user requires 1-${maxQuestions} valid questions.`);
 
     const id = requestId(context.now(), questions);
     const output: ContextAskUserOutput = { requestId: id, questions };

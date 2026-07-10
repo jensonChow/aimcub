@@ -10,7 +10,7 @@
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 
-import type { ContextIntakeProgressSignal } from "@core/domain";
+import { decideChoiceSelection, type ContextIntakeProgressSignal } from "@core/domain";
 import { clarifyAnswersToMemories } from "@core/llm";
 import type { ClarifyAnswer, ClarifyQuestion } from "@core/llm";
 import type { NewMemory } from "@core/store";
@@ -20,28 +20,58 @@ import type { NewMemory } from "@core/store";
  * `question_id` or carrying no actual answer are dropped. Throws only when the input is not
  * valid JSON or not an array.
  */
-export function parseAnswers(raw: string): ClarifyAnswer[] {
+export function parseAnswers(raw: string, questions: readonly ClarifyQuestion[] = []): ClarifyAnswer[] {
   let data: unknown;
   try {
     data = JSON.parse(raw);
   } catch {
-    throw new Error("--answers is not valid JSON (expected an array of {question_id, selected_label?, other_text?})");
+    throw new Error("--answers is not valid JSON (expected an array of {question_id, selected_label?, selected_labels?, other_text?})");
   }
   if (!Array.isArray(data)) {
-    throw new Error("--answers must be a JSON array of {question_id, selected_label?, other_text?}");
+    throw new Error("--answers must be a JSON array of {question_id, selected_label?, selected_labels?, other_text?}");
   }
 
   const answers: ClarifyAnswer[] = [];
+  const questionById = new Map(questions.map((question) => [question.id, question]));
   for (const item of data) {
     if (!item || typeof item !== "object") continue;
     const o = item as Record<string, unknown>;
     const question_id =
       typeof o.question_id === "string" ? o.question_id : typeof o.id === "string" ? o.id : "";
     if (!question_id) continue;
-    const selected_label = typeof o.selected_label === "string" && o.selected_label.trim() ? o.selected_label : null;
+    const rawListedLabels = Array.isArray(o.selected_labels) ? o.selected_labels : null;
+    const hasListedLabels = rawListedLabels !== null;
+    const listedLabels: string[] = rawListedLabels
+      ? [...new Set(rawListedLabels.flatMap((label: unknown) =>
+        typeof label === "string" && label.trim() ? [label.trim()] : []))]
+      : [];
+    const explicitLabel = typeof o.selected_label === "string" && o.selected_label.trim()
+      ? o.selected_label.trim()
+      : null;
+    const selected_labels = explicitLabel
+      ? [explicitLabel, ...listedLabels.filter((label) => label !== explicitLabel)]
+      : listedLabels;
+    const selected_label = explicitLabel ?? selected_labels[0] ?? null;
     const other_text = typeof o.other_text === "string" && o.other_text.trim() ? o.other_text : null;
-    if (!selected_label && !other_text) continue; // an answer with nothing chosen is a non-answer
-    answers.push({ question_id, selected_label, other_text });
+    if (!selected_label && selected_labels.length === 0 && !other_text) continue;
+    const question = questionById.get(question_id);
+    const selectionMode = question
+      ? decideChoiceSelection({
+        question: question.question,
+        options: question.options.map((option) => ({ label: option.label, detail: option.tradeoff })),
+        requestedMode: question.selection_mode,
+        requestedReason: question.selection_mode_reason,
+      }).mode
+      : null;
+    if (selectionMode === "single" && (selected_labels.length > 1 || (selected_label && other_text))) {
+      throw new Error(`--answers entry ${question_id} is single-select; provide one selected label or one other_text answer`);
+    }
+    answers.push({
+      question_id,
+      selected_label,
+      ...(hasListedLabels && selected_labels.length > 0 ? { selected_labels } : {}),
+      other_text,
+    });
   }
   return answers;
 }
@@ -82,7 +112,10 @@ export function answersToIntakeSignals(
 ): ContextIntakeProgressSignal[] {
   const questionById = new Map(questions.map((question) => [question.id, question]));
   return answers.flatMap((answer): ContextIntakeProgressSignal[] => {
-    const text = answer.other_text?.trim() || answer.selected_label?.trim();
+    const selected = answer.selected_labels?.map((label) => label.trim()).filter(Boolean).join("; ");
+    const text = selected
+      ? [selected, answer.other_text?.trim()].filter(Boolean).join("; ")
+      : answer.other_text?.trim() || answer.selected_label?.trim();
     if (!text) return [];
     const question = questionById.get(answer.question_id);
     const inferredMemory = clarifyAnswersToMemories(questions, [answer])[0];
@@ -95,6 +128,36 @@ export function answersToIntakeSignals(
       summary: text,
     }];
   });
+}
+
+/** Parse one interactive reply while preserving the question's single/multi contract. */
+export function parseChoiceReply(question: ClarifyQuestion, raw: string): ClarifyAnswer | null {
+  const reply = raw.trim();
+  if (!reply) return null;
+  const selectionMode = decideChoiceSelection({
+    question: question.question,
+    options: question.options.map((option) => ({ label: option.label, detail: option.tradeoff })),
+    requestedMode: question.selection_mode,
+    requestedReason: question.selection_mode_reason,
+  }).mode;
+  const [indexPart = "", ...customParts] = reply.split("|");
+  const customText = customParts.join("|").trim();
+  const indexText = selectionMode === "multiple"
+    ? /^\d+(?:\s*[,\uff0c]\s*\d+)*$/.test(indexPart.trim())
+    : /^\d+$/.test(indexPart.trim()) && customParts.length === 0;
+  if (indexText) {
+    const indexes = [...new Set(indexPart.split(/[,\uff0c]/).map((value) => Number(value.trim())))];
+    if (indexes.every((index) => Number.isInteger(index) && index >= 1 && index <= question.options.length)) {
+      const selectedLabels = indexes.map((index) => question.options[index - 1]!.label);
+      return {
+        question_id: question.id,
+        selected_label: selectedLabels[0] ?? null,
+        selected_labels: selectedLabels,
+        other_text: customText || null,
+      };
+    }
+  }
+  return { question_id: question.id, selected_label: null, selected_labels: [], other_text: reply };
 }
 
 /** Interactively ask each question on the TTY and collect the answers (empty input = skip). */
@@ -112,15 +175,17 @@ export async function promptAnswers(questions: ClarifyQuestion[]): Promise<Clari
       if (capture) stdout.write(`  capture: ${capture}\n`);
       q.options.forEach((o, n) => stdout.write(`  ${n + 1}) ${o.label}${o.tradeoff ? ` — ${o.tradeoff}` : ""}\n`));
 
-      const reply = (await rl.question(`  Pick 1-${q.options.length}, type your own answer, or Enter to skip: `)).trim();
-      if (!reply) continue; // skip → leave to the disclosed assumption / default
-
-      const n = Number(reply);
-      if (Number.isInteger(n) && n >= 1 && n <= q.options.length) {
-        answers.push({ question_id: q.id, selected_label: q.options[n - 1]!.label, other_text: null });
-      } else {
-        answers.push({ question_id: q.id, selected_label: null, other_text: reply });
-      }
+      const selectionMode = decideChoiceSelection({
+        question: q.question,
+        options: q.options.map((option) => ({ label: option.label, detail: option.tradeoff })),
+        requestedMode: q.selection_mode,
+        requestedReason: q.selection_mode_reason,
+      }).mode;
+      const prompt = selectionMode === "multiple"
+        ? `  Pick one or more from 1-${q.options.length} (for example 1,3 or 1,3 | another answer), type your own answer, or Enter to skip: `
+        : `  Pick 1-${q.options.length}, type your own answer, or Enter to skip: `;
+      const answer = parseChoiceReply(q, await rl.question(prompt));
+      if (answer) answers.push(answer);
     }
   } finally {
     rl.close();

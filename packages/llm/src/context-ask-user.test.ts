@@ -35,7 +35,8 @@ describe("createContextAskUserHandler", () => {
             question: "What evidence proves this is complete?",
             category: "eval_signal",
             choices: ["Tests pass", "User confirms"],
-            selectionMode: "single",
+            selectionMode: "multiple",
+            selectionModeReason: "compatible_options",
             captureScope: "global",
           }],
         },
@@ -64,9 +65,54 @@ describe("createContextAskUserHandler", () => {
           questions: [{
             id: "sources",
             selectionMode: "multiple",
+            selectionModeReason: "compatible_options",
           }],
         },
       },
+    });
+  });
+
+  it("corrects an explicit single mode when two evidence options can coexist", async () => {
+    const handler = createContextAskUserHandler();
+
+    const result = await handler({
+      questions: [{
+        id: "evidence",
+        question: "Which evidence should count?",
+        choices: ["CI result", "User acceptance"],
+        selectionMode: "single",
+        selectionModeReason: "compatible_options",
+      }],
+    }, context);
+
+    expect(result).toMatchObject({
+      ok: true,
+      observation: { data: { questions: [{
+        selectionMode: "multiple",
+        selectionModeReason: "compatible_options",
+      }] } },
+    });
+  });
+
+  it("keeps one explicitly primary approver as single choice", async () => {
+    const handler = createContextAskUserHandler();
+
+    const result = await handler({
+      questions: [{
+        id: "approver",
+        question: "Who should be the single final approver?",
+        choices: ["Product lead", "Legal lead", "Executive sponsor"],
+        selectionMode: "single",
+        selectionModeReason: "primary_choice_requested",
+      }],
+    }, context);
+
+    expect(result).toMatchObject({
+      ok: true,
+      observation: { data: { questions: [{
+        selectionMode: "single",
+        selectionModeReason: "primary_choice_requested",
+      }] } },
     });
   });
 

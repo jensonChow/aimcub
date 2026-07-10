@@ -111,6 +111,8 @@ function validQuestions() {
         kind: "scope",
         source_dimension: "granularity",
         allow_other: true,
+        selection_mode: "single",
+        selection_mode_reason: "mutually_exclusive",
         options: [
           { label: "Prototype", tradeoff: "Fastest, looser." },
           { label: "Production", tradeoff: "Slower, strict CI gates." },
@@ -122,6 +124,8 @@ function validQuestions() {
         why_high_impact: "Changes the scaffold and CI workflow.",
         kind: "constraint",
         allow_other: true,
+        selection_mode: "single",
+        selection_mode_reason: "mutually_exclusive",
         options: [
           { label: "TypeScript", tradeoff: "Node ecosystem." },
           { label: "Go", tradeoff: "Single static binary." },
@@ -145,6 +149,8 @@ function validThreeQuestions() {
         kind: "assumption",
         source_dimension: "verifiability",
         allow_other: true,
+        selection_mode: "multiple",
+        selection_mode_reason: "compatible_options",
         options: [
           { label: "Passing smoke test", tradeoff: "Clear and automatable." },
           { label: "Manual demo", tradeoff: "Faster but less repeatable." },
@@ -163,7 +169,9 @@ describe("clarify · happy path", () => {
     expect(result.validation.ok).toBe(true);
     expect(result.validation.errors).toEqual([]);
     expect(result.output).not.toBeNull();
-    expect(result.output?.questions.map((q) => q.id)).toEqual(["scope", "lang", "aim_target_context", "durable_eval_signal"]);
+    expect(gw.calls[0]!.system).toContain("Return 0-7 questions");
+    expect(gw.calls[0]!.system).not.toContain("usually 4-6 questions");
+    expect(result.output?.questions.map((q) => q.id)).toEqual(["scope", "lang"]);
     expect(result.output?.questions[0]?.source_dimension).toBe("granularity");
     expect(result.output?.questions[0]?.selection_mode).toBe("single");
     expect(result.output?.questions[1]?.selection_mode).toBe("single");
@@ -175,16 +183,6 @@ describe("clarify · happy path", () => {
       reason: "clarify_granularity",
     });
     expect(result.output?.questions[0]?.options).toHaveLength(2);
-    expect(result.output?.questions.find((q) => q.id === "aim_target_context")?.capture).toMatchObject({
-      category: "project_fact",
-      scope: "aim",
-      purpose: "shape_plan",
-    });
-    expect(result.output?.questions.find((q) => q.id === "durable_eval_signal")?.capture).toMatchObject({
-      category: "eval_signal",
-      scope: "global",
-      purpose: "define_eval",
-    });
     expect(result.output?.assumptions[0]?.default_value).toBe("github");
     expect(result.usage).toEqual(FIXED_USAGE);
   });
@@ -212,6 +210,7 @@ describe("clarify · happy path", () => {
           source_dimension: "granularity",
           allow_other: true,
           selection_mode: "single",
+          selection_mode_reason: "mutually_exclusive",
           options: [
             { label: "Prototype", tradeoff: "Fastest path." },
             { label: "Production-ready", tradeoff: "More quality gates." },
@@ -226,6 +225,38 @@ describe("clarify · happy path", () => {
     expect(result.output?.questions.find((q) => q.id === "polish")?.selection_mode).toBe("single");
   });
 
+  it("overrides an explicit single mode when the model says route options are compatible", async () => {
+    const result = await clarify(mockGateway({
+      questions: [{
+        id: "legacy_routes",
+        question: "\u4f60\u7684\u2018\u540d\u5782\u9752\u53f2\u2019\u5177\u4f53\u60f3\u901a\u8fc7\u54ea\u6761\u8def\u5f84\u5b9e\u73b0\uff1f",
+        why_high_impact: "\u4e0d\u540c\u8def\u5f84\u4f1a\u6539\u53d8\u8ba1\u5212\u8fb9\u754c\u548c\u8d44\u6e90\u914d\u7f6e\u3002",
+        kind: "scope",
+        source_dimension: "context_fit",
+        allow_other: true,
+        selection_mode: "single",
+        selection_mode_reason: "compatible_options",
+        options: [
+          { label: "\u6587\u5b66\u521b\u4f5c", tradeoff: "\u9700\u8981\u957f\u671f\u5199\u4f5c\u548c\u51fa\u7248\u3002" },
+          { label: "\u79d1\u5b66\u7a81\u7834", tradeoff: "\u9700\u8981\u4e13\u4e1a\u7814\u7a76\u548c\u540c\u884c\u8ba4\u53ef\u3002" },
+          { label: "\u521b\u4e1a\u521b\u65b0", tradeoff: "\u9700\u8981\u56e2\u961f\u3001\u8d44\u672c\u548c\u5e02\u573a\u9a8c\u8bc1\u3002" },
+          { label: "\u793e\u4f1a\u5f71\u54cd", tradeoff: "\u9700\u8981\u7ec4\u7ec7\u884c\u52a8\u548c\u516c\u5171\u6210\u679c\u3002" },
+        ],
+      }],
+      assumptions: [],
+    }), {
+      ...INPUT,
+      title: "\u6211\u60f3\u8981\u540d\u5782\u9752\u53f2",
+      outputLanguage: "simplified_chinese",
+    });
+
+    expect(result.validation.ok).toBe(true);
+    expect(result.output?.questions[0]).toMatchObject({
+      selection_mode: "multiple",
+      selection_mode_reason: "compatible_options",
+    });
+  });
+
   it("routes the request as a `classify` task and supplies the JSON schema + draft", async () => {
     const gw = mockGateway(validQuestions());
     await clarify(gw, INPUT);
@@ -236,9 +267,11 @@ describe("clarify · happy path", () => {
     expect(call.schema).toBeDefined();
     expect(JSON.stringify(call.schema)).toContain("source_dimension");
     expect(JSON.stringify(call.schema)).toContain("selection_mode");
+    expect(JSON.stringify(call.schema)).toContain("selection_mode_reason");
     expect(call.system).toContain("CLARIFYING");
     expect(call.system).toContain("source_dimension");
     expect(call.system).toContain("selection_mode");
+    expect(call.system).toContain("Test every option pair");
     expect(call.prompt).toContain(INPUT.title);
     expect(call.prompt).toContain("Scaffold the CLI"); // draft is grounded in
     expect(call.prompt).toContain("contract: owner=agent");
@@ -460,7 +493,7 @@ describe("clarify · happy path", () => {
     expect(gw.calls[0]!.prompt).toContain("[high] context_fit");
     expect(gw.calls[0]!.prompt).toContain("change milestone boundaries, owner routing, required evidence, or eval signals");
     expect(result.validation.ok).toBe(true);
-    expect(result.output?.questions.map((q) => q.id)).toEqual(["scope", "lang", "proof", "aim_target_context"]);
+    expect(result.output?.questions.map((q) => q.id)).toEqual(["scope", "lang", "proof"]);
   });
 
   it("annotates returned questions with decomposition-strategy why-asked signals", async () => {
@@ -1127,7 +1160,7 @@ describe("clarify · happy path", () => {
     });
 
     expect(result.validation.ok).toBe(true);
-    expect(result.output?.questions.map((q) => q.id)).toEqual(["scope", "aim_target_context", "durable_eval_signal", "aim_procedure_context"]);
+    expect(result.output?.questions.map((q) => q.id)).toEqual(["scope"]);
     expect(result.output?.questions.map((q) => q.id)).not.toContain("lang");
     expect(result.output?.assumptions.some((a) => a.statement.includes("Which language?"))).toBe(true);
     expect(result.output?.assumptions.some((a) => a.default_value.includes("TypeScript"))).toBe(true);
@@ -1149,7 +1182,7 @@ describe("clarify · happy path", () => {
     });
 
     expect(result.validation.ok).toBe(true);
-    expect(result.output?.questions.map((q) => q.id)).toEqual(["scope", "lang", "aim_target_context", "durable_eval_signal"]);
+    expect(result.output?.questions.map((q) => q.id)).toEqual(["scope", "lang"]);
   });
 
   it("truncates to maxQuestions", async () => {
@@ -1166,26 +1199,40 @@ describe("clarify · happy path", () => {
     expect(result.output?.questions.map((q) => q.id)).toEqual([
       "aim_target_context",
       "durable_eval_signal",
-      "aim_procedure_context",
-      "durable_capability_routing",
     ]);
-    expect(result.output?.questions.map((q) => q.capture?.scope)).toEqual(["aim", "global", "aim", "global"]);
+    expect(result.output?.questions.map((q) => q.capture?.scope)).toEqual(["aim", "global"]);
+    expect(result.output?.questions.map((q) => q.selection_mode)).toEqual(["multiple", "multiple"]);
+    expect(result.output?.questions.map((q) => q.selection_mode_reason)).toEqual([
+      "compatible_options",
+      "compatible_options",
+    ]);
     expect(result.output?.assumptions).toHaveLength(1);
+  });
+
+  it("keeps one high-impact model question without padding to a form length", async () => {
+    const output = validQuestions();
+    output.questions = [output.questions[0]!];
+
+    const result = await clarify(mockGateway(output), INPUT);
+
+    expect(result.output?.questions.map((question) => question.id)).toEqual(["scope"]);
+    expect(result.validation.ok).toBe(true);
   });
 
   it("localizes baseline context intake for a Chinese aim", async () => {
     const gw = mockGateway({ questions: [], assumptions: [] });
     const result = await clarify(gw, {
       ...INPUT,
-      title: "我想找一个工作",
-      description: "希望先拆成清晰的求职计划。",
+      title: "\u6211\u60f3\u627e\u4e00\u4e2a\u5de5\u4f5c",
+      description: "\u5e0c\u671b\u5148\u62c6\u6210\u6e05\u6670\u7684\u6c42\u804c\u8ba1\u5212\u3002",
       outputLanguage: "simplified_chinese",
     });
 
     expect(result.validation.ok).toBe(true);
-    expect(result.output?.questions[0]?.question).toContain("查看");
-    expect(result.output?.questions[0]?.options[0]?.label).toBe("先看本地材料");
-    expect(result.output?.questions[1]?.question).toContain("证据");
+    expect(result.output?.questions[0]?.question).toContain("\u4e0a\u4e0b\u6587\u6765\u6e90");
+    expect(result.output?.questions[0]?.options[0]?.label).toBe("\u672c\u5730\u9879\u76ee\u6216\u6587\u4ef6");
+    expect(result.output?.questions[1]?.question).toContain("\u8bc1\u636e");
+    expect(result.output?.questions[0]?.selection_mode).toBe("multiple");
   });
 
   it("keeps backward compatibility when source dimensions are missing or invalid", async () => {
@@ -1197,7 +1244,7 @@ describe("clarify · happy path", () => {
 
     expect(result.validation.ok).toBe(true);
     expect(result.output?.questions.slice(0, 2).map((q) => q.source_dimension)).toEqual([undefined, undefined]);
-    expect(result.output?.questions.map((q) => q.id)).toContain("aim_target_context");
+    expect(result.output?.questions.map((q) => q.id)).toEqual(["scope", "lang"]);
   });
 });
 
@@ -1209,6 +1256,22 @@ describe("clarify · validation rejections (returned, never thrown)", () => {
     expect(result.validation.ok).toBe(false);
     expect(result.output).toBeNull();
     expect(result.validation.errors.some((e) => e.includes("at least 2 options"))).toBe(true);
+  });
+
+  it("keeps the custom-answer escape hatch and rejects duplicate option labels", async () => {
+    const customAnswer = validQuestions();
+    customAnswer.questions[0]!.allow_other = false;
+    const customResult = await clarify(mockGateway(customAnswer), INPUT);
+    expect(customResult.output?.questions[0]?.allow_other).toBe(true);
+
+    const duplicate = validQuestions();
+    duplicate.questions[0]!.options = [
+      { label: "Prototype", tradeoff: "Fast." },
+      { label: " prototype ", tradeoff: "Still fast." },
+    ];
+    const duplicateResult = await clarify(mockGateway(duplicate), INPUT);
+    expect(duplicateResult.validation.ok).toBe(false);
+    expect(duplicateResult.validation.errors.some((error) => error.includes("at least 2 options"))).toBe(true);
   });
 
   it("rejects duplicate question ids", async () => {

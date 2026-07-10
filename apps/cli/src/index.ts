@@ -599,7 +599,7 @@ async function runClarify(title: string, description: string | undefined, opts: 
   let answers: ClarifyAnswer[] = [];
   if (opts.answersRaw !== undefined) {
     try {
-      answers = parseAnswers(opts.answersRaw);
+      answers = parseAnswers(opts.answersRaw, questions);
     } catch (e) {
       throw new UserError(e instanceof Error ? e.message : String(e));
     }

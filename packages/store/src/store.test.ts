@@ -445,6 +445,7 @@ describe("createJsonFileStore · round-trip", () => {
         source_dimension: "context_fit",
         allow_other: true,
         selection_mode: "multiple",
+        selection_mode_reason: "compatible_options",
         options: [{ label: "Title", tradeoff: "The draft row can be named." }],
       }],
       intakeAnswers: [{
