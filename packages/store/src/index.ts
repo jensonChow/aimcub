@@ -45,6 +45,7 @@ import type {
   AimDraftSaveBlock,
   AimDraftStage,
   AimDraftStatus,
+  AimDraftSurface,
   AimProgressReadModel,
   Assignment,
   AssignmentSource,
@@ -142,6 +143,7 @@ export interface UpsertAimDraftInput {
   currentStage?: AimDraftStage;
   phase?: AimDraftPhase;
   status?: AimDraftStatus;
+  aimSurface?: AimDraftSurface;
   contextNote?: string;
   intakeQuestions?: AimDraftQuestion[];
   intakeAnswers?: AimDraftAnswer[];
@@ -1206,6 +1208,7 @@ export function createJsonFileStore(dataDir: string = defaultDataDir(), options:
         current_stage: input.currentStage ?? existing?.current_stage ?? "aim",
         phase: input.phase === undefined ? existing?.phase ?? null : input.phase,
         status: input.status ?? existing?.status ?? "draft",
+        aim_surface: input.aimSurface === undefined ? existing?.aim_surface ?? null : input.aimSurface,
         context_note: input.contextNote ?? existing?.context_note ?? "",
         intake_questions: input.intakeQuestions ?? existing?.intake_questions ?? [],
         intake_answers: input.intakeAnswers ?? existing?.intake_answers ?? [],

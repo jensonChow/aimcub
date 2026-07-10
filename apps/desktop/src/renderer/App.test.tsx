@@ -152,6 +152,7 @@ const draftRow: AimDraft = {
   parent_goal_id: null,
   parent_milestone_id: null,
   current_stage: "contracts",
+  aim_surface: "summary",
   phase: "post_draft",
   status: "save_blocked",
   context_note: "Keep the context note.",
@@ -724,7 +725,7 @@ describe("App planning state guards", () => {
     expect(clarifyPanel).toMatch(/onSkip=\{clarifyPhase === "intake" \? undefined : \(\) => \{[\s\S]*?setClarifyPhase\(null\);[\s\S]*?openCockpitStage\("contracts"\);/);
     expect(refinePlan.indexOf("setClarifyPhase(null)")).toBeLessThan(refinePlan.indexOf('setStageOverride("contracts")'));
     expect(builtAnswers).toContain('clarifyPhase === "intake" ? null : clarify');
-    expect(currentAimDraftInput).toContain('clarify: clarifyPhase === "intake" ? null : clarify');
+    expect(currentAimDraftInput).toContain('clarify: resetPlanning || clarifyPhase === "intake" ? null : clarify');
     expect(clarifyPanel).toContain('flowKey={activeDraftId ?? selected?.id ?? "new-aim"}');
   });
 
@@ -787,15 +788,29 @@ describe("App planning state guards", () => {
   it("separates new aim composition from committed draft summary and explicit editing", () => {
     const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
     const startDraft = source.match(/async function startDraft[\s\S]*?\n {2}const builtAnswers/)?.[0] ?? "";
+    const checkpointSubmittedAim = source.match(/async function checkpointSubmittedAim[\s\S]*?\n {2}async function refreshAimDrafts/)?.[0] ?? "";
     const applyHydratedDraft = source.match(/function applyHydratedDraft[\s\S]*?async function openAimDraft/)?.[0] ?? "";
     const mainStage = source.match(/const mainStageContent = \(\(\) => \{[\s\S]*?\n {2}\}\)\(\);/)?.[0] ?? "";
+    const draftAutosave = source.match(/useEffect\(\(\) => \{\n {4}if \(selected\) return;[\s\S]*?\n {2}\}\);/)?.[0] ?? "";
 
     expect(source).toContain('type AimSurfaceMode = "idle" | "compose" | "summary" | "edit";');
     expect(startDraft).toContain("if (options.aim) {");
     expect(startDraft).toContain("resetPlanningForAimUpdate()");
+    expect(startDraft).toContain("aimSurfaceAfterSubmit");
+    expect(startDraft.indexOf("setAimSurfaceMode(nextAimSurface)")).toBeLessThan(
+      startDraft.indexOf('if (route === "show_helper_guidance")'),
+    );
+    expect(startDraft.indexOf("await checkpointSubmittedAim")).toBeLessThan(
+      startDraft.indexOf("setAimSurfaceMode(nextAimSurface)"),
+    );
+    expect(checkpointSubmittedAim).toContain('aimSurface: "summary"');
+    expect(checkpointSubmittedAim).toContain("{ navigation: true, throwOnError: true }");
+    expect(checkpointSubmittedAim).toContain("draftPersistence.pauseAutosave()");
+    expect(checkpointSubmittedAim).toContain("draftPersistence.resumeAutosave()");
     expect(startDraft).toContain("setAimEditBuffer(null)");
-    expect(startDraft).toContain('setAimSurfaceMode("summary")');
-    expect(applyHydratedDraft).toContain('setAimSurfaceMode(resumeInitialComposition ? "compose" : "summary")');
+    expect(applyHydratedDraft).toContain("setAimSurfaceMode(hydrated.aimSurface)");
+    expect(source).toContain("aimSurface: overrides.aimSurface ?? persistedAimSurface(aimSurfaceMode)");
+    expect(draftAutosave).toContain("aimSurfaceMode");
     expect(mainStage).toContain("if (showAimEditor)");
     expect(mainStage).toContain('onTitle={aimSurfaceMode === "edit" ? changeAimTitle : setAimTitle}');
     expect(mainStage).toContain('onDescription={aimSurfaceMode === "edit" ? changeAimDescription : setAimDescription}');
@@ -803,6 +818,7 @@ describe("App planning state guards", () => {
     expect(mainStage.indexOf("if (showAimEditor)")).toBeLessThan(mainStage.indexOf("<DraftAimOverviewPanel"));
     expect(source).toContain('setAimSurfaceMode("edit")');
     expect(source).not.toContain("aimComposerOpen || hasUnsavedAim");
+    expect(source).toContain('activeDraftId: aimSurfaceMode === "compose" ? null : activeDraftId');
     expect(source).toContain("const continueContextToPlan = () => {");
     expect(source).not.toContain("const continueContextToPlan = parent ? undefined");
   });

@@ -434,6 +434,7 @@ describe("createJsonFileStore · round-trip", () => {
       title: "Recover desktop draft",
       description: "Keep the local-first promise.",
       currentStage: "context",
+      aimSurface: "summary",
       phase: "intake",
       status: "context_needed",
       contextNote: "The user already supplied context before leaving.",
@@ -465,10 +466,45 @@ describe("createJsonFileStore · round-trip", () => {
       title: "Recover desktop draft",
       status: "context_needed",
       current_stage: "context",
+      aim_surface: "summary",
       phase: "intake",
       context_note: "The user already supplied context before leaving.",
     });
     expect((await b.getAimDraft(draft.id))?.intake_answers[0]?.other_text).toBe("Also keep the context note.");
+  });
+
+  it("replaces a persisted composer with the submitted summary before restart", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "aimcub-store-"));
+    const first = createJsonFileStore(dir);
+    const draft = await first.upsertAimDraft({
+      title: "Keep this Aim readable",
+      currentStage: "aim",
+      aimSurface: "compose",
+      status: "draft",
+    });
+
+    await first.upsertAimDraft({
+      id: draft.id,
+      description: "Submitted and checkpointed before the UI changes.",
+      aimSurface: "summary",
+    });
+
+    const second = createJsonFileStore(dir);
+    expect((await second.getAimDraft(draft.id))?.aim_surface).toBe("summary");
+  });
+
+  it("normalizes legacy Aim drafts without a persisted surface", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "aimcub-store-"));
+    writeFileSync(join(dir, "store.json"), JSON.stringify({
+      aimDrafts: [{
+        id: "00000000-0000-4000-8000-000000000099",
+        owner_id: "00000000-0000-4000-8000-000000000001",
+        title: "Legacy captured aim",
+      }],
+    }), "utf8");
+
+    const [legacy] = await createJsonFileStore(dir).listAimDrafts();
+    expect(legacy?.aim_surface).toBeNull();
   });
 
   it("keeps generated plans and save-blocked state recoverable until explicit discard", async () => {

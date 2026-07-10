@@ -5,6 +5,7 @@ type RuntimeProvider = Pick<ProviderStatus, "configured"> | null | undefined;
 type RuntimeAgent = Pick<LocalAgentDetection, "available" | "authStatus">;
 
 export type AimSubmitAction = "missing_aim" | "show_helper_guidance" | "start_planning";
+export type AimSubmitSurface = "compose" | "summary" | "edit";
 export type AimHelperCapability = "code_execution" | "current_research" | "source_context" | "general_planning";
 export type AimHelperPreference = "local_agent" | "provider_with_web" | "provider" | "either";
 export type AimHelperSettingsFocus = "local" | "provider" | "web" | "context";
@@ -50,6 +51,15 @@ export function routeAfterAimSubmit(input: {
 }): AimSubmitAction {
   if (!input.title.trim()) return "missing_aim";
   return hasPlanningRuntime(input.provider, input.localAgents) ? "start_planning" : "show_helper_guidance";
+}
+
+export function aimSurfaceAfterSubmit(input: {
+  action: AimSubmitAction;
+  current: "compose" | "edit";
+}): AimSubmitSurface {
+  if (input.action === "missing_aim") return input.current;
+  if (input.action === "show_helper_guidance" && input.current === "edit") return "edit";
+  return "summary";
 }
 
 export function deriveAimHelperProfile(input: { title: string; description?: string | null }): AimHelperProfile {

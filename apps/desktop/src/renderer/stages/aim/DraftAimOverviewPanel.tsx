@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import { useI18n } from "../../i18n";
 import { shortText } from "../../workflow/text";
 
-export type DraftAimOverviewState = "context" | "planReady" | "needsRepair" | "saveBlocked";
+export type DraftAimOverviewState = "helperSetup" | "context" | "planReady" | "needsRepair" | "saveBlocked";
 
 interface DraftAimOverviewPanelProps {
   title: string;
@@ -39,17 +39,23 @@ export function DraftAimOverviewPanel({
       ? t("aimDraft.overview.needsRepair")
       : state === "planReady"
         ? t("aimDraft.overview.planReady")
-        : t("aimDraft.overview.contextInProgress");
-  const nextAction = state === "context"
-    ? t("aimDraft.overview.continueContext")
-    : state === "planReady"
-      ? t("aimDraft.overview.reviewContracts")
-      : t("aimDraft.overview.repairContracts");
-  const nextHint = state === "context"
-    ? t("aimDraft.overview.contextHint")
-    : state === "planReady"
-      ? t("aimDraft.overview.contractsHint")
-      : t("aimDraft.overview.repairHint");
+        : state === "helperSetup"
+          ? t("aimDraft.overview.helperNeeded")
+          : t("aimDraft.overview.contextInProgress");
+  const nextAction = state === "helperSetup"
+    ? t("aimDraft.overview.setupHelper")
+    : state === "context"
+      ? t("aimDraft.overview.continueContext")
+      : state === "planReady"
+        ? t("aimDraft.overview.reviewContracts")
+        : t("aimDraft.overview.repairContracts");
+  const nextHint = state === "helperSetup"
+    ? t("aimDraft.overview.helperHint")
+    : state === "context"
+      ? t("aimDraft.overview.contextHint")
+      : state === "planReady"
+        ? t("aimDraft.overview.contractsHint")
+        : t("aimDraft.overview.repairHint");
 
   useEffect(() => {
     if (!focusEditAction) return;

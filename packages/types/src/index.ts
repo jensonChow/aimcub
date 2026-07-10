@@ -369,6 +369,9 @@ export type AimDraftPhase = z.infer<typeof AimDraftPhase>;
 export const AimDraftStatus = z.enum(["draft", "context_needed", "plan_ready", "save_blocked"]);
 export type AimDraftStatus = z.infer<typeof AimDraftStatus>;
 
+export const AimDraftSurface = z.enum(["compose", "summary"]);
+export type AimDraftSurface = z.infer<typeof AimDraftSurface>;
+
 export const AimDraftQuestionOption = z.object({
   label: z.string(),
   tradeoff: z.string().default(""),
@@ -419,6 +422,7 @@ export const AimDraft = z.object({
   current_stage: AimDraftStage.default("aim"),
   phase: AimDraftPhase,
   status: AimDraftStatus.default("draft"),
+  aim_surface: AimDraftSurface.nullable().default(null),
   context_note: z.string().default(""),
   intake_questions: z.array(AimDraftQuestion).default([]),
   intake_answers: z.array(AimDraftAnswer).default([]),
