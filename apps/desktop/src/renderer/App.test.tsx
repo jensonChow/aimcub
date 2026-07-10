@@ -16,6 +16,7 @@ import { LocalAgentExecutionSummary } from "./stages/execute/LocalAgentExecution
 import { PlanContractCard } from "./stages/plan/PlanContractCard";
 import { PlanPanel } from "./stages/plan/PlanPanel";
 import { editableContractForNode, formatAcceptanceRule } from "./stages/plan/planContract";
+import { Notice } from "./Notice";
 
 const OWNER = "00000000-0000-4000-8000-000000000001";
 const GOAL = "00000000-0000-4000-8000-000000000010";
@@ -64,6 +65,7 @@ const savedGoal: Goal = {
 
 const noop = () => {};
 const asyncNoop = async () => {};
+const asyncTrue = async () => true;
 const testT: I18n["t"] = (key, vars) => translate("en", key, vars);
 
 const providerStatus: ProviderStatus = {
@@ -352,7 +354,7 @@ function renderExecute(rows: AimProgressReadModel["milestones"]): string {
         progress={executeProgress(rows)}
         disabled={false}
         onRunAgent={noop}
-        onConfirm={asyncNoop}
+        onConfirm={asyncTrue}
         onPickFiles={async () => []}
         onBreakDown={noop}
         onReviewEval={noop}
@@ -385,6 +387,7 @@ describe("EvidenceSubmissionForm", () => {
 
     expect(html).toContain("Submit evidence");
     expect(html).toContain("Proof note");
+    expect(html).toContain('autofocus=""');
     expect(html).toContain("URL");
     expect(html).toContain("Local file references");
     expect(html).toContain("Approval note.");
@@ -602,6 +605,8 @@ describe("LocalAgentExecutionSummary", () => {
     expect(html).toContain("Activity");
     expect(html).toContain("Started");
     expect(html).toContain("Tool started");
+    expect(html).toContain('<details class="od-execution-secondary-details"><summary>');
+    expect(html).not.toContain('<details class="od-execution-secondary-details" open="">');
     expect(html).not.toContain("Verbose assistant output");
     expect(css).toMatch(/\.od-execution-grid\s*{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\);/s);
     expect(css).toMatch(/\.od-execution-runtime\s*{[^}]*border-top:\s*1px solid var\(--od-border-soft\);/s);
@@ -676,6 +681,57 @@ describe("App first-run workspace", () => {
 });
 
 describe("App planning state guards", () => {
+  it("announces errors and busy state with appropriate live-region roles", () => {
+    const errorHtml = renderToStaticMarkup(<Notice tone="error">Proof failed</Notice>);
+    const infoHtml = renderToStaticMarkup(<Notice tone="info">Saving proof</Notice>);
+
+    expect(errorHtml).toContain('role="alert"');
+    expect(infoHtml).toContain('role="status"');
+  });
+
+  it("keeps manual proof drafts open when confirmation fails or navigation is attempted", () => {
+    const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+    const navigationGuard = source.match(/function navigationIsLocked\(\)[\s\S]*?function workflowMutationIsLocked/)?.[0] ?? "";
+    const confirmFlow = source.match(/async function confirmMilestone[\s\S]*?async function acceptContextCandidate/)?.[0] ?? "";
+    const openGoal = source.match(/async function openGoal[\s\S]*?async function refreshGoalState/)?.[0] ?? "";
+
+    expect(navigationGuard).toContain("manualProofDraftActive");
+    expect(navigationGuard).toContain('const message = t("os.proofNavigationBlocked")');
+    expect(navigationGuard).toContain("proofNavigationErrorRef.current = message");
+    expect(openGoal).toContain("if (!options.allowDuringSave && navigationIsLocked()) return;");
+    expect(confirmFlow).toContain("Promise<boolean>");
+    expect(confirmFlow).toContain("confirmMilestoneAndRefresh(");
+    expect(confirmFlow).toContain("const mutationTargetIsCurrent");
+    expect(confirmFlow).toContain('outcome.status === "confirmation_failed"');
+    expect(confirmFlow).toMatch(/outcome\.status === "refresh_failed"[\s\S]*?setError\([\s\S]*?return true;/);
+    expect(confirmFlow).toContain("return true;");
+    expect(confirmFlow).toContain("return false;");
+  });
+
+  it("routes accepted or skipped draft refinements to Contracts", () => {
+    const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+    const clarifyPanel = source.match(/const clarifyPanel = clarify[\s\S]*?const planPanel =/)?.[0] ?? "";
+    const refinePlan = source.match(/async function refinePlan[\s\S]*?async function savePlan/)?.[0] ?? "";
+    const builtAnswers = source.match(/const builtAnswers[\s\S]*?const builtIntakeAnswers/)?.[0] ?? "";
+    const currentAimDraftInput = source.match(/function currentAimDraftInput[\s\S]*?async function persistCurrentDraftNow/)?.[0] ?? "";
+
+    expect(source).toContain("const clarifyPanelActive = clarifyPhase !== null;");
+    expect(clarifyPanel).toMatch(/onSkip=\{clarifyPhase === "intake" \? undefined : \(\) => \{[\s\S]*?setClarifyPhase\(null\);[\s\S]*?openCockpitStage\("contracts"\);/);
+    expect(refinePlan.indexOf("setClarifyPhase(null)")).toBeLessThan(refinePlan.indexOf('setStageOverride("contracts")'));
+    expect(builtAnswers).toContain('clarifyPhase === "intake" ? null : clarify');
+    expect(currentAimDraftInput).toContain('clarify: clarifyPhase === "intake" ? null : clarify');
+    expect(clarifyPanel).toContain('flowKey={activeDraftId ?? selected?.id ?? "new-aim"}');
+  });
+
+  it("keeps the Contracts context review compact above the plan", () => {
+    const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+    const contractsStage = source.match(/if \(activeStage === "contracts"\)[\s\S]*?if \(activeStage === "run"\)/)?.[0] ?? "";
+
+    expect(contractsStage).toContain("<ContextReviewPanel");
+    expect(contractsStage).toContain("compact />");
+    expect(contractsStage.indexOf("<ContextReviewPanel")).toBeLessThan(contractsStage.indexOf("{planPanel}"));
+  });
+
   it("keeps product error details behind an explicit developer disclosure", () => {
     const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
 
@@ -712,7 +768,16 @@ describe("App planning state guards", () => {
   it("keeps plan validation failures repairable instead of disabling contract edits", () => {
     const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
     const planPanel = source.match(/<PlanPanel[\s\S]*?\/>/)?.[0] ?? "";
+    const beginWorkspaceTransition = source.match(/function beginWorkspaceTransition[\s\S]*?function bumpWorkspaceRevision/)?.[0] ?? "";
+    const openGoal = source.match(/async function openGoal[\s\S]*?async function refreshGoalState/)?.[0] ?? "";
+    const resetComposer = source.match(/function resetComposer[\s\S]*?function descriptionWithContext/)?.[0] ?? "";
+    const applyHydratedDraft = source.match(/function applyHydratedDraft[\s\S]*?async function openAimDraft/)?.[0] ?? "";
 
+    expect(planPanel).toContain('key={`plan-workspace-${workspaceRevision}`}');
+    expect(beginWorkspaceTransition).not.toContain("bumpWorkspaceRevision()");
+    expect(openGoal).toContain("bumpWorkspaceRevision()");
+    expect(resetComposer).toContain("bumpWorkspaceRevision()");
+    expect(applyHydratedDraft).toContain("bumpWorkspaceRevision()");
     expect(planPanel).toContain("validationErrors={activePlanValidationMessages}");
     expect(planPanel).toContain("disabled={Boolean(busy)}");
     expect(planPanel).not.toContain("activePlanValidation?.ok === false");
@@ -838,6 +903,45 @@ describe("App planning state guards", () => {
 });
 
 describe("PlanPanel", () => {
+  it("shows one selected contract instead of stacking every contract", () => {
+    const secondNode = {
+      ...contractPlan.nodes[0]!,
+      key: "ship-contract",
+      title: "Ship the reviewed contract",
+      description: "SECOND CONTRACT BODY SHOULD STAY HIDDEN",
+      decomposition_contract: {
+        ...contractPlan.nodes[0]!.decomposition_contract!,
+        definition_of_done: "SECOND CONTRACT DONE SHOULD STAY HIDDEN",
+      },
+    };
+    const html = renderToStaticMarkup(
+      <I18nProvider>
+        <PlanPanel
+          plan={{ ...contractPlan, nodes: [...contractPlan.nodes, secondNode] }}
+          quality={null}
+          review={null}
+          saved={false}
+          disabled={false}
+          validationErrors={[]}
+          routingAgents={routingAgents}
+          routingValidation={null}
+          onChange={noop}
+          onSave={noop}
+        />
+      </I18nProvider>,
+    );
+    const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
+
+    expect(html).toContain('data-od-id="plan-contract-selector"');
+    expect(html).toContain("Current contract");
+    expect(html).toContain("1. Review execution contracts");
+    expect(html).toContain("2. Ship the reviewed contract");
+    expect(html.match(/class="od-plan-contract-card/g)).toHaveLength(1);
+    expect(html).not.toContain("SECOND CONTRACT BODY SHOULD STAY HIDDEN");
+    expect(html).not.toContain("SECOND CONTRACT DONE SHOULD STAY HIDDEN");
+    expect(css).toMatch(/\.od-plan-contract-selector\s*{[^}]*grid-template-columns:\s*auto minmax\(0, 1fr\);/s);
+  });
+
   it("renders summary-first contract cards by default without raw acceptance JSON", () => {
     const html = renderToStaticMarkup(
       <I18nProvider>
@@ -905,6 +1009,7 @@ describe("PlanPanel", () => {
           nodeCount={3}
           editable
           disabled={false}
+          structureDisabled={false}
           contract={editableContractForNode(node)}
           recommendation={routingRecommendationForPlanNode(node)}
           owner="agent"
@@ -968,6 +1073,7 @@ describe("PlanPanel", () => {
           nodeCount={contractPlan.nodes.length}
           editable
           disabled={false}
+          structureDisabled={false}
           contract={editableContractForNode(node)}
           recommendation={routingRecommendationForPlanNode(node)}
           owner="agent"
@@ -1004,6 +1110,64 @@ describe("PlanPanel", () => {
     expect(html).toContain("completion_mode");
     expect(html).toContain("auto_then_confirm");
     expect(html).toContain("clauses");
+  });
+
+  it("locks contract mutations while busy and keeps saved acceptance rules read-only", () => {
+    const node = contractPlan.nodes[0]!;
+    const sharedProps = {
+      node,
+      index: 0,
+      nodeCount: contractPlan.nodes.length,
+      contract: editableContractForNode(node),
+      recommendation: routingRecommendationForPlanNode(node),
+      owner: "agent" as const,
+      selectedAgent: routingAgents[0]!,
+      selectedModel: "gpt-5",
+      readyAgents: routingAgents,
+      nodeIssues: [] as string[],
+      overrideActive: false,
+      ruleText: formatAcceptanceRule(node.acceptance_rule),
+      advancedOpen: true,
+      onNode: noop,
+      onContract: noop,
+      onMoveUp: noop,
+      onMoveDown: noop,
+      onMergeUp: noop,
+      onMergeDown: noop,
+      onSplit: noop,
+      onOwner: noop,
+      onAgent: noop,
+      onModel: noop,
+      onRoutingReset: noop,
+      onAdvancedToggle: noop,
+      onRuleText: noop,
+      onRuleCommit: noop,
+    };
+    const busyHtml = renderToStaticMarkup(
+      <I18nProvider>
+        <PlanContractCard {...sharedProps} editable disabled structureDisabled />
+      </I18nProvider>,
+    );
+    const busyTextareas = [...busyHtml.matchAll(/<textarea[^>]*>/g)].map(([tag]) => tag);
+    const structureButtons = [...busyHtml.matchAll(/<button[^>]*aria-label="(?:Move|Merge|Split)[^"]*"[^>]*>/g)].map(([tag]) => tag);
+
+    expect(busyHtml.match(/<input[^>]*>/)?.[0]).toContain('disabled=""');
+    expect(busyTextareas).toHaveLength(6);
+    expect(busyTextareas.every((tag) => tag.includes('disabled=""'))).toBe(true);
+    expect(structureButtons).toHaveLength(5);
+    expect(structureButtons.every((tag) => tag.includes('disabled=""'))).toBe(true);
+    expect(busyHtml).toContain('<button type="button" disabled="">Apply rule</button>');
+
+    const savedHtml = renderToStaticMarkup(
+      <I18nProvider>
+        <PlanContractCard {...sharedProps} editable={false} disabled={false} structureDisabled={false} />
+      </I18nProvider>,
+    );
+    const savedRule = savedHtml.match(/<textarea[^>]*aria-label="Acceptance rule"[^>]*>/)?.[0] ?? "";
+
+    expect(savedHtml).not.toContain("Apply rule");
+    expect(savedRule).toContain('readOnly=""');
+    expect(savedRule).not.toContain('disabled=""');
   });
 });
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import {
   validateExecutablePlan,
@@ -103,6 +103,7 @@ import {
   createDraftPersistenceQueue,
   type DraftPersistenceQueue,
 } from "./workflow/draftPersistenceQueue";
+import { confirmMilestoneAndRefresh } from "./workflow/confirmationFlow";
 import {
   beginNavigation,
   beginPlanningActivity,
@@ -165,6 +166,17 @@ function AimOsApp() {
   const [stageOverride, setStageOverride] = useState<CockpitStage | null>(null);
   const [runtimeGuidanceVisible, setRuntimeGuidanceVisible] = useState(false);
   const [settingsSection, setSettingsSection] = useState<SettingsSectionId>("overview");
+  const [manualProofDraftActive, setManualProofDraftActive] = useState(false);
+  const proofNavigationErrorRef = useRef<string | null>(null);
+  const [workspaceRevision, setWorkspaceRevision] = useState(0);
+  const handleProofDraftActiveChange = useCallback((active: boolean) => {
+    setManualProofDraftActive(active);
+    if (!active) {
+      const blockedMessage = proofNavigationErrorRef.current;
+      setError((current) => current === blockedMessage ? null : current);
+      proofNavigationErrorRef.current = null;
+    }
+  }, []);
   const navigationConcurrencyRef = useRef(createNavigationConcurrencyState<string>());
   const selectedGoalRef = useRef<Goal | null>(null);
   const draftActivationTrackerRef = useRef(createDraftActivationTracker());
@@ -241,6 +253,12 @@ function AimOsApp() {
   }
 
   function navigationIsLocked(): boolean {
+    if (manualProofDraftActive) {
+      const message = t("os.proofNavigationBlocked");
+      proofNavigationErrorRef.current = message;
+      setError(message);
+      return true;
+    }
     return navigationConcurrencyRef.current.saveInFlight || Boolean(discardInFlightDraftIdRef.current);
   }
 
@@ -258,6 +276,10 @@ function AimOsApp() {
     navigationConcurrencyRef.current = next;
     setBusyState(next.busy);
     return next.workspace;
+  }
+
+  function bumpWorkspaceRevision() {
+    setWorkspaceRevision((current) => current + 1);
   }
 
   function isCurrentWorkspaceTransition(transition: number): boolean {
@@ -364,6 +386,7 @@ function AimOsApp() {
     goal: Goal,
     options: { allowDuringSave?: boolean; checkpointDraft?: boolean } = {},
   ) {
+    if (!options.allowDuringSave && navigationIsLocked()) return;
     if (discardInFlightDraftIdRef.current || !canActivateGoal(
       navigationConcurrencyRef.current,
       options.allowDuringSave ? "save_success" : "external_navigation",
@@ -377,6 +400,7 @@ function AimOsApp() {
       if (!isCurrentWorkspaceTransition(transition)) return;
       finishPendingTargetNavigation(transition);
       draftPersistence.invalidateSession();
+      bumpWorkspaceRevision();
       setSelected(goal);
       setBusy(null);
       setMode("cockpit");
@@ -448,6 +472,7 @@ function AimOsApp() {
   }
 
   function resetComposer(options: { openComposer?: boolean } = {}) {
+    bumpWorkspaceRevision();
     draftPersistence.invalidateSession();
     setStageOverride("aim");
     setActiveDraftId(null);
@@ -570,7 +595,7 @@ function AimOsApp() {
   }
 
   const builtAnswers = useMemo<ClarifyAnswer[]>(() => {
-    return answersFor(clarifyPhase === "postDraft" ? clarify : null, answers);
+    return answersFor(clarifyPhase === "intake" ? null : clarify, answers);
   }, [answers, clarify, clarifyPhase]);
 
   const builtIntakeAnswers = useMemo<ClarifyAnswer[]>(() => {
@@ -590,7 +615,7 @@ function AimOsApp() {
       contextNote,
       intakeClarify,
       intakeAnswers: builtIntakeAnswers,
-      clarify: clarifyPhase === "postDraft" ? clarify : null,
+      clarify: clarifyPhase === "intake" ? null : clarify,
       clarifyAnswers: builtAnswers,
       draft,
       finalPlan,
@@ -665,6 +690,7 @@ function AimOsApp() {
   }
 
   function applyHydratedDraft(hydrated: HydratedAimDraft) {
+    bumpWorkspaceRevision();
     draftPersistence.beginSession(hydrated.id);
     setSelected(null);
     setBusy(null);
@@ -698,7 +724,11 @@ function AimOsApp() {
     setDraftSaveBlock(hydrated.saveBlock);
     setError(hydrated.saveBlock ? productErrorFromSaveBlock(hydrated.saveBlock) : null);
     setRuntimeGuidanceVisible(false);
-    setMode(hydrated.stage === "contracts" ? "reviewing" : hydrated.stage === "context" ? "contexting" : "cockpit");
+    setMode(hydrated.stage === "contracts"
+      ? "reviewing"
+      : hydrated.stage === "context"
+        ? hydrated.phase === "postDraft" ? "answering" : "contexting"
+        : "cockpit");
     setStageOverride(hydrated.stage);
   }
 
@@ -834,6 +864,7 @@ function AimOsApp() {
       if (refineTrace) {
         setPlanningDebugTraces((current) => [...current, refineTrace]);
       }
+      setClarifyPhase(null);
       setMode("reviewing");
       setStageOverride("contracts");
     } catch (err) {
@@ -912,7 +943,7 @@ function AimOsApp() {
         debugTrace: mergePlanningDebugTraces(planningDebugTraces.length ? planningDebugTraces : [planResult?.debugTrace]),
         questions: [
           ...(intakeClarify?.questions ?? []),
-          ...(clarifyPhase === "postDraft" ? clarify?.questions ?? [] : []),
+          ...(clarifyPhase === "intake" ? [] : clarify?.questions ?? []),
         ],
         answers: [...builtIntakeAnswers, ...builtAnswers],
         assumptions: clarify?.assumptions ?? [],
@@ -965,33 +996,51 @@ function AimOsApp() {
     }
   }
 
-  async function confirmMilestone(milestone: Milestone, submission: Omit<ConfirmMilestoneRequest, "goalId" | "milestoneId">) {
-    if (workflowMutationIsLocked()) return;
-    if (!selected) return;
+  async function confirmMilestone(
+    milestone: Milestone,
+    submission: Omit<ConfirmMilestoneRequest, "goalId" | "milestoneId">,
+  ): Promise<boolean> {
+    if (workflowMutationIsLocked()) return false;
+    if (!selected) return false;
     const goal = selected;
     const operationId = `confirm:${goal.id}:${milestone.id}`;
-    if (!beginSideEffectOperation(operationId, t("os.busy.confirm"))) return;
+    if (!beginSideEffectOperation(operationId, t("os.busy.confirm"))) return false;
     const transition = navigationConcurrencyRef.current.workspace;
     const surfaceTransition = navigationConcurrencyRef.current.surface;
     setError(null);
     try {
-      const nextDetail = await window.aimcub.confirmMilestone({
-        goalId: goal.id,
-        milestoneId: milestone.id,
-        ...submission,
-      });
-      const nextProgress = await window.aimcub.getAimProgress(goal.id);
+      const outcome = await confirmMilestoneAndRefresh(
+        () => window.aimcub.confirmMilestone({
+          goalId: goal.id,
+          milestoneId: milestone.id,
+          ...submission,
+        }),
+        () => window.aimcub.getAimProgress(goal.id),
+      );
+      if (outcome.status === "confirmation_failed") {
+        if (isCurrentWorkspaceTransition(transition) || selectedGoalRef.current?.id === goal.id) {
+          setError(outcome.error instanceof Error ? outcome.error.message : String(outcome.error));
+        }
+        return false;
+      }
+      const mutationTargetIsCurrent = isCurrentWorkspaceTransition(transition)
+        || selectedGoalRef.current?.id === goal.id;
+      if (mutationTargetIsCurrent) setDetail(outcome.detail);
+      if (outcome.status === "refresh_failed") {
+        if (mutationTargetIsCurrent) {
+          setError(outcome.error instanceof Error ? outcome.error.message : String(outcome.error));
+        }
+        return true;
+      }
+      const nextProgress = outcome.progress;
       const originalTargetIsCurrent = isCurrentWorkspaceTransition(transition);
-      if (!originalTargetIsCurrent && selectedGoalRef.current?.id !== goal.id) return;
-      setDetail(nextDetail);
+      if (!originalTargetIsCurrent && selectedGoalRef.current?.id !== goal.id) return true;
       setProgress(nextProgress);
       if (originalTargetIsCurrent && hasCompletionRecap(nextProgress) && isCurrentSurfaceTransition(surfaceTransition)) {
         setMode("reviewing");
         setStageOverride("eval");
       }
-    } catch (err) {
-      if (!isCurrentWorkspaceTransition(transition) && selectedGoalRef.current?.id !== goal.id) return;
-      setError(err instanceof Error ? err.message : String(err));
+      return true;
     } finally {
       finishSideEffectOperation(operationId);
     }
@@ -1252,7 +1301,8 @@ function AimOsApp() {
     />
   );
 
-  const clarifyPanel = clarify && (mode === "contexting" || mode === "answering" || mode === "reviewing") ? (
+  const clarifyPanelActive = clarifyPhase !== null;
+  const clarifyPanel = clarify && clarifyPanelActive ? (
     <ContextClarifyPanel
       clarify={clarify}
       phase={clarifyPhase}
@@ -1270,12 +1320,18 @@ function AimOsApp() {
       }}
       onContextNote={setContextNote}
       onRefine={() => void (clarifyPhase === "intake" ? continueFromContext() : refinePlan())}
-      onSkip={clarifyPhase === "intake" ? undefined : () => setMode("reviewing")}
+      onSkip={clarifyPhase === "intake" ? undefined : () => {
+        setClarifyPhase(null);
+        openCockpitStage("contracts");
+      }}
+      onOpenSettings={openContextSettings}
+      flowKey={activeDraftId ?? selected?.id ?? "new-aim"}
     />
   ) : null;
 
   const planPanel = activePlan ? (
     <PlanPanel
+      key={`plan-workspace-${workspaceRevision}`}
       plan={activePlan}
       quality={planResult?.quality ?? null}
       review={planResult?.review ?? null}
@@ -1302,6 +1358,7 @@ function AimOsApp() {
       }}
       onBreakDown={breakDown}
       onReviewEval={() => openCockpitStage("eval")}
+      onProofDraftActiveChange={handleProofDraftActiveChange}
     />
   ) : null;
 
@@ -1392,7 +1449,7 @@ function AimOsApp() {
     if (activeStage === "contracts") {
       return planPanel ? (
         <>
-          <ContextReviewPanel bundle={contextReview} running={mode === "drafting" && Boolean(busy)} />
+          <ContextReviewPanel bundle={contextReview} running={mode === "drafting" && Boolean(busy)} compact />
           {planPanel}
         </>
       ) : (

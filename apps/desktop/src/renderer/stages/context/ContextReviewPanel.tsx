@@ -29,9 +29,10 @@ interface ReviewBucket {
 interface ContextReviewPanelProps {
   bundle: ContextBundleReview;
   running: boolean;
+  compact?: boolean;
 }
 
-export function ContextReviewPanel({ bundle, running }: ContextReviewPanelProps) {
+export function ContextReviewPanel({ bundle, running, compact = false }: ContextReviewPanelProps) {
   const { t } = useI18n();
   const buckets: ReviewBucket[] = [
     {
@@ -61,33 +62,58 @@ export function ContextReviewPanel({ bundle, running }: ContextReviewPanelProps)
   ];
   const visibleBuckets = buckets.filter((bucket) => bucket.items.length > 0);
   const totalItems = visibleBuckets.reduce((sum, bucket) => sum + bucket.items.length, 0);
+  if (totalItems === 0) return null;
+
+  const reviewContents = (
+    <>
+      <div className="od-stage-metrics" aria-label={t("contextReview.title")}>
+        {visibleBuckets.map((bucket) => (
+          <StageMetric key={bucket.key} label={bucket.metric} value={String(bucket.items.length)} />
+        ))}
+      </div>
+
+      <div className="od-context-review-grid">
+        {visibleBuckets.map((bucket) => (
+          <ContextReviewBucket key={bucket.key} title={bucket.title} items={bucket.items} />
+        ))}
+      </div>
+    </>
+  );
+
+  if (compact) {
+    return (
+      <details className="od-context-review-disclosure" data-od-id="context-bundle-review">
+        <summary>
+          <span className="od-context-review-disclosure-copy">
+            <strong>{t("contextReview.compactTitle")}</strong>
+            <small>{t("contextReview.compactBody")}</small>
+          </span>
+          <span className="od-context-review-disclosure-meta">
+            {running ? <span className="od-pill blue">{t("debug.pending")}</span> : null}
+            <span className="od-context-review-count" aria-label={t("contextReview.itemCount", { n: totalItems })}>
+              {totalItems}
+            </span>
+          </span>
+        </summary>
+        <div className="od-context-review-disclosure-body">
+          <p>{t("contextReview.body")}</p>
+          {reviewContents}
+        </div>
+      </details>
+    );
+  }
 
   return (
-    <section className="od-context-review" data-od-id="context-bundle-review" data-empty={totalItems === 0 ? "true" : "false"}>
+    <section className="od-context-review" data-od-id="context-bundle-review">
       <div className="od-stage-panel-head">
         <div>
           <div className="od-stage-kicker">{t("contextReview.eyebrow")}</div>
           <h2>{t("contextReview.title")}</h2>
-          <p>{t(totalItems === 0 ? "contextReview.emptyBody" : "contextReview.body")}</p>
+          <p>{t("contextReview.body")}</p>
         </div>
         {running ? <span className="od-pill blue">{t("debug.pending")}</span> : null}
       </div>
-
-      {visibleBuckets.length > 0 ? (
-        <>
-          <div className="od-stage-metrics" aria-label={t("contextReview.title")}>
-            {visibleBuckets.map((bucket) => (
-              <StageMetric key={bucket.key} label={bucket.metric} value={String(bucket.items.length)} />
-            ))}
-          </div>
-
-          <div className="od-context-review-grid">
-            {visibleBuckets.map((bucket) => (
-              <ContextReviewBucket key={bucket.key} title={bucket.title} items={bucket.items} />
-            ))}
-          </div>
-        </>
-      ) : null}
+      {reviewContents}
     </section>
   );
 }
