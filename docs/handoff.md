@@ -5,64 +5,56 @@ Branch: `main`
 
 ## Current Session
 
-- Request: remove Desktop layout conflicts with native macOS traffic lights across the app, then replace the post-submit Aim input treatment with a clearer product-state design and audit similar false-editor patterns.
-- Starting state: clean `main` matched `origin/main` at `c15345f8` (`Finalize memory refresh handoff`).
-- Evidence reviewed: the two user screenshots, current handoff and module memories, Desktop shell/main-process code, renderer state and CSS, all input/read-only control sites, related tests, and the refreshed packaged app.
+- Request: fix repeated misclassification of compatible Context answers as single-select, research the public Claude Design and Claude Code interaction model, and improve Aim/context understanding rather than adding another option-count heuristic.
+- Starting state: clean local `main` at `c3d58d25`, three commits ahead of `origin/main` at `c15345f8`.
+- Evidence reviewed: official Anthropic Claude Code user-input, agent-loop, best-practice, autonomy, and Claude Design materials; the complete pre-draft and post-draft clarification pipelines; `context.ask_user`; Desktop, CLI, draft persistence, store, and type contracts; current product and interaction memories; and the user's reported non-exclusive life-path example.
+- Research boundary: Anthropic publicly exposes an explicit `multiSelect` contract and examples where compatible sections are multiple while mutually exclusive output formats are single. It does not publish Claude's internal classifier or system prompt. The pairwise-coexistence policy and deterministic safeguards below are Aimcub engineering inferences from that public behavior, not copied Claude internals.
 
 ## Completed Work
 
-- Replaced the stage-name-specific compact safe area with a shell-geometry rule. Every collapsed or peek non-Settings workspace now reserves one native-titlebar-safe top inset, including Aim and transient notice states. Pinned sidebar surfaces keep the normal shared top baseline.
-- Split Aim presentation into `idle`, `compose`, `summary`, and explicit `edit` states. New Aim and unsent child breakdown work use the composer; submitted or normally recovered drafts show a static outcome summary with Edit and Context/Contracts actions.
-- Added a dedicated draft Aim overview component. Explicit editing uses an isolated buffer, so the committed Aim and its plan remain intact until Update; Cancel simply discards the buffer. A valid Update clears the stale plan and all previously collected hidden context before restarting intake or planning. Ordinary navigation is blocked until Update or Cancel, while Settings remains a safe runtime-setup detour and its guidance follows the visible edit buffer.
-- Removed the child-Aim Context composer exception so top-level and child drafts share the same post-submit summary behavior.
-- Replaced saved acceptance-rule JSON rendered as a read-only textarea with selectable code, and replaced the inert Brave Search button with a static configuration value.
-- Added English/Chinese copy, focused component/state/CSS regression tests, and durable design-system/Desktop memory rules for geometric titlebar clearance, compose-summary-edit state, and static-control semantics.
+- Added one pure core selection policy shared by every Aimcub question surface. A question is single-select only when the answer set is demonstrably mutually exclusive or the prompt is tightly anchored to one primary/default/best/current scalar choice. Compatible answers and unresolved ambiguity default to multiple-select. Model-provided mode or reason alone cannot force single-select.
+- Added structured selection reason codes and propagated them through intake, clarification, tool contracts, shared types, store fixtures, Desktop drafts, and hydration. Legacy drafts are re-normalized on load so old incorrect single-select labels do not silently retain bad behavior.
+- Reworked both clarification prompts around pairwise coexistence, exact Aim wording, existing context, memory, and prior answers. Broad source gaps can split into several atomic questions; empty model output is valid; pre-draft and post-draft flows no longer manufacture a fixed-size form or pad high-confidence output with generic capability and constraint questions.
+- Hardened question quality and budgets: bounded every prompt section independently, enforced runtime question limits, deduplicated option labels and identifiers, preserved `Other`, and kept fallback questions limited to high-impact source and completion-evidence gaps.
+- Updated Desktop answer semantics. Single-select custom text replaces a preset; multiple-select custom text supplements presets. Single questions now expose a real radio-group accessibility model with roving focus and arrow/Home/End navigation, while multiple questions remain pressed toggle buttons.
+- Updated CLI answer semantics. Interactive multiple-select accepts comma-separated choices plus optional custom text; JSON answers validate against the actual question modes and reject conflicting values for single-select questions. Selected labels now survive into the intake signal.
+- Added bilingual adversarial coverage for the reported life-path case, parallel routes, cross-resource availability, contextual versus genuine primary/default wording, binary availability, dates, residency, current scalar state, duplicate options, split-gap identifiers, prompt truncation, zero-question readiness, persistence migration, and keyboard behavior.
+- Updated durable product, architecture, Desktop, and design-system memory to lock the semantic policy and answer-control behavior.
 
-## Changed Files
+## Changed Areas
 
-- `apps/desktop/src/renderer/App.tsx`
-- `apps/desktop/src/renderer/App.test.tsx`
-- `apps/desktop/src/renderer/cockpit.css`
-- `apps/desktop/src/renderer/i18n.tsx`
-- `apps/desktop/src/renderer/stages/aim/DraftAimOverviewPanel.tsx`
-- `apps/desktop/src/renderer/stages/aim/DraftAimOverviewPanel.test.tsx`
-- `apps/desktop/src/renderer/stages/context/ContextStage.tsx`
-- `apps/desktop/src/renderer/stages/context/ContextStage.test.tsx`
-- `apps/desktop/src/renderer/stages/plan/PlanContractCard.tsx`
-- `apps/desktop/src/renderer/WebResearchForm.tsx`
-- `apps/desktop/src/renderer/WebResearchForm.test.tsx`
-- `docs/memory/design-system.md`
-- `docs/memory/desktop.md`
-- `docs/desktop-polish-audit.md`
-- `docs/handoff.md`
+- `packages/core`: shared semantic choice-mode policy, reason vocabulary, intake types, exports, and adversarial tests.
+- `packages/llm`: pre-draft intake, post-draft clarification, schemas, `context.ask_user`, tool contracts, prompt budgets, fallbacks, and tests.
+- `apps/desktop`: planner integration, clarification controls, debug rendering, draft persistence and migration, accessibility, and tests.
+- `apps/cli`: interactive and JSON answer parsing, selected-label propagation, and tests.
+- `packages/types` and `packages/store`: persisted reason contract and fixtures.
+- `docs/memory`: product, architecture, Desktop, and design-system rules.
 
 ## Verification
 
-- Desktop focused gates passed: 26 test files and 193 tests, plus Desktop typecheck and lint.
-- Repository gates passed: `pnpm build`, `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm core:purity`, and `git diff --check`.
-- `pnpm desktop:pack` passed with Electron 43.0.0, and `ditto apps/desktop/dist/mac-arm64/Aimcub.app Aimcub.app` refreshed the project-root bundle.
-- Root `Aimcub.app` is `com.aimcub.desktop`, version `0.0.0`; `Resources/app.asar` SHA256 is `47ad4bcfb5bd0d395df89cf061435f6f43f2d03113d034a6bdf4a2dcb7757c9b`.
-
-## Packaged Visual QA
-
-- The final project-root package opened at the normal 960 by 680 footprint. With the sidebar collapsed, the real draft Aim and Context surfaces used the same titlebar-safe navigation baseline; the current-surface label and stage switcher no longer occupied the native traffic-light/sidebar-toggle row.
-- The draft Aim opened as a static summary with no input or textarea. Edit Aim explicitly opened a buffered composer with Cancel and Update actions, and Cancel restored the summary without changing the Aim text.
-- Pinned sidebar checks kept Aim and Context aligned in the main workspace with no native-control overlap. Accessibility exposed the native close/minimize/fullscreen controls and all summary/edit actions.
-- Computer Use resolved the root bundle to the normal local session rather than the prepared `/tmp` demo seed. QA therefore did not type, answer intake, submit, save, discard, or change Settings. The draft's stage metadata was returned to Context before restoring the visible app to Home with the sidebar collapsed.
+- Full required gate passed after the final edits: `pnpm build && pnpm test && pnpm typecheck && pnpm lint && pnpm core:purity && git diff --check`.
+- Test result: 81 files and 868 tests passed. Relevant package totals were Core 171, LLM 164, CLI 84, Desktop 197, Store 62, API 40, DB 36, and MCP 114.
+- The expected MCP missing-Supabase-environment stderr came only from its hygiene fixture; the suite passed.
+- `pnpm desktop:pack` passed with Electron 43.0.0 for macOS arm64, without signing.
+- `ditto apps/desktop/dist/mac-arm64/Aimcub.app Aimcub.app` refreshed the project-root bundle. It is `com.aimcub.desktop`, version `0.0.0`; `Resources/app.asar` SHA256 is `a22b2a4e9c792f3607471a10f10a0ce28201d0bd83dad22617621908c210ebaa`.
+- No live app state was mutated and no real `~/.aimcub` data was written. Logic, persistence migration, SSR rendering, accessibility, and keyboard behavior were verified through automated tests.
+- Independent final review found no P0 or P1 issue in the policy, intake/clarify counts, CLI validation, Desktop radio behavior, or legacy migration.
 
 ## Commit And Push Status
 
-- Feature commit: `530150cd` (`Unify desktop aim states and titlebar safety`).
-- Local merge commit: `47135fa8` (`Merge desktop aim state and titlebar safety`).
-- Remote push: not performed. The environment's export safety review rejected the GitHub push and requires fresh explicit user approval; `origin/main` remains at `c15345f8`.
+- Feature commit: `8e5ed037` (`Fix semantic context choice modes`).
+- Local merge commit: `74e9a825` (`Merge semantic context choice modes`).
+- Handoff-only commit: pending at the time this file was written.
+- Remote push: not performed. The prior export safety review requires fresh explicit user approval; `origin/main` remains at `c15345f8`.
 
 ## Open Risks
 
-- Exact 640 by 520 packaged resizing was not available through the current Computer Use control surface in this pass. Responsive CSS and automated tests cover the same selectors, and prior packaged QA established the focused Context flow at the minimum size, but the new draft summary should receive another exact minimum-size screenshot when deterministic window resizing is available.
-- The saved-contract code surface and fixed web provider value are covered by SSR regression tests but were not opened in the live local session because doing so would have required different seeded state.
+- The deterministic core deliberately covers only high-confidence wording and answer-shape evidence. It is a safety layer around model understanding, not an attempt to encode every language pattern. Unknown or ambiguous relations intentionally resolve to multiple-select because that loses less valid context than a false single-select.
+- Anthropic's internal classification logic is not public. Future tuning should continue to use observed product failures and adversarial bilingual examples, without presenting Aimcub's inferred policy as Claude internals.
+- A future deterministic seeded visual pass can supplement the automated radio and multi-toggle coverage, but no known behavior or accessibility blocker remains.
 
 ## Next Session Prompt
 
 ```text
-Continue from Aimcub main. Read AGENTS.md, docs/handoff.md, docs/memory/README.md, docs/memory/desktop.md, docs/memory/design-system.md, and docs/memory/operations.md first. Preserve geometric titlebar clearance and the Aim compose-summary-edit model; use an isolated AIMCUB_HOME for any state-changing visual QA.
+Continue from Aimcub main. Read AGENTS.md, docs/handoff.md, docs/memory/README.md, docs/memory/product.md, docs/memory/architecture.md, docs/memory/desktop.md, and docs/memory/design-system.md first. Preserve the shared semantic choice policy: require strong evidence for single-select, default uncertain compatible answers to multiple-select, and never reintroduce option-count or fixed-form padding heuristics. Use an isolated AIMCUB_HOME for any state-changing visual QA.
 ```
