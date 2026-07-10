@@ -1,7 +1,7 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-10
-Branch: `codex/refresh-desktop-focus-memory`
+Branch: `main`
 
 ## Current Session
 
@@ -40,8 +40,10 @@ Branch: `codex/refresh-desktop-focus-memory`
 
 ## Commit And Push Status
 
-- Memory-refresh commit: pending.
-- Push and merge: pending.
+- Memory-refresh commit: `0a9f166e` (`Refresh desktop visual QA memory`).
+- Feature branch: `codex/refresh-desktop-focus-memory`, pushed to `origin`.
+- Merge commit: `a08edb4f` (`Merge desktop visual QA memory refresh`).
+- Merge status: pushed to the verified private `origin/main` remote with admin permission.
 
 ## Open Risks
 
