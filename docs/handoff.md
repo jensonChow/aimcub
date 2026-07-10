@@ -5,53 +5,50 @@ Branch: `main`
 
 ## Current Session
 
-- Request: fix repeated single-select classification of compatible Context answers, research the public Claude interaction contract, then run `$memory-refresh` so project memory matches the implementation and current Git state.
-- Starting state: the feature began from local `main` at `c3d58d25`, three commits ahead of `origin/main`; the memory refresh began from clean `main` at `2769ff4e`, six commits ahead of `origin/main` at `c15345f8`.
-- Evidence reviewed: official Anthropic public materials, the complete choice-mode implementation and adversarial tests, recent diffs and commits, the memory audit, root contracts, module memory map, prior handoffs at `c15345f8` and `c3d58d25`, and three independent read-only audits.
+- Request: restore real single-select questions, deepen user exploration and research coverage, add working network research, and connect local agent CLIs to the Aimcub product loop.
+- Starting state: local `main` at `e84e229f`, seven commits ahead of `origin/main` at `c15345f8`.
+- Implementation branch: `codex/deepen-context-research-cli`.
+- Evidence reviewed: the current intake/clarify normalization path, Desktop planning tools and research settings, local Codex/Claude adapters, CLI/store/eval flows, official Codex CLI/config documentation, live local-agent probes, and the relevant durable project memory.
 
 ## Completed Work
 
-- Added one shared choice-mode contract across pre-draft intake, post-draft clarification, `context.ask_user`, Desktop, draft hydration, and CLI. Aim-aware generation prompts test same-scope option coexistence; the deterministic Core layer accepts only high-confidence single-choice evidence and otherwise preserves context as multiple-select.
-- Removed option-count and fixed-form heuristics. Pre-draft intake can split a broad gap into atomic questions or return zero when ready. Post-draft clarification keeps any useful non-empty model set without padding; after memory filtering leaves no unresolved question, it may add up to two baseline questions within the runtime budget.
-- Preserved answer semantics end to end: Desktop single custom text replaces a preset while multi custom text supplements presets; radio groups support roving keyboard navigation; legacy migration preserves ambiguous or unknown selections as visible custom text; CLI validates answers against the generated question mode.
-- Added bilingual adversarial coverage for compatible life paths and routes, primary/default/scalar counterexamples, binary availability, migration, CLI parsing, prompt budgets, question counts, and Desktop control semantics.
-- Refreshed memory ownership. `product.md` is the normative semantic source; `architecture.md` now distinguishes model reasoning from the deterministic safety layer and records the public-research boundary; `desktop.md` owns hydration data safety; `design-system.md` owns radio/toggle/custom/keyboard behavior; `operations.md` and the root contracts now require authorization before push.
-- Restored unresolved risks that had been dropped when the prior handoff was replaced, and corrected the stale pending handoff commit state.
-
-## Memory-Refresh Files
-
-- `AGENTS.md`
-- `CLAUDE.md`
-- `docs/memory/architecture.md`
-- `docs/memory/desktop.md`
-- `docs/memory/design-system.md`
-- `docs/memory/operations.md`
-- `docs/handoff.md`
+- Repaired choice normalization with a trust-but-verify rule. An aligned generated `single` plus exclusive/primary reason now survives unless wording or options contain strong additive/coexistence evidence. Compatible routes, evidence, capabilities, plural sets, and uncertainty remain multiple-select.
+- Replaced the pre-draft static question batch with a bounded adaptive interview. Desktop asks one question, returns cumulative visible questions and answers through the same intake run, appends one non-duplicate follow-up, and stops when the model reports sufficient context or six turns are reached.
+- Expanded model exploration across outcome and motivation, baseline, users and stakeholders, resources/access/skills/budget/time, preferences and tradeoffs, authority/delegation, risks and disallowed outcomes, source truth, environment/distribution, and observable completion evidence when those dimensions can change the plan.
+- Added a provider-independent research brief across aim facts, authoritative requirements, alternatives/market, risks/tradeoffs, and user/audience evidence. It preserves URLs and exposes lane coverage, domain diversity, authority, freshness, conflict signals, gaps, and scored sufficiency. Fetch selection is lane-aware, authority-prioritized, and domain-diverse.
+- Added Desktop local-CLI web research fallback. Configured Brave remains the dedicated provider; otherwise an authenticated Codex/Claude CLI builds one bounded live-search corpus that is reused across research lanes, and first-party page fetching verifies selected public sources. Web research is required only for relevant or explicitly enabled aims, not every aim merely because deep mode is on.
+- Extracted shared Codex/Claude discovery, live model selection, permission mapping, current JSONL parsing, and execution into `packages/local-agent`. Codex network runs use `--search`; workspace-write shell network is separately scoped. Claude workspace writes use `acceptEdits`, and network-off runs disallow built-in WebSearch/WebFetch.
+- Connected CLI planning to an authenticated local agent when no API key exists. Added `aimcub agents` and a bounded `aimcub run <id> --workspace <absolute-path>` command that executes one ready agent-owned sub-aim, streams/persists events, records attributed low-trust evidence, re-evaluates progress, and sediments context without writing completion directly.
+- Updated durable product, architecture, Desktop, design-system, v1, tool-contract, local-alpha, vision, and README documentation. The CLI remains explicitly one-run-at-a-time: no daemon, until-blocked loop, retry scheduler, or direct completion claim.
 
 ## Verification
 
-- The read-only memory audit passed; `AGENTS.md` and `CLAUDE.md` remain identical, hard-rule-only, and 34 lines each under the 50-line limit.
-- The full required gate passed on the refresh: `pnpm build`, `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm core:purity`, and `git diff --check`.
-- Test result: 81 files and 868 tests passed. Package totals remain Core 171, LLM 164, CLI 84, Desktop 197, Store 62, API 40, DB 36, and MCP 114. The expected missing-Supabase stderr came only from the MCP hygiene fixture.
-- `pnpm desktop:pack` passed with Electron 43.0.0 for macOS arm64, without signing, and the project-root `Aimcub.app` was refreshed. It is `com.aimcub.desktop`, version `0.0.0`; `Resources/app.asar` SHA256 is `a22b2a4e9c792f3607471a10f10a0ce28201d0bd83dad22617621908c210ebaa`.
-- No live app state or real `~/.aimcub` data was changed during this memory refresh.
+- `pnpm install --frozen-lockfile` passed for all 11 workspace projects.
+- The full required gate passed: `pnpm build`, `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm core:purity`, and `git diff --check`.
+- Test result: 88 test files and 900 tests passed. Package totals were Core 176, LLM 170, local-agent 10, CLI 88, Desktop 204, Store 62, API 40, DB 36, and MCP 114. The expected missing-Supabase stderr came only from the MCP hygiene fixture.
+- A real read-only Codex `--search` run used the live compatible model catalog and returned the current official Codex CLI documentation URL through the normalized JSONL parser.
+- Built CLI smoke passed: `aimcub agents --json` detected authenticated Codex CLI `0.142.5` with live models and an installed but unauthenticated Claude Code `2.1.191`.
+- An isolated `AIMCUB_HOME=/tmp/aimcub-cli-plan-smoke` run of built `aimcub plan` completed without an API key through local Codex, including structured decomposition and the quality retry/review path. Its deliberately thin input remained honestly flagged for missing context/research instead of being presented as high-quality evidence.
+- `pnpm desktop:pack` passed with Electron 43.0.0 for macOS arm64, without signing, and the project-root `Aimcub.app` was refreshed. It is `com.aimcub.desktop`, version `0.0.0`; `Resources/app.asar` SHA256 is `089cf0eb76f30c3f217fb184665dc2947b809c6183e74d92df5a275273325d65`.
+- No real `~/.aimcub` state was read or written. Live Aimcub CLI checks used isolated `/tmp` homes; the local-agent smoke was read-only.
 
 ## Commit And Push Status
 
-- Choice-mode feature commit: `8e5ed037` (`Fix semantic context choice modes`).
-- Choice-mode local merge commit: `74e9a825` (`Merge semantic context choice modes`).
-- Choice-mode handoff commit: `2769ff4e` (`Finalize context choice mode handoff`).
-- This handoff is part of the focused memory-refresh commit on local `main`; no separate branch merge is needed. That commit leaves local `main` seven commits ahead of `origin/main`.
-- Remote push is not performed. The prior export safety review requires fresh explicit user approval; `origin/main` remains at `c15345f8`.
+- Feature commit: `c25dcf6b` (`Deepen context research and local CLI orchestration`).
+- Local merge commit: `1dd6f9e2` (`Merge deeper context research and CLI orchestration`).
+- This handoff is the only post-merge change and will be finalized in a focused local `main` commit.
+- Local `main` is nine commits ahead of `origin/main` before the handoff commit. Remote push is not performed because the user did not authorize it; `origin/main` remains at `c15345f8`.
 
 ## Open Risks
 
-- Semantic pairwise reasoning currently depends on the model prompt, pure Core tests, and mock-gateway adversarial regressions. The Core layer is intentionally a conservative wording/answer-shape safeguard, and there is not yet a live-provider accuracy benchmark over a broader Aim corpus.
+- Adaptive intake and source classification still depend on model behavior. Deterministic normalization, bounded turns, source URL preservation, coverage scoring, and focused tests constrain the failure modes, but there is not yet a live benchmark across a broad multilingual Aim corpus.
+- Local-CLI research gathers one bounded corpus per planning context. It is materially deeper and faster than spawning one agent per lane, but difficult or highly dynamic topics may still need a dedicated Brave provider, additional domain-specific queries, or explicit user sources.
+- `aimcub run` handles one ready agent-owned sub-aim per invocation. Durable queues, automatic until-blocked orchestration, retries, resumable sessions, and structured artifact capture remain future work.
 - An open manual-proof draft is protected from normal in-app navigation but is not checkpointed across process termination or a full reload.
-- A deterministic isolated-seed packaged pass should still cover the new radio/multi controls, the Aim summary at exactly 640 by 520, saved-contract code, the fixed web provider value, and selected Contract/Work layouts. Automated regressions cover related component behavior and responsive selectors; these packaged visual assertions remain pending.
+- A deterministic isolated-seed packaged visual pass remains useful for the adaptive question transition and Settings provider label. Component, source-state, build, package, and real CLI regressions passed in this session.
 
 ## Next Session Prompt
 
 ```text
-Continue from Aimcub main. Read AGENTS.md, docs/handoff.md, docs/memory/README.md, and the module memory for the surface you touch. Preserve product.md as the choice-cardinality source of truth, keep model semantic reasoning separate from the conservative Core safeguard, and never reintroduce option-count or fixed-form padding heuristics. Use an isolated AIMCUB_HOME for state-changing visual QA. Do not push the seven local commits until the user gives fresh explicit approval.
+Continue from Aimcub main. Read AGENTS.md, docs/handoff.md, docs/memory/README.md, and the module memory for the surface you touch. Preserve trust-but-verify single/multiple normalization, the one-question adaptive intake loop, research coverage/sufficiency honesty, and eval-only completion. Treat packages/local-agent as the shared Codex/Claude runtime boundary. Use isolated AIMCUB_HOME for live or packaged validation. Do not push the local commits until the user gives fresh explicit approval.
 ```
