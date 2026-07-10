@@ -34,8 +34,8 @@ Branch: `main`
 
 - Feature commit: `b7247c33` (`Compact Aim navigation and workspace layout`).
 - Local merge commit: `eb241ef5` (`Merge compact Aim navigation and layout`).
-- This handoff is the only post-merge change and will be finalized in a focused local `main` commit.
-- Local `main` is fifteen commits ahead of `origin/main` before the handoff commit. Remote push is not performed because the user did not authorize it; `origin/main` remains at `c15345f8`.
+- Initial handoff commit: `c34c075a` (`Finalize compact Aim layout handoff`).
+- The user explicitly authorized commit, merge, and push after invoking `memory-refresh`. `main` through `c34c075a` was pushed successfully, advancing `origin/main` from `c15345f8`; this focused memory-refresh record is the final history-only update and is published as the new `main` tip.
 
 ## Open Risks
 
@@ -46,5 +46,5 @@ Branch: `main`
 ## Next Session Prompt
 
 ```text
-Continue from Aimcub main. Read AGENTS.md, docs/handoff.md, docs/memory/README.md, and the relevant module memory. Preserve canonical Aim titles for editing, planning, search, CLI, and agent work; use concise display-only navigation summaries in one-line sidebar rows without status subtitles. Keep Home single-surface and align related workbench content to the shared 560/760/940 px rails. Use isolated HOME, AIMCUB_HOME, and Electron user data for packaged QA. The project-root Aimcub.app is the current verified bundle. Do not push local commits until the user gives fresh explicit approval.
+Continue from Aimcub main. Read AGENTS.md, docs/handoff.md, docs/memory/README.md, and the relevant module memory. The compact Aim navigation and workspace alignment work is merged and published on origin/main. Preserve canonical Aim titles for editing, planning, search, CLI, and agent work; use concise display-only navigation summaries in one-line sidebar rows without status subtitles. Keep Home single-surface and align related workbench content to the shared 560/760/940 px rails. Use isolated HOME, AIMCUB_HOME, and Electron user data for packaged QA. The project-root Aimcub.app is the current verified bundle. Require fresh explicit authorization for future pushes.
 ```
