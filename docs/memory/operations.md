@@ -19,6 +19,8 @@ Every repository-changing session must finish by running the full verification s
 
 If pushing the default branch is blocked by permission review or requires explicit user approval, do not retry through another route. Leave the local focused commit in place, record the exact ahead/unpushed state in `docs/handoff.md`, and ask the user for explicit approval before pushing.
 
+After approval, verify the destination before retrying: use `gh auth status` plus `gh repo view --json nameWithOwner,visibility,viewerPermission,defaultBranchRef`, confirm that `origin` matches that repository, and require suitable write permission. A verified authenticated owner/admin repository is materially different from an unidentified remote; record the resolved push state in the handoff.
+
 ## Dependency Compatibility
 
 As of 2026-07-06, the newest mutually compatible dependency set keeps Electron 43.0.0, electron-builder 26.15.3, electron-vite 5.0.0, Vite 7.3.6, React 19.2.7, TypeScript 6.0.3, Vitest 4.1.9, ESLint 10.6.0, Zod 4.4.3, Supabase JS 2.110.0, Anthropic SDK 0.110.0, Wrangler 4.107.0, and Turbo 2.10.3.

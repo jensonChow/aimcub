@@ -22,13 +22,14 @@ Branch: `main`
 - Removed draft list caps so every persisted draft remains reachable. Draft status now reflects workflow content rather than the page the user happened to browse.
 - Added focused navigation, persistence, activation, save-release, startup, Settings-return, and stale-response regression coverage plus matching English/Chinese copy.
 - Updated `docs/memory/desktop.md` and `docs/memory/design-system.md` with the durable navigation and checkpoint rules.
+- A post-merge memory refresh reconciled active-draft discard semantics and the verified-origin push approval procedure.
 
 ## Changed Files
 
 - Renderer orchestration and shell: `apps/desktop/src/renderer/App.tsx`, `CockpitShell.tsx`, `firstRunFlow.ts`, and `i18n.tsx`.
 - Draft UI and workflow: `stages/aim/AimDraftRecovery.tsx`, `workflow/aimDrafts.ts`, and new `workflow/workspaceNavigation.ts`, `workflow/draftPersistenceQueue.ts`, and `workflow/navigationConcurrency.ts`.
 - Tests: matching renderer, routing, draft, workspace-navigation, persistence-queue, and navigation-concurrency test files.
-- Memory and transfer docs: `docs/memory/desktop.md`, `docs/memory/design-system.md`, and this handoff.
+- Memory and transfer docs: `docs/memory/desktop.md`, `docs/memory/design-system.md`, `docs/memory/operations.md`, and this handoff.
 
 ## Verification
 
@@ -38,6 +39,7 @@ Branch: `main`
 - Isolated live QA used `AIMCUB_HOME=/tmp/aimcub-navigation-qa-019f4a1f` at the normal 960x680 window and a macOS half-screen narrow layout. It confirmed one current draft row, no New Aim double selection, three draft surfaces, ignored Cmd+4, Context -> Settings -> Context return, Home recovery, and no visible overflow.
 - `pnpm desktop:pack` passed with Electron 43.0.0, and `ditto apps/desktop/dist/mac-arm64/Aimcub.app Aimcub.app` refreshed the root bundle.
 - Root `Aimcub.app` remains `com.aimcub.desktop`, version `0.0.0`; `Resources/app.asar` SHA256 is `bbd5c8e26ee1cb213e728115f0f7276306e6923dfaf37431957de0513c73f06a`.
+- The post-merge memory refresh reran the memory audit, all repository gates, `git diff --check`, and Desktop packaging; the root app hash remained unchanged.
 
 ## Commit And Push Status
 
@@ -45,6 +47,7 @@ Branch: `main`
 - Local `main` merge: `ee7c84045777df52337f5e1d501056f425909e3a` (`Merge desktop draft navigation coherence`).
 - The user explicitly approved remote upload after the initial safety hold. Read-only verification confirmed `jensonChow/aimcub` is the authenticated user's private repository with `ADMIN` access.
 - `origin/codex/desktop-navigation-coherence` now contains the feature commit, and `main` was pushed with the verified merge plus final handoff commits.
+- The post-merge memory refresh was completed directly on `main`; no additional feature branch or merge was needed.
 
 ## Open Risks
 
