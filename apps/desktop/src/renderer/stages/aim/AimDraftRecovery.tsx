@@ -43,7 +43,7 @@ export function AimDraftHomeSection(props: {
         </div>
       </div>
       <div className="od-draft-recovery-list">
-        {props.drafts.slice(0, 4).map((draft) => {
+        {props.drafts.map((draft) => {
           const title = aimDraftDisplayTitle(draft, t("aimDraft.untitled"));
           return (
             <div className="od-content-entry od-draft-recovery-row" key={draft.id}>
@@ -76,7 +76,7 @@ export function AimDraftSidebarRows(props: {
         <span>{t("aimDraft.sidebarLabel")}</span>
       </div>
       <div className="od-draft-list">
-        {props.drafts.slice(0, 6).map((draft) => {
+        {props.drafts.map((draft) => {
           const selected = props.activeDraftId === draft.id;
           const title = aimDraftDisplayTitle(draft, t("aimDraft.untitled"));
           return (

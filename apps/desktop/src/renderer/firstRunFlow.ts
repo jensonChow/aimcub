@@ -28,12 +28,17 @@ export function hasPlanningRuntime(provider: RuntimeProvider, localAgents: reado
   return Boolean(provider?.configured) || hasReadyLocalAgent(localAgents);
 }
 
-export function routeAfterRefresh(input: { hasSelectedAim: boolean; hasGoals: boolean }): RefreshRoute {
-  if (input.hasSelectedAim) {
+export function routeAfterRefresh(input: {
+  hasSelectedAim: boolean;
+  hasActiveDraft: boolean;
+  hasDrafts: boolean;
+  hasGoals: boolean;
+}): RefreshRoute {
+  if (input.hasSelectedAim || input.hasActiveDraft) {
     return { autoOpenFirstGoal: false, stageOverride: null };
   }
   return {
-    autoOpenFirstGoal: input.hasGoals,
+    autoOpenFirstGoal: input.hasGoals && !input.hasDrafts,
     stageOverride: "aim",
   };
 }

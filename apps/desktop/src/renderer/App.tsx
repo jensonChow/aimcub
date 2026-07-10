@@ -27,7 +27,7 @@ import type {
   WebResearchStatus,
 } from "../shared/ipc";
 
-import { CockpitShell, type CockpitStage, type SidebarAction } from "./CockpitShell";
+import { CockpitShell, type CockpitStage, type WorkbenchStage } from "./CockpitShell";
 import { hasCompletionRecap, stageForOpenedAim } from "./completionRecap";
 import { buildContextCandidateAcceptRequest, type ContextInboxScope } from "./ContextInbox";
 import { ContextSourcesPanel } from "./ContextSourcesPanel";
@@ -99,6 +99,27 @@ import {
   type SettingsModel,
   type SettingsSectionId,
 } from "./workflow/settingsModel";
+import {
+  createDraftPersistenceQueue,
+  type DraftPersistenceQueue,
+} from "./workflow/draftPersistenceQueue";
+import {
+  beginNavigation,
+  beginPlanningActivity,
+  canActivateGoal,
+  canApplyDeferredSurfaceRoute,
+  canApplyDeferredWorkspaceResponse,
+  canStartWorkflowMutation,
+  createNavigationConcurrencyState,
+  finishSaveInFlight,
+  withSaveInFlight,
+} from "./workflow/navigationConcurrency";
+import {
+  createDraftActivationTracker,
+  deriveWorkspaceTarget,
+  isWorkbenchStageAvailable,
+  settingsReturnStage,
+} from "./workflow/workspaceNavigation";
 import { shortText } from "./workflow/text";
 
 export { buildSettingsModel };
@@ -116,7 +137,7 @@ function AimOsApp() {
   const [mode, setMode] = useState<AppMode>("cockpit");
   const [goals, setGoals] = useState<Goal[]>([]);
   const [aimDrafts, setAimDrafts] = useState<AimDraft[]>([]);
-  const [selected, setSelected] = useState<Goal | null>(null);
+  const [selected, setSelectedState] = useState<Goal | null>(null);
   const [detail, setDetail] = useState<GoalDetail | null>(null);
   const [progress, setProgress] = useState<AimProgressReadModel | null>(null);
   const [provider, setProvider] = useState<ProviderStatus | null>(null);
@@ -140,18 +161,124 @@ function AimOsApp() {
   const [contextNote, setContextNote] = useState("");
   const [draftSaveBlock, setDraftSaveBlock] = useState<AimDraftSaveBlock | null>(null);
   const [error, setError] = useState<string | ProductError | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
+  const [busy, setBusyState] = useState<string | null>(null);
   const [stageOverride, setStageOverride] = useState<CockpitStage | null>(null);
   const [runtimeGuidanceVisible, setRuntimeGuidanceVisible] = useState(false);
   const [settingsSection, setSettingsSection] = useState<SettingsSectionId>("overview");
-  const planningRunIdRef = useRef<string | null>(null);
-  const draftPersistencePausedRef = useRef(false);
+  const navigationConcurrencyRef = useRef(createNavigationConcurrencyState<string>());
+  const selectedGoalRef = useRef<Goal | null>(null);
+  const draftActivationTrackerRef = useRef(createDraftActivationTracker());
+  const sideEffectOperationRef = useRef<{ id: string; busy: string } | null>(null);
+  const pendingTargetNavigationRef = useRef<{
+    transition: number;
+    busy: string;
+    targetDraftId?: string;
+  } | null>(null);
+  const discardInFlightDraftIdRef = useRef<string | null>(null);
+  const settingsReturnStageRef = useRef<WorkbenchStage>("aim");
+  const draftPersistenceRef = useRef<DraftPersistenceQueue | null>(null);
   const activeDraftIdRef = useRef<string | null>(null);
   const [activeDraftId, setActiveDraftIdState] = useState<string | null>(null);
+  if (!draftPersistenceRef.current) {
+    draftPersistenceRef.current = createDraftPersistenceQueue((req) => window.aimcub.upsertAimDraft(req));
+  }
+  const draftPersistence = draftPersistenceRef.current;
+
+  function setSelected(goal: Goal | null) {
+    selectedGoalRef.current = goal;
+    setSelectedState(goal);
+  }
 
   function setActiveDraftId(id: string | null) {
     activeDraftIdRef.current = id;
     setActiveDraftIdState(id);
+  }
+
+  function setBusy(nextBusy: string | null) {
+    const lockedBusy = sideEffectOperationRef.current?.busy
+      ?? pendingTargetNavigationRef.current?.busy
+      ?? (discardInFlightDraftIdRef.current ? t("os.busy.discardDraft") : null)
+      ?? (navigationConcurrencyRef.current.saveInFlight ? navigationConcurrencyRef.current.busy : null);
+    const guardedBusy = nextBusy === null && lockedBusy
+      ? lockedBusy
+      : nextBusy;
+    navigationConcurrencyRef.current = {
+      ...navigationConcurrencyRef.current,
+      busy: guardedBusy,
+    };
+    setBusyState(guardedBusy);
+  }
+
+  function beginSideEffectOperation(id: string, busyMessage: string): boolean {
+    if (sideEffectOperationRef.current) return false;
+    sideEffectOperationRef.current = { id, busy: busyMessage };
+    setBusy(busyMessage);
+    return true;
+  }
+
+  function finishSideEffectOperation(id: string) {
+    if (sideEffectOperationRef.current?.id !== id) return;
+    sideEffectOperationRef.current = null;
+    setBusy(null);
+  }
+
+  function beginPendingTargetNavigation(transition: number, targetDraftId?: string) {
+    const pending = { transition, busy: t("os.busy.navigation"), targetDraftId };
+    pendingTargetNavigationRef.current = pending;
+    setBusy(pending.busy);
+  }
+
+  function finishPendingTargetNavigation(transition: number) {
+    if (pendingTargetNavigationRef.current?.transition !== transition) return;
+    pendingTargetNavigationRef.current = null;
+    setBusy(null);
+  }
+
+  function cancelPendingTargetNavigation() {
+    if (!pendingTargetNavigationRef.current) return;
+    pendingTargetNavigationRef.current = null;
+    setBusy(null);
+  }
+
+  function navigationIsLocked(): boolean {
+    return navigationConcurrencyRef.current.saveInFlight || Boolean(discardInFlightDraftIdRef.current);
+  }
+
+  function workflowMutationIsLocked(): boolean {
+    return !canStartWorkflowMutation({
+      saveInFlight: navigationConcurrencyRef.current.saveInFlight,
+      discardInFlight: Boolean(discardInFlightDraftIdRef.current),
+      pendingTargetNavigation: Boolean(pendingTargetNavigationRef.current),
+      sideEffectInFlight: Boolean(sideEffectOperationRef.current),
+    });
+  }
+
+  function beginWorkspaceTransition(): number {
+    const next = beginNavigation(navigationConcurrencyRef.current, "target");
+    navigationConcurrencyRef.current = next;
+    setBusyState(next.busy);
+    return next.workspace;
+  }
+
+  function isCurrentWorkspaceTransition(transition: number): boolean {
+    const current = navigationConcurrencyRef.current;
+    return canApplyDeferredWorkspaceResponse({ workspace: transition, surface: current.surface }, current);
+  }
+
+  function beginSurfaceTransition(): number {
+    const next = beginNavigation(navigationConcurrencyRef.current, "surface");
+    navigationConcurrencyRef.current = next;
+    setBusyState(next.busy);
+    return next.surface;
+  }
+
+  function isCurrentSurfaceTransition(transition: number): boolean {
+    const current = navigationConcurrencyRef.current;
+    return canApplyDeferredSurfaceRoute({ workspace: current.workspace, surface: transition }, current);
+  }
+
+  function isCurrentPlanningRun(runId: string, transition: number): boolean {
+    return navigationConcurrencyRef.current.planningRunId === runId && isCurrentWorkspaceTransition(transition);
   }
 
   useEffect(() => {
@@ -160,7 +287,7 @@ function AimOsApp() {
 
   useEffect(() => {
     return window.aimcub.onPlanningLiveEvent((event) => {
-      const activeRunId = planningRunIdRef.current;
+      const activeRunId = navigationConcurrencyRef.current.planningRunId;
       if (!activeRunId || event.runId !== activeRunId) return;
       setPlanningLiveEvents((current) => [...current, event].slice(-80));
     });
@@ -168,74 +295,160 @@ function AimOsApp() {
 
   function startPlanningRun(): string {
     const runId = createPlanningRunId();
-    planningRunIdRef.current = runId;
+    navigationConcurrencyRef.current = beginPlanningActivity(
+      navigationConcurrencyRef.current,
+      runId,
+      navigationConcurrencyRef.current.busy,
+    );
     setPlanningLiveEvents([]);
     return runId;
   }
 
   function clearPlanningRun() {
-    planningRunIdRef.current = null;
+    navigationConcurrencyRef.current = {
+      ...navigationConcurrencyRef.current,
+      planningRunId: null,
+    };
   }
 
-  async function refreshAll() {
-    const [nextGoals, nextDrafts, nextProvider, nextWeb, nextSources, nextAgents] = await Promise.all([
+  function interruptPlanningForNavigation() {
+    if (!navigationConcurrencyRef.current.planningRunId) return;
+    clearPlanningRun();
+    setBusy(null);
+  }
+
+  async function refreshAll(options: { autoOpenFirstGoal?: boolean } = {}) {
+    const transitionAtStart = navigationConcurrencyRef.current.workspace;
+    const surfaceAtStart = navigationConcurrencyRef.current.surface;
+    const configurationRefresh = Promise.all([
+      window.aimcub.getProviderConfig().then(setProvider).catch(() => setProvider(null)),
+      window.aimcub.getWebResearchConfig().then(setWebResearch).catch(() => setWebResearch(null)),
+      window.aimcub.getContextSourceConfig().then(setContextSources).catch(() => setContextSources(null)),
+      window.aimcub.listLocalAgents().then(setLocalAgents).catch(() => setLocalAgents([])),
+    ]).then(() => undefined);
+    const [nextGoals, nextDrafts] = await Promise.all([
       window.aimcub.listGoals().catch(() => []),
       window.aimcub.listAimDrafts().catch(() => []),
-      window.aimcub.getProviderConfig().catch(() => null),
-      window.aimcub.getWebResearchConfig().catch(() => null),
-      window.aimcub.getContextSourceConfig().catch(() => null),
-      window.aimcub.listLocalAgents().catch(() => []),
     ]);
+    if (!isCurrentWorkspaceTransition(transitionAtStart)) {
+      await configurationRefresh;
+      return;
+    }
     setGoals(nextGoals);
     setAimDrafts(nextDrafts);
-    setProvider(nextProvider);
-    setWebResearch(nextWeb);
-    setContextSources(nextSources);
-    setLocalAgents(nextAgents);
-    const route = routeAfterRefresh({ hasSelectedAim: Boolean(selected), hasGoals: nextGoals.length > 0 });
-    if (route.autoOpenFirstGoal && nextGoals[0]) void openGoal(nextGoals[0]);
-    if (route.stageOverride) {
+    const route = routeAfterRefresh({
+      hasSelectedAim: Boolean(selected),
+      hasActiveDraft: Boolean(activeDraftIdRef.current),
+      hasDrafts: nextDrafts.length > 0,
+      hasGoals: nextGoals.length > 0,
+    });
+    if (
+      options.autoOpenFirstGoal !== false
+      && route.autoOpenFirstGoal
+      && nextGoals[0]
+      && isCurrentWorkspaceTransition(transitionAtStart)
+      && isCurrentSurfaceTransition(surfaceAtStart)
+    ) {
+      await openGoal(nextGoals[0]);
+      await configurationRefresh;
+      return;
+    }
+    if (route.stageOverride && isCurrentSurfaceTransition(surfaceAtStart)) {
       setMode("cockpit");
       setStageOverride(route.stageOverride);
     }
+    await configurationRefresh;
   }
 
-  async function openGoal(goal: Goal) {
-    await persistCurrentDraftNow();
-    setSelected(goal);
-    setMode("cockpit");
-    setAimComposerOpen(false);
-    setActiveDraftId(null);
-    setError(null);
-    setDraftSaveBlock(null);
-    setDraft(null);
-    setFinalPlan(null);
-    setPlanResult(null);
-    setPlanningDebugTraces([]);
-    setPlanningLiveEvents([]);
-    clearPlanningRun();
-    setIntakeClarify(null);
-    setIntakeAnswers({});
-    setClarifyPhase(null);
-    setClarify(null);
-    setAnswers({});
-    setRuntimeGuidanceVisible(false);
-    setContextNote("");
-    await refreshGoalState(goal);
+  async function openGoal(
+    goal: Goal,
+    options: { allowDuringSave?: boolean; checkpointDraft?: boolean } = {},
+  ) {
+    if (discardInFlightDraftIdRef.current || !canActivateGoal(
+      navigationConcurrencyRef.current,
+      options.allowDuringSave ? "save_success" : "external_navigation",
+    )) return;
+    interruptPlanningForNavigation();
+    const transition = beginWorkspaceTransition();
+    const surfaceTransition = navigationConcurrencyRef.current.surface;
+    beginPendingTargetNavigation(transition);
+    try {
+      if (options.checkpointDraft !== false && !(await checkpointCurrentDraftBeforeNavigation())) return;
+      if (!isCurrentWorkspaceTransition(transition)) return;
+      finishPendingTargetNavigation(transition);
+      draftPersistence.invalidateSession();
+      setSelected(goal);
+      setBusy(null);
+      setMode("cockpit");
+      setAimComposerOpen(false);
+      setActiveDraftId(null);
+      setDetail(null);
+      setProgress(null);
+      setStageOverride("aim");
+      setError(null);
+      setDraftSaveBlock(null);
+      setDraft(null);
+      setFinalPlan(null);
+      setPlanResult(null);
+      setPlanningDebugTraces([]);
+      setPlanningLiveEvents([]);
+      clearPlanningRun();
+      setIntakeClarify(null);
+      setIntakeAnswers({});
+      setClarifyPhase(null);
+      setClarify(null);
+      setAnswers({});
+      setRuntimeGuidanceVisible(false);
+      setContextNote("");
+      try {
+        await refreshGoalState(goal, transition, surfaceTransition);
+      } catch (err) {
+        if (isCurrentWorkspaceTransition(transition)) setError(err instanceof Error ? err.message : String(err));
+      }
+    } finally {
+      finishPendingTargetNavigation(transition);
+    }
   }
 
-  async function refreshGoalState(goal: Goal | null = selected) {
+  async function refreshGoalState(
+    goal: Goal | null = selected,
+    transition = navigationConcurrencyRef.current.workspace,
+    surfaceTransition = navigationConcurrencyRef.current.surface,
+    options: { route?: boolean } = {},
+  ) {
     if (!goal) return;
     const [nextDetail, nextProgress] = await Promise.all([
       window.aimcub.getGoal(goal.id),
       window.aimcub.getAimProgress(goal.id),
     ]);
+    if (!isCurrentWorkspaceTransition(transition)) return;
     setDetail(nextDetail);
     setProgress(nextProgress);
-    setStageOverride(stageForOpenedAim(nextProgress));
+    if (options.route !== false && isCurrentSurfaceTransition(surfaceTransition)) {
+      setStageOverride(stageForOpenedAim(nextProgress));
+    }
+  }
+
+  async function refreshGoalAfterSideEffect(
+    goal: Goal,
+    transition: number,
+    surfaceTransition: number,
+  ) {
+    if (isCurrentWorkspaceTransition(transition)) {
+      await refreshGoalState(goal, transition, surfaceTransition, { route: false });
+      return;
+    }
+    if (selectedGoalRef.current?.id !== goal.id) return;
+    await refreshGoalState(
+      goal,
+      navigationConcurrencyRef.current.workspace,
+      navigationConcurrencyRef.current.surface,
+      { route: false },
+    );
   }
 
   function resetComposer(options: { openComposer?: boolean } = {}) {
+    draftPersistence.invalidateSession();
     setStageOverride("aim");
     setActiveDraftId(null);
     setAimComposerOpen(Boolean(options.openComposer));
@@ -257,6 +470,7 @@ function AimOsApp() {
     setContextNote("");
     setDraftSaveBlock(null);
     setSelected(null);
+    setBusy(null);
     setDetail(null);
     setProgress(null);
     setError(null);
@@ -272,6 +486,8 @@ function AimOsApp() {
   }
 
   async function startDraft(options: { skipIntakeGate?: boolean } = {}) {
+    if (workflowMutationIsLocked()) return;
+    const transition = navigationConcurrencyRef.current.workspace;
     const title = aimTitle.trim();
     const route = routeAfterAimSubmit({ title, provider, localAgents });
     if (route === "missing_aim") return;
@@ -293,6 +509,7 @@ function AimOsApp() {
         setMode("contexting");
         setStageOverride("context");
         const intake = await window.aimcub.intake({ title, description: aimDescription.trim() || undefined, clientRunId: runId });
+        if (!isCurrentPlanningRun(runId, transition)) return;
         setPlanResult({ ok: false, output: null, errors: [], intake });
         if (shouldBlockForIntake(intake) && intake.questions.length > 0) {
           const intakeOutput = intakeToClarifyOutput(intake, hasCjkText(`${title}\n${aimDescription}`));
@@ -309,6 +526,7 @@ function AimOsApp() {
       setStageOverride("contracts");
       const req = { title, description: descriptionWithContext(), clientRunId: runId };
       const nextDraft = await window.aimcub.draft(req);
+      if (!isCurrentPlanningRun(runId, transition)) return;
       setPlanResult(nextDraft);
       setPlanningDebugTraces(nextDraft.debugTrace ? [nextDraft.debugTrace] : []);
       if (!nextDraft.ok || !nextDraft.output) {
@@ -325,6 +543,7 @@ function AimOsApp() {
         output: null,
         errors: [err instanceof Error ? err.message : String(err)],
       }));
+      if (!isCurrentPlanningRun(runId, transition)) return;
       const clarifyTrace = nextClarify.debugTrace;
       if (clarifyTrace) {
         setPlanningDebugTraces((current) => [...current, clarifyTrace]);
@@ -335,6 +554,7 @@ function AimOsApp() {
       setMode("answering");
       setStageOverride("context");
     } catch (err) {
+      if (!isCurrentPlanningRun(runId, transition)) return;
       setError(formatPlanningFailure({
         stage: "draft",
         errors: [err instanceof Error ? err.message : String(err)],
@@ -345,7 +565,7 @@ function AimOsApp() {
       setMode(route.mode);
       setStageOverride(route.stageOverride);
     } finally {
-      setBusy(null);
+      if (isCurrentPlanningRun(runId, transition)) setBusy(null);
     }
   }
 
@@ -363,7 +583,9 @@ function AimOsApp() {
       title: aimTitle,
       description: aimDescription,
       parent,
-      activeStage: stageOverride ?? cockpitStageFor(mode, selected, (finalPlan ?? draft ?? detail?.goal.plan_json ?? null) as DecompositionOutput | null),
+      activeStage: stageOverride === "settings"
+        ? settingsReturnStageRef.current
+        : stageOverride ?? cockpitStageFor(mode, selected, (finalPlan ?? draft ?? detail?.goal.plan_json ?? null) as DecompositionOutput | null),
       phase: clarifyPhase,
       contextNote,
       intakeClarify,
@@ -376,18 +598,56 @@ function AimOsApp() {
     };
   }
 
-  async function persistCurrentDraftNow(overrides: { saveBlock?: AimDraftSaveBlock | null } = {}): Promise<AimDraft | null> {
-    if (draftPersistencePausedRef.current || selected) return null;
+  async function persistCurrentDraftNow(
+    overrides: { saveBlock?: AimDraftSaveBlock | null } = {},
+    options: { navigation?: boolean; throwOnError?: boolean; allowDuringDiscard?: boolean } = {},
+  ): Promise<AimDraft | null> {
+    const discardingCurrentDraft = Boolean(discardInFlightDraftIdRef.current)
+      && discardInFlightDraftIdRef.current === activeDraftIdRef.current;
+    if (selected || (discardingCurrentDraft && !options.allowDuringDiscard)) return null;
+    const transition = navigationConcurrencyRef.current.workspace;
     const req = buildAimDraftUpsertRequest(currentAimDraftInput(overrides));
     if (!req) return null;
+    if (!draftPersistence.currentDraftId()) {
+      draftPersistence.beginSession(activeDraftIdRef.current);
+      if (options.navigation) draftPersistence.pauseAutosave();
+    }
     try {
-      const saved = await window.aimcub.upsertAimDraft(req);
+      const result = options.navigation
+        ? await draftPersistence.flushForNavigation(req)
+        : await draftPersistence.enqueue(req);
+      if (result.status !== "persisted") return null;
+      const saved = result.draft;
+      if (!isCurrentWorkspaceTransition(transition)) return saved;
       setActiveDraftId(saved.id);
       setAimDrafts((current) => [saved, ...current.filter((row) => row.id !== saved.id)]
         .sort((a, b) => (b.updated_at ?? b.created_at ?? "").localeCompare(a.updated_at ?? a.created_at ?? "")));
       return saved;
-    } catch {
+    } catch (err) {
+      if (options.throwOnError) throw err;
       return null;
+    }
+  }
+
+  async function checkpointCurrentDraftBeforeNavigation(): Promise<boolean> {
+    if (selected) return true;
+    const transition = navigationConcurrencyRef.current.workspace;
+    draftPersistence.pauseAutosave();
+    try {
+      await persistCurrentDraftNow({}, { navigation: true, throwOnError: true });
+      return true;
+    } catch (err) {
+      if (!isCurrentWorkspaceTransition(transition)) return false;
+      draftPersistence.resumeAutosave();
+      clearPlanningRun();
+      setBusy(null);
+      setError({
+        title: t("aimDraft.checkpointErrorTitle"),
+        message: t("aimDraft.checkpointErrorMessage"),
+        recovery: t("aimDraft.checkpointErrorRecovery"),
+        details: [err instanceof Error ? err.message : String(err)],
+      });
+      return false;
     }
   }
 
@@ -405,7 +665,9 @@ function AimOsApp() {
   }
 
   function applyHydratedDraft(hydrated: HydratedAimDraft) {
+    draftPersistence.beginSession(hydrated.id);
     setSelected(null);
+    setBusy(null);
     setDetail(null);
     setProgress(null);
     setActiveDraftId(hydrated.id);
@@ -441,15 +703,70 @@ function AimOsApp() {
   }
 
   async function openAimDraft(draftRow: AimDraft) {
-    await persistCurrentDraftNow();
-    const fresh = await window.aimcub.getAimDraft(draftRow.id).catch(() => null);
-    applyHydratedDraft(hydrateAimDraft(fresh ?? draftRow));
+    if (navigationIsLocked()) return;
+    if (activeDraftIdRef.current === draftRow.id && !pendingTargetNavigationRef.current) return;
+    const activation = draftActivationTrackerRef.current.capture(draftRow.id);
+    interruptPlanningForNavigation();
+    const transition = beginWorkspaceTransition();
+    beginPendingTargetNavigation(transition, draftRow.id);
+    try {
+      if (!(await checkpointCurrentDraftBeforeNavigation())) return;
+      if (!isCurrentWorkspaceTransition(transition)) return;
+      if (!draftActivationTrackerRef.current.isCurrent(activation)) {
+        draftPersistence.resumeAutosave();
+        return;
+      }
+      const fresh = await window.aimcub.getAimDraft(draftRow.id).catch(() => undefined);
+      if (!isCurrentWorkspaceTransition(transition)) return;
+      if (!draftActivationTrackerRef.current.isCurrent(activation)) {
+        draftPersistence.resumeAutosave();
+        return;
+      }
+      if (fresh === null) {
+        draftPersistence.resumeAutosave();
+        await refreshAimDrafts();
+        return;
+      }
+      finishPendingTargetNavigation(transition);
+      applyHydratedDraft(hydrateAimDraft(fresh ?? draftRow));
+    } finally {
+      finishPendingTargetNavigation(transition);
+    }
   }
 
   async function discardAimDraft(draftRow: AimDraft) {
-    await window.aimcub.discardAimDraft(draftRow.id);
-    if (activeDraftIdRef.current === draftRow.id) resetComposer();
-    await refreshAimDrafts();
+    if (navigationIsLocked() || sideEffectOperationRef.current) return;
+    draftActivationTrackerRef.current.invalidate(draftRow.id);
+    const discardingActiveDraft = activeDraftIdRef.current === draftRow.id;
+    const cancelsPendingDraftActivation = pendingTargetNavigationRef.current?.targetDraftId === draftRow.id;
+    if (discardingActiveDraft) {
+      cancelPendingTargetNavigation();
+      interruptPlanningForNavigation();
+    } else if (cancelsPendingDraftActivation) {
+      cancelPendingTargetNavigation();
+      draftPersistence.resumeAutosave();
+    }
+    discardInFlightDraftIdRef.current = draftRow.id;
+    setBusy(t("os.busy.discardDraft"));
+    const transition = discardingActiveDraft ? beginWorkspaceTransition() : navigationConcurrencyRef.current.workspace;
+    if (discardingActiveDraft) {
+      draftPersistence.pauseAutosave();
+      await persistCurrentDraftNow({}, { navigation: true, allowDuringDiscard: true });
+      draftPersistence.invalidateSession();
+    }
+    try {
+      await window.aimcub.discardAimDraft(draftRow.id);
+      if (discardingActiveDraft && isCurrentWorkspaceTransition(transition)) resetComposer();
+      await refreshAimDrafts();
+    } catch (err) {
+      if (discardingActiveDraft && isCurrentWorkspaceTransition(transition)) {
+        draftPersistence.beginSession(draftRow.id);
+      }
+      if (isCurrentWorkspaceTransition(transition)) setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      discardInFlightDraftIdRef.current = null;
+      setBusy(null);
+    }
   }
 
   useEffect(() => {
@@ -482,7 +799,9 @@ function AimOsApp() {
   }
 
   async function refinePlan() {
+    if (workflowMutationIsLocked()) return;
     if (!draft) return;
+    const transition = navigationConcurrencyRef.current.workspace;
     setBusy(t("os.busy.refine"));
     setError(null);
     setDraftSaveBlock(null);
@@ -496,6 +815,7 @@ function AimOsApp() {
         answers: builtAnswers,
         clientRunId: runId,
       });
+      if (!isCurrentPlanningRun(runId, transition)) return;
       if (!refined.ok || !refined.output) {
         setPlanResult(refined);
         const refineTrace = refined.debugTrace;
@@ -517,6 +837,7 @@ function AimOsApp() {
       setMode("reviewing");
       setStageOverride("contracts");
     } catch (err) {
+      if (!isCurrentPlanningRun(runId, transition)) return;
       setError(formatPlanningFailure({
         stage: "refine",
         errors: [err instanceof Error ? err.message : String(err)],
@@ -527,11 +848,13 @@ function AimOsApp() {
       setMode(route.mode);
       setStageOverride(route.stageOverride);
     } finally {
-      setBusy(null);
+      if (isCurrentPlanningRun(runId, transition)) setBusy(null);
     }
   }
 
   async function savePlan() {
+    if (workflowMutationIsLocked()) return;
+    const transition = navigationConcurrencyRef.current.workspace;
     const plan = finalPlan ?? draft;
     if (!plan) return;
     const validation = validateExecutablePlan(plan);
@@ -541,6 +864,7 @@ function AimOsApp() {
       setError(productError);
       setDraftSaveBlock(saveBlock);
       await persistCurrentDraftNow({ saveBlock });
+      if (!isCurrentWorkspaceTransition(transition)) return;
       const route = routeAfterPlanningFailure("save");
       setMode(route.mode);
       setStageOverride(route.stageOverride);
@@ -562,17 +886,20 @@ function AimOsApp() {
       setError(message);
       setDraftSaveBlock(saveBlock);
       await persistCurrentDraftNow({ saveBlock });
+      if (!isCurrentWorkspaceTransition(transition)) return;
       setStageOverride("contracts");
       setMode("reviewing");
       return;
     }
     setBusy(t("os.busy.save"));
     setError(null);
-    const savedDraft = await persistCurrentDraftNow();
-    draftPersistencePausedRef.current = true;
+    navigationConcurrencyRef.current = withSaveInFlight(navigationConcurrencyRef.current, true);
     try {
+      const savedDraft = await persistCurrentDraftNow({}, { throwOnError: true });
+      if (!isCurrentWorkspaceTransition(transition)) return;
+      draftPersistence.pauseAutosave();
       const saved = await window.aimcub.saveGoal({
-        draftId: savedDraft?.id ?? activeDraftIdRef.current ?? undefined,
+        draftId: savedDraft?.id ?? draftPersistence.currentDraftId() ?? activeDraftIdRef.current ?? undefined,
         title: aimTitle.trim(),
         description: aimDescription.trim() || undefined,
         parentGoalId: parent?.goalId,
@@ -590,12 +917,19 @@ function AimOsApp() {
         answers: [...builtIntakeAnswers, ...builtAnswers],
         assumptions: clarify?.assumptions ?? [],
       });
+      if (!isCurrentWorkspaceTransition(transition)) {
+        await refreshAll({ autoOpenFirstGoal: false });
+        return;
+      }
       setActiveDraftId(null);
       setDraftSaveBlock(null);
+      setBusy(null);
       resetComposer();
-      await refreshAll();
-      await openGoal(saved.goal);
+      await refreshAll({ autoOpenFirstGoal: false });
+      if (!isCurrentWorkspaceTransition(transition)) return;
+      await openGoal(saved.goal, { allowDuringSave: true, checkpointDraft: false });
     } catch (err) {
+      if (!isCurrentWorkspaceTransition(transition)) return;
       setError(formatPlanningFailure({
         stage: "save",
         errors: [err instanceof Error ? err.message : String(err)],
@@ -603,79 +937,109 @@ function AimOsApp() {
         fallback: t("planningError.save.message"),
       }));
     } finally {
-      draftPersistencePausedRef.current = false;
+      navigationConcurrencyRef.current = finishSaveInFlight(navigationConcurrencyRef.current);
+      draftPersistence.resumeAutosave();
       setBusy(null);
     }
   }
 
   async function runAgent(milestone: Milestone) {
+    if (workflowMutationIsLocked()) return;
     if (!selected) return;
-    setBusy(t("os.busy.agent"));
+    const goal = selected;
+    const operationId = `agent:${goal.id}:${milestone.id}`;
+    if (!beginSideEffectOperation(operationId, t("os.busy.agent"))) return;
+    const transition = navigationConcurrencyRef.current.workspace;
+    const surfaceTransition = navigationConcurrencyRef.current.surface;
     setError(null);
     try {
-      const result = await window.aimcub.runMilestoneAgent({ goalId: selected.id, milestoneId: milestone.id });
-      if (!result.ok && result.error) setError(result.error);
-      await refreshGoalState(selected);
+      const result = await window.aimcub.runMilestoneAgent({ goalId: goal.id, milestoneId: milestone.id });
+      const resultTargetIsCurrent = isCurrentWorkspaceTransition(transition) || selectedGoalRef.current?.id === goal.id;
+      if (resultTargetIsCurrent && !result.ok && result.error) setError(result.error);
+      await refreshGoalAfterSideEffect(goal, transition, surfaceTransition);
     } catch (err) {
+      if (!isCurrentWorkspaceTransition(transition) && selectedGoalRef.current?.id !== goal.id) return;
       setError(err instanceof Error ? err.message : String(err));
     } finally {
-      setBusy(null);
+      finishSideEffectOperation(operationId);
     }
   }
 
   async function confirmMilestone(milestone: Milestone, submission: Omit<ConfirmMilestoneRequest, "goalId" | "milestoneId">) {
+    if (workflowMutationIsLocked()) return;
     if (!selected) return;
-    setBusy(t("os.busy.confirm"));
+    const goal = selected;
+    const operationId = `confirm:${goal.id}:${milestone.id}`;
+    if (!beginSideEffectOperation(operationId, t("os.busy.confirm"))) return;
+    const transition = navigationConcurrencyRef.current.workspace;
+    const surfaceTransition = navigationConcurrencyRef.current.surface;
     setError(null);
     try {
       const nextDetail = await window.aimcub.confirmMilestone({
-        goalId: selected.id,
+        goalId: goal.id,
         milestoneId: milestone.id,
         ...submission,
       });
-      const nextProgress = await window.aimcub.getAimProgress(selected.id);
+      const nextProgress = await window.aimcub.getAimProgress(goal.id);
+      const originalTargetIsCurrent = isCurrentWorkspaceTransition(transition);
+      if (!originalTargetIsCurrent && selectedGoalRef.current?.id !== goal.id) return;
       setDetail(nextDetail);
       setProgress(nextProgress);
-      if (hasCompletionRecap(nextProgress)) {
+      if (originalTargetIsCurrent && hasCompletionRecap(nextProgress) && isCurrentSurfaceTransition(surfaceTransition)) {
         setMode("reviewing");
         setStageOverride("eval");
       }
     } catch (err) {
+      if (!isCurrentWorkspaceTransition(transition) && selectedGoalRef.current?.id !== goal.id) return;
       setError(err instanceof Error ? err.message : String(err));
     } finally {
-      setBusy(null);
+      finishSideEffectOperation(operationId);
     }
   }
 
   async function acceptContextCandidate(candidate: Memory, content: string, scope: ContextInboxScope) {
-    setBusy(t("os.busy.contextReview"));
+    if (workflowMutationIsLocked()) return;
+    const goal = selected;
+    const operationId = `context-accept:${candidate.id}`;
+    if (!beginSideEffectOperation(operationId, t("os.busy.contextReview"))) return;
+    const transition = navigationConcurrencyRef.current.workspace;
+    const surfaceTransition = navigationConcurrencyRef.current.surface;
     setError(null);
     try {
       await window.aimcub.acceptContextCandidate(buildContextCandidateAcceptRequest(candidate, content, scope));
-      await refreshGoalState();
+      if (goal) await refreshGoalAfterSideEffect(goal, transition, surfaceTransition);
     } catch (err) {
+      if (!isCurrentWorkspaceTransition(transition) && (!goal || selectedGoalRef.current?.id !== goal.id)) return;
       setError(err instanceof Error ? err.message : String(err));
     } finally {
-      setBusy(null);
+      finishSideEffectOperation(operationId);
     }
   }
 
   async function rejectContextCandidate(candidate: Memory) {
-    setBusy(t("os.busy.contextReview"));
+    if (workflowMutationIsLocked()) return;
+    const goal = selected;
+    const operationId = `context-reject:${candidate.id}`;
+    if (!beginSideEffectOperation(operationId, t("os.busy.contextReview"))) return;
+    const transition = navigationConcurrencyRef.current.workspace;
+    const surfaceTransition = navigationConcurrencyRef.current.surface;
     setError(null);
     try {
       await window.aimcub.rejectContextCandidate(candidate.id);
-      await refreshGoalState();
+      if (goal) await refreshGoalAfterSideEffect(goal, transition, surfaceTransition);
     } catch (err) {
+      if (!isCurrentWorkspaceTransition(transition) && (!goal || selectedGoalRef.current?.id !== goal.id)) return;
       setError(err instanceof Error ? err.message : String(err));
     } finally {
-      setBusy(null);
+      finishSideEffectOperation(operationId);
     }
   }
 
   function breakDown(milestone: Milestone) {
+    if (workflowMutationIsLocked()) return;
     const plan = detail?.goal.plan_json as DecompositionOutput | null | undefined;
     const node = planNodeForMilestone(plan, milestone);
+    beginWorkspaceTransition();
     resetComposer({ openComposer: true });
     setParent({ goalId: milestone.goal_id, milestoneId: milestone.id });
     setAimTitle(milestone.title);
@@ -711,7 +1075,11 @@ function AimOsApp() {
   const hasUnsavedAim = aimTitle.trim().length > 0;
   const showAimComposer = aimComposerOpen || hasUnsavedAim || Boolean(parent) || Boolean(draft);
   const activeStage = stageOverride ?? cockpitStageFor(mode, selected, activePlan);
-  const activeSidebarAction: SidebarAction = selected ? null : showAimComposer ? "newAim" : activeStage === "aim" ? "home" : null;
+  const workspaceTarget = deriveWorkspaceTarget({
+    selectedGoalId: selected?.id ?? null,
+    activeDraftId,
+    showAimComposer,
+  });
   const planningRuntimeReady = hasPlanningRuntime(provider, localAgents);
   const activeAimTitle = selected?.title ?? aimTitle.trim();
   const activeAimDescription = selected?.description ?? aimDescription;
@@ -775,12 +1143,24 @@ function AimOsApp() {
   }
 
   function openCockpitStage(stage: CockpitStage) {
-    setStageOverride(stage);
+    if (navigationIsLocked() || pendingTargetNavigationRef.current) return;
+    if (stage !== "settings" && !isWorkbenchStageAvailable(workspaceTarget, stage)) return;
+    if (stage !== activeStage) {
+      beginSurfaceTransition();
+      interruptPlanningForNavigation();
+    }
     if (stage === "settings") {
+      settingsReturnStageRef.current = settingsReturnStage(
+        workspaceTarget,
+        activeStage,
+        settingsReturnStageRef.current,
+      );
+      setStageOverride(stage);
       setSettingsSection("overview");
       setMode("settings");
       return;
     }
+    setStageOverride(stage);
     if (stage === "context") {
       setMode("contexting");
       return;
@@ -797,35 +1177,66 @@ function AimOsApp() {
   }
 
   async function startNewAim() {
-    await persistCurrentDraftNow();
-    resetComposer({ openComposer: true });
-    setMode("cockpit");
-    setStageOverride("aim");
+    if (navigationIsLocked()) return;
+    interruptPlanningForNavigation();
+    const transition = beginWorkspaceTransition();
+    beginPendingTargetNavigation(transition);
+    try {
+      if (!(await checkpointCurrentDraftBeforeNavigation())) return;
+      if (!isCurrentWorkspaceTransition(transition)) return;
+      finishPendingTargetNavigation(transition);
+      resetComposer({ openComposer: true });
+      setMode("cockpit");
+      setStageOverride("aim");
+    } finally {
+      finishPendingTargetNavigation(transition);
+    }
   }
 
   async function openHomePanel() {
-    await persistCurrentDraftNow();
-    resetComposer();
-    setMode("cockpit");
-    setStageOverride("aim");
+    if (navigationIsLocked()) return;
+    interruptPlanningForNavigation();
+    const transition = beginWorkspaceTransition();
+    beginPendingTargetNavigation(transition);
+    try {
+      if (!(await checkpointCurrentDraftBeforeNavigation())) return;
+      if (!isCurrentWorkspaceTransition(transition)) return;
+      finishPendingTargetNavigation(transition);
+      resetComposer();
+      setMode("cockpit");
+      setStageOverride("aim");
+    } finally {
+      finishPendingTargetNavigation(transition);
+    }
   }
 
   function openSettingsForAim() {
+    if (navigationIsLocked() || pendingTargetNavigationRef.current) return;
+    beginSurfaceTransition();
+    interruptPlanningForNavigation();
+    settingsReturnStageRef.current = settingsReturnStage(
+      workspaceTarget,
+      activeStage,
+      settingsReturnStageRef.current,
+    );
     setSettingsSection(settingsSectionForFocus(activeAimHelper.settingsFocus));
     setMode("settings");
     setStageOverride("settings");
   }
 
   function openContextSettings() {
+    if (navigationIsLocked() || pendingTargetNavigationRef.current) return;
+    beginSurfaceTransition();
+    interruptPlanningForNavigation();
+    settingsReturnStageRef.current = "context";
     setSettingsSection("context");
     setMode("settings");
     setStageOverride("settings");
   }
 
-  function returnToAim() {
+  function returnFromSettings() {
     if (planningRuntimeReady) setRuntimeGuidanceVisible(false);
-    setMode("cockpit");
-    setStageOverride("aim");
+    openCockpitStage(settingsReturnStageRef.current);
   }
 
   const composerPanel = (
@@ -924,7 +1335,7 @@ function AimOsApp() {
         profile: activeAimHelper,
         runtimeReady: planningRuntimeReady,
       } : null}
-      onReturnToAim={activeAimTitle ? returnToAim : undefined}
+      onReturnToAim={activeAimTitle ? returnFromSettings : undefined}
     />
   );
   const settingsSidebar = (
@@ -932,7 +1343,7 @@ function AimOsApp() {
       model={settingsModel}
       activeSection={settingsSection}
       onSection={setSettingsSection}
-      onBack={() => openCockpitStage("aim")}
+      onBack={returnFromSettings}
     />
   );
   const continueContextToPlan = parent ? undefined : () => {
@@ -995,7 +1406,7 @@ function AimOsApp() {
       );
     }
     if (activeStage === "run") {
-      return executePanel ?? planPanel ?? (
+      return executePanel ?? (
         <LockedStagePanel
           eyebrow={t("os.stepExecute")}
           title={t("cockpit.runLockedTitle")}
@@ -1006,7 +1417,7 @@ function AimOsApp() {
       );
     }
     if (activeStage === "eval") {
-      return evalPanel ?? planPanel ?? (
+      return evalPanel ?? (
         <LockedStagePanel
           eyebrow={t("os.stepEval")}
           title={t("cockpit.runLockedTitle")}
@@ -1057,10 +1468,8 @@ function AimOsApp() {
     <CockpitShell
       goals={goals}
       drafts={aimDrafts}
-      activeDraftId={activeDraftId}
-      selected={selected}
       activeStage={activeStage}
-      activeSidebarAction={activeSidebarAction}
+      workspaceTarget={workspaceTarget}
       onHome={() => void openHomePanel()}
       onNewAim={() => void startNewAim()}
       onOpenGoal={(goal) => void openGoal(goal)}

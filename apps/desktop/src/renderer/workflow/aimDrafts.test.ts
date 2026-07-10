@@ -117,6 +117,28 @@ describe("aim draft persistence helpers", () => {
     expect(req?.saveBlock?.issues.join(" ")).not.toContain("nodes.0");
   });
 
+  it("does not change draft status just because the user browses another surface", () => {
+    const req = buildAimDraftUpsertRequest({
+      id: null,
+      title: "Browse a draft",
+      description: "",
+      parent: null,
+      activeStage: "context",
+      phase: null,
+      contextNote: "",
+      intakeClarify: null,
+      intakeAnswers: [],
+      clarify: null,
+      clarifyAnswers: [],
+      draft: null,
+      finalPlan: null,
+      saveBlock: null,
+    });
+
+    expect(req?.currentStage).toBe("context");
+    expect(req?.status).toBe("draft");
+  });
+
   it("hydrates saved draft rows back into renderer state", () => {
     const hydrated = hydrateAimDraft({
       id: "00000000-0000-4000-8000-000000000099",

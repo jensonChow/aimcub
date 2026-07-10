@@ -1,6 +1,6 @@
 # Design System Memory
 
-Last updated: 2026-07-09
+Last updated: 2026-07-10
 
 ## Scope
 
@@ -185,6 +185,7 @@ Reference links:
 ## Interaction and State
 
 - Every interactive element needs visible hover, active, focus-visible, disabled, selected/current, loading, and error states where applicable.
+- Desktop navigation must have exactly one primary current content target: Home, transient New Aim, one persisted draft, or one saved aim. Once New Aim work is checkpointed, its draft row owns the selected state and New Aim is no longer current. Drafts expose only Aim, Context, and Contracts; saved aims expose Aim, Context, Contracts, Work, and Review. Never render one surface's content under another surface's active label. Settings is a temporary detour and Back returns to the same content target and workbench surface.
 - Sidebar peek must be transient and hover/focus driven: it should open after a short hover delay, stay open while the pointer is over the toggle, reveal rail, revealed sidebar, or brief transition path between them, and close without changing the pinned/collapsed preference only after the pointer leaves that whole hover zone.
 - Hover-revealed overlays, including sidebar peek, must have symmetric enter and exit motion. Keep the overlay rendered and visible until the collapse transition finishes; do not hide or unmount it instantly on pointer leave.
 - Manual sidebar toggle actions take precedence over peek behavior: clicking or keyboard-toggling collapsed must not immediately reopen from the same pointer/focus state, but a fresh hover over the button or left-edge rail must still reveal the overlay sidebar. Draggable chrome must not cover the toggle or reveal hit targets, and window drag hit areas must stay stable across window focus and activation cycles instead of depending only on transient hover/peek sidebar DOM.

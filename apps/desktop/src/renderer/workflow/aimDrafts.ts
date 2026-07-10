@@ -150,10 +150,10 @@ export function saveBlockFromProductError(error: ProductError): AimDraftSaveBloc
   };
 }
 
-export function aimDraftStatus(input: Pick<AimDraftBuildInput, "draft" | "finalPlan" | "saveBlock" | "activeStage" | "phase" | "contextNote" | "intakeAnswers" | "clarifyAnswers">): AimDraftStatus {
+export function aimDraftStatus(input: Pick<AimDraftBuildInput, "draft" | "finalPlan" | "saveBlock" | "phase" | "contextNote" | "intakeAnswers" | "clarifyAnswers">): AimDraftStatus {
   if (input.saveBlock) return "save_blocked";
   if (input.finalPlan || input.draft) return "plan_ready";
-  if (input.activeStage === "context" || input.phase === "intake" || input.contextNote.trim() || input.intakeAnswers.length || input.clarifyAnswers.length) {
+  if (input.phase === "intake" || input.contextNote.trim() || input.intakeAnswers.length || input.clarifyAnswers.length) {
     return "context_needed";
   }
   return "draft";
