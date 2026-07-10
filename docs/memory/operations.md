@@ -55,6 +55,8 @@ ELECTRON_BUILDER_CACHE=/private/tmp/aimcub-electron-builder-cache pnpm --filter 
 
 For any repo-changing session, `pnpm build` is not enough because it updates build output but not the project-root `Aimcub.app` bundle. Run `pnpm desktop:pack`, copy `apps/desktop/dist/mac-arm64/Aimcub.app` to root `Aimcub.app`, and restart/open that exact bundle when the user needs to inspect visible app behavior.
 
+Every Desktop runtime dependency under `@core/*` currently exports raw TypeScript and must be listed in `bundleFromSource` in `apps/desktop/electron.vite.config.ts`. Desktop build, pack, and dist run `scripts/verify-bundled-core.mjs`; do not bypass that check. A successful electron-builder run is not sufficient startup evidence: after refreshing the root bundle, launch that exact `Aimcub.app` with isolated `AIMCUB_HOME` and Electron user data, and confirm that both the main process and a renderer process remain alive.
+
 ## Packaged Desktop Visual QA
 
 When Computer Use is available, run packaged visual QA against the exact project-root `Aimcub.app` after it has been refreshed. Start from the visible Home state, keep real local data read-only, and do not answer intake questions, submit proof, save plans, or change settings merely to reach another screen. If Contracts or Work need deterministic data, use the isolated Local Alpha Demo Seed below with `AIMCUB_HOME` under `/tmp`; never seed or rewrite the real `~/.aimcub` store for visual QA.
