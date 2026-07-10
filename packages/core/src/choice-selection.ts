@@ -91,10 +91,19 @@ function asksForPrimaryChoice(question: string): boolean {
 
 function asksForCompatibleSet(input: DecideChoiceSelectionInput): boolean {
   const text = input.question.normalize("NFKC");
-  return /\b(?:routes?|paths?|pathways?|approaches?|strategies|constraints?|requirements?|sources?|materials?|evidence|proof|tools?|platforms?|channels?|capabilities|skills?|audiences?|stakeholders?|participants?|reviewers?|roles?|teams?|sections?|features?|outcomes?|deliverables?|qualities|attributes?|values?|principles|themes?|styles?|traits?)\b/i.test(text) ||
+  return /\b(?:routes?|paths?|pathways?|approaches|strategies|evidence|proof|capabilities|constraints|requirements|sources|materials|tools|platforms|channels|skills|audiences|stakeholders|participants|reviewers|roles|teams|sections|features|outcomes|deliverables|qualities|attributes|values|principles|themes|styles|traits|integrations)\b/i.test(text) ||
+    /\b(?:one\s+or\s+more|all\s+that\s+apply)\b/i.test(text) ||
+    /\b(?:what|which)\b.{0,48}\b(?:coexist|apply\s+together)\b/i.test(text) ||
     /\b(?:participate|participating|involved|take part)\b/i.test(text) ||
     /\bwho\b.{0,24}\breview\b/i.test(text) ||
-    /(?:\u8def\u5f84|\u8def\u7ebf|\u65b9\u5f0f|\u65b9\u5411|\u7b56\u7565|\u7ea6\u675f|\u8981\u6c42|\u6765\u6e90|\u6750\u6599|\u8bc1\u636e|\u5de5\u5177|\u5e73\u53f0|\u6e20\u9053|\u80fd\u529b|\u6280\u80fd|\u53d7\u4f17|\u4eba\u7fa4|\u53c2\u4e0e\u8005|\u8bc4\u5ba1\u8005|\u89d2\u8272|\u56e2\u961f|\u677f\u5757|\u529f\u80fd|\u6210\u679c|\u4ea4\u4ed8\u7269|\u54c1\u8d28|\u7279\u8d28|\u5c5e\u6027|\u4ef7\u503c|\u539f\u5219|\u4e3b\u9898|\u98ce\u683c|\u57fa\u8c03)/.test(text);
+    /(?:\u8def\u5f84|\u8def\u7ebf|\u8bc1\u636e|\u80fd\u529b)/.test(text) ||
+    /(?:\u54ea\u4e9b|\u54ea\u51e0|\u591a\u9009|\u5171\u540c|\u540c\u65f6|\u5e76\u884c|\u53c2\u4e0e|\u6d89\u53ca|\u5305\u542b)/.test(text);
+}
+
+function asksForUnclearAdditiveSet(question: string): boolean {
+  const text = question.normalize("NFKC").replace(/\s+/g, " ").trim();
+  return /\bwhat\s+is\s+true\b/i.test(text) ||
+    /\b(?:what|which)\b.{0,48}\b(?:include|included)\b/i.test(text);
 }
 
 function normalizedLabel(label: string): string {
@@ -148,9 +157,9 @@ function isClearAvailabilityBinary(question: string, options: readonly ChoiceSel
 /**
  * Resolves a generated choice question conservatively.
  *
- * Single selection requires affirmative evidence that answers cannot coexist or
- * that the question intentionally asks for one primary choice. Everything else
- * defaults to multiple selection so compatible context is not discarded.
+ * Single selection requires either strong deterministic evidence or an aligned
+ * model mode/reason pair with no deterministic coexistence contradiction.
+ * Everything else defaults to multiple so compatible context is not discarded.
  */
 export function decideChoiceSelection(input: DecideChoiceSelectionInput): ChoiceSelectionDecision {
   const mode = requestedMode(input.requestedMode);
@@ -160,12 +169,31 @@ export function decideChoiceSelection(input: DecideChoiceSelectionInput): Choice
     return { mode: "single", reason: "primary_choice_requested" };
   }
 
+  const availabilityQuestion = asksAvailabilityQuestion(input.question);
   if (isClearYesNoBinary(input.options) || isClearAvailabilityBinary(input.question, input.options)) {
     return { mode: "single", reason: "mutually_exclusive" };
   }
 
   if (asksForPrimaryChoice(input.question)) {
     return { mode: "single", reason: "primary_choice_requested" };
+  }
+
+  if (availabilityQuestion) {
+    return {
+      mode: "multiple",
+      reason: mode === "multiple" && reason === "compatible_options"
+        ? "compatible_options"
+        : "unclear_defaults_multiple",
+    };
+  }
+
+  if (asksForUnclearAdditiveSet(input.question)) {
+    return {
+      mode: "multiple",
+      reason: mode === "multiple" && reason === "compatible_options"
+        ? "compatible_options"
+        : "unclear_defaults_multiple",
+    };
   }
 
   if (asksForCompatibleSet(input)) {
@@ -185,6 +213,10 @@ export function decideChoiceSelection(input: DecideChoiceSelectionInput): Choice
 
   if (mode === "single" && (reason === "compatible_options" || reason === "unclear_defaults_multiple")) {
     return { mode: "multiple", reason: "unclear_defaults_multiple" };
+  }
+
+  if (mode === "single" && (reason === "mutually_exclusive" || reason === "primary_choice_requested")) {
+    return { mode, reason };
   }
 
   if (reason === "compatible_options") {

@@ -3,6 +3,7 @@ packages:
   - "packages/core"
   - "packages/db"
   - "packages/llm"
+  - "packages/local-agent"
   - "packages/store"
   - "packages/types"
   - "apps/cli"

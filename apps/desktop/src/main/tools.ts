@@ -149,7 +149,7 @@ function aimLikelyNeedsWeb(req: DraftRequest): boolean {
 
 function aimRequiresWebResearch(req: DraftRequest): boolean {
   const context = resolveContextSourceConfig();
-  return envFlag("AIMCUB_ENABLE_WEB_RESEARCH") === true || (context.research.webEnabled && (context.research.deepResearch || aimLikelyNeedsWeb(req)));
+  return envFlag("AIMCUB_ENABLE_WEB_RESEARCH") === true || (context.research.webEnabled && aimLikelyNeedsWeb(req));
 }
 
 function shouldAttemptWebResearch(req: DraftRequest): boolean {

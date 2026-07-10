@@ -6,6 +6,7 @@ import {
 import type { WebResearchSettings } from "@core/store";
 
 import type { WebResearchConfig, WebResearchStatus, WebResearchTestResult } from "../shared/ipc";
+import { LocalCliWebSearchClient } from "./local-cli-web-search";
 import { loadWebResearchSettings, saveWebResearchSettings } from "./store";
 
 const WEB_RESEARCH_TEST_QUERY = "Aimcub web research";
@@ -50,7 +51,10 @@ export function resolveWebResearchConfig(): ResolvedWebResearchConfig {
   const settingsKey = stored?.apiKey.trim() ?? "";
   const apiKey = envKey || settingsKey;
   const enabled = envFlag("AIMCUB_ENABLE_WEB_RESEARCH") ?? stored?.enabled ?? Boolean(apiKey);
-  const fetchPages = envFlag("AIMCUB_FETCH_WEB_RESULTS") ?? stored?.fetchPages ?? enabled;
+  // Page fetching is provider-independent. Default it on for deep research so
+  // the local-CLI search fallback can still verify source pages, while honoring
+  // an explicit saved or environment opt-out.
+  const fetchPages = envFlag("AIMCUB_FETCH_WEB_RESULTS") ?? stored?.fetchPages ?? true;
   return {
     provider: "brave",
     apiKey,
@@ -61,7 +65,12 @@ export function resolveWebResearchConfig(): ResolvedWebResearchConfig {
 }
 
 export function createDesktopWebResearchRuntime(): WebResearchRuntime {
-  return createWebResearchRuntime({ braveApiKey: resolveWebResearchConfig().apiKey });
+  const config = resolveWebResearchConfig();
+  return createWebResearchRuntime({
+    braveApiKey: config.apiKey,
+    searchClient: config.apiKey ? undefined : new LocalCliWebSearchClient(),
+    requestTimeoutMs: config.apiKey ? undefined : 195_000,
+  });
 }
 
 export function webResearchDisabledBySettings(): boolean {

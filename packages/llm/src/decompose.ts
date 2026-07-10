@@ -296,10 +296,16 @@ function renderResearchEvidence(research: ResearchBrief | null | undefined, requ
     `Research required: ${required ? "yes" : "not explicitly"}`,
     `Research question: ${research.question}`,
     `Queries: ${research.queries.join(" | ")}`,
-    `Coverage: ${research.sources.length} sources · ${research.fetchedSourceCount} fetched pages · ${research.searchResultCount} search results`,
+    `Coverage: ${research.coverage.coveredLaneCount}/${research.coverage.requiredLaneCount} required lanes · ${research.coverage.uniqueDomainCount} independent domains · ${research.sources.length} sources · ${research.fetchedSourceCount} fetched pages · ${research.searchResultCount} search results`,
+    `Authority and freshness: ${research.coverage.primarySourceCount} primary · ${research.coverage.currentSourceCount} current · ${research.coverage.unknownFreshnessCount} freshness unknown`,
+    `Research sufficiency: ${research.sufficiency.level} (${research.sufficiency.score}/100, sufficient=${research.sufficiency.sufficient ? "yes" : "no"})`,
     "Findings:",
     ...research.findings.slice(0, 8).map((finding) => `- ${finding}`),
   ];
+  if (research.conflicts.length > 0) {
+    lines.push("Potential conflicts:");
+    lines.push(...research.conflicts.map((conflict) => `- ${conflict.summary} Sources: ${conflict.sourceUrls.join(" | ")}`));
+  }
   if (research.uncertainties.length > 0) {
     lines.push("Uncertainties:");
     lines.push(...research.uncertainties.map((uncertainty) => `- ${uncertainty}`));

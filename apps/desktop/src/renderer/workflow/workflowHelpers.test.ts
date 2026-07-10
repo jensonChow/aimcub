@@ -11,6 +11,7 @@ import {
   evidenceSubmissionPayload,
 } from "./evidenceSubmission";
 import {
+  appendIntakeQuestions,
   answersFor,
   buildDescriptionWithContext,
   intakeToClarifyOutput,
@@ -194,6 +195,28 @@ describe("intake clarify helpers", () => {
       contextNote: "Use the desktop alpha contract.",
     })).toContain("Context collected before decomposition");
   });
+
+  it("appends adaptive intake turns with stable history and unique ids", () => {
+    const first = intakeToClarifyOutput(intake, false);
+    const next = intakeToClarifyOutput({
+      ...intake,
+      questions: [{
+        ...intake.questions[0]!,
+        prompt: "Who must approve the cockpit before launch?",
+      }],
+    }, false);
+
+    const merged = appendIntakeQuestions(first, next);
+    expect(merged.questions.map((question) => question.question)).toEqual([
+      "What evidence proves the cockpit is ready?",
+      "Who must approve the cockpit before launch?",
+    ]);
+    expect(merged.questions.map((question) => question.id)).toEqual([
+      "intake_done_signal",
+      "intake_done_signal_2",
+    ]);
+    expect(appendIntakeQuestions(merged, next).questions).toHaveLength(2);
+  });
 });
 
 describe("stage routing helpers", () => {
@@ -261,12 +284,21 @@ describe("routing and settings helpers", () => {
         message: "Select a ready agent.",
       }],
     })).toBe("Missing agent: Select a ready agent.");
-    expect(buildSettingsModel({
+    const settings = buildSettingsModel({
       provider: null,
-      webResearch: null,
+      webResearch: {
+        configured: false,
+        provider: "brave",
+        enabled: true,
+        fetchPages: true,
+        hasApiKey: false,
+        keySource: null,
+      },
       contextSources,
       localAgents: agents,
-    }, testT).planningReady).toBe(true);
+    }, testT);
+    expect(settings.planningReady).toBe(true);
+    expect(settings.webResearchHelper.status).toBe("intake.ready");
   });
 });
 

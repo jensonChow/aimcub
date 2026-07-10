@@ -62,7 +62,7 @@ export function buildSettingsModel(input: SettingsModelInput, t: I18n["t"]): Set
   const availableLocalAgents = input.localAgents.filter((agent) => agent.available);
   const localAgentReady = readyLocalAgents.length > 0;
   const planningReady = providerReady || localAgentReady;
-  const webResearchReady = Boolean(input.webResearch?.configured);
+  const webResearchReady = Boolean(input.webResearch?.configured) || localAgentReady;
   const webResearchEnabled = input.webResearch?.enabled ?? false;
   const contextSourceCount = activeContextSourceCount(input.contextSources);
   const contextReady = contextSourceCount >= 4;

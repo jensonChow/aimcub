@@ -30,7 +30,8 @@ v1 is a Desktop-first local harness for managing aims with agents:
 
 1. The user enters an aim.
 2. Aim OS gathers planning context from memory, selected local files/folders,
-   linked source references, optional web research, and user answers.
+   linked source references, optional multi-lane web research, and adaptive
+   one-question-at-a-time user exploration.
 3. Aim OS decomposes the aim into sub-aims with explicit eval contracts.
 4. Aim OS routes each sub-aim to an agent or a human, with the user able to
    override routing.
@@ -86,7 +87,8 @@ The local product should own:
 - CLI as the scriptable/debuggable companion surface.
 - Local store under the shared AimStore interface.
 - Provider/model setup.
-- Local agent registry and execution adapters.
+- A shared local-agent registry and Codex/Claude execution adapters used by both
+  Desktop and CLI.
 - First-party local planning tools for memory, files, linked sources, web
   research, context distillation, and user questions.
 - Evidence attribution, eval transparency, run history, and context review.
@@ -155,6 +157,9 @@ not a blocker for the local v1 harness.
   governed by eval/manual confirmation.
 - Context inferred from work starts reviewable; it should not silently become
   active planning memory.
+- A local CLI run executes one ready agent-owned sub-aim and records low-trust
+  evidence; repeated scheduling and completion remain separate orchestration and
+  eval concerns.
 
 ## Current v1 Gates
 

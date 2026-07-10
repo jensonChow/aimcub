@@ -95,6 +95,58 @@ const cases: ChoiceSelectionCase[] = [
     expected: { mode: "single", reason: "mutually_exclusive" },
   },
   {
+    name: "preserves a model-confirmed exclusive release-access decision",
+    input: {
+      question: "Should the first release be public or invitation-only?",
+      options: [
+        { label: "Public" },
+        { label: "Invitation-only" },
+      ],
+      requestedMode: "single",
+      requestedReason: "mutually_exclusive",
+    },
+    expected: { mode: "single", reason: "mutually_exclusive" },
+  },
+  {
+    name: "preserves a model-confirmed Chinese exclusive release-access decision",
+    input: {
+      question: "首个版本的发布方式是公开还是仅限邀请？",
+      options: [
+        { label: "公开发布" },
+        { label: "仅限邀请" },
+      ],
+      requestedMode: "single",
+      requestedReason: "mutually_exclusive",
+    },
+    expected: { mode: "single", reason: "mutually_exclusive" },
+  },
+  {
+    name: "preserves a model-confirmed singular target platform decision",
+    input: {
+      question: "Which platform should the first release target?",
+      options: [
+        { label: "Web" },
+        { label: "Desktop" },
+      ],
+      requestedMode: "single",
+      requestedReason: "mutually_exclusive",
+    },
+    expected: { mode: "single", reason: "mutually_exclusive" },
+  },
+  {
+    name: "preserves a model-confirmed primary starting decision",
+    input: {
+      question: "Where should the team begin?",
+      options: [
+        { label: "Pilot with one team" },
+        { label: "Roll out company-wide" },
+      ],
+      requestedMode: "single",
+      requestedReason: "primary_choice_requested",
+    },
+    expected: { mode: "single", reason: "primary_choice_requested" },
+  },
+  {
     name: "defaults compatible completion proof to multiple",
     input: {
       question: "\u54ea\u4e9b\u6750\u6599\u53ef\u4ee5\u5171\u540c\u8bc1\u660e\u8fd9\u4e2a Aim \u5df2\u5b8c\u6210\uff1f",
@@ -452,5 +504,22 @@ describe("decideChoiceSelection", () => {
       "compatible_options",
       "unclear_defaults_multiple",
     ]);
+  });
+
+  it("keeps an aligned semantic single decision stable across repeated normalization", () => {
+    const input: DecideChoiceSelectionInput = {
+      question: "Should the first release be public or invitation-only?",
+      options: [{ label: "Public" }, { label: "Invitation-only" }],
+      requestedMode: "single",
+      requestedReason: "mutually_exclusive",
+    };
+    const first = decideChoiceSelection(input);
+
+    expect(first).toEqual({ mode: "single", reason: "mutually_exclusive" });
+    expect(decideChoiceSelection({
+      ...input,
+      requestedMode: first.mode,
+      requestedReason: first.reason,
+    })).toEqual(first);
   });
 });

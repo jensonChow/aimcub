@@ -122,9 +122,11 @@ harness is now the active product surface. The old emotional shell was removed.
 - **First-party planning tools.** Local memory, file/context, linked-source, web
   research, context distillation, and user-question tools are Aimcub runtime
   tools, not MCP primitives.
-- **Local CLI agent harness.** Desktop can detect local Codex/Claude CLIs, run a
-  sub-aim through a read-only local adapter, record low-trust evidence, and keep
-  completion governed by eval/manual confirmation.
+- **Local CLI agent harness.** Desktop and CLI share Codex/Claude discovery,
+  permission mapping, event normalization, and execution adapters. Desktop can
+  use an authenticated local runtime for planning and relevant web-research
+  fallback; `aimcub run` executes one ready agent-owned sub-aim, records
+  low-trust evidence, and keeps completion governed by eval/manual confirmation.
 - **MCP server.** The human/agent connection point: OAuth 2.1 resource server,
   `report_evidence` / `goal_status` / `list_milestones`. This is central, not
   peripheral — it is how agents plug into an aim.

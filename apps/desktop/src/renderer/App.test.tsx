@@ -723,6 +723,20 @@ describe("App planning state guards", () => {
     expect(clarifyPanel).toContain('flowKey={activeDraftId ?? selected?.id ?? "new-aim"}');
   });
 
+  it("runs pre-draft Context as a bounded adaptive one-question interview", () => {
+    const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+    const startDraft = source.match(/async function startDraft[\s\S]*?const builtAnswers/)?.[0] ?? "";
+    const continueFromContext = source.match(/async function continueFromContext[\s\S]*?async function refinePlan/)?.[0] ?? "";
+
+    expect(startDraft).toContain("maxQuestions: 1");
+    expect(continueFromContext).toContain("priorQuestions");
+    expect(continueFromContext).toContain("answers: answersFor(intakeClarify, intakeAnswers)");
+    expect(continueFromContext).toContain("appendIntakeQuestions(intakeClarify, next)");
+    expect(continueFromContext).toContain("MAX_ADAPTIVE_INTAKE_TURNS");
+    expect(continueFromContext).toMatch(/next\.questions\.length > 0[\s\S]*?setClarifyPhase\("intake"\)/);
+    expect(continueFromContext).toMatch(/setClarifyPhase\(null\)[\s\S]*?startDraft\(\{ skipIntakeGate: true \}\)/);
+  });
+
   it("keeps the Contracts context review compact above the plan", () => {
     const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
     const contractsStage = source.match(/if \(activeStage === "contracts"\)[\s\S]*?if \(activeStage === "run"\)/)?.[0] ?? "";

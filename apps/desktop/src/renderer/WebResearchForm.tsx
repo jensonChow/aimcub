@@ -7,10 +7,11 @@ import { C, TYPE, WEIGHT, inputStyle, labelStyle, primaryButton, secondaryButton
 
 interface WebResearchFormProps {
   status: WebResearchStatus | null;
+  localAgentReady?: boolean;
   onSaved: (s: WebResearchStatus) => void;
 }
 
-export function WebResearchForm({ status, onSaved }: WebResearchFormProps) {
+export function WebResearchForm({ status, localAgentReady = false, onSaved }: WebResearchFormProps) {
   const { t } = useI18n();
   const [apiKey, setApiKey] = useState("");
   const [enabled, setEnabled] = useState(status?.enabled ?? false);
@@ -21,7 +22,8 @@ export function WebResearchForm({ status, onSaved }: WebResearchFormProps) {
 
   const hasStoredKey = status?.hasApiKey ?? false;
   const keyOk = apiKey.trim().length > 0 || hasStoredKey;
-  const canSave = !busy && !testBusy && (!enabled || keyOk);
+  const runtimeReady = keyOk || localAgentReady;
+  const canSave = !busy && !testBusy && (!enabled || runtimeReady);
   const canTest = !busy && !testBusy && keyOk;
 
   function currentConfig(): WebResearchConfig {
@@ -55,7 +57,10 @@ export function WebResearchForm({ status, onSaved }: WebResearchFormProps) {
     try {
       const next = await window.aimcub.setWebResearchConfig(currentConfig());
       onSaved(next);
-      setMessage({ ok: next.configured || !next.enabled, text: t(next.configured ? "wf.saved" : "wf.savedDisabled") });
+      setMessage({
+        ok: next.configured || localAgentReady || !next.enabled,
+        text: t(next.configured || (next.enabled && localAgentReady) ? "wf.saved" : "wf.savedDisabled"),
+      });
     } catch (err) {
       setMessage({ ok: false, text: err instanceof Error ? err.message : String(err) });
     } finally {
@@ -70,8 +75,8 @@ export function WebResearchForm({ status, onSaved }: WebResearchFormProps) {
           <div className="od-form-title">{t("wf.title")}</div>
           <div className="od-form-body">{t("wf.blurb")}</div>
         </div>
-        <div style={{ color: status?.configured ? C.success : C.muted, fontSize: TYPE.meta, fontWeight: WEIGHT.strong, whiteSpace: "nowrap" }}>
-          {status?.configured ? t("wf.ready") : t("wf.notReady")}
+        <div style={{ color: status?.configured || localAgentReady ? C.success : C.muted, fontSize: TYPE.meta, fontWeight: WEIGHT.strong, whiteSpace: "nowrap" }}>
+          {status?.configured || localAgentReady ? t("wf.ready") : t("wf.notReady")}
         </div>
       </div>
 
@@ -81,7 +86,11 @@ export function WebResearchForm({ status, onSaved }: WebResearchFormProps) {
       </label>
 
       <label style={labelStyle()}>{t("wf.provider")}</label>
-      <output className="od-static-config-value" aria-label={t("wf.provider")}>Brave Search</output>
+      <output className="od-static-config-value" aria-label={t("wf.provider")}>
+        {t(!keyOk && localAgentReady ? "wf.providerWithCli" : "wf.providerBrave")}
+      </output>
+
+      {!keyOk && localAgentReady ? <p className="od-form-body">{t("wf.localFallback")}</p> : null}
 
       <label style={{ ...labelStyle(), marginTop: 14 }}>{t("wf.apiKey")}</label>
       <input

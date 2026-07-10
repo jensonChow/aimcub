@@ -48,6 +48,7 @@ See [`local-alpha.md`](local-alpha.md) for the alpha contract and
 | `packages/core` | Pure TypeScript domain kernel. Completion is derived by `evaluate()` and related core logic, not written directly by app shells. |
 | `packages/store` | Local JSON-file AimStore plus provider, web, and context-source settings. It is path-injected and shared by Desktop and CLI. |
 | `packages/llm` | Provider catalog, LLM gateways, decomposition, planning-context selection, context distillation, and first-party local planning tool contracts. |
+| `packages/local-agent` | Shared Codex/Claude CLI discovery, permission mapping, event normalization, execution, and local-CLI planning fallback for Desktop and CLI. |
 | `packages/api` | Supabase API client layer for hosted evidence/platform surfaces. It is outside the local store-first path. |
 | `apps/desktop` | Electron local harness. It performs platform I/O, rendering, IPC, local-agent detection/execution, and settings UI around the core/store loop. |
 | `apps/cli` | Headless local companion for setup, planning, saved aims, evidence, context review, import/export, and diagnostics over the shared store. |
@@ -60,8 +61,8 @@ Desktop is the main local alpha surface. It should help a contributor understand
 the full aim loop without opening a hosted app:
 
 - start or reopen an aim
-- collect context from memory, local sources, optional web research, and user
-  answers
+- collect context from memory, local sources, optional multi-lane web research,
+  and adaptive one-question-at-a-time user exploration
 - review plan/contracts before saving work
 - route sub-aims to humans or local CLI agents
 - run a selected local agent or collect manual proof
@@ -82,6 +83,10 @@ The CLI is the developer-friendly companion over the same store. It can:
   `aimcub board`
 - append proof with `aimcub confirm` or `aimcub evidence add`
 - review and edit context with `aimcub context ...` and `aimcub memories ...`
+- detect authenticated local runtimes with `aimcub agents`
+- execute one dependency-ready agent-owned sub-aim with
+  `aimcub run <id> --workspace <absolute-path>`; use `--milestone` to choose a
+  specific sub-aim and `--network` only when that execution needs network access
 - import or export the local store
 
 The CLI does not replace Desktop as the primary product surface for v1.
@@ -127,9 +132,16 @@ Anthropic, OpenAI, DeepSeek, MiniMax, Z.ai, Google Gemini, Qwen/DashScope, and a
 custom OpenAI-compatible endpoint.
 
 Local CLI agents are optional execution runtimes. Desktop detects configured
-local tools such as Codex and Claude Code, runs selected sub-aims through local
-adapters, records low-trust evidence, and still leaves completion to eval or
-manual confirmation.
+local tools such as Codex and Claude Code through the same shared adapter used by
+the CLI. Planning can fall back to an authenticated local runtime when no API
+provider is configured. When web research is enabled and relevant, Desktop
+prefers configured Brave search and otherwise can use an authenticated local CLI
+for a bounded live-search corpus; unavailable or unauthenticated providers remain
+explicit research gaps.
+
+`aimcub run` persists the orchestration Run, normalized stream events, and
+attributed low-trust evidence for one ready sub-aim. It does not mark the sub-aim
+complete; the shared eval kernel derives completion from evidence.
 
 ## Deterministic Demo Seed
 
@@ -155,8 +167,10 @@ AIMCUB_HOME=/tmp/aimcub-local-alpha-demo pnpm desktop
 
 ## Known Limitations
 
-- Local execution is still closer to one-shot local CLI runs than a durable run
-  queue with streamed artifacts, retries, and scheduling.
+- Each `aimcub run` invocation handles one ready agent-owned sub-aim. There is no
+  daemon or until-blocked loop, and durable queueing, retries, scheduling, and
+  structured artifact capture remain future work even though normalized events
+  and low-trust result evidence are persisted.
 - Local store persistence is JSON-file based and single-user. Concurrent Desktop
   and CLI writes are a known limitation.
 - Context and personalized eval are present, but the visible proof that they

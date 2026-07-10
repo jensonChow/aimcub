@@ -12,17 +12,19 @@
  *   - edit     — hand-edit a saved aim's plan JSON (in $EDITOR or via --plan), then validate.
  *   - setup    — configure + persist the provider to settings.json (shared with the desktop).
  *   - config   — show the resolved provider + store path (API key redacted).
+ *   - agents/run — inspect local CLI agents and execute one ready agent-owned sub-aim.
  *
- * No daemon, no agent-running. Provider config is read from settings.json (`aimcub setup`) with
- * `AIMCUB_*` env vars overriding it. The store is a
+ * No daemon or durable scheduler. Provider config is read from settings.json (`aimcub setup`) with
+ * `AIMCUB_*` env vars overriding it; planning falls back to an authenticated local CLI when no
+ * API key exists. The store is a
  * local JSON file today, behind the async `AimStore` interface so a Supabase adapter can
  * swap in later without changing these call sites. Deeper verbs (`eval`/`route`/`why`) wait
  * on the eval pillar.
  */
 import { spawnSync } from "node:child_process";
-import { accessSync, constants, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { accessSync, constants, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { parseArgs } from "node:util";
 
 import {
@@ -68,6 +70,11 @@ import {
   type DecomposeWithQualityResult,
 } from "@core/llm";
 import { getDefaultModel, getLlmProviderDefinition } from "@core/llm/providers";
+import {
+  listLocalAgents,
+  type LocalAgentEvent,
+  type LocalAgentId,
+} from "@core/local-agent";
 import { createJsonFileStore, defaultDataDir, loadSettings, saveSettings, settingsPath, type LocalStore } from "@core/store";
 import type {
   ContextCategory,
@@ -87,6 +94,8 @@ import { promptSetup } from "./setup";
 import { completionScript, normalizeShell } from "./completion";
 import { buildDoctorReport, formatDoctor } from "./doctor";
 import { formatFirstRun, formatHome, formatPostSetupNextSteps, providerSetupComplete } from "./home";
+import { runAimAgent } from "./agent-run";
+import { localPlanningGateway } from "./local-planning";
 import {
   formatBoard,
   formatPlanPretty,
@@ -162,6 +171,10 @@ Stored (shared ~/.aimcub store — the desktop app sees these too):
   aimcub context accept <id> [--text "..."] [--kind k] [--category c] [--scope aim|global]
                                                        Accept a pending context candidate
   aimcub context reject <id>                             Reject a pending context candidate
+  aimcub agents [--json]                                 Detect authenticated Codex/Claude CLIs
+  aimcub run <id> --workspace <absolute-path> [opts]     Run one ready agent-owned sub-aim
+       [--milestone <ref>] [--agent codex|claude] [--model <m>] [--reasoning <r>]
+       [--network] [--read-only] [--jsonl]
   aimcub replan <id> [--title "..."] [--desc "..."] [--json]
                                                        Re-decompose a saved aim (keeps done work)
   aimcub edit <id> [--plan <file|-|json>] [--json]     Edit a saved aim's plan ($EDITOR or --plan)
@@ -200,6 +213,8 @@ Examples:
   aimcub evidence add 1a2b --milestone 2 --kind manual_check --payload '{"confirmed":true}'
   aimcub context review && aimcub context accept abcd1234
   aimcub memories add "I prefer production-ready CLI tools with tests"
+  aimcub agents --json
+  aimcub run 1a2b --workspace "$PWD" --network
   aimcub replan 1a2b --desc "now mobile-first"`;
 
 const noopMeter = { async record(): Promise<void> {} };
@@ -242,14 +257,18 @@ function loadTextArg(value: string): string {
   }
 }
 
-/** Build a gateway from the resolved config (env over settings.json), or a friendly UserError. */
-function buildGateway(): LlmGateway {
+/** Build a provider gateway, falling back to an authenticated local CLI when no API key exists. */
+async function buildGateway(): Promise<LlmGateway> {
   const r = resolveProvider(process.env, loadSettings());
   if (r.provider === null) {
     throw new UserError(`Unknown provider "${r.providerLabel}". Use anthropic, openai, deepseek, minimax, zai, google, qwen, or openai-compatible.`);
   }
   if (!r.apiKey) {
-    throw new UserError(`No API key for the ${r.provider} provider. Run \`aimcub setup\` to configure one.`);
+    const fallback = await localPlanningGateway();
+    if (fallback) return fallback;
+    throw new UserError(
+      `No API key for the ${r.provider} provider and no authenticated local CLI agent is available. Run \`aimcub setup\` or authenticate Codex/Claude CLI.`,
+    );
   }
   const def = getLlmProviderDefinition(r.provider);
   if (!def) {
@@ -496,7 +515,7 @@ async function decomposeOrThrow(
   decompositionLearningReport?: DecompositionLearningReport | null,
   decompositionStrategyReport?: DecompositionStrategyReport | null,
 ): Promise<DecomposeWithQualityResult & { output: DecompositionOutput }> {
-  const gw = buildGateway();
+  const gw = await buildGateway();
   const effectiveLineageLearning = lineageLearning === undefined ? await contextLineageLearning() : lineageLearning;
   const effectiveDecompositionLearning = decompositionLearningReport === undefined ? await decompositionLearning() : decompositionLearningReport;
   const effectiveDecompositionStrategy = decompositionStrategyReport === undefined
@@ -565,7 +584,7 @@ async function runPlan(title: string, description: string | undefined, json: boo
 }
 
 async function runClarify(title: string, description: string | undefined, opts: ClarifyOpts): Promise<void> {
-  const gw = buildGateway();
+  const gw = await buildGateway();
   const planning = await planningContext({ title, description });
   const memories = planning.memories;
   const [lineageLearning, decompositionLearningReport] = await Promise.all([contextLineageLearning(), decompositionLearning()]);
@@ -1150,6 +1169,104 @@ async function runRm(idPrefix: string): Promise<void> {
   out(`Deleted aim ${id}`);
 }
 
+async function runAgents(json: boolean): Promise<void> {
+  const agents = await listLocalAgents();
+  if (json) {
+    out(JSON.stringify(agents, null, 2));
+    return;
+  }
+  for (const agent of agents) {
+    const status = !agent.available
+      ? "not installed"
+      : agent.authStatus === "ok"
+        ? "ready"
+        : agent.authStatus === "missing"
+          ? "authentication required"
+          : "authentication unknown";
+    out(`${agent.name}: ${status}${agent.version ? ` · ${agent.version}` : ""}`);
+    out(`  ${agent.path ?? agent.diagnostics[0] ?? "No executable path."}`);
+  }
+}
+
+function localAgentId(raw: string | undefined): LocalAgentId | undefined {
+  if (raw === undefined) return undefined;
+  if (raw === "codex" || raw === "claude") return raw;
+  throw new UserError(`Unknown local agent "${raw}". Use codex or claude.`);
+}
+
+function absoluteWorkspace(raw: string | undefined, readOnly: boolean): string {
+  const workspace = raw?.trim();
+  if (!workspace) throw new UserError("--workspace <absolute-path> is required for agent runs.");
+  if (!isAbsolute(workspace)) throw new UserError("--workspace must be an absolute path.");
+  try {
+    if (!statSync(workspace).isDirectory()) throw new UserError(`Workspace is not a directory: ${workspace}`);
+    accessSync(workspace, readOnly ? constants.R_OK : constants.R_OK | constants.W_OK);
+  } catch (error) {
+    if (error instanceof UserError) throw error;
+    throw new UserError(`Cannot access workspace: ${workspace}`);
+  }
+  return workspace;
+}
+
+function streamedAgentEvent(event: LocalAgentEvent): Record<string, unknown> {
+  return {
+    type: "agent.event",
+    event: event.type,
+    summary: event.summary,
+    ...(event.sessionId ? { sessionId: event.sessionId } : {}),
+    ...(event.toolId ? { toolId: event.toolId } : {}),
+    ...(event.toolName ? { toolName: event.toolName } : {}),
+    ...(event.usage ? { usage: event.usage } : {}),
+  };
+}
+
+async function runAgentCommand(input: {
+  idPrefix: string;
+  milestoneRef?: string;
+  workspace?: string;
+  agent?: string;
+  model?: string;
+  reasoning?: string;
+  network: boolean;
+  readOnly: boolean;
+  json: boolean;
+  jsonl: boolean;
+}): Promise<void> {
+  const goalId = await resolveGoalId(input.idPrefix);
+  const result = await runAimAgent(store, {
+    goalId,
+    milestoneRef: input.milestoneRef,
+    workspace: absoluteWorkspace(input.workspace, input.readOnly),
+    agentId: localAgentId(input.agent),
+    model: input.model,
+    reasoning: input.reasoning,
+    network: input.network,
+    readOnly: input.readOnly,
+    onEvent: input.jsonl ? (event) => out(JSON.stringify(streamedAgentEvent(event))) : undefined,
+  });
+  const summary = {
+    type: result.run.ok ? "aimcub.run.completed" : "aimcub.run.failed",
+    ok: result.run.ok,
+    goalId: result.goalId,
+    milestone: { id: result.milestone.id, title: result.milestone.title },
+    agent: result.agent.id,
+    model: result.model,
+    runId: result.orchestrationRun.id,
+    evidenceId: result.evidence.id,
+    completionCount: result.completions.length,
+    error: result.run.error,
+  };
+  if (input.jsonl) out(JSON.stringify(summary));
+  else if (input.json) out(JSON.stringify(summary, null, 2));
+  else {
+    out(`${result.run.ok ? "Completed" : "Failed"} local agent run ${result.orchestrationRun.id}`);
+    out(`sub-aim: ${result.milestone.title}`);
+    out(`agent: ${result.agent.name} · model: ${result.model}`);
+    out(`evidence: ${result.evidence.id} · derived completions: ${result.completions.length}`);
+  }
+  if (!result.run.ok) throw new UserError(result.run.error ?? "Local agent run failed.");
+}
+
 function runConfig(json: boolean): void {
   const r = resolveProvider(process.env, loadSettings());
   const dataDir = defaultDataDir();
@@ -1473,6 +1590,9 @@ async function main(): Promise<number> {
         provider: { type: "string" },
         "api-key": { type: "string" },
         model: { type: "string" },
+        agent: { type: "string" },
+        workspace: { type: "string" },
+        reasoning: { type: "string" },
         "base-url": { type: "string" },
         milestone: { type: "string", short: "m" },
         kind: { type: "string" },
@@ -1488,6 +1608,9 @@ async function main(): Promise<number> {
         save: { type: "boolean" },
         yes: { type: "boolean", short: "y" },
         replace: { type: "boolean" },
+        network: { type: "boolean" },
+        "read-only": { type: "boolean" },
+        jsonl: { type: "boolean" },
         json: { type: "boolean" },
         help: { type: "boolean", short: "h" },
         version: { type: "boolean", short: "v" },
@@ -1600,6 +1723,25 @@ async function main(): Promise<number> {
           scope: values.scope,
           confidence: values.confidence,
           json,
+        });
+        return 0;
+      case "agents":
+        if (positionals.length > 1) throw new UserError("Usage: aimcub agents [--json]");
+        await runAgents(json);
+        return 0;
+      case "run":
+        if (!arg) throw new UserError("Missing aim id. Usage: aimcub run <id> --workspace <absolute-path>");
+        await runAgentCommand({
+          idPrefix: arg,
+          milestoneRef: values.milestone,
+          workspace: values.workspace,
+          agent: values.agent,
+          model: values.model,
+          reasoning: values.reasoning,
+          network: Boolean(values.network),
+          readOnly: Boolean(values["read-only"]),
+          json,
+          jsonl: Boolean(values.jsonl),
         });
         return 0;
       case "replan":

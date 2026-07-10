@@ -57,9 +57,71 @@ export interface PlanningToolContextResult {
   research: ResearchBrief | null;
 }
 
+export type ResearchLaneId =
+  | "aim_facts"
+  | "authoritative_requirements"
+  | "alternatives_market"
+  | "risks_tradeoffs"
+  | "user_audience";
+
+export type ResearchSourceAuthority = "primary" | "secondary" | "unknown";
+export type ResearchSourceFreshness = "current" | "dated" | "unknown";
+export type ResearchSufficiencyLevel = "thin" | "useful" | "strong";
+
+export interface ResearchQueryPlanItem {
+  id: string;
+  lanes: ResearchLaneId[];
+  query: string;
+  purpose: string;
+  required: boolean;
+}
+
+export interface ResearchLaneCoverage {
+  lane: ResearchLaneId;
+  required: boolean;
+  queryCount: number;
+  searchResultCount: number;
+  sourceCount: number;
+  fetchedSourceCount: number;
+  uniqueDomainCount: number;
+  covered: boolean;
+}
+
+export interface ResearchConflictSignal {
+  kind: "requirement" | "availability" | "direction";
+  summary: string;
+  sourceUrls: string[];
+}
+
+export interface ResearchCoverageReport {
+  lanes: ResearchLaneCoverage[];
+  requiredLaneCount: number;
+  coveredLaneCount: number;
+  uniqueDomainCount: number;
+  primarySourceCount: number;
+  secondarySourceCount: number;
+  currentSourceCount: number;
+  datedSourceCount: number;
+  unknownFreshnessCount: number;
+  timeSensitive: boolean;
+  conflicts: ResearchConflictSignal[];
+  gaps: string[];
+}
+
+export interface ResearchSufficiencySignal {
+  level: ResearchSufficiencyLevel;
+  score: number;
+  sufficient: boolean;
+  reasons: string[];
+}
+
 export interface ResearchBriefSource {
   title: string;
   url: string;
+  domain: string;
+  lanes: ResearchLaneId[];
+  authority: ResearchSourceAuthority;
+  freshness: ResearchSourceFreshness;
   snippet?: string;
   source?: string;
   publishedAt?: string;
@@ -72,8 +134,12 @@ export interface ResearchBriefSource {
 export interface ResearchBrief {
   question: string;
   queries: string[];
+  queryPlan: ResearchQueryPlanItem[];
   findings: string[];
   uncertainties: string[];
+  conflicts: ResearchConflictSignal[];
+  coverage: ResearchCoverageReport;
+  sufficiency: ResearchSufficiencySignal;
   sources: ResearchBriefSource[];
   generatedAt: string;
   searchResultCount: number;
@@ -82,7 +148,8 @@ export interface ResearchBrief {
 
 const DEFAULT_CONTEXT_LIMIT = 12;
 const DEFAULT_WEB_SEARCH_LIMIT = 3;
-const DEFAULT_WEB_QUERY_LIMIT = 3;
+const DEFAULT_WEB_QUERY_LIMIT = 4;
+const HARD_WEB_QUERY_LIMIT = 8;
 const DEFAULT_WEB_FETCH_LIMIT = 3;
 const DEFAULT_LOCAL_MANIFEST_READ_LIMIT = 3;
 const DEFAULT_LOCAL_MANIFEST_READ_LINES = 80;
@@ -98,47 +165,102 @@ function compactText(value: string, maxLength = 260): string {
   return `${cleaned.slice(0, maxLength - 1).trim()}…`;
 }
 
-function uniqueNonEmpty(values: readonly string[]): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const value of values) {
-    const cleaned = compactText(value, 180);
-    const key = cleaned.toLowerCase();
-    if (!cleaned || seen.has(key)) continue;
-    seen.add(key);
-    out.push(cleaned);
-  }
-  return out;
-}
-
 function hasCjk(value: string): boolean {
   return /[\u3400-\u9fff]/.test(value);
 }
 
-function researchQueriesForAim(input: PlanningToolContextInput): string[] {
+function audienceEvidenceRelevant(value: string): boolean {
+  return /\b(app|product|service|consumer|customer|user|audience|market|launch|onboarding|subscription|community|content|creator|game|travel|health|wellness|education|learning|coaching|finance|legal|tarot|astrology)\b/i.test(value) ||
+    /应用|产品|服务|消费者|客户|用户|受众|市场|上线|发布|引导|订阅|社区|内容|创作|游戏|旅行|旅游|健康|疗愈|教育|学习|教练|咨询|财务|法律|塔罗|占星/.test(value);
+}
+
+function normalizeQueryPlanLimit(limit: number | undefined): number {
+  if (limit === undefined || !Number.isFinite(limit)) return DEFAULT_WEB_QUERY_LIMIT;
+  return Math.max(1, Math.min(HARD_WEB_QUERY_LIMIT, Math.floor(limit)));
+}
+
+function uniqueQueryPlan(rows: readonly ResearchQueryPlanItem[]): ResearchQueryPlanItem[] {
+  const seen = new Set<string>();
+  const out: ResearchQueryPlanItem[] = [];
+  for (const row of rows) {
+    const query = compactText(row.query, 220);
+    const key = query.toLowerCase();
+    if (!query || seen.has(key)) continue;
+    seen.add(key);
+    out.push({ ...row, query });
+  }
+  return out;
+}
+
+export function buildResearchQueryPlan(input: PlanningToolContextInput): ResearchQueryPlanItem[] {
   const title = compactText(input.title, 120);
   const description = compactText(input.description ?? "", 160);
   const base = compactText([title, description].filter(Boolean).join(" "), 180);
-  const text = `${title} ${description}`.toLowerCase();
-  const chinese = hasCjk(`${title} ${description}`);
-  const candidates = chinese
+  const fullText = `${title} ${description}`;
+  const chinese = hasCjk(fullText);
+  const audienceRelevant = audienceEvidenceRelevant(fullText);
+  const rows: ResearchQueryPlanItem[] = chinese
     ? [
-        base,
-        `${title} 最新 官方 要求 资料`,
-        `${title} 对比 风险 成本 最佳实践`,
+        {
+          id: "aim-facts",
+          lanes: audienceRelevant ? ["aim_facts", "user_audience"] : ["aim_facts"],
+          query: `${base} 现状 关键事实${audienceRelevant ? " 目标用户 需求 反馈 证据" : ""}`,
+          purpose: "Establish the current situation and evidence that grounds the aim.",
+          required: true,
+        },
+        {
+          id: "authoritative-requirements",
+          lanes: ["authoritative_requirements"],
+          query: `${title} 最新 官方 要求 法规 标准 文档`,
+          purpose: "Find primary or official requirements, standards, and current constraints.",
+          required: true,
+        },
+        {
+          id: "alternatives-market",
+          lanes: ["alternatives_market"],
+          query: `${title} 替代方案 竞品 市场 对比 差异`,
+          purpose: "Compare realistic alternatives, market patterns, and competing approaches.",
+          required: true,
+        },
+        {
+          id: "risks-tradeoffs",
+          lanes: ["risks_tradeoffs"],
+          query: `${title} 风险 成本 限制 取舍 失败案例`,
+          purpose: "Surface risks, costs, limitations, tradeoffs, and failure modes.",
+          required: true,
+        },
       ]
     : [
-        base,
-        `${title} current official requirements guidance`,
-        `${title} comparison risks costs best practices`,
+        {
+          id: "aim-facts",
+          lanes: audienceRelevant ? ["aim_facts", "user_audience"] : ["aim_facts"],
+          query: `${base} current state key facts${audienceRelevant ? " target users needs reviews evidence" : ""}`,
+          purpose: "Establish the current situation and evidence that grounds the aim.",
+          required: true,
+        },
+        {
+          id: "authoritative-requirements",
+          lanes: ["authoritative_requirements"],
+          query: `${title} current official requirements regulations standards documentation`,
+          purpose: "Find primary or official requirements, standards, and current constraints.",
+          required: true,
+        },
+        {
+          id: "alternatives-market",
+          lanes: ["alternatives_market"],
+          query: `${title} alternatives competitors market comparison differences`,
+          purpose: "Compare realistic alternatives, market patterns, and competing approaches.",
+          required: true,
+        },
+        {
+          id: "risks-tradeoffs",
+          lanes: ["risks_tradeoffs"],
+          query: `${title} risks costs limitations tradeoffs failure cases`,
+          purpose: "Surface risks, costs, limitations, tradeoffs, and failure modes.",
+          required: true,
+        },
       ];
-  if (/\b(api|sdk|library|framework|docs|documentation|code|software|app)\b/i.test(text) || /文档|接口|框架|代码|软件|应用/.test(text)) {
-    candidates.push(chinese ? `${title} 官方文档 API 限制 实现` : `${title} official documentation API limits implementation`);
-  }
-  if (/\b(travel|visa|flight|hotel|trip|country|city)\b/i.test(text) || /旅行|旅游|签证|机票|航班|酒店|国家|城市/.test(text)) {
-    candidates.push(chinese ? `${title} 签证 安全 交通 预算 官方` : `${title} visa safety transport budget official`);
-  }
-  return uniqueNonEmpty(candidates).slice(0, input.webQueryLimit ?? DEFAULT_WEB_QUERY_LIMIT);
+  return uniqueQueryPlan(rows).slice(0, normalizeQueryPlanLimit(input.webQueryLimit));
 }
 
 function memorySearchOutputToPlanningMemory(memory: MemorySearchOutput["memories"][number]): PlanningMemory {
@@ -288,30 +410,203 @@ function webFetchData(observation: AimcubToolObservation<WebFetchOutput>): WebFe
   return observation.data;
 }
 
-function mergeResearchSources(
-  searchObservations: readonly AimcubToolObservation<WebSearchOutput>[],
-  fetchObservations: readonly AimcubToolObservation<WebFetchOutput>[],
-): ResearchBriefSource[] {
-  const byUrl = new Map<string, ResearchBriefSource>();
-  for (const observation of searchObservations) {
-    for (const result of webSearchData(observation).results) {
+interface ResearchSearchObservation {
+  plan: ResearchQueryPlanItem;
+  observation: AimcubToolObservation<WebSearchOutput>;
+}
+
+interface ResearchFetchTarget {
+  url: string;
+  title: string;
+  lanes: ResearchLaneId[];
+  domain: string;
+  authority: ResearchSourceAuthority;
+  order: number;
+}
+
+interface ResearchFetchObservation {
+  target: ResearchFetchTarget;
+  observation: AimcubToolObservation<WebFetchOutput>;
+}
+
+function domainForUrl(value: string): string {
+  try {
+    return new URL(value).hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
+function uniqueLanes(values: readonly ResearchLaneId[]): ResearchLaneId[] {
+  return [...new Set(values)];
+}
+
+function authorityRank(value: ResearchSourceAuthority): number {
+  return value === "primary" ? 2 : value === "secondary" ? 1 : 0;
+}
+
+function strongerAuthority(
+  left: ResearchSourceAuthority,
+  right: ResearchSourceAuthority,
+): ResearchSourceAuthority {
+  return authorityRank(left) >= authorityRank(right) ? left : right;
+}
+
+function sourceAuthority(input: {
+  url: string;
+  title?: string;
+  source?: string;
+}): ResearchSourceAuthority {
+  const domain = domainForUrl(input.url);
+  if (!domain) return "unknown";
+  const hostParts = domain.split(".");
+  const metadata = `${input.title ?? ""} ${input.source ?? ""} ${domain}`;
+  if (
+    hostParts.includes("gov") ||
+    hostParts.includes("edu") ||
+    hostParts.includes("ac") ||
+    /\b(official|government|ministry|regulator|standards? body|university|documentation)\b/i.test(metadata) ||
+    /官方|政府|部委|监管|标准|大学|文档/.test(metadata)
+  ) {
+    return "primary";
+  }
+  return "secondary";
+}
+
+function sourceFreshness(publishedAt: string | undefined, generatedAt: string): ResearchSourceFreshness {
+  const value = publishedAt?.trim();
+  if (!value) return "unknown";
+  const lower = value.toLowerCase();
+  if (/\b(today|yesterday|\d+\s*(?:minute|hour|day|week|month)s?\s+ago)\b/.test(lower) || /今天|昨天|分钟前|小时前|天前|周前|月前/.test(value)) {
+    return "current";
+  }
+  if (/\b\d+\s*years?\s+ago\b/.test(lower) || /年前/.test(value)) return "dated";
+  const publishedMs = Date.parse(value);
+  const generatedMs = Date.parse(generatedAt);
+  if (!Number.isFinite(publishedMs) || !Number.isFinite(generatedMs)) return "unknown";
+  const ageDays = Math.max(0, (generatedMs - publishedMs) / 86_400_000);
+  return ageDays <= 400 ? "current" : "dated";
+}
+
+function freshnessRank(value: ResearchSourceFreshness): number {
+  return value === "current" ? 2 : value === "dated" ? 1 : 0;
+}
+
+function fresherSource(
+  left: ResearchSourceFreshness,
+  right: ResearchSourceFreshness,
+): ResearchSourceFreshness {
+  return freshnessRank(left) >= freshnessRank(right) ? left : right;
+}
+
+function researchIsTimeSensitive(input: PlanningToolContextInput): boolean {
+  const value = `${input.title} ${input.description ?? ""}`;
+  return /\b(latest|current|recent|today|market|competitor|pricing|price|docs|documentation|api|regulation|law|legal|policy|guideline|travel|visa|flight|hotel|availability|release|version)\b/i.test(value) ||
+    /最新|当前|现在|近期|市场|竞品|价格|文档|接口|法规|法律|政策|指南|旅行|旅游|签证|航班|酒店|可用性|发布|版本/.test(value);
+}
+
+function fetchTargetsForResearch(
+  searchObservations: readonly ResearchSearchObservation[],
+  limit: number,
+): ResearchFetchTarget[] {
+  if (limit <= 0) return [];
+  const byUrl = new Map<string, ResearchFetchTarget>();
+  let order = 0;
+  for (const row of searchObservations) {
+    for (const result of row.observation.data.results) {
       if (!result.url) continue;
+      const existing = byUrl.get(result.url);
+      const nextAuthority = sourceAuthority(result);
+      if (existing) {
+        existing.lanes = uniqueLanes([...existing.lanes, ...row.plan.lanes]);
+        existing.authority = strongerAuthority(existing.authority, nextAuthority);
+        continue;
+      }
       byUrl.set(result.url, {
-        title: result.title || result.url,
         url: result.url,
-        snippet: result.snippet,
-        source: result.source,
-        publishedAt: result.publishedAt,
-        fetched: false,
+        title: result.title || result.url,
+        lanes: [...row.plan.lanes],
+        domain: domainForUrl(result.url),
+        authority: nextAuthority,
+        order: order++,
       });
     }
   }
-  for (const observation of fetchObservations) {
-    const result = webFetchData(observation);
-    const existing = byUrl.get(result.finalUrl);
+
+  const candidates = [...byUrl.values()].sort((left, right) =>
+    authorityRank(right.authority) - authorityRank(left.authority) || left.order - right.order,
+  );
+  const laneOrder = uniqueLanes(searchObservations.flatMap((row) => row.plan.lanes));
+  const selected: ResearchFetchTarget[] = [];
+  const selectedUrls = new Set<string>();
+  const selectedDomains = new Set<string>();
+
+  const fill = (requireNewDomain: boolean) => {
+    let progressed = true;
+    while (selected.length < limit && progressed) {
+      progressed = false;
+      for (const lane of laneOrder) {
+        const candidate = candidates.find((item) =>
+          !selectedUrls.has(item.url) &&
+          item.lanes.includes(lane) &&
+          (!requireNewDomain || !item.domain || !selectedDomains.has(item.domain)),
+        );
+        if (!candidate) continue;
+        selected.push(candidate);
+        selectedUrls.add(candidate.url);
+        if (candidate.domain) selectedDomains.add(candidate.domain);
+        progressed = true;
+        if (selected.length >= limit) break;
+      }
+    }
+  };
+
+  fill(true);
+  fill(false);
+  return selected;
+}
+
+function mergeResearchSources(
+  searchObservations: readonly ResearchSearchObservation[],
+  fetchObservations: readonly ResearchFetchObservation[],
+  generatedAt: string,
+): ResearchBriefSource[] {
+  const byUrl = new Map<string, ResearchBriefSource>();
+  for (const row of searchObservations) {
+    for (const result of webSearchData(row.observation).results) {
+      if (!result.url) continue;
+      const existing = byUrl.get(result.url);
+      const authority = sourceAuthority(result);
+      const freshness = sourceFreshness(result.publishedAt, generatedAt);
+      byUrl.set(result.url, {
+        title: result.title || existing?.title || result.url,
+        url: result.url,
+        domain: domainForUrl(result.url),
+        lanes: uniqueLanes([...(existing?.lanes ?? []), ...row.plan.lanes]),
+        authority: existing ? strongerAuthority(existing.authority, authority) : authority,
+        freshness: existing ? fresherSource(existing.freshness, freshness) : freshness,
+        snippet: result.snippet || existing?.snippet,
+        source: result.source || existing?.source,
+        publishedAt: result.publishedAt || existing?.publishedAt,
+        fetched: existing?.fetched ?? false,
+        status: existing?.status,
+        textExcerpt: existing?.textExcerpt,
+        truncated: existing?.truncated,
+      });
+    }
+  }
+  for (const row of fetchObservations) {
+    const result = webFetchData(row.observation);
+    const existing = byUrl.get(row.target.url) ?? byUrl.get(result.finalUrl);
+    if (row.target.url !== result.finalUrl) byUrl.delete(row.target.url);
+    const authority = sourceAuthority({ url: result.finalUrl, title: result.title || existing?.title });
     byUrl.set(result.finalUrl, {
       title: result.title || existing?.title || result.finalUrl,
       url: result.finalUrl,
+      domain: domainForUrl(result.finalUrl),
+      lanes: uniqueLanes([...(existing?.lanes ?? []), ...row.target.lanes]),
+      authority: existing ? strongerAuthority(existing.authority, authority) : authority,
+      freshness: existing?.freshness ?? "unknown",
       snippet: existing?.snippet,
       source: existing?.source,
       publishedAt: existing?.publishedAt,
@@ -326,29 +621,185 @@ function mergeResearchSources(
 
 function renderFinding(source: ResearchBriefSource): string {
   const body = source.textExcerpt || source.snippet || "No extractable text was available.";
-  return `${source.title}: ${compactText(body, 320)} Source: ${source.url}`;
+  const tags = [...source.lanes, `authority=${source.authority}`, `freshness=${source.freshness}`].join(", ");
+  return `[${tags}] ${source.title}: ${compactText(body, 320)} Source: ${source.url}`;
+}
+
+const CONFLICT_PATTERNS: Array<{
+  kind: ResearchConflictSignal["kind"];
+  positive: RegExp;
+  negative: RegExp;
+}> = [
+  {
+    kind: "requirement",
+    positive: /\b(required|must|mandatory|shall)\b|必须|强制|务必/iu,
+    negative: /\b(not required|no requirement|optional|voluntary)\b|无需|不需要|可选|自愿/iu,
+  },
+  {
+    kind: "availability",
+    positive: /\b(available|supported|allowed|permitted|eligible)\b|可用|支持|允许|符合资格/iu,
+    negative: /\b(unavailable|unsupported|not allowed|prohibited|ineligible|discontinued)\b|不可用|不支持|禁止|不允许|不符合资格|停产/iu,
+  },
+  {
+    kind: "direction",
+    positive: /\b(increase|increased|rising|growth|grew)\b|上涨|增加|增长/iu,
+    negative: /\b(decrease|decreased|declining|fell|drop)\b|下降|减少|下跌/iu,
+  },
+];
+
+function detectResearchConflicts(sources: readonly ResearchBriefSource[]): ResearchConflictSignal[] {
+  const conflicts: ResearchConflictSignal[] = [];
+  for (const pattern of CONFLICT_PATTERNS) {
+    const positive: ResearchBriefSource[] = [];
+    const negative: ResearchBriefSource[] = [];
+    for (const source of sources) {
+      const text = `${source.title} ${source.textExcerpt ?? source.snippet ?? ""}`;
+      const hasNegative = pattern.negative.test(text);
+      if (hasNegative) negative.push(source);
+      else if (pattern.positive.test(text)) positive.push(source);
+    }
+    if (positive.length === 0 || negative.length === 0) continue;
+    const urls = [...new Set([...positive, ...negative].map((source) => source.url))];
+    const domains = new Set([...positive, ...negative].map((source) => source.domain).filter(Boolean));
+    if (domains.size < 2) continue;
+    conflicts.push({
+      kind: pattern.kind,
+      summary: `Potentially conflicting ${pattern.kind} language appears across ${domains.size} independent domains.`,
+      sourceUrls: urls,
+    });
+  }
+  return conflicts;
+}
+
+function researchCoverage(input: {
+  aim: PlanningToolContextInput;
+  queryPlan: readonly ResearchQueryPlanItem[];
+  searchObservations: readonly ResearchSearchObservation[];
+  sources: readonly ResearchBriefSource[];
+}): ResearchCoverageReport {
+  const expectedQueryPlan = buildResearchQueryPlan({
+    ...input.aim,
+    webQueryLimit: HARD_WEB_QUERY_LIMIT,
+  });
+  const laneIds = uniqueLanes(expectedQueryPlan.flatMap((row) => row.lanes));
+  const lanes = laneIds.map((lane): ResearchLaneCoverage => {
+    const expectedPlans = expectedQueryPlan.filter((row) => row.lanes.includes(lane));
+    const plans = input.queryPlan.filter((row) => row.lanes.includes(lane));
+    const searchRows = input.searchObservations.filter((row) => row.plan.lanes.includes(lane));
+    const laneSources = input.sources.filter((source) => source.lanes.includes(lane));
+    const searchResultCount = searchRows.reduce((sum, row) => sum + row.observation.data.results.length, 0);
+    return {
+      lane,
+      required: expectedPlans.some((row) => row.required),
+      queryCount: plans.length,
+      searchResultCount,
+      sourceCount: laneSources.length,
+      fetchedSourceCount: laneSources.filter((source) => source.fetched).length,
+      uniqueDomainCount: new Set(laneSources.map((source) => source.domain).filter(Boolean)).size,
+      covered: searchResultCount > 0,
+    };
+  });
+  const conflicts = detectResearchConflicts(input.sources);
+  const uniqueDomainCount = new Set(input.sources.map((source) => source.domain).filter(Boolean)).size;
+  const primarySourceCount = input.sources.filter((source) => source.authority === "primary").length;
+  const secondarySourceCount = input.sources.filter((source) => source.authority === "secondary").length;
+  const currentSourceCount = input.sources.filter((source) => source.freshness === "current").length;
+  const datedSourceCount = input.sources.filter((source) => source.freshness === "dated").length;
+  const unknownFreshnessCount = input.sources.filter((source) => source.freshness === "unknown").length;
+  const requiredLanes = lanes.filter((lane) => lane.required);
+  const timeSensitive = researchIsTimeSensitive(input.aim);
+  const gaps: string[] = [];
+  for (const lane of requiredLanes.filter((row) => !row.covered)) {
+    gaps.push(`No search results covered required research lane: ${lane.lane}.`);
+  }
+  if (uniqueDomainCount < 3) gaps.push("Fewer than 3 independent web sources were available.");
+  const fetchedSourceCount = input.sources.filter((source) => source.fetched).length;
+  if (fetchedSourceCount === 0) {
+    gaps.push("No source pages were fetched; findings rely on search snippets only.");
+  } else if (fetchedSourceCount < 2) {
+    gaps.push("Only 1 source page was fetched; cross-source verification remains thin.");
+  }
+  if (primarySourceCount === 0) gaps.push("No primary or clearly official source was identified.");
+  if (timeSensitive && currentSourceCount === 0) {
+    gaps.push("Freshness could not be established for this time-sensitive aim.");
+  }
+  for (const conflict of conflicts) gaps.push(conflict.summary);
+  return {
+    lanes,
+    requiredLaneCount: requiredLanes.length,
+    coveredLaneCount: requiredLanes.filter((lane) => lane.covered).length,
+    uniqueDomainCount,
+    primarySourceCount,
+    secondarySourceCount,
+    currentSourceCount,
+    datedSourceCount,
+    unknownFreshnessCount,
+    timeSensitive,
+    conflicts,
+    gaps: [...new Set(gaps)],
+  };
+}
+
+function researchSufficiency(
+  coverage: ResearchCoverageReport,
+  fetchedSourceCount: number,
+): ResearchSufficiencySignal {
+  const laneRatio = coverage.requiredLaneCount > 0
+    ? coverage.coveredLaneCount / coverage.requiredLaneCount
+    : 1;
+  const score = Math.max(0, Math.min(100, Math.round(
+    laneRatio * 40 +
+    Math.min(15, coverage.uniqueDomainCount * 5) +
+    Math.min(15, fetchedSourceCount * 7.5) +
+    (coverage.primarySourceCount > 0 ? 15 : 0) +
+    (coverage.timeSensitive ? (coverage.currentSourceCount > 0 ? 10 : 0) : 10) +
+    (coverage.conflicts.length === 0 ? 5 : 0),
+  )));
+  const sufficient = coverage.gaps.length === 0 && score >= 80;
+  const level: ResearchSufficiencyLevel = sufficient
+    ? "strong"
+    : score >= 55
+      ? "useful"
+      : "thin";
+  return {
+    level,
+    score,
+    sufficient,
+    reasons: coverage.gaps.length > 0
+      ? [...coverage.gaps]
+      : [`Covered ${coverage.coveredLaneCount}/${coverage.requiredLaneCount} required lanes across ${coverage.uniqueDomainCount} independent domains.`],
+  };
 }
 
 function buildResearchBrief(input: {
   aim: PlanningToolContextInput;
-  queries: readonly string[];
-  searchObservations: readonly AimcubToolObservation<WebSearchOutput>[];
-  fetchObservations: readonly AimcubToolObservation<WebFetchOutput>[];
+  queryPlan: readonly ResearchQueryPlanItem[];
+  searchObservations: readonly ResearchSearchObservation[];
+  fetchObservations: readonly ResearchFetchObservation[];
   generatedAt: string;
 }): ResearchBrief | null {
-  const sources = mergeResearchSources(input.searchObservations, input.fetchObservations);
+  const sources = mergeResearchSources(input.searchObservations, input.fetchObservations, input.generatedAt);
   if (sources.length === 0) return null;
   const fetchedSourceCount = sources.filter((source) => source.fetched).length;
-  const searchResultCount = input.searchObservations.reduce((sum, observation) => sum + observation.data.results.length, 0);
-  const uncertainties: string[] = [];
-  if (sources.length < 3) uncertainties.push("Fewer than 3 independent web sources were available.");
-  if (fetchedSourceCount === 0) uncertainties.push("No source pages were fetched; findings rely on search snippets only.");
+  const searchResultCount = input.searchObservations.reduce((sum, row) => sum + row.observation.data.results.length, 0);
+  const coverage = researchCoverage({
+    aim: input.aim,
+    queryPlan: input.queryPlan,
+    searchObservations: input.searchObservations,
+    sources,
+  });
+  const sufficiency = researchSufficiency(coverage, fetchedSourceCount);
+  const uncertainties = [...coverage.gaps];
   if (sources.some((source) => source.truncated)) uncertainties.push("Some fetched pages were truncated by runtime bounds.");
   return {
     question: queryForAim(input.aim),
-    queries: [...input.queries],
+    queries: input.queryPlan.map((row) => row.query),
+    queryPlan: input.queryPlan.map((row) => ({ ...row, lanes: [...row.lanes] })),
     findings: sources.slice(0, 8).map(renderFinding),
-    uncertainties,
+    uncertainties: [...new Set(uncertainties)],
+    conflicts: coverage.conflicts,
+    coverage,
+    sufficiency,
     sources,
     generatedAt: input.generatedAt,
     searchResultCount,
@@ -361,9 +812,17 @@ function renderResearchBriefForPlanning(brief: ResearchBrief): string {
     `Research brief for aim: ${compactText(brief.question, 220)}`,
     `Queries: ${brief.queries.join(" | ")}`,
     `Sources: ${brief.sources.length} selected, ${brief.fetchedSourceCount} fetched pages, ${brief.searchResultCount} search results.`,
+    `Coverage: ${brief.coverage.coveredLaneCount}/${brief.coverage.requiredLaneCount} required lanes across ${brief.coverage.uniqueDomainCount} independent domains.`,
+    `Authority: ${brief.coverage.primarySourceCount} primary, ${brief.coverage.secondarySourceCount} secondary.`,
+    `Freshness: ${brief.coverage.currentSourceCount} current, ${brief.coverage.datedSourceCount} dated, ${brief.coverage.unknownFreshnessCount} unknown.`,
+    `Research sufficiency: ${brief.sufficiency.level} (${brief.sufficiency.score}/100, sufficient=${brief.sufficiency.sufficient ? "yes" : "no"}).`,
     "Findings:",
     ...brief.findings.map((finding) => `- ${finding}`),
   ];
+  if (brief.conflicts.length > 0) {
+    lines.push("Potential conflicts:");
+    lines.push(...brief.conflicts.map((conflict) => `- ${conflict.summary} Sources: ${conflict.sourceUrls.join(" | ")}`));
+  }
   if (brief.uncertainties.length > 0) {
     lines.push("Uncertainties:");
     lines.push(...brief.uncertainties.map((uncertainty) => `- ${uncertainty}`));
@@ -552,12 +1011,12 @@ export async function collectPlanningToolContext(
   }
 
   if (input.includeWeb) {
-    const webQueries = researchQueriesForAim(input);
-    const webSearchObservations: AimcubToolObservation<WebSearchOutput>[] = [];
-    const webFetchObservations: AimcubToolObservation<WebFetchOutput>[] = [];
-    for (const webQuery of webQueries) {
+    const queryPlan = buildResearchQueryPlan(input);
+    const webSearchObservations: ResearchSearchObservation[] = [];
+    const webFetchObservations: ResearchFetchObservation[] = [];
+    for (const plan of queryPlan) {
       const searchResult = await registry.execute("web.search", {
-        query: webQuery,
+        query: plan.query,
         limit: input.webSearchLimit ?? DEFAULT_WEB_SEARCH_LIMIT,
       }, context);
       const webSearchObservation = addResult(
@@ -568,28 +1027,28 @@ export async function collectPlanningToolContext(
         failures,
       );
       if (webSearchObservation) {
-        webSearchObservations.push(webSearchObservation);
+        webSearchObservations.push({ plan, observation: webSearchObservation });
         planningMemories.push(...collectWebSearchData(webSearchObservation));
-      } else if (!searchResult.ok && (searchResult.error.code === "disabled" || searchResult.error.code === "permission_denied")) {
+      } else if (!searchResult.ok && (
+        searchResult.error.code === "disabled" ||
+        searchResult.error.code === "permission_denied" ||
+        searchResult.error.code === "unavailable"
+      )) {
         break;
       }
     }
     if (webSearchObservations.length > 0) {
-      const seenUrls = new Set<string>();
-      const fetchUrls = webSearchObservations.flatMap((observation) => observation.data.results)
-        .map((result) => result.url)
-        .filter((url): url is string => {
-          if (!url || seenUrls.has(url)) return false;
-          seenUrls.add(url);
-          return true;
-        })
-        .slice(0, input.webFetchLimit ?? DEFAULT_WEB_FETCH_LIMIT);
+      const requestedFetchLimit = input.webFetchLimit ?? DEFAULT_WEB_FETCH_LIMIT;
+      const fetchLimit = Number.isFinite(requestedFetchLimit)
+        ? Math.max(0, Math.floor(requestedFetchLimit))
+        : DEFAULT_WEB_FETCH_LIMIT;
+      const fetchTargets = fetchTargetsForResearch(webSearchObservations, fetchLimit);
       if (input.fetchWebResults) {
-        for (const url of fetchUrls) {
+        for (const target of fetchTargets) {
           const webFetchObservation = addResult(
             "web.fetch",
             await registry.execute("web.fetch", {
-              url,
+              url: target.url,
               maxBytes: 80_000,
               extractMode: "text",
             }, context),
@@ -598,14 +1057,14 @@ export async function collectPlanningToolContext(
             failures,
           );
           if (webFetchObservation) {
-            webFetchObservations.push(webFetchObservation);
+            webFetchObservations.push({ target, observation: webFetchObservation });
             planningMemories.push(...collectWebFetchData(webFetchObservation));
           }
         }
       }
       research = buildResearchBrief({
         aim: input,
-        queries: webQueries,
+        queryPlan,
         searchObservations: webSearchObservations,
         fetchObservations: webFetchObservations,
         generatedAt: context.now().toISOString(),

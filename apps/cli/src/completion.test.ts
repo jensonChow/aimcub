@@ -9,6 +9,8 @@ describe("completionScript", () => {
     expect(text).toContain("doctor");
     expect(text).toContain("context");
     expect(text).toContain("evidence");
+    expect(text).toContain("agents");
+    expect(text).toContain("run");
     expect(text).toContain("health accept reject deprioritize archive");
   });
 
