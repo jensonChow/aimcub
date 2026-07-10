@@ -12,7 +12,6 @@ import type { ContextLoopModel } from "./contextLoop";
 import type { ClarifyPhase } from "./types";
 
 interface ContextStageProps {
-  parentComposer: ReactNode | null;
   title: string;
   description: string | undefined | null;
   saved: boolean;
@@ -31,7 +30,6 @@ interface ContextStageProps {
 }
 
 export function ContextStage({
-  parentComposer,
   title,
   description,
   saved,
@@ -76,15 +74,13 @@ export function ContextStage({
 
   return (
     <>
-      {parentComposer ?? (
-        <ContextAimSummaryPanel
-          title={title}
-          description={description}
-          saved={saved}
-          compact={hasBlockingQuestion}
-          onEdit={onEditAim}
-        />
-      )}
+      <ContextAimSummaryPanel
+        title={title}
+        description={description}
+        saved={saved}
+        compact={hasBlockingQuestion}
+        onEdit={disabled ? undefined : onEditAim}
+      />
       <ContextActivityPanel model={loop} />
       {sourceWorkbench}
       {showContextReview ? <ContextReviewPanel bundle={review} running={reviewRunning} /> : null}

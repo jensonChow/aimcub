@@ -336,17 +336,22 @@ export function PlanContractCard(props: PlanContractCardProps) {
                 </button>
               ) : null}
             </div>
-            <textarea
-              aria-label={t("plan.acceptanceRule")}
-              className="od-plan-rule-input"
-              value={props.ruleText}
-              disabled={props.disabled}
-              readOnly={!props.editable}
-              onBlur={props.editable ? props.onRuleCommit : undefined}
-              onChange={props.editable ? (event) => props.onRuleText(event.target.value) : undefined}
-              rows={8}
-              spellCheck={false}
-            />
+            {props.editable ? (
+              <textarea
+                aria-label={t("plan.acceptanceRule")}
+                className="od-plan-rule-input"
+                value={props.ruleText}
+                disabled={props.disabled}
+                onBlur={props.onRuleCommit}
+                onChange={(event) => props.onRuleText(event.target.value)}
+                rows={8}
+                spellCheck={false}
+              />
+            ) : (
+              <pre className="od-plan-rule-code" aria-label={t("plan.acceptanceRule")} tabIndex={0}>
+                <code>{props.ruleText}</code>
+              </pre>
+            )}
             {props.ruleError ? <small className="od-plan-error">{props.ruleError}</small> : null}
           </div>
         ) : null}

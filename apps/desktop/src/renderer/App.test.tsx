@@ -762,7 +762,62 @@ describe("App planning state guards", () => {
 
     expect(resetComposer).toContain("setAimTitle(\"\")");
     expect(resetComposer).toContain("setAimDescription(\"\")");
-    expect(openGoal).toContain("setAimComposerOpen(false)");
+    expect(openGoal).toContain('setAimSurfaceMode("idle")');
+  });
+
+  it("separates new aim composition from committed draft summary and explicit editing", () => {
+    const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+    const startDraft = source.match(/async function startDraft[\s\S]*?\n {2}const builtAnswers/)?.[0] ?? "";
+    const applyHydratedDraft = source.match(/function applyHydratedDraft[\s\S]*?async function openAimDraft/)?.[0] ?? "";
+    const mainStage = source.match(/const mainStageContent = \(\(\) => \{[\s\S]*?\n {2}\}\)\(\);/)?.[0] ?? "";
+
+    expect(source).toContain('type AimSurfaceMode = "idle" | "compose" | "summary" | "edit";');
+    expect(startDraft).toContain("if (options.aim) {");
+    expect(startDraft).toContain("resetPlanningForAimUpdate()");
+    expect(startDraft).toContain("setAimEditBuffer(null)");
+    expect(startDraft).toContain('setAimSurfaceMode("summary")');
+    expect(applyHydratedDraft).toContain('setAimSurfaceMode(resumeInitialComposition ? "compose" : "summary")');
+    expect(mainStage).toContain("if (showAimEditor)");
+    expect(mainStage).toContain('onTitle={aimSurfaceMode === "edit" ? changeAimTitle : setAimTitle}');
+    expect(mainStage).toContain('onDescription={aimSurfaceMode === "edit" ? changeAimDescription : setAimDescription}');
+    expect(mainStage).toContain("<DraftAimOverviewPanel");
+    expect(mainStage.indexOf("if (showAimEditor)")).toBeLessThan(mainStage.indexOf("<DraftAimOverviewPanel"));
+    expect(source).toContain('setAimSurfaceMode("edit")');
+    expect(source).not.toContain("aimComposerOpen || hasUnsavedAim");
+    expect(source).toContain("const continueContextToPlan = () => {");
+    expect(source).not.toContain("const continueContextToPlan = parent ? undefined");
+  });
+
+  it("keeps an explicit aim edit aligned with downstream planning state", () => {
+    const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+    const startDraft = source.match(/async function startDraft[\s\S]*?\n {2}const builtAnswers/)?.[0] ?? "";
+    const beginEdit = source.match(/function beginAimEdit[\s\S]*?function resetPlanningForAimUpdate/)?.[0] ?? "";
+    const resetPlanning = source.match(/function resetPlanningForAimUpdate[\s\S]*?function changeAimTitle/)?.[0] ?? "";
+    const changeTitle = source.match(/function changeAimTitle[\s\S]*?function changeAimDescription/)?.[0] ?? "";
+    const cancel = source.match(/function cancelAimEdit[\s\S]*?async function startNewAim/)?.[0] ?? "";
+    const navigationLock = source.match(/function navigationIsLocked[\s\S]*?function workflowMutationIsLocked/)?.[0] ?? "";
+
+    expect(beginEdit).toContain("setAimEditBuffer({ title: aimTitle, description: aimDescription })");
+    expect(beginEdit).toContain('if (pendingTargetNavigationRef.current || !openCockpitStage("aim")) return;');
+    expect(beginEdit).not.toContain("setDraft(null)");
+    expect(changeTitle).toContain("setAimEditBuffer");
+    expect(changeTitle).not.toContain("setAimTitle");
+    expect(resetPlanning).toContain("setDraft(null)");
+    expect(resetPlanning).toContain("setFinalPlan(null)");
+    expect(resetPlanning).toContain("setClarifyPhase(null)");
+    expect(resetPlanning).toContain('setContextNote("")');
+    expect(startDraft).toContain('contextNote: ""');
+    expect(startDraft.indexOf('route === "show_helper_guidance"')).toBeLessThan(startDraft.indexOf("resetPlanningForAimUpdate()"));
+    expect(cancel).toContain("setAimEditBuffer(null)");
+    expect(cancel).not.toContain("setAimTitle");
+    expect(cancel).toContain('setAimSurfaceMode("summary")');
+    expect(navigationLock).toContain('aimSurfaceMode === "edit"');
+    expect(navigationLock).toContain('t("aimDraft.edit.navigationRecovery")');
+    expect(source).toContain('if (aimSurfaceMode === "edit" && stage === "aim") return true;');
+    expect(source).toContain('const activeAimTitle = aimSurfaceMode === "edit" && aimEditBuffer');
+    expect(source).toContain('? aimEditBuffer.title.trim()');
+    expect(source).toContain('? aimEditBuffer.description');
+    expect(source).toContain("titleInputRef.current?.focus()");
   });
 
   it("keeps plan validation failures repairable instead of disabling contract edits", () => {
@@ -1112,7 +1167,7 @@ describe("PlanPanel", () => {
     expect(html).toContain("clauses");
   });
 
-  it("locks contract mutations while busy and keeps saved acceptance rules read-only", () => {
+  it("locks contract mutations while busy and renders saved acceptance rules as code", () => {
     const node = contractPlan.nodes[0]!;
     const sharedProps = {
       node,
@@ -1163,11 +1218,9 @@ describe("PlanPanel", () => {
         <PlanContractCard {...sharedProps} editable={false} disabled={false} structureDisabled={false} />
       </I18nProvider>,
     );
-    const savedRule = savedHtml.match(/<textarea[^>]*aria-label="Acceptance rule"[^>]*>/)?.[0] ?? "";
-
     expect(savedHtml).not.toContain("Apply rule");
-    expect(savedRule).toContain('readOnly=""');
-    expect(savedRule).not.toContain('disabled=""');
+    expect(savedHtml).toContain('<pre class="od-plan-rule-code" aria-label="Acceptance rule" tabindex="0"><code>');
+    expect(savedHtml).not.toContain('<textarea aria-label="Acceptance rule"');
   });
 });
 
@@ -1447,6 +1500,8 @@ describe("CockpitShell", () => {
     expect(css).toMatch(/\.od-main-aim\s*{[^}]*grid-template-rows:\s*minmax\(0,\s*1fr\);[^}]*}/s);
     expect(css).toMatch(/\.od-main-aim:has\(>\s*\.od-stage-nav\)\s*{[^}]*grid-template-rows:\s*auto minmax\(0,\s*1fr\);[^}]*}/s);
     expect(css).toMatch(/\.od-workspace-aim:has\(>\s*\.od-aim-overview\)\s*{[^}]*align-content:\s*start;[^}]*}/s);
+    expect(css).toMatch(/\.od-draft-aim-overview \.od-aim-intake-head > div\s*{[^}]*min-width:\s*0;/s);
+    expect(css).toMatch(/\.od-draft-aim-overview h1,\s*\.od-draft-aim-overview p\s*{[^}]*overflow-wrap:\s*anywhere;/s);
   });
 
   it("uses the New Aim quiet hover treatment for secondary desktop controls", () => {
@@ -1623,13 +1678,13 @@ describe("CockpitShell", () => {
   it("keeps workbench navigation clear of titlebar controls at compact widths", () => {
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
     const stageSafeAreaRule = css.match(
-      /\.od-main:not\(\.od-main-aim\):not\(\.od-main-settings\)\s*{[^}]*}/s,
+      /\.od-app\[data-sidebar-state="collapsed"\] \.od-main:not\(\.od-main-settings\),[\s\S]*?\{[^}]*}/s,
     )?.[0] ?? "";
 
-    expect(css).toMatch(/\.od-main\s*{[^}]*--stage-nav-titlebar-safe-top:\s*0px;/s);
-    expect(stageSafeAreaRule).toContain("--stage-nav-titlebar-safe-top: calc(var(--titlebar-toggle-top) + var(--titlebar-toggle-size) + 16px);");
-    expect(stageSafeAreaRule).toContain("padding-top: max(16px, var(--stage-nav-titlebar-safe-top));");
-    expect(stageSafeAreaRule).not.toContain("data-sidebar-state");
+    expect(css).toMatch(/\.od-main\s*{[^}]*--stage-nav-titlebar-safe-top:\s*calc\(var\(--titlebar-toggle-top\) \+ var\(--titlebar-toggle-size\) \+ 16px\);/s);
+    expect(stageSafeAreaRule).toContain('.od-app[data-sidebar-state="peek"] .od-main:not(.od-main-settings)');
+    expect(stageSafeAreaRule).toContain("padding-top: max(24px, var(--stage-nav-titlebar-safe-top));");
+    expect(css).not.toContain('.od-main:not(.od-main-aim):not(.od-main-settings)');
     expect(stageSafeAreaRule).not.toMatch(/\.od-sidebar|\.od-user-menu-|\.od-window-drag-strip/);
     expect(css).toMatch(/\.od-stage-nav\s*{[^}]*justify-content:\s*space-between;[^}]*gap:\s*12px;[^}]*min-height:\s*32px;/s);
     expect(css).toMatch(/\.od-stage-switcher\s*{[^}]*gap:\s*4px;[^}]*padding:\s*2px;[^}]*border:\s*1px solid var\(--od-border-soft\);/s);
