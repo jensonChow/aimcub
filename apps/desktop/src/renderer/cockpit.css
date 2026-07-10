@@ -1574,7 +1574,7 @@ kbd {
 }
 
 .od-workspace-aim:has(> .od-aim-overview) {
-  align-content: start;
+  align-content: safe center;
 }
 
 .od-workspace-aim:has(> .od-notice) {
@@ -1582,7 +1582,7 @@ kbd {
 }
 
 .od-workspace-aim:has(> .od-initial-workspace[data-has-drafts="true"]) {
-  align-content: start;
+  align-content: safe center;
   justify-items: stretch;
 }
 

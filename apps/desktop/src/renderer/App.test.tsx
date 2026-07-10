@@ -1586,7 +1586,7 @@ describe("CockpitShell", () => {
     expect(css).toMatch(/\.od-main\s*{[^}]*--od-rail-operational:\s*940px;[^}]*--od-rail-reading:\s*760px;[^}]*--od-rail-compose:\s*560px;/s);
     expect(css).toMatch(/\.od-stage-nav\s*{[^}]*width:\s*min\(100%, var\(--od-rail-operational\)\);[^}]*justify-content:\s*flex-start;/s);
     expect(css).toMatch(/\.od-workspace\s*{[^}]*width:\s*min\(100%, var\(--od-rail-operational\)\);/s);
-    expect(css).toMatch(/\.od-workspace-aim:has\(> \.od-initial-workspace\[data-has-drafts="true"\]\)\s*{[^}]*align-content:\s*start;[^}]*justify-items:\s*stretch;/s);
+    expect(css).toMatch(/\.od-workspace-aim:has\(> \.od-initial-workspace\[data-has-drafts="true"\]\)\s*{[^}]*align-content:\s*safe center;[^}]*justify-items:\s*stretch;/s);
     expect(css).toMatch(/\.od-initial-workspace\[data-has-drafts="true"\]\s*{[^}]*min-height:\s*0;[^}]*align-content:\s*start;[^}]*padding:\s*0;/s);
     expect(css).toMatch(/\.od-draft-recovery\s*{[^}]*width:\s*min\(100%, var\(--od-rail-compose\)\);[^}]*margin:\s*0 auto;/s);
     expect(css).toMatch(/\.od-context-focus\s*{[^}]*width:\s*min\(100%, var\(--od-rail-reading\)\);[^}]*padding-top:\s*0;/s);
@@ -1597,7 +1597,7 @@ describe("CockpitShell", () => {
 
     expect(css).toMatch(/\.od-main-aim\s*{[^}]*grid-template-rows:\s*minmax\(0,\s*1fr\);[^}]*}/s);
     expect(css).toMatch(/\.od-main-aim:has\(>\s*\.od-stage-nav\)\s*{[^}]*grid-template-rows:\s*auto minmax\(0,\s*1fr\);[^}]*}/s);
-    expect(css).toMatch(/\.od-workspace-aim:has\(>\s*\.od-aim-overview\)\s*{[^}]*align-content:\s*start;[^}]*}/s);
+    expect(css).toMatch(/\.od-workspace-aim:has\(>\s*\.od-aim-overview\)\s*{[^}]*align-content:\s*safe center;[^}]*}/s);
     expect(css).toMatch(/\.od-draft-aim-overview \.od-aim-intake-head > div\s*{[^}]*min-width:\s*0;/s);
     expect(css).toMatch(/\.od-draft-aim-overview h1,\s*\.od-draft-aim-overview p\s*{[^}]*overflow-wrap:\s*anywhere;/s);
   });

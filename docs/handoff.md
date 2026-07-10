@@ -5,42 +5,36 @@ Branch: `main`
 
 ## Current Session
 
-- Request: fix the regression where a captured Aim could reappear as the New Aim input after submit or draft recovery.
-- Starting state: clean `main` matched `origin/main` at `ba029dfe` (`Refresh compact Aim layout handoff`).
-- Root cause: the missing-runtime submit branch returned before switching from compose to summary, while hydration guessed the Aim presentation from stage, phase, and plan state because drafts did not persist that distinction.
+- Request: correct the vertical placement shown in the supplied P1 and P2 Desktop screenshots. The Home draft recovery surface sat too close to the top, and the recovered Aim summary should be centered in the right workspace.
+- Starting state: clean `main` matched `origin/main` at `1faebadd`.
 
 ## Completed Work
 
-- Made the submit presentation decision explicit. A normal first submit now checkpoints a durable summary snapshot before changing the UI, then enters the static Aim summary even when no provider or authenticated local agent is available. Explicit Edit remains buffered when runtime setup blocks regeneration, so the committed Aim and existing plan cannot drift.
-- Added the persisted `aim_surface` draft field with `compose` and `summary` values. New drafts write the current presentation state, edit serializes as summary, and legacy rows without the field recover safely into summary instead of reopening an input.
-- Removed the stage/phase/plan hydration heuristic. Draft autosave now reacts to Aim surface changes, and unsubmitted composition no longer presents itself as a selected draft workbench with Aim/Context/Contracts navigation.
-- Added a summary-native helper-setup state. A captured Aim without a planning runtime stays readable and offers Edit plus Set up planning helper instead of keeping helper recovery inside the composer.
-- Added value-level transition, persistence, legacy normalization, Store round-trip, component rendering, and App integration regression tests. Updated architecture, Desktop, and design-system memory with the durable presentation-state contract.
+- Changed the Home draft recovery workspace from top alignment to safe vertical centering while preserving the 560 px compose rail and existing horizontal alignment.
+- Changed recovered Aim summaries from top alignment to safe vertical centering below the compact workbench navigation while preserving the 760 px reading rail.
+- Used CSS safe centering so content that becomes taller than the available workspace remains reachable from the scrollable start edge.
+- Updated the Desktop CSS regression assertions and recorded the durable vertical-centering rule in Desktop and design-system memory.
 
 ## Verification
 
-- Focused verification passed: Desktop 29 test files / 220 tests, Desktop typecheck, Store 64 tests, and `git diff --check`.
+- Focused Desktop verification passed: 29 test files and 220 tests, including the updated layout assertions.
 - Repository gates passed: `pnpm build`, `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm core:purity`, and `git diff --check`.
-- Repository tests passed across 90 test files and 918 tests. Package totals were Core 176, LLM 170, local-agent 10, CLI 88, Desktop 220, Store 64, API 40, DB 36, and MCP 114. The expected missing-Supabase stderr came only from the MCP hygiene fixture.
-- `pnpm desktop:pack` passed with Electron 43.0.0 for macOS arm64, without signing. The project-root `Aimcub.app` exactly matches the packaged output; the refreshed `Resources/app.asar` SHA256 is `4f1e1fec046c65db165a027f381414b67b3952eb425d8b0d18bd2afbc46ba632`.
-- Packaged UI verification used the exact root app with isolated `HOME`, `AIMCUB_HOME`, and Electron user-data directories under `/tmp`. A legacy aim-stage draft opened directly as a static summary with no input; Edit opened the buffered composer and Cancel restored the summary. A brand-new Aim submitted without any planning runtime also switched immediately to the static summary. A final checkpoint race test first confirmed `aim_surface: "compose"` on disk, submitted the Aim, terminated the app as soon as summary appeared, restarted against the same Store, and reopened the draft as summary with no input; disk held `aim_surface: "summary"`. The isolated instances were closed, and no real `~/.aimcub` data was read or written.
-- The `memory-refresh` audit passed before publication. Root `AGENTS.md` and `CLAUDE.md` remain within their 50-line budgets, and the architecture, Desktop, and design-system memories already contain the durable compose-summary-edit contract, so no duplicate module-memory edits were needed.
+- `pnpm desktop:pack` passed with Electron 43.0.0 for macOS arm64, without signing. The project-root `Aimcub.app` was refreshed from the packaged output; its `Resources/app.asar` SHA256 is `9574e3c6ff2570289f0326d9cfba649a6b28c835fe14f1acdf6729990d5df719`.
+- Packaged visual QA used the exact root `Aimcub.app` with isolated `HOME`, `AIMCUB_HOME`, and Electron user-data directories under `/private/tmp`. A temporary draft confirmed that the P1 Home recovery surface is vertically centered with collapsed and pinned sidebars, and that the P2 recovered Aim summary is vertically centered below workbench navigation. The isolated instance was closed, and no real `~/.aimcub` data was read or written.
 
 ## Commit And Push Status
 
-- Feature commit: `74f792db` (`Fix captured Aim summary persistence`).
-- Local merge commit: `dd2edd43` (`Merge captured Aim summary persistence fix`).
-- Regression handoff commit: `1faebadd` (`Finalize Aim summary regression handoff`).
-- The user explicitly authorized commit, merge, and push after invoking `memory-refresh`. The merged fix through `1faebadd` was pushed to `origin/main` on 2026-07-10 after verifying the `jensonChow` GitHub identity, the `jensonChow/aimcub` destination, `ADMIN` permission, and `main` as the default branch.
-- This focused memory-refresh status record is committed on `main` and published as the current `origin/main` tip.
+- Work was completed directly on `main`; no separate branch merge was needed.
+- A focused local commit contains the layout, tests, memory, and handoff updates. Local `main` is one commit ahead of `origin/main`.
+- The commit has not been pushed. Fresh explicit user approval is required before pushing.
 
 ## Open Risks
 
-- Legacy drafts cannot reveal whether their old title was submitted or only autosaved because the field did not exist. Recovery intentionally fails safe to the readable summary; Edit remains the explicit route back to composition.
-- The local macOS bundle remains unsigned and uses the default Electron icon. This does not affect the verified Aim presentation behavior.
+- The centering change is intentionally limited to Home draft recovery and Aim overview surfaces. Notices and operational stages retain their existing top-aligned behavior.
+- The local macOS bundle remains unsigned and uses the default Electron icon.
 
 ## Next Session Prompt
 
 ```text
-Continue from Aimcub main. Read AGENTS.md, docs/handoff.md, docs/memory/README.md, and the relevant module memory. Preserve the compose-summary-edit contract: first submit and legacy draft recovery show a static Aim summary; only explicit Edit opens the composer. Keep aim_surface persisted, serialize Edit as summary, and never let missing runtime setup, autosave, navigation, or restart reopen a captured Aim as an input. Use isolated HOME, AIMCUB_HOME, and Electron user data for packaged QA. Require fresh explicit authorization before any later push.
+Continue from Aimcub main. Read AGENTS.md, docs/handoff.md, docs/memory/README.md, and the relevant module memory. Preserve safe vertical centering for Home draft recovery and recovered Aim summaries while keeping overflowing content reachable from the scrollable start edge. The current local main is one focused commit ahead of origin/main; require fresh explicit authorization before pushing.
 ```
