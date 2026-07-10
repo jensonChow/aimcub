@@ -55,6 +55,12 @@ ELECTRON_BUILDER_CACHE=/private/tmp/aimcub-electron-builder-cache pnpm --filter 
 
 For any repo-changing session, `pnpm build` is not enough because it updates build output but not the project-root `Aimcub.app` bundle. Run `pnpm desktop:pack`, copy `apps/desktop/dist/mac-arm64/Aimcub.app` to root `Aimcub.app`, and restart/open that exact bundle when the user needs to inspect visible app behavior.
 
+## Packaged Desktop Visual QA
+
+When Computer Use is available, run packaged visual QA against the exact project-root `Aimcub.app` after it has been refreshed. Start from the visible Home state, keep real local data read-only, and do not answer intake questions, submit proof, save plans, or change settings merely to reach another screen. If Contracts or Work need deterministic data, use the isolated Local Alpha Demo Seed below with `AIMCUB_HOME` under `/tmp`; never seed or rewrite the real `~/.aimcub` store for visual QA.
+
+Check the normal 960 by 680 footprint and the 640 by 520 minimum. At minimum size, verify that the focused Context surface shows only the current question, its answer lane scrolls independently, custom input remains reachable, and the footer action stays visible without horizontal overflow. Also check Home, collapsed and pinned sidebar states, and the Contracts context-gate recovery surface. Use the accessibility tree as well as screenshots to confirm that the current question receives focus and that controls remain reachable. Restore Home and the prior sidebar/workbench state when practical, and record any Contracts or Work surfaces that could not be exercised without mutating real data.
+
 Desktop release packaging for distributable DMG/zip artifacts uses:
 
 ```bash

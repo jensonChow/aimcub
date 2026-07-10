@@ -1,59 +1,55 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-10
-Branch: `main`
+Branch: `codex/refresh-desktop-focus-memory`
 
 ## Current Session
 
-- Request: investigate and fix the exported Desktop complaint that one Context screen exposes too many elements for the user to focus on one interaction.
-- Starting state: clean `main` matched `origin/main` at `b1b1d06b` (`Refresh memory after navigation fix`).
-- Export evidence: the nested archive contained one Notion note and two screenshots showing Aim summary, context activity/sufficiency, warnings, five activity rows, a disabled plan action, one of four questions, choices, two free-form lanes, and source controls on the same long page.
+- Request: run `$memory-refresh`, then commit, push, and merge the refreshed memory into `main`.
+- Starting state: clean `main` matched `origin/main` at `6156907d` (`Finalize desktop focus handoff`).
+- Evidence reviewed: the memory audit, root memory contract, memory map, Desktop and operations memory, the focused Context/Contracts/Work source and tests, commits `5a74083f`, `bde28594`, and `6156907d`, and the live packaged GUI inspection.
 
 ## Completed Work
 
-- Made blocking intake and optional draft refinement mutually exclusive focused Context surfaces. Aim summary/edit, activity, sufficiency, source controls, and bundle review stay hidden while a question flow is active.
-- Replaced automatic answer-driven question switching with explicit Back/Next navigation. Multi-select and custom text remain on the current question, remounts resume at the first unanswered question, and question changes move keyboard focus to the new heading.
-- Kept optional draft refinement pending across repeated Context clicks, stage re-entry, and draft hydration. Only successful refinement or explicit accept/skip completes the flow, while completed questions and answers remain persisted for final save metadata.
-- Removed the duplicate general context note while a targeted question exists, disabled every answer/navigation control while planning is busy, and added a single Settings recovery action when both intake paths are paused.
-- Kept the focused question footer visible while the answer lane scrolls at short window heights. Choices use a compact responsive grid.
-- Omitted empty Context bundle reviews and changed the Contracts review to a counted, default-closed disclosure.
-- Replaced stacked Contracts cards with one compact contract selector plus the selected contract detail while keeping Save Aim in the header. The selector marks contracts needing attention; invalid rule drafts block structure changes, and contract-local state resets only after a target change succeeds.
-- Moved the Work primary task ahead of runtime/activity detail, placed runtime and activity in a default-closed disclosure, bounded the selector at all widths, and made an open proof form replace the normal action group.
-- Preserved proof values after failed confirmation, disabled sub-aim switching, blocked every normal target/workbench navigation entry until submit or cancel, and added focus handoff into and out of the proof form.
-- Split proof confirmation from its follow-up progress refresh. A successful evidence write now closes the submitted draft even when refresh fails, preventing duplicate evidence on retry; the three transaction outcomes have direct behavior tests.
-- Added assertive error and polite busy-state live regions, and moved focus to the first asynchronously rendered Context question as well as later Back/Next questions.
-- Updated English/Chinese copy, focused regression coverage, `docs/memory/desktop.md`, and `docs/memory/design-system.md`.
+- Ran `audit_project_memory.py`; `AGENTS.md` and `CLAUDE.md` remain within the 50-line limit and still contain only hard project rules.
+- Confirmed `docs/memory/desktop.md` and `docs/memory/design-system.md` already match the focused Context, selected-contract, and selected-work implementation, so they were not duplicated or rewritten.
+- Added a durable packaged Desktop visual-QA protocol to `docs/memory/operations.md`: inspect the exact root bundle, keep the real local store read-only, use the isolated `/tmp` seed for deeper fixtures, cover 960x680 and 640x520, combine screenshots with the accessibility tree, and restore the prior surface when practical.
+- Replaced the stale handoff claim that live GUI QA was blocked with the observed packaged-app results below.
+
+## Live GUI Results
+
+- Opened the refreshed project-root `Aimcub.app` successfully through Computer Use; the prior single-instance/preview blockers did not recur.
+- At 960x680, the active Context intake showed only one focused question, four choices, one custom-answer lane, and the footer action. Aim summary, activity, sufficiency, source controls, and bundle review did not compete with the question.
+- At 640x520, the answer lane scrolled independently, the custom answer remained reachable, the footer action stayed visible, and no horizontal overflow or overlap appeared.
+- The first Context question heading held accessibility focus. Home, collapsed/pinned sidebar states, and the 640x520 Contracts context-gate recovery surface were also visually sound.
+- The real local store had no saved Aim, so selected-contract details and Work execution details were not opened. QA stayed read-only rather than generating or mutating user data.
+- Returned the app to Home with the sidebar collapsed after inspection.
 
 ## Changed Files
 
-- Context flow: `ContextStage.tsx`, `ContextClarifyPanel.tsx`, `ContextReviewPanel.tsx`, `ContextSourcesPanel.test.tsx`, and matching Context tests.
-- Contracts and Work: `PlanPanel.tsx`, `PlanContractCard.tsx`, `ExecutePanel.tsx`, `LocalAgentExecutionSummary.tsx`, `EvidenceSubmissionForm.tsx`, new `ExecutePanel.test.tsx`, and new `workflow/confirmationFlow.ts` plus its test.
-- Renderer integration: `App.tsx`, `App.test.tsx`, `Notice.tsx`, `cockpit.css`, and `i18n.tsx`.
-- Durable memory and transfer: `docs/memory/desktop.md`, `docs/memory/design-system.md`, and this handoff.
+- `docs/memory/operations.md`
+- `docs/handoff.md`
 
 ## Verification
 
-- `pnpm build && pnpm test && pnpm typecheck && pnpm lint && pnpm core:purity` passed.
-- Desktop reported 24 test files and 186 passing tests. MCP worker tests replayed the existing missing-Supabase-env stderr while asserting opaque 500 behavior.
-- `git diff --check` passed.
+- `pnpm build`, `pnpm test`, `pnpm typecheck`, `pnpm lint`, and `pnpm core:purity` passed.
+- Desktop reported 24 test files and 186 passing tests.
+- `git diff --check` passed; the memory audit still reports `AGENTS.md` and `CLAUDE.md` at 34 lines each.
 - `pnpm desktop:pack` passed with Electron 43.0.0, and `ditto apps/desktop/dist/mac-arm64/Aimcub.app Aimcub.app` refreshed the root bundle.
-- Root `Aimcub.app` is `com.aimcub.desktop`, version `0.0.0`; `Resources/app.asar` SHA256 is `a837d87c5339cf01744f99da5c454aee9ca4966722646f9f60cb91ce7675cfa6`.
-- Live GUI QA was not claimed: launching the isolated `/tmp` app instance was blocked by the environment usage limit, and the in-app browser rejected the local preview URL. Responsive layout is covered by component/CSS regression guards, but a human visual pass at 960x680 and 640x520 remains useful.
+- Root `Aimcub.app` remains `com.aimcub.desktop`, version `0.0.0`; `Resources/app.asar` SHA256 is `a837d87c5339cf01744f99da5c454aee9ca4966722646f9f60cb91ce7675cfa6`.
 
 ## Commit And Push Status
 
-- Feature commit: `5a74083f` (`Focus desktop work surfaces`).
-- Feature branch: `codex/desktop-context-focus`, pushed to `origin`.
-- Merge commit: `bde28594` (`Merge desktop focused work surfaces`).
-- Merge status: pushed to the verified private `origin/main` remote with admin permission.
+- Memory-refresh commit: pending.
+- Push and merge: pending.
 
 ## Open Risks
 
 - An open manual proof draft is protected from normal in-app navigation by requiring submit or cancel, but it is not yet checkpointed across process termination or a full app reload.
-- The packaged app was rebuilt, but the environment blocked live visual inspection. Open the refreshed root `Aimcub.app` for the final human layout pass.
+- Live selected-contract and Work layouts still need an isolated seeded pass because the real store intentionally remained unchanged.
 
 ## Next Session Prompt
 
 ```text
-Continue from Aimcub main. Read AGENTS.md, docs/handoff.md, docs/memory/README.md, docs/memory/desktop.md, and docs/memory/design-system.md first. Preserve the focused-work invariant: Context shows one question flow, Contracts shows one selected contract, and Work shows one primary task or proof form. Recheck the live 960x680 and 640x520 layouts if GUI access is available.
+Continue from Aimcub main. Read AGENTS.md, docs/handoff.md, docs/memory/README.md, docs/memory/desktop.md, and docs/memory/operations.md first. Preserve the focused-work invariant: Context shows one question flow, Contracts shows one selected contract, and Work shows one primary task or proof form. Use the isolated Local Alpha seed for live selected-contract or Work visual QA instead of mutating the real ~/.aimcub store.
 ```
