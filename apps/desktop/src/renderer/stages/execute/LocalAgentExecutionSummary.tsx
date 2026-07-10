@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import { routingOverrideForMilestone } from "@core/domain";
 import type { AimProgressReadModel, RunStatus } from "@core/types";
 
@@ -245,6 +247,7 @@ function compactActivity(row: ProgressMilestoneRow): ActivityEvent[] {
 export function LocalAgentExecutionSummary(props: {
   row: ProgressMilestoneRow;
   actors: readonly ProgressActor[];
+  task?: ReactNode;
 }) {
   const { t } = useI18n();
   const row = props.row;
@@ -290,40 +293,47 @@ export function LocalAgentExecutionSummary(props: {
         </div>
       </div>
 
-      <div className="od-execution-runtime" aria-label={t("execute.runtimeDetails")}>
-        <div className="od-execution-runtime-head">
-          <span>{t("execute.runtimeDetails")}</span>
-        </div>
-        <div className="od-execution-field">
-          <span>{t("execute.modelReasoning")}</span>
-          <strong className={!modelRecorded ? "is-placeholder" : ""}>{modelText(row, t)}</strong>
-          <small>{t("execute.reasoningValue", { value: reasoningText(row, t) })}</small>
-        </div>
-        <div className="od-execution-field">
-          <span>{t("execute.workspace")}</span>
-          <strong className={!row.latest_run?.workspace_root ? "is-placeholder" : ""}>{workspaceText(row, t)}</strong>
-          <small>{permissionText(row, t)}</small>
-        </div>
-      </div>
+      {props.task ? <div className="od-execute-task">{props.task}</div> : null}
 
-      <div className="od-execution-activity">
-        <div className="od-execution-activity-head">
-          <span>{t("execute.activityTitle")}</span>
+      <details className="od-execution-secondary-details">
+        <summary>
+          <span>{t("execute.runtimeDetails")} · {t("execute.activityTitle")}</span>
           <small>{activity.length ? t("execute.activityCount", { n: activity.length }) : t("execute.activityEmpty")}</small>
+        </summary>
+        <div className="od-execution-secondary-body">
+          <div className="od-execution-runtime" aria-label={t("execute.runtimeDetails")}>
+            <div className="od-execution-field">
+              <span>{t("execute.modelReasoning")}</span>
+              <strong className={!modelRecorded ? "is-placeholder" : ""}>{modelText(row, t)}</strong>
+              <small>{t("execute.reasoningValue", { value: reasoningText(row, t) })}</small>
+            </div>
+            <div className="od-execution-field">
+              <span>{t("execute.workspace")}</span>
+              <strong className={!row.latest_run?.workspace_root ? "is-placeholder" : ""}>{workspaceText(row, t)}</strong>
+              <small>{permissionText(row, t)}</small>
+            </div>
+          </div>
+
+          <div className="od-execution-activity">
+            <div className="od-execution-activity-head">
+              <span>{t("execute.activityTitle")}</span>
+              <small>{activity.length ? t("execute.activityCount", { n: activity.length }) : t("execute.activityEmpty")}</small>
+            </div>
+            {activity.length ? (
+              <ol>
+                {activity.map((event, index) => (
+                  <li key={`${event.type}-${index}`}>
+                    <span>{activityLabel(event.type, t)}</span>
+                    <strong>{event.summary}</strong>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <div className="od-empty-inline">{row.latest_run?.summary || row.latest_run?.error || t("execute.activityNoEvents")}</div>
+            )}
+          </div>
         </div>
-        {activity.length ? (
-          <ol>
-            {activity.map((event, index) => (
-              <li key={`${event.type}-${index}`}>
-                <span>{activityLabel(event.type, t)}</span>
-                <strong>{event.summary}</strong>
-              </li>
-            ))}
-          </ol>
-        ) : (
-          <div className="od-empty-inline">{row.latest_run?.summary || row.latest_run?.error || t("execute.activityNoEvents")}</div>
-        )}
-      </div>
+      </details>
     </section>
   );
 }

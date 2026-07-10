@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import type { AimProgressReadModel } from "@core/domain";
 import type { Milestone } from "@core/types";
@@ -31,10 +31,11 @@ export function ExecutePanel(props: {
   progress: AimProgressReadModel | null;
   disabled: boolean;
   onRunAgent: (milestone: Milestone) => void;
-  onConfirm: (milestone: Milestone, submission: Omit<ConfirmMilestoneRequest, "goalId" | "milestoneId">) => Promise<void>;
+  onConfirm: (milestone: Milestone, submission: Omit<ConfirmMilestoneRequest, "goalId" | "milestoneId">) => Promise<boolean>;
   onPickFiles: () => Promise<string[]>;
   onBreakDown: (milestone: Milestone) => void;
   onReviewEval: () => void;
+  onProofDraftActiveChange?: (active: boolean) => void;
 }) {
   const { t } = useI18n();
   const rows = progressRows(props.detail, props.progress);
@@ -46,6 +47,9 @@ export function ExecutePanel(props: {
   const [activeProofId, setActiveProofId] = useState<string | null>(null);
   const [proofDrafts, setProofDrafts] = useState<Record<string, EvidenceSubmissionDraft>>({});
   const [pickingFilesFor, setPickingFilesFor] = useState<string | null>(null);
+  const proofTriggerRef = useRef<HTMLButtonElement>(null);
+  const restoreProofFocusRef = useRef(false);
+  const proofDraftActiveChangeRef = useRef(props.onProofDraftActiveChange);
   const selectedRow = rows.find((row) => row.milestone.id === selectedMilestoneId) ?? defaultSelectedRow;
 
   function proofDraftFor(milestone: Milestone): EvidenceSubmissionDraft {
@@ -60,8 +64,16 @@ export function ExecutePanel(props: {
   }
 
   function openProof(milestone: Milestone): void {
+    setSelectedMilestoneId(milestone.id);
     setActiveProofId(milestone.id);
     setProofDrafts((current) => current[milestone.id] ? current : { ...current, [milestone.id]: emptyEvidenceDraft(milestone) });
+    props.onProofDraftActiveChange?.(true);
+  }
+
+  function closeProof(restoreFocus: boolean): void {
+    restoreProofFocusRef.current = restoreFocus;
+    setActiveProofId(null);
+    props.onProofDraftActiveChange?.(false);
   }
 
   async function pickProofFiles(milestone: Milestone): Promise<void> {
@@ -81,8 +93,9 @@ export function ExecutePanel(props: {
   async function submitProof(milestone: Milestone): Promise<void> {
     const draft = proofDraftFor(milestone);
     if (!evidenceDraftIsSubmittable(draft)) return;
-    await props.onConfirm(milestone, evidenceSubmissionPayload(draft));
-    setActiveProofId(null);
+    const confirmed = await props.onConfirm(milestone, evidenceSubmissionPayload(draft));
+    if (!confirmed) return;
+    closeProof(false);
     setProofDrafts((current) => {
       const next = { ...current };
       delete next[milestone.id];
@@ -119,6 +132,21 @@ export function ExecutePanel(props: {
     && !selectedRow.completed
     && !selectedRow.blocked,
   );
+  const proofIsActive = Boolean(selectedRow && activeProofId === selectedRow.milestone.id);
+
+  useEffect(() => {
+    if (proofIsActive || !restoreProofFocusRef.current) return;
+    restoreProofFocusRef.current = false;
+    proofTriggerRef.current?.focus();
+  }, [proofIsActive]);
+
+  useEffect(() => {
+    proofDraftActiveChangeRef.current = props.onProofDraftActiveChange;
+  }, [props.onProofDraftActiveChange]);
+
+  useEffect(() => {
+    return () => proofDraftActiveChangeRef.current?.(false);
+  }, []);
 
   return (
     <section className="od-stage-panel">
@@ -148,6 +176,7 @@ export function ExecutePanel(props: {
                   className={`od-execute-selector-row${selected ? " is-selected" : ""}`}
                   type="button"
                   aria-current={selected ? "true" : undefined}
+                  disabled={proofIsActive}
                   onClick={() => setSelectedMilestoneId(row.milestone.id)}
                 >
                   <span className="od-execute-selector-index">{index + 1}</span>
@@ -162,69 +191,80 @@ export function ExecutePanel(props: {
           </div>
 
           <article className="od-execute-detail" aria-label={t("execute.selectedDetailLabel")}>
-            <LocalAgentExecutionSummary row={selectedRow} actors={props.progress?.actors ?? []} />
+            <LocalAgentExecutionSummary
+              row={selectedRow}
+              actors={props.progress?.actors ?? []}
+              task={executeTaskContent(proofIsActive ? (
+                <EvidenceSubmissionForm
+                  milestone={selectedRow.milestone}
+                  draft={proofDraftFor(selectedRow.milestone)}
+                  disabled={props.disabled}
+                  pickingFiles={pickingFilesFor === selectedRow.milestone.id}
+                  onChange={(next) => updateProofDraft(selectedRow.milestone, () => next)}
+                  onPickFiles={() => void pickProofFiles(selectedRow.milestone)}
+                  onCancel={() => closeProof(true)}
+                  onSubmit={() => void submitProof(selectedRow.milestone)}
+                />
+              ) : null, (
+                <>
+                  {selectedRow.blocked ? (
+                    <div className="od-execute-blocker">
+                      <strong>{t("execute.blockedTitle")}</strong>
+                      <span>{executeBlockedDetail(selectedRow, t)}</span>
+                    </div>
+                  ) : null}
 
-            {selectedRow.blocked ? (
-              <div className="od-execute-blocker">
-                <strong>{t("execute.blockedTitle")}</strong>
-                <span>{executeBlockedDetail(selectedRow, t)}</span>
-              </div>
-            ) : null}
+                  <div className="od-execute-primary-action">
+                    <div>
+                      <span>{t("execute.primaryActionLabel")}</span>
+                      <strong>{primaryAction.detail}</strong>
+                    </div>
+                    <button
+                      className="od-aim-primary od-execute-primary-button"
+                      type="button"
+                      ref={primaryAction.kind === "submit_proof" ? proofTriggerRef : undefined}
+                      disabled={props.disabled || primaryAction.kind === "blocked"}
+                      onClick={() => runPrimaryAction(selectedRow, primaryAction.kind)}
+                    >
+                      {primaryAction.label}
+                    </button>
+                  </div>
 
-            {selectedRow.assignment?.reason ? <div className="od-work-note">{shortText(selectedRow.assignment.reason, 220)}</div> : null}
+                  <div className="od-execute-secondary-actions" aria-label={t("execute.secondaryActionsLabel")}>
+                    {showSecondaryRun ? (
+                      <button className="od-aim-secondary" type="button" disabled={props.disabled} onClick={() => props.onRunAgent(selectedRow.milestone)}>
+                        {t("os.runAgent")}
+                      </button>
+                    ) : null}
+                    {showSecondaryProof ? (
+                      <button
+                        ref={proofTriggerRef}
+                        className="od-aim-secondary"
+                        type="button"
+                        disabled={props.disabled}
+                        onClick={() => openProof(selectedRow.milestone)}
+                      >
+                        {t("os.submitProof")}
+                      </button>
+                    ) : null}
+                    {!selectedRow.completed ? (
+                      <button className="od-aim-secondary" type="button" disabled={props.disabled} onClick={() => props.onBreakDown(selectedRow.milestone)}>
+                        {t("os.breakDown")}
+                      </button>
+                    ) : null}
+                  </div>
 
-            {selectedRow.child_relations.length ? (
-              <div className="od-work-note">
-                <strong>{t("os.childBreakdown", { n: selectedRow.child_relations.length })}</strong>
-                <span>{selectedRow.child_relations.map((item) => item.status).join(", ")}</span>
-              </div>
-            ) : null}
+                  {selectedRow.assignment?.reason ? <div className="od-work-note">{shortText(selectedRow.assignment.reason, 220)}</div> : null}
 
-            <div className="od-execute-primary-action">
-              <div>
-                <span>{t("execute.primaryActionLabel")}</span>
-                <strong>{primaryAction.detail}</strong>
-              </div>
-              <button
-                className="od-aim-primary od-execute-primary-button"
-                type="button"
-                disabled={props.disabled || primaryAction.kind === "blocked"}
-                onClick={() => runPrimaryAction(selectedRow, primaryAction.kind)}
-              >
-                {primaryAction.label}
-              </button>
-            </div>
-
-            <div className="od-execute-secondary-actions" aria-label={t("execute.secondaryActionsLabel")}>
-              {showSecondaryRun ? (
-                <button className="od-aim-secondary" type="button" disabled={props.disabled} onClick={() => props.onRunAgent(selectedRow.milestone)}>
-                  {t("os.runAgent")}
-                </button>
-              ) : null}
-              {showSecondaryProof ? (
-                <button className="od-aim-secondary" type="button" disabled={props.disabled} onClick={() => openProof(selectedRow.milestone)}>
-                  {t("os.submitProof")}
-                </button>
-              ) : null}
-              {!selectedRow.completed ? (
-                <button className="od-aim-secondary" type="button" disabled={props.disabled} onClick={() => props.onBreakDown(selectedRow.milestone)}>
-                  {t("os.breakDown")}
-                </button>
-              ) : null}
-            </div>
-
-            {activeProofId === selectedRow.milestone.id ? (
-              <EvidenceSubmissionForm
-                milestone={selectedRow.milestone}
-                draft={proofDraftFor(selectedRow.milestone)}
-                disabled={props.disabled}
-                pickingFiles={pickingFilesFor === selectedRow.milestone.id}
-                onChange={(next) => updateProofDraft(selectedRow.milestone, () => next)}
-                onPickFiles={() => void pickProofFiles(selectedRow.milestone)}
-                onCancel={() => setActiveProofId(null)}
-                onSubmit={() => void submitProof(selectedRow.milestone)}
-              />
-            ) : null}
+                  {selectedRow.child_relations.length ? (
+                    <div className="od-work-note">
+                      <strong>{t("os.childBreakdown", { n: selectedRow.child_relations.length })}</strong>
+                      <span>{selectedRow.child_relations.map((item) => item.status).join(", ")}</span>
+                    </div>
+                  ) : null}
+                </>
+              ))}
+            />
           </article>
         </div>
       ) : (
@@ -232,6 +272,10 @@ export function ExecutePanel(props: {
       )}
     </section>
   );
+}
+
+export function executeTaskContent(proofTask: ReactNode | null, normalTask: ReactNode): ReactNode {
+  return proofTask ?? normalTask;
 }
 
 function StageMetric({ label, value }: { label: string; value: string }) {

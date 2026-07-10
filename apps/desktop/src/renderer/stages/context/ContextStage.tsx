@@ -51,8 +51,19 @@ export function ContextStage({
   const { t } = useI18n();
   const hasBlockingQuestion = clarifyPhase === "intake";
   const hasClarifyPanel = Boolean(clarifyPanel);
+  const hasFocusedQuestion = hasClarifyPanel
+    && (clarifyPhase === "intake" || clarifyPhase === "postDraft");
   const showContinue = !hasBlockingQuestion && !hasClarifyPanel && Boolean(onContinueToPlan);
   const showContextReview = !hasBlockingQuestion && showReview;
+
+  if (hasFocusedQuestion) {
+    return (
+      <section className="od-context-focus" data-od-id="context-focus">
+        {clarifyPanel}
+      </section>
+    );
+  }
+
   const sourceWorkbench = (
     <ContextSourcesPanel
       status={contextSources}
@@ -75,22 +86,9 @@ export function ContextStage({
         />
       )}
       <ContextActivityPanel model={loop} />
-      {hasBlockingQuestion ? clarifyPanel : null}
-      {hasBlockingQuestion ? (
-        <details className="od-context-secondary-sources" data-od-id="context-secondary-sources">
-          <summary>
-            <span>
-              <strong>{t("context.workbench.secondarySummary")}</strong>
-              <small>{t("context.workbench.secondaryBody")}</small>
-            </span>
-          </summary>
-          <div className="od-context-secondary-body">
-            {sourceWorkbench}
-          </div>
-        </details>
-      ) : sourceWorkbench}
+      {sourceWorkbench}
       {showContextReview ? <ContextReviewPanel bundle={review} running={reviewRunning} /> : null}
-      {!hasBlockingQuestion ? clarifyPanel : null}
+      {clarifyPanel}
       {showContinue ? (
         <div className="od-context-continue">
           <Button variant="primary" size="lg" disabled={disabled} onClick={onContinueToPlan}>

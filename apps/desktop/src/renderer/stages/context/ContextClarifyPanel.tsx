@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from "react";
+
 import type { ClarifyOutput } from "@core/llm";
 
 import { useI18n } from "../../i18n";
@@ -16,164 +18,225 @@ interface ContextClarifyPanelProps {
   onContextNote: (value: string) => void;
   onRefine: () => void;
   onSkip?: () => void;
+  onOpenSettings?: () => void;
+  flowKey?: string;
 }
 
-export function ContextClarifyPanel(props: ContextClarifyPanelProps) {
+interface ContextClarifyFlowProps extends ContextClarifyPanelProps {
+  questions: ClarifyOutput["questions"];
+}
+
+function answerProvided(answer: { labels: string[]; other: string } | undefined): boolean {
+  return Boolean(answer && (answer.labels.length > 0 || answer.other.trim()));
+}
+
+function firstUnansweredQuestionIndex(
+  questions: ClarifyOutput["questions"],
+  answers: ContextAnswerMap,
+): number {
+  const index = questions.findIndex((question) => !answerProvided(answers[question.id]));
+  return index >= 0 ? index : Math.max(questions.length - 1, 0);
+}
+
+function ContextClarifyFlow(props: ContextClarifyFlowProps) {
   const { t } = useI18n();
   const intake = props.phase === "intake";
-  const questions = intake && !props.questionnaireEnabled ? [] : props.clarify.questions;
-  const answeredQuestionIds = new Set(Object.entries(props.answers)
-    .filter(([, answer]) => answer.other.trim() || answer.labels.length > 0)
-    .map(([id]) => id));
-  const activeQuestionIndex = intake
-    ? questions.findIndex((question) => !answeredQuestionIds.has(question.id))
-    : -1;
-  const visibleQuestions = intake
-    ? activeQuestionIndex >= 0 ? [questions[activeQuestionIndex]!] : []
-    : questions;
-  const hasQuestionAnswer = Object.values(props.answers).some((answer) => answer.other.trim() || answer.labels.length > 0);
-  const activeQuestion = activeQuestionIndex >= 0 ? questions[activeQuestionIndex] : null;
-  const activeAnswer = activeQuestion ? props.answers[activeQuestion.id] : null;
-  const activeQuestionAnswered = Boolean(activeAnswer && (activeAnswer.other.trim() || activeAnswer.labels.length > 0));
+  const [activeQuestionIndex, setActiveQuestionIndex] = useState(() =>
+    firstUnansweredQuestionIndex(props.questions, props.answers));
+  const questionHeadingRef = useRef<HTMLHeadingElement>(null);
+  const questionIndex = Math.min(activeQuestionIndex, Math.max(props.questions.length - 1, 0));
+  const activeQuestion = props.questions[questionIndex] ?? null;
+  const activeAnswer = activeQuestion
+    ? props.answers[activeQuestion.id] ?? { labels: [], other: "" }
+    : null;
+  const activeQuestionAnswered = answerProvided(activeAnswer ?? undefined);
+  const hasQuestionAnswer = Object.values(props.answers).some(answerProvided);
   const contextNoteProvided = props.conversationEnabled && props.contextNote.trim().length > 0;
-  const hasContextAnswer = (props.conversationEnabled && props.contextNote.trim().length > 0)
-    || hasQuestionAnswer;
-  const primaryAcceptsDraft = !intake && !hasQuestionAnswer && Boolean(props.onSkip);
-  const primaryAction = primaryAcceptsDraft && props.onSkip ? props.onSkip : props.onRefine;
-  const primaryLabel = intake ? t("os.generateFromContext") : primaryAcceptsDraft ? t("os.acceptDraft") : t("os.refineDraft");
-  const secondaryLabel = hasQuestionAnswer ? t("os.acceptDraft") : t("os.skipRefinement");
-  const primaryDisabled = props.disabled || (intake && (
-    activeQuestion
-      ? !activeQuestionAnswered && !contextNoteProvided
-      : !hasContextAnswer
+  const hasNextQuestion = Boolean(activeQuestion && questionIndex < props.questions.length - 1);
+  const intakePaused = intake && !activeQuestion && !props.conversationEnabled;
+  const primaryAcceptsDraft = !intake && !hasQuestionAnswer && !hasNextQuestion && Boolean(props.onSkip);
+  const primaryLabel = intakePaused
+    ? t("context.workbench.manage")
+    : hasNextQuestion
+      ? t("os.nextQuestion")
+      : intake
+        ? t("os.generateFromContext")
+        : primaryAcceptsDraft
+          ? t("os.acceptDraft")
+          : t("os.refineDraft");
+  const primaryDisabled = props.disabled || (intake && !intakePaused && (
+    activeQuestion ? !activeQuestionAnswered : !contextNoteProvided
   ));
-  const body = intake
-    ? t("os.contextIntakeBody")
-    : questions.length
-      ? t("os.clarifyBody")
-      : t("os.noQuestionsBody");
+
+  useEffect(() => {
+    if (!activeQuestion) return;
+    questionHeadingRef.current?.focus();
+  }, [activeQuestion?.id]);
+
+  function showQuestion(index: number) {
+    setActiveQuestionIndex(index);
+  }
+
+  function runPrimaryAction() {
+    if (intakePaused) {
+      props.onOpenSettings?.();
+      return;
+    }
+    if (hasNextQuestion) {
+      showQuestion(questionIndex + 1);
+      return;
+    }
+    if (primaryAcceptsDraft && props.onSkip) {
+      props.onSkip();
+      return;
+    }
+    props.onRefine();
+  }
+
   return (
-    <Panel variant="plain" className="od-context-clarify" data-od-id={intake ? "context-blocking-question" : "context-draft-refinement"}>
-      <div className="od-stage-panel-head od-context-clarify-head">
+    <Panel
+      variant="plain"
+      className="od-context-clarify"
+      data-od-id={intake ? "context-blocking-question" : "context-draft-refinement"}
+      data-phase={intake ? "intake" : "refinement"}
+    >
+      {activeQuestion && activeAnswer ? (
+        <>
+          <header className="od-context-question-focus">
+            <div className="od-context-question-meta">
+              <span>{t("os.contextQuestionProgress", { current: questionIndex + 1, total: props.questions.length })}</span>
+              <Pill>{t(activeQuestion.selection_mode === "multiple" ? "os.multiSelect" : "os.singleSelect")}</Pill>
+            </div>
+            <h2 ref={questionHeadingRef} tabIndex={-1}>{activeQuestion.question}</h2>
+            <p>{activeQuestion.why_high_impact}</p>
+          </header>
+
+          <div
+            className="od-context-answer-focus"
+            data-od-id={intake ? "context-user-reply" : undefined}
+            role="group"
+            aria-label={activeQuestion.question}
+          >
+            <div className="od-context-choice-list">
+              {activeQuestion.options.map((option) => (
+                <Button
+                  key={option.label}
+                  variant="secondary"
+                  className="od-ui-button-card od-context-choice"
+                  selected={activeAnswer.labels.includes(option.label)}
+                  aria-pressed={activeAnswer.labels.includes(option.label)}
+                  disabled={props.disabled}
+                  onClick={() => {
+                    const selected = activeAnswer.labels.includes(option.label);
+                    const labels = activeQuestion.selection_mode === "multiple"
+                      ? selected
+                        ? activeAnswer.labels.filter((label) => label !== option.label)
+                        : [...activeAnswer.labels, option.label]
+                      : [option.label];
+                    props.onAnswer(activeQuestion.id, { ...activeAnswer, labels });
+                  }}
+                >
+                  <strong>{option.label}</strong>
+                  <span>{option.tradeoff}</span>
+                </Button>
+              ))}
+            </div>
+            {activeQuestion.allow_other ? (
+              <TextField
+                label={t("os.otherAnswer")}
+                value={activeAnswer.other}
+                disabled={props.disabled}
+                onChange={(event) => props.onAnswer(activeQuestion.id, { ...activeAnswer, other: event.target.value })}
+                placeholder={t("os.otherAnswerPlaceholder")}
+                fieldClassName="od-context-other-field"
+              />
+            ) : null}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="od-stage-panel-head od-context-clarify-head">
+            <div>
+              <div className="od-stage-kicker">
+                {t(intake ? "os.contextIntakeEyebrow" : "os.draftRefinementEyebrow")}
+              </div>
+              <h2>
+                {intakePaused
+                  ? t("os.contextIntakePausedHeading")
+                  : intake
+                    ? t("os.contextConversation")
+                    : t("os.noQuestionsHeading")}
+              </h2>
+            </div>
+          </div>
+          <p className="od-context-clarify-body">
+            {intakePaused
+              ? t("os.contextIntakePausedBody")
+              : intake
+                ? t("os.contextConversationBody")
+                : t("os.noQuestionsBody")}
+          </p>
+          {intake && props.conversationEnabled ? (
+            <TextArea
+              label={t("os.contextConversation")}
+              value={props.contextNote}
+              disabled={props.disabled}
+              onChange={(event) => props.onContextNote(event.target.value)}
+              placeholder={t("os.contextConversationPlaceholder")}
+              rows={4}
+              fieldClassName="od-context-note-field"
+            />
+          ) : null}
+        </>
+      )}
+
+      <footer className="od-context-clarify-footer">
         <div>
-          <div className="od-stage-kicker">{t(intake ? "os.contextIntakeEyebrow" : "os.draftRefinementEyebrow")}</div>
-          <h2>
-            {intake ? t("os.contextIntakeHeading") : questions.length ? t("os.clarifyHeading") : t("os.noQuestionsHeading")}
-          </h2>
+          {activeQuestion && questionIndex > 0 ? (
+            <Button
+              variant="ghost"
+              size="lg"
+              disabled={props.disabled}
+              onClick={() => showQuestion(Math.max(0, questionIndex - 1))}
+            >
+              {t("common.back")}
+            </Button>
+          ) : null}
         </div>
         <div className="od-context-clarify-actions">
           {props.onSkip && !primaryAcceptsDraft ? (
-            <Button variant="secondary" size="lg" className="od-context-clarify-action" onClick={props.onSkip}>
-              {secondaryLabel}
+            <Button
+              variant="secondary"
+              size="lg"
+              className="od-context-clarify-action"
+              disabled={props.disabled}
+              onClick={props.onSkip}
+            >
+              {t(hasQuestionAnswer ? "os.acceptDraft" : "os.skipRefinement")}
             </Button>
           ) : null}
-          <Button variant="primary" size="lg" className="od-context-clarify-action" onClick={primaryAction} disabled={primaryDisabled}>
+          <Button
+            variant="primary"
+            size="lg"
+            className="od-context-clarify-action"
+            onClick={runPrimaryAction}
+            disabled={primaryDisabled}
+          >
             {primaryLabel}
           </Button>
         </div>
-      </div>
-      <p className="od-context-clarify-body">{body}</p>
-      {intake && questions.length > 0 ? (
-        <div className="od-context-step-progress">
-          <span>
-            {activeQuestionIndex >= 0
-              ? t("os.contextQuestionProgress", { current: activeQuestionIndex + 1, total: questions.length })
-              : t("os.contextQuestionsComplete", { total: questions.length })}
-          </span>
-        </div>
-      ) : null}
-      <div className="od-context-question-list">
-        {visibleQuestions.map((question) => {
-          const answer = props.answers[question.id] ?? { labels: [], other: "" };
-          const multi = question.selection_mode === "multiple";
-          return (
-            <div
-              key={question.id}
-              className="od-context-chat-exchange"
-              data-od-id={intake ? "context-chat-exchange" : undefined}
-            >
-              <article className="od-context-message od-context-message-assistant" data-od-id={intake ? "context-assistant-message" : undefined}>
-                <div className="od-context-message-meta">
-                  <span>{t("context.chat.assistant")}</span>
-                  <Pill>{t(multi ? "os.multiSelect" : "os.singleSelect")}</Pill>
-                </div>
-                <strong>{question.question}</strong>
-                <p>{question.why_high_impact}</p>
-              </article>
-
-              <article className="od-context-message od-context-message-user" data-od-id={intake ? "context-user-reply" : undefined}>
-                <div className="od-context-message-meta">
-                  <span>{t("context.chat.reply")}</span>
-                </div>
-                <div className="od-context-choice-list">
-                  {question.options.map((option) => (
-                    <Button
-                      key={option.label}
-                      variant="secondary"
-                      className="od-ui-button-card od-context-choice"
-                      selected={answer.labels.includes(option.label)}
-                      aria-pressed={answer.labels.includes(option.label)}
-                      onClick={() => {
-                        const selected = answer.labels.includes(option.label);
-                        const labels = multi
-                          ? selected
-                            ? answer.labels.filter((label) => label !== option.label)
-                            : [...answer.labels, option.label]
-                          : [option.label];
-                        props.onAnswer(question.id, { ...answer, labels });
-                      }}
-                    >
-                      <strong>{option.label}</strong>
-                      <span>{option.tradeoff}</span>
-                    </Button>
-                  ))}
-                </div>
-                <TextField
-                  aria-label={t("os.otherAnswer")}
-                  value={answer.other}
-                  onChange={(event) => props.onAnswer(question.id, { ...answer, other: event.target.value })}
-                  placeholder={t("os.otherAnswer")}
-                  fieldClassName="od-context-other-field"
-                />
-                {intake && props.conversationEnabled ? (
-                  <TextArea
-                    aria-label={t("os.contextConversation")}
-                    value={props.contextNote}
-                    onChange={(event) => props.onContextNote(event.target.value)}
-                    placeholder={t("os.contextConversationPlaceholder")}
-                    rows={3}
-                    fieldClassName="od-context-note-field"
-                  />
-                ) : null}
-              </article>
-            </div>
-          );
-        })}
-        {intake && props.conversationEnabled && visibleQuestions.length === 0 ? (
-          <div className="od-context-chat-exchange" data-od-id="context-chat-exchange">
-            <article className="od-context-message od-context-message-assistant" data-od-id="context-assistant-message">
-              <div className="od-context-message-meta">
-                <span>{t("context.chat.assistant")}</span>
-              </div>
-              <strong>{t("os.contextConversation")}</strong>
-              <p>{t("os.contextConversationBody")}</p>
-            </article>
-            <article className="od-context-message od-context-message-user" data-od-id="context-user-reply">
-              <div className="od-context-message-meta">
-                <span>{t("context.chat.reply")}</span>
-              </div>
-              <TextArea
-                aria-label={t("os.contextConversation")}
-                value={props.contextNote}
-                onChange={(event) => props.onContextNote(event.target.value)}
-                placeholder={t("os.contextConversationPlaceholder")}
-                rows={3}
-                fieldClassName="od-context-note-field"
-              />
-            </article>
-          </div>
-        ) : null}
-      </div>
+      </footer>
     </Panel>
   );
+}
+
+export function ContextClarifyPanel(props: ContextClarifyPanelProps) {
+  const questions = props.phase === "intake" && !props.questionnaireEnabled
+    ? []
+    : props.clarify.questions;
+  const flowKey = `${props.flowKey ?? "default"}:${props.phase ?? "none"}:${questions
+    .map((question) => `${question.id}:${question.question}`)
+    .join("|")}`;
+
+  return <ContextClarifyFlow key={flowKey} {...props} questions={questions} />;
 }

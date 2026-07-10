@@ -11,6 +11,7 @@ interface PlanContractCardProps {
   nodeCount: number;
   editable: boolean;
   disabled: boolean;
+  structureDisabled: boolean;
   contract: DecompositionContract;
   recommendation: PlanNodeRoutingRecommendation;
   owner: PlanRoutingOwner;
@@ -137,7 +138,11 @@ export function PlanContractCard(props: PlanContractCardProps) {
           {props.editable ? (
             <label className="od-plan-title-field">
               <span>{t("subAim.title")}</span>
-              <input value={props.node.title} onChange={(event) => props.onNode({ title: event.target.value })} />
+              <input
+                value={props.node.title}
+                disabled={props.disabled}
+                onChange={(event) => props.onNode({ title: event.target.value })}
+              />
             </label>
           ) : (
             <div className="od-plan-readonly-title">
@@ -172,6 +177,7 @@ export function PlanContractCard(props: PlanContractCardProps) {
                 <span>{t("subAim.body")}</span>
                 <textarea
                   value={props.node.description}
+                  disabled={props.disabled}
                   onChange={(event) => props.onNode({ description: event.target.value })}
                   rows={2}
                 />
@@ -180,6 +186,7 @@ export function PlanContractCard(props: PlanContractCardProps) {
                 <span>{t("plan.contractWhy")}</span>
                 <textarea
                   value={props.contract.why}
+                  disabled={props.disabled}
                   onChange={(event) => props.onContract({ why: event.target.value })}
                   rows={2}
                 />
@@ -188,6 +195,7 @@ export function PlanContractCard(props: PlanContractCardProps) {
                 <span>{t("plan.contractDone")}</span>
                 <textarea
                   value={props.contract.definition_of_done}
+                  disabled={props.disabled}
                   onChange={(event) => props.onContract({ definition_of_done: event.target.value })}
                   rows={2}
                 />
@@ -196,6 +204,7 @@ export function PlanContractCard(props: PlanContractCardProps) {
                 <span>{t("plan.contractEvidence")}</span>
                 <textarea
                   value={props.contract.required_evidence.join("\n")}
+                  disabled={props.disabled}
                   onChange={(event) => props.onContract({ required_evidence: event.target.value.split(/\r?\n/g) })}
                   rows={2}
                 />
@@ -204,6 +213,7 @@ export function PlanContractCard(props: PlanContractCardProps) {
                 <span>{t("plan.contractEval")}</span>
                 <textarea
                   value={props.contract.eval_signal}
+                  disabled={props.disabled}
                   onChange={(event) => props.onContract({ eval_signal: event.target.value })}
                   rows={2}
                 />
@@ -295,11 +305,11 @@ export function PlanContractCard(props: PlanContractCardProps) {
           <details className="od-plan-structure-details">
             <summary>{t("plan.structureActions")}</summary>
             <div className="od-plan-actions" aria-label={t("plan.structureActions")}>
-              <StructureActionButton label={t("plan.moveUp")} kind="moveUp" onClick={props.onMoveUp} disabled={props.index === 0} />
-              <StructureActionButton label={t("plan.moveDown")} kind="moveDown" onClick={props.onMoveDown} disabled={props.index >= props.nodeCount - 1} />
-              <StructureActionButton label={t("plan.mergeUp")} kind="mergeUp" onClick={props.onMergeUp} disabled={props.index === 0} />
-              <StructureActionButton label={t("plan.mergeDown")} kind="mergeDown" onClick={props.onMergeDown} disabled={props.index >= props.nodeCount - 1} />
-              <StructureActionButton label={t("plan.split")} kind="split" onClick={props.onSplit} disabled={props.nodeCount >= 15} />
+              <StructureActionButton label={t("plan.moveUp")} kind="moveUp" onClick={props.onMoveUp} disabled={props.disabled || props.structureDisabled || props.index === 0} />
+              <StructureActionButton label={t("plan.moveDown")} kind="moveDown" onClick={props.onMoveDown} disabled={props.disabled || props.structureDisabled || props.index >= props.nodeCount - 1} />
+              <StructureActionButton label={t("plan.mergeUp")} kind="mergeUp" onClick={props.onMergeUp} disabled={props.disabled || props.structureDisabled || props.index === 0} />
+              <StructureActionButton label={t("plan.mergeDown")} kind="mergeDown" onClick={props.onMergeDown} disabled={props.disabled || props.structureDisabled || props.index >= props.nodeCount - 1} />
+              <StructureActionButton label={t("plan.split")} kind="split" onClick={props.onSplit} disabled={props.disabled || props.structureDisabled || props.nodeCount >= 15} />
             </div>
           </details>
         ) : null}
@@ -320,16 +330,20 @@ export function PlanContractCard(props: PlanContractCardProps) {
             <RuleSummary node={props.node} />
             <div className="od-plan-field-head">
               <span>{t("plan.acceptanceRule")}</span>
-              <button type="button" onClick={props.onRuleCommit}>
-                {t("plan.applyRule")}
-              </button>
+              {props.editable ? (
+                <button type="button" disabled={props.disabled} onClick={props.onRuleCommit}>
+                  {t("plan.applyRule")}
+                </button>
+              ) : null}
             </div>
             <textarea
               aria-label={t("plan.acceptanceRule")}
               className="od-plan-rule-input"
               value={props.ruleText}
-              onBlur={props.onRuleCommit}
-              onChange={(event) => props.onRuleText(event.target.value)}
+              disabled={props.disabled}
+              readOnly={!props.editable}
+              onBlur={props.editable ? props.onRuleCommit : undefined}
+              onChange={props.editable ? (event) => props.onRuleText(event.target.value) : undefined}
               rows={8}
               spellCheck={false}
             />

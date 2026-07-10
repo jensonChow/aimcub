@@ -14,19 +14,14 @@ const emptyReview: ContextBundleReview = {
 };
 
 describe("ContextReviewPanel", () => {
-  it("does not render empty buckets as a debug-style table", () => {
+  it("does not render when the review has no items", () => {
     const html = renderToStaticMarkup(
       <I18nProvider>
         <ContextReviewPanel bundle={emptyReview} running={false} />
       </I18nProvider>,
     );
 
-    expect(html).toContain('data-empty="true"');
-    expect(html).toContain("Review context before planning");
-    expect(html).not.toContain("Used context");
-    expect(html).not.toContain("Skipped or unread");
-    expect(html).not.toContain("Permission gaps");
-    expect(html).not.toContain("Decomposition risks");
+    expect(html).toBe("");
   });
 
   it("shows only relevant skipped, permission, and risk buckets", () => {
@@ -60,5 +55,40 @@ describe("ContextReviewPanel", () => {
     expect(html).toContain("Connector or access needed");
     expect(html).not.toContain("Used context");
     expect(html).not.toContain("Skipped or unread");
+  });
+
+  it("renders Contracts context as a counted disclosure that is closed by default", () => {
+    const html = renderToStaticMarkup(
+      <I18nProvider>
+        <ContextReviewPanel
+          compact
+          running={false}
+          bundle={{
+            ...emptyReview,
+            usedContext: [{
+              id: "used",
+              title: "Aim brief",
+              body: "The brief shaped the plan.",
+              meta: ["local"],
+              tone: "success",
+            }],
+            decompositionRisks: [{
+              id: "risk",
+              title: "Unanswered intake question",
+              body: "What would change decomposition?",
+              meta: ["high"],
+              tone: "danger",
+            }],
+          }}
+        />
+      </I18nProvider>,
+    );
+
+    expect(html).toContain('<details class="od-context-review-disclosure" data-od-id="context-bundle-review">');
+    expect(html).not.toContain('<details class="od-context-review-disclosure" data-od-id="context-bundle-review" open');
+    expect(html).toContain("Context behind these contracts");
+    expect(html).toContain('aria-label="2 context items">2</span>');
+    expect(html).toContain("Aim brief");
+    expect(html).toContain("Unanswered intake question");
   });
 });

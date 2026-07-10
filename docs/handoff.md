@@ -1,61 +1,57 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-10
-Branch: `main`
+Branch: `codex/desktop-context-focus`
 
 ## Current Session
 
-- Request: fix the exported Desktop complaint that normal browsing loses the relationship between pages and can select New Aim together with an active draft.
-- Starting state: clean `main` matched `origin/main` at `2146ba0d` (`Refresh desktop action menu memory`).
-- The evidence showed a resumed draft and New Aim highlighted together and described drafts becoming difficult to return to after ordinary navigation.
+- Request: investigate and fix the exported Desktop complaint that one Context screen exposes too many elements for the user to focus on one interaction.
+- Starting state: clean `main` matched `origin/main` at `b1b1d06b` (`Refresh memory after navigation fix`).
+- Export evidence: the nested archive contained one Notion note and two screenshots showing Aim summary, context activity/sufficiency, warnings, five activity rows, a disabled plan action, one of four questions, choices, two free-form lanes, and source controls on the same long page.
 
 ## Completed Work
 
-- Replaced independent Home/New Aim/draft/saved-aim selection flags with one mutually exclusive workspace target.
-- Scoped persisted drafts to Aim, Context, and Contracts; saved aims keep all five workbench surfaces. Draft navigation remains visible on Aim, and Work/Review no longer render Contracts content under the wrong label.
-- Added a serialized draft persistence queue with a stable store-compatible ID, navigation flushes, session invalidation, stale-response detection, and checkpoint-failure recovery.
-- Added per-draft activation versions so a delayed open cannot resurrect a draft that was discarded while the read was in flight.
-- Added separate target and surface navigation epochs. Older planning and goal responses cannot replace newer navigation, while same-goal data may refresh without rerouting the current surface.
-- Locked workflow mutations while a target checkpoint/read is pending, retained side-effect locks across surface browsing, and made save/discard locks release deterministically.
-- Split draft/goal list refresh from slower helper probes so a stale startup snapshot cannot hide a draft created during launch.
-- Preserved the originating workbench surface across Settings and kept startup on Home when recoverable drafts exist.
-- Removed draft list caps so every persisted draft remains reachable. Draft status now reflects workflow content rather than the page the user happened to browse.
-- Added focused navigation, persistence, activation, save-release, startup, Settings-return, and stale-response regression coverage plus matching English/Chinese copy.
-- Updated `docs/memory/desktop.md` and `docs/memory/design-system.md` with the durable navigation and checkpoint rules.
-- A post-merge memory refresh reconciled active-draft discard semantics and the verified-origin push approval procedure.
+- Made blocking intake and optional draft refinement mutually exclusive focused Context surfaces. Aim summary/edit, activity, sufficiency, source controls, and bundle review stay hidden while a question flow is active.
+- Replaced automatic answer-driven question switching with explicit Back/Next navigation. Multi-select and custom text remain on the current question, remounts resume at the first unanswered question, and question changes move keyboard focus to the new heading.
+- Kept optional draft refinement pending across repeated Context clicks, stage re-entry, and draft hydration. Only successful refinement or explicit accept/skip completes the flow, while completed questions and answers remain persisted for final save metadata.
+- Removed the duplicate general context note while a targeted question exists, disabled every answer/navigation control while planning is busy, and added a single Settings recovery action when both intake paths are paused.
+- Kept the focused question footer visible while the answer lane scrolls at short window heights. Choices use a compact responsive grid.
+- Omitted empty Context bundle reviews and changed the Contracts review to a counted, default-closed disclosure.
+- Replaced stacked Contracts cards with one compact contract selector plus the selected contract detail while keeping Save Aim in the header. The selector marks contracts needing attention; invalid rule drafts block structure changes, and contract-local state resets only after a target change succeeds.
+- Moved the Work primary task ahead of runtime/activity detail, placed runtime and activity in a default-closed disclosure, bounded the selector at all widths, and made an open proof form replace the normal action group.
+- Preserved proof values after failed confirmation, disabled sub-aim switching, blocked every normal target/workbench navigation entry until submit or cancel, and added focus handoff into and out of the proof form.
+- Split proof confirmation from its follow-up progress refresh. A successful evidence write now closes the submitted draft even when refresh fails, preventing duplicate evidence on retry; the three transaction outcomes have direct behavior tests.
+- Added assertive error and polite busy-state live regions, and moved focus to the first asynchronously rendered Context question as well as later Back/Next questions.
+- Updated English/Chinese copy, focused regression coverage, `docs/memory/desktop.md`, and `docs/memory/design-system.md`.
 
 ## Changed Files
 
-- Renderer orchestration and shell: `apps/desktop/src/renderer/App.tsx`, `CockpitShell.tsx`, `firstRunFlow.ts`, and `i18n.tsx`.
-- Draft UI and workflow: `stages/aim/AimDraftRecovery.tsx`, `workflow/aimDrafts.ts`, and new `workflow/workspaceNavigation.ts`, `workflow/draftPersistenceQueue.ts`, and `workflow/navigationConcurrency.ts`.
-- Tests: matching renderer, routing, draft, workspace-navigation, persistence-queue, and navigation-concurrency test files.
-- Memory and transfer docs: `docs/memory/desktop.md`, `docs/memory/design-system.md`, `docs/memory/operations.md`, and this handoff.
+- Context flow: `ContextStage.tsx`, `ContextClarifyPanel.tsx`, `ContextReviewPanel.tsx`, `ContextSourcesPanel.test.tsx`, and matching Context tests.
+- Contracts and Work: `PlanPanel.tsx`, `PlanContractCard.tsx`, `ExecutePanel.tsx`, `LocalAgentExecutionSummary.tsx`, `EvidenceSubmissionForm.tsx`, new `ExecutePanel.test.tsx`, and new `workflow/confirmationFlow.ts` plus its test.
+- Renderer integration: `App.tsx`, `App.test.tsx`, `Notice.tsx`, `cockpit.css`, and `i18n.tsx`.
+- Durable memory and transfer: `docs/memory/desktop.md`, `docs/memory/design-system.md`, and this handoff.
 
 ## Verification
 
-- `pnpm build && pnpm test && pnpm typecheck && pnpm lint && pnpm core:purity` passed after the final code changes.
-- Desktop reported 22 test files and 170 passing tests. MCP worker tests replayed the existing missing-Supabase-env stderr while asserting opaque 500 behavior.
-- `git diff --check` passed, and two independent final code reviews reported no remaining actionable issues.
-- Isolated live QA used `AIMCUB_HOME=/tmp/aimcub-navigation-qa-019f4a1f` at the normal 960x680 window and a macOS half-screen narrow layout. It confirmed one current draft row, no New Aim double selection, three draft surfaces, ignored Cmd+4, Context -> Settings -> Context return, Home recovery, and no visible overflow.
+- `pnpm build && pnpm test && pnpm typecheck && pnpm lint && pnpm core:purity` passed.
+- Desktop reported 24 test files and 186 passing tests. MCP worker tests replayed the existing missing-Supabase-env stderr while asserting opaque 500 behavior.
+- `git diff --check` passed.
 - `pnpm desktop:pack` passed with Electron 43.0.0, and `ditto apps/desktop/dist/mac-arm64/Aimcub.app Aimcub.app` refreshed the root bundle.
-- Root `Aimcub.app` remains `com.aimcub.desktop`, version `0.0.0`; `Resources/app.asar` SHA256 is `bbd5c8e26ee1cb213e728115f0f7276306e6923dfaf37431957de0513c73f06a`.
-- The post-merge memory refresh reran the memory audit, all repository gates, `git diff --check`, and Desktop packaging; the root app hash remained unchanged.
+- Root `Aimcub.app` is `com.aimcub.desktop`, version `0.0.0`; `Resources/app.asar` SHA256 is `a837d87c5339cf01744f99da5c454aee9ca4966722646f9f60cb91ce7675cfa6`.
+- Live GUI QA was not claimed: launching the isolated `/tmp` app instance was blocked by the environment usage limit, and the in-app browser rejected the local preview URL. Responsive layout is covered by component/CSS regression guards, but a human visual pass at 960x680 and 640x520 remains useful.
 
 ## Commit And Push Status
 
-- Feature commit: `697d668dcd4787a2dbb48f36edc7d92b4479a63b` (`Fix desktop draft navigation coherence`).
-- Local `main` merge: `ee7c84045777df52337f5e1d501056f425909e3a` (`Merge desktop draft navigation coherence`).
-- The user explicitly approved remote upload after the initial safety hold. Read-only verification confirmed `jensonChow/aimcub` is the authenticated user's private repository with `ADMIN` access.
-- `origin/codex/desktop-navigation-coherence` now contains the feature commit, and `main` was pushed with the verified merge plus final handoff commits.
-- The post-merge memory refresh was completed directly on `main`; no additional feature branch or merge was needed.
+- Feature commit: pending.
+- Push and merge: pending.
 
 ## Open Risks
 
-- Live QA used an isolated title-only draft and did not run a real provider planning call; deferred persistence, activation, navigation, and lock behavior is covered by deterministic tests.
-- Dev mode emitted only the existing Electron insecure-CSP warning; the packaged build does not emit that development warning.
+- An open manual proof draft is protected from normal in-app navigation by requiring submit or cancel, but it is not yet checkpointed across process termination or a full app reload.
+- The packaged app was rebuilt, but the environment blocked live visual inspection. Open the refreshed root `Aimcub.app` for the final human layout pass.
 
 ## Next Session Prompt
 
 ```text
-Continue from Aimcub main. Read AGENTS.md, docs/handoff.md, docs/memory/README.md, docs/memory/desktop.md, and docs/memory/design-system.md first. The verified navigation fix is committed, merged, and pushed to origin. Preserve the single workspace-target invariant: Home, New Aim, one draft, or one saved aim is current; drafts expose Aim/Context/Contracts only; Settings returns to the originating surface. Check git status and remote state before new work.
+Continue from Aimcub main. Read AGENTS.md, docs/handoff.md, docs/memory/README.md, docs/memory/desktop.md, and docs/memory/design-system.md first. Preserve the focused-work invariant: Context shows one question flow, Contracts shows one selected contract, and Work shows one primary task or proof form. Recheck the live 960x680 and 640x520 layouts if GUI access is available.
 ```

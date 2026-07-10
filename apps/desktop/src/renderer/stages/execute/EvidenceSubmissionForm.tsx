@@ -60,6 +60,7 @@ export function EvidenceSubmissionForm(props: {
       <label className="od-proof-field">
         <span>{t("os.proofNote")}</span>
         <textarea
+          autoFocus
           value={props.draft.proofNote}
           disabled={props.disabled}
           rows={3}

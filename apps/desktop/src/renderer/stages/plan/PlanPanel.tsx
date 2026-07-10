@@ -61,6 +61,7 @@ export function PlanPanel(props: PlanPanelProps) {
   const [ruleDrafts, setRuleDrafts] = useState<Record<string, string>>({});
   const [ruleErrors, setRuleErrors] = useState<Record<string, string>>({});
   const [advancedOpen, setAdvancedOpen] = useState<Record<string, boolean>>({});
+  const [selectedNodeKey, setSelectedNodeKey] = useState<string | null>(() => props.plan.nodes[0]?.key ?? null);
   const hasRuleErrors = Object.keys(ruleErrors).length > 0;
   const validation = props.routingValidation ?? validatePlanRouting({ plan: props.plan, agents: props.routingAgents, allowHuman: true });
   const readyAgents = readyRoutingAgents(props.routingAgents);
@@ -72,10 +73,29 @@ export function PlanPanel(props: PlanPanelProps) {
     issuesByNode.set(issue.nodeKey, rows);
   }
 
+  const selectedNodeIndex = Math.max(0, props.plan.nodes.findIndex((node) => node.key === selectedNodeKey));
+  const selectedNode = props.plan.nodes[selectedNodeIndex] ?? null;
+  const selectedRecommendation = selectedNode ? routingRecommendationForPlanNode(selectedNode) : null;
+  const selectedOverride = selectedNode?.routing_override ?? null;
+  const selectedOwner = selectedOverride?.owner ?? selectedRecommendation?.recommendedOwner ?? "human";
+  const selectedAgent = findRoutingAgent(props.routingAgents, selectedOverride?.agent_id) ?? readyAgents[0] ?? null;
+  const selectedModel = selectedOverride?.model ?? firstModel(selectedAgent) ?? "";
+  const attentionNodeKeys = new Set([
+    ...validation.issues.map((issue) => issue.nodeKey),
+    ...Object.keys(ruleErrors),
+  ]);
+  const firstRoutingIssue = validation.issues[0];
+  const firstRoutingIssueTitle = props.plan.nodes.find((node) => node.key === firstRoutingIssue?.nodeKey)?.title;
+  const validationMessages = [
+    ...props.validationErrors,
+    ...(hasRuleErrors ? [t("plan.contractsNeedAttention", { n: Object.keys(ruleErrors).length })] : []),
+  ];
+
   const saveDisabled = props.disabled || hasRuleErrors || props.validationErrors.length > 0 || !validation.ok;
 
   useEffect(() => {
     const keys = new Set(props.plan.nodes.map((node) => node.key));
+    setSelectedNodeKey((current) => current && keys.has(current) ? current : props.plan.nodes[0]?.key ?? null);
     setRuleDrafts((current) => {
       const next: Record<string, string> = {};
       for (const node of props.plan.nodes) {
@@ -103,10 +123,14 @@ export function PlanPanel(props: PlanPanelProps) {
     props.onChange?.(nextPlan);
   }
 
-  function applyStructureEdit(nextPlan: DecompositionOutput) {
+  function applyStructureEdit(nextPlan: DecompositionOutput, nextSelectedNodeKey = selectedNodeKey) {
+    if (hasRuleErrors) return;
     setRuleDrafts({});
     setRuleErrors({});
     setAdvancedOpen({});
+    setSelectedNodeKey(nextSelectedNodeKey && nextPlan.nodes.some((node) => node.key === nextSelectedNodeKey)
+      ? nextSelectedNodeKey
+      : nextPlan.nodes[0]?.key ?? null);
     apply(nextPlan);
   }
 
@@ -210,70 +234,91 @@ export function PlanPanel(props: PlanPanelProps) {
         <StageMetric label={t("os.metricActions")} value={String(props.review?.actions.length ?? 0)} />
       </div>
 
-      {props.validationErrors.length > 0 ? (
+      {validationMessages.length > 0 ? (
         <div className="od-plan-validation" role="status">
           <strong>{t("plan.validationIssues")}</strong>
-          <span>{props.validationErrors.join("; ")}</span>
+          <span>{validationMessages.join("; ")}</span>
         </div>
       ) : null}
 
       {!validation.ok ? (
         <div className="od-routing-alert">
           <strong>{t("routing.validationTitle")}</strong>
-          <span>{validation.issues[0]?.message ?? t("routing.validationBody")}</span>
+          <span>
+            {firstRoutingIssueTitle && firstRoutingIssue
+              ? `${firstRoutingIssueTitle}: ${firstRoutingIssue.message}`
+              : firstRoutingIssue?.message ?? t("routing.validationBody")}
+          </span>
         </div>
       ) : null}
 
-      <div className="od-plan-list">
-        {props.plan.nodes.map((node, index) => {
-          const contract = editableContractForNode(node);
-          const recommendation = routingRecommendationForPlanNode(node);
-          const override = node.routing_override;
-          const owner = override?.owner ?? recommendation.recommendedOwner;
-          const selectedAgent = findRoutingAgent(props.routingAgents, override?.agent_id) ?? readyAgents[0] ?? null;
-          const selectedModel = override?.model ?? firstModel(selectedAgent) ?? "";
-          const nodeIssues = issuesByNode.get(node.key) ?? [];
+      {props.plan.nodes.length > 1 ? (
+        <label className="od-plan-contract-selector" data-od-id="plan-contract-selector">
+          <span>{t("plan.currentContract")}</span>
+          <select
+            value={selectedNode?.key ?? ""}
+            disabled={props.disabled}
+            onChange={(event) => setSelectedNodeKey(event.currentTarget.value)}
+          >
+            {props.plan.nodes.map((node, index) => (
+              <option key={node.key} value={node.key}>
+                {index + 1}. {node.title}{attentionNodeKeys.has(node.key) ? ` - ${t("plan.needsAttention")}` : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
 
-          return (
-            <PlanContractCard
-              key={node.key}
-              node={node}
-              index={index}
-              nodeCount={props.plan.nodes.length}
-              editable={editable}
-              disabled={props.disabled}
-              contract={contract}
-              recommendation={recommendation}
-              owner={owner}
-              selectedAgent={selectedAgent}
-              selectedModel={selectedModel}
-              readyAgents={readyAgents}
-              nodeIssues={nodeIssues}
-              overrideActive={Boolean(override)}
-              ruleText={ruleTextFor(node)}
-              ruleError={ruleErrors[node.key]}
-              advancedOpen={Boolean(advancedOpen[node.key])}
-              onNode={(patch) => updateNode(node, patch)}
-              onContract={(patch) => updateContract(node, patch)}
-              onMoveUp={() => applyStructureEdit(movePlanNode(props.plan, node.key, index - 1))}
-              onMoveDown={() => applyStructureEdit(movePlanNode(props.plan, node.key, index + 1))}
-              onMergeUp={() => applyStructureEdit(mergePlanNodes(props.plan, props.plan.nodes[index - 1]!.key, node.key))}
-              onMergeDown={() => applyStructureEdit(mergePlanNodes(props.plan, node.key, props.plan.nodes[index + 1]!.key))}
-              onSplit={() => applyStructureEdit(splitPlanNode(props.plan, node.key))}
-              onOwner={(nextOwner) => chooseOwner(node, nextOwner)}
-              onAgent={(agentId) => chooseAgent(node, agentId)}
-              onModel={(model) => chooseModel(node, model)}
-              onRoutingReset={() => applyOverride(node, null)}
-              onAdvancedToggle={() => setAdvancedOpen((current) => ({ ...current, [node.key]: !current[node.key] }))}
-              onRuleText={(text) => {
-                setRuleDrafts((current) => ({ ...current, [node.key]: text }));
-                applyRuleText(node, text);
-              }}
-              onRuleCommit={() => commitRule(node)}
-            />
-          );
-        })}
-      </div>
+      {selectedNode ? (
+        <div className="od-plan-list">
+          <PlanContractCard
+            key={selectedNode.key}
+            node={selectedNode}
+            index={selectedNodeIndex}
+            nodeCount={props.plan.nodes.length}
+            editable={editable}
+            disabled={props.disabled}
+            structureDisabled={hasRuleErrors}
+            contract={editableContractForNode(selectedNode)}
+            recommendation={selectedRecommendation!}
+            owner={selectedOwner}
+            selectedAgent={selectedAgent}
+            selectedModel={selectedModel}
+            readyAgents={readyAgents}
+            nodeIssues={issuesByNode.get(selectedNode.key) ?? []}
+            overrideActive={Boolean(selectedOverride)}
+            ruleText={ruleTextFor(selectedNode)}
+            ruleError={ruleErrors[selectedNode.key]}
+            advancedOpen={Boolean(advancedOpen[selectedNode.key])}
+            onNode={(patch) => updateNode(selectedNode, patch)}
+            onContract={(patch) => updateContract(selectedNode, patch)}
+            onMoveUp={() => applyStructureEdit(movePlanNode(props.plan, selectedNode.key, selectedNodeIndex - 1))}
+            onMoveDown={() => applyStructureEdit(movePlanNode(props.plan, selectedNode.key, selectedNodeIndex + 1))}
+            onMergeUp={() => {
+              const targetKey = props.plan.nodes[selectedNodeIndex - 1]!.key;
+              applyStructureEdit(mergePlanNodes(props.plan, targetKey, selectedNode.key), targetKey);
+            }}
+            onMergeDown={() => applyStructureEdit(
+              mergePlanNodes(props.plan, selectedNode.key, props.plan.nodes[selectedNodeIndex + 1]!.key),
+              selectedNode.key,
+            )}
+            onSplit={() => applyStructureEdit(splitPlanNode(props.plan, selectedNode.key))}
+            onOwner={(nextOwner) => chooseOwner(selectedNode, nextOwner)}
+            onAgent={(agentId) => chooseAgent(selectedNode, agentId)}
+            onModel={(model) => chooseModel(selectedNode, model)}
+            onRoutingReset={() => applyOverride(selectedNode, null)}
+            onAdvancedToggle={() => setAdvancedOpen((current) => ({
+              ...current,
+              [selectedNode.key]: !current[selectedNode.key],
+            }))}
+            onRuleText={(text) => {
+              setRuleDrafts((current) => ({ ...current, [selectedNode.key]: text }));
+              applyRuleText(selectedNode, text);
+            }}
+            onRuleCommit={() => commitRule(selectedNode)}
+          />
+        </div>
+      ) : null}
     </section>
   );
 }
