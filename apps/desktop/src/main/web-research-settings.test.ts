@@ -24,6 +24,18 @@ afterEach(() => {
 });
 
 describe("desktop web research settings", () => {
+  it("defaults provider-independent page fetching on without requiring a Brave key", () => {
+    process.env = { ...ORIGINAL_ENV, AIMCUB_HOME: freshHome() };
+    loadWebResearchConfig();
+
+    expect(resolveWebResearchConfig()).toMatchObject({
+      apiKey: "",
+      enabled: false,
+      fetchPages: true,
+      keySource: null,
+    });
+  });
+
   it("saves and resolves a Brave web research config", () => {
     process.env = { ...ORIGINAL_ENV, AIMCUB_HOME: freshHome() };
     loadWebResearchConfig();

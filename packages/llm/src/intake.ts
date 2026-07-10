@@ -27,6 +27,7 @@ export interface GenerateAimIntakeQuestionsInput {
   research?: ResearchBrief | null;
   researchRequired?: boolean;
   toolSignals?: readonly AimIntakeToolSignal[];
+  explorationHistory?: readonly { question: string; answer: string }[];
   maxQuestions?: number;
 }
 
@@ -60,6 +61,7 @@ const MAX_MEMORY_CONTEXT_CHARS = 2_400;
 const MAX_RESEARCH_CONTEXT_CHARS = 2_400;
 const MAX_TOOL_CONTEXT_CHARS = 1_600;
 const MAX_GAP_CONTEXT_CHARS = 3_600;
+const MAX_EXPLORATION_HISTORY_CHARS = 3_200;
 
 function clampQuestionLimit(value: number | undefined): number {
   const finiteValue = typeof value === "number" && Number.isFinite(value)
@@ -136,6 +138,19 @@ const SYSTEM_PROMPT = [
   "- If research or local inspection was required but not available, ask for enabling/attaching that context rather than pretending facts are known.",
   "- Never output generic template instructions such as 'Ask for...', 'Ask whether...', or 'Ask what...'.",
   "- Prefer one precise question over broad bundles. It should be obvious why the answer changes the plan.",
+  "- Treat this as an adaptive interview, not a static questionnaire. Use prior answers to choose",
+  "  the next highest-value unexplored dimension and to ask a concrete follow-up when an answer",
+  "  reveals a consequential assumption, conflict, motivation, or boundary.",
+  "- Explore the relevant layers of the user's situation: desired real-world outcome and why it",
+  "  matters; current baseline; users/stakeholders; resources, access, skills, budget, and time;",
+  "  preferences and tradeoffs; authority and delegation; risks and disallowed outcomes; source",
+  "  truth or research needs; distribution/environment; and observable completion evidence.",
+  "- Do not mechanically cover every layer. Ask only when an answer can change milestone boundaries,",
+  "  routing, research scope, risk controls, required evidence, or the definition of done.",
+  "- Do not repeat or lightly paraphrase a prior question. Challenge generic answers by asking for a",
+  "  concrete example, counterexample, priority, threshold, or real constraint when that would change the plan.",
+  "- Return an empty questions array once the available context and prior answers are sufficient to",
+  "  decompose without a high-impact unknown. Never invent a filler question to keep the interview going.",
   "- Ask one decision dimension per question. One internal gap may become several atomic questions",
   "  when audience, outcome, channel, constraints, evidence, or access need separate answers.",
   "- For product/app goals, cover real-world prerequisites such as account access, store distribution, payment, policy, content/source material, audience, and launch path only when relevant.",
@@ -178,10 +193,16 @@ function renderResearch(research: ResearchBrief | null | undefined, required: bo
   const lines = [
     `Research required: ${required ? "yes" : "not explicitly"}`,
     `Research question: ${compactText(research.question, 280)}`,
-    `Coverage: ${research.sources.length} sources, ${research.fetchedSourceCount} fetched pages, ${research.searchResultCount} search results.`,
+    `Coverage: ${research.coverage.coveredLaneCount}/${research.coverage.requiredLaneCount} required lanes across ${research.coverage.uniqueDomainCount} independent domains; ${research.sources.length} sources, ${research.fetchedSourceCount} fetched pages, ${research.searchResultCount} search results.`,
+    `Authority and freshness: ${research.coverage.primarySourceCount} primary sources, ${research.coverage.currentSourceCount} current sources, ${research.coverage.unknownFreshnessCount} with unknown freshness.`,
+    `Research sufficiency: ${research.sufficiency.level} (${research.sufficiency.score}/100, sufficient=${research.sufficiency.sufficient ? "yes" : "no"}).`,
     "Findings:",
     ...research.findings.slice(0, 6).map((finding) => `- ${compactText(finding, 420)}`),
   ];
+  if (research.conflicts.length > 0) {
+    lines.push("Potential conflicts:");
+    lines.push(...research.conflicts.slice(0, 3).map((conflict) => `- ${compactText(conflict.summary, 220)}`));
+  }
   if (research.uncertainties.length > 0) {
     lines.push("Uncertainties:");
     lines.push(...research.uncertainties.slice(0, 4).map((item) => `- ${compactText(item, 220)}`));
@@ -194,6 +215,17 @@ function renderToolSignals(signals: readonly AimIntakeToolSignal[] | undefined):
   return signals
     .slice(0, 12)
     .map((signal) => `- ${signal.toolName}: ${compactText(signal.summary, 360)}`)
+    .join("\n");
+}
+
+function renderExplorationHistory(history: GenerateAimIntakeQuestionsInput["explorationHistory"]): string {
+  if (!history?.length) return "(no user answers collected yet)";
+  return history
+    .slice(-MAX_QUESTION_COUNT)
+    .map((turn, index) => [
+      `${index + 1}. Question: ${compactText(turn.question, 360)}`,
+      `   Answer: ${compactText(turn.answer, 520)}`,
+    ].join("\n"))
     .join("\n");
 }
 
@@ -222,6 +254,9 @@ function buildPrompt(input: GenerateAimIntakeQuestionsInput): string {
     "",
     "Tool observations already attempted:",
     compactBlock(renderToolSignals(input.toolSignals), MAX_TOOL_CONTEXT_CHARS),
+    "",
+    "Adaptive exploration history. Do not repeat these questions; use the answers to decide what matters next:",
+    compactBlock(renderExplorationHistory(input.explorationHistory), MAX_EXPLORATION_HISTORY_CHARS),
     "",
     "Internal gap signals to rewrite. These are not user-facing copy:",
     compactBlock(renderInternalGaps(input.intake), MAX_GAP_CONTEXT_CHARS),

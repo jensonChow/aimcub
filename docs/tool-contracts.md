@@ -52,7 +52,7 @@ The v1 contract registry includes:
 
 These handlers are still Aimcub-owned runtime tools, not MCP tools. They enforce `network.search` / `network.fetch` permissions and return normalized `AimcubToolResult` observations.
 
-`web.search` uses a provider abstraction. The built-in provider is `BraveWebSearchClient`, enabled through `AIMCUB_BRAVE_SEARCH_API_KEY` or `BRAVE_SEARCH_API_KEY` when constructing the runtime with `createWebResearchRuntimeFromEnv`. If no provider is configured, the handler returns `disabled` instead of blocking local planning.
+`web.search` uses a provider abstraction. The package-level environment helper can construct `BraveWebSearchClient` from `AIMCUB_BRAVE_SEARCH_API_KEY` or `BRAVE_SEARCH_API_KEY`. Desktop prefers a configured Brave key and otherwise supplies `LocalCliWebSearchClient`, which asks one authenticated Codex or Claude CLI run for a bounded live-search corpus and reuses that corpus across the research lanes. If neither path is available, the handler returns a normalized failure and planning records an explicit web-research gap.
 
 `web.fetch` uses an injected or platform `fetch` implementation. It only fetches `http` / `https` URLs, blocks localhost and private-network hosts by default, enforces response-size limits, extracts text/metadata/links from text-like content, and emits web source metadata for Inspector provenance.
 
@@ -60,6 +60,6 @@ These handlers are still Aimcub-owned runtime tools, not MCP tools. They enforce
 
 `packages/llm/src/tool-registry.ts` owns the unified first-party registry shape. Runtime shells register handlers for the built-in contracts, then execute tools through a single `execute(name, input, context)` path.
 
-`packages/llm/src/planning-tool-context.ts` is the planning collector used before decomposition. It executes `memory.search`, optional web research, and `context.distill`, then converts tool observations into bounded `PlanningMemory` rows for the decompose prompt.
+`packages/llm/src/planning-tool-context.ts` is the planning collector used before decomposition. It executes memory, linked/local context, optional web research, and distillation tools, then converts observations into bounded `PlanningMemory` rows for the decompose prompt. Web research uses bounded lanes for aim facts, authoritative requirements, alternatives/market evidence, risks/tradeoffs, and user/audience evidence when relevant. Its brief preserves source URLs and reports lane/domain coverage, authority, freshness, conflicts, uncertainty, and sufficiency.
 
-Desktop binds the registry in `apps/desktop/src/main/tools.ts`. By default it grants only memory/context permissions. Web research is opt-in via `AIMCUB_ENABLE_WEB_RESEARCH=1`; fetching the top web result is additionally gated by `AIMCUB_FETCH_WEB_RESULTS=1`.
+Desktop binds the registry in `apps/desktop/src/main/tools.ts`. Memory/context and configured local reads are enabled by their source settings. Web permissions are granted only when research is enabled and relevant, or explicitly enabled through `AIMCUB_ENABLE_WEB_RESEARCH`; page fetching follows the saved deep-research/fetch setting or its environment override.

@@ -233,13 +233,13 @@ describe("ContextStage", () => {
     const singleClarify: ClarifyOutput = {
       questions: [{
         ...blockingClarify.questions[0]!,
-        id: "polish",
-        question: "How polished should the release be?",
+        id: "release_access",
+        question: "Should the first release be public or invitation-only?",
         selection_mode: "single",
         selection_mode_reason: "mutually_exclusive",
         options: [
-          { label: "Prototype", tradeoff: "Optimizes for speed." },
-          { label: "Production-ready", tradeoff: "Optimizes for resilience." },
+          { label: "Public", tradeoff: "Anyone can discover and use the release." },
+          { label: "Invitation-only", tradeoff: "Access stays controlled during validation." },
         ],
       }],
       assumptions: [],
@@ -249,7 +249,7 @@ describe("ContextStage", () => {
         <ContextClarifyPanel
           clarify={singleClarify}
           phase="postDraft"
-          answers={{ polish: { labels: ["Prototype"], other: "" } }}
+          answers={{ release_access: { labels: ["Public"], other: "" } }}
           contextNote=""
           conversationEnabled
           questionnaireEnabled

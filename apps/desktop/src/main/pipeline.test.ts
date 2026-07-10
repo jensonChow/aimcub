@@ -175,6 +175,34 @@ describe("desktop planner · intake question generation", () => {
     });
     expect(events.map((event) => event.type)).toEqual(["model.started", "model.completed"]);
   });
+
+  it("forwards adaptive exploration history and a one-question turn budget", async () => {
+    const calls: Array<LlmRequest & { schema?: unknown }> = [];
+    const gateway: LlmGateway = {
+      async complete(): Promise<LlmResponse<string>> {
+        return { output: "", usage: USAGE };
+      },
+      async completeStructured<T>(req: LlmRequest & { schema: unknown }): Promise<LlmResponse<T>> {
+        calls.push(req);
+        return { output: INTAKE_OUTPUT as T, usage: USAGE };
+      },
+    };
+    const intake = reviewAimIntake({ title: "Develop a tarot app", memories: [], selectedContext: [] });
+
+    const result = await runIntakeQuestions(gateway, {
+      title: "Develop a tarot app",
+      intake,
+      maxQuestions: 1,
+      explorationHistory: [{
+        question: "Who should use the pilot?",
+        answer: "A private group of experienced readers.",
+      }],
+    });
+
+    expect(result.ok).toBe(true);
+    expect(calls[0]!.prompt).toContain("A private group of experienced readers");
+    expect(calls[0]!.prompt).toContain("Return at most 1 atomic questions");
+  });
 });
 
 describe("desktop planner · with a gateway (real @core/llm pipeline)", () => {

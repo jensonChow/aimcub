@@ -143,6 +143,39 @@ export function intakeToClarifyOutput(intake: AimIntakeReport, zh: boolean): Cla
   };
 }
 
+function normalizedQuestionText(value: string): string {
+  return value.normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+/**
+ * Append the next adaptive intake turn while preserving prior replies and Back
+ * navigation. Internal gap ids may repeat across turns, so visible question ids
+ * are made unique without changing the question's semantic metadata.
+ */
+export function appendIntakeQuestions(
+  current: ClarifyOutput | null,
+  next: ClarifyOutput,
+): ClarifyOutput {
+  if (!current) return next;
+  const questions = [...current.questions];
+  const seenText = new Set(questions.map((question) => normalizedQuestionText(question.question)));
+  const usedIds = new Set(questions.map((question) => question.id));
+  for (const question of next.questions) {
+    const textKey = normalizedQuestionText(question.question);
+    if (!textKey || seenText.has(textKey)) continue;
+    seenText.add(textKey);
+    let id = question.id;
+    let suffix = 2;
+    while (usedIds.has(id)) {
+      id = `${question.id}_${suffix}`;
+      suffix += 1;
+    }
+    usedIds.add(id);
+    questions.push({ ...question, id });
+  }
+  return { questions, assumptions: [] };
+}
+
 export function shouldBlockForIntake(intake: AimIntakeReport): boolean {
   return intake.loop.shouldContinue
     || intake.questions.some((question) => question.priority === "high" || question.priority === "medium");

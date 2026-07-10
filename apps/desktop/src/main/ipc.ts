@@ -49,6 +49,7 @@ import {
   type ConfirmMilestoneRequest,
   type DraftRequest,
   type GoalDetail,
+  type IntakeRequest,
   type ProviderConfig,
   type ProviderStatus,
   type ProviderTestResult,
@@ -90,6 +91,40 @@ async function planningContext(input: {
   description?: string;
 }): Promise<DesktopPlanningContext> {
   return collectDesktopPlanningContext(input);
+}
+
+const INTAKE_CONTEXT_CACHE_LIMIT = 12;
+const intakeContextByRunId = new Map<string, DesktopPlanningContext>();
+
+function rememberIntakeContext(runId: string | undefined, context: DesktopPlanningContext): void {
+  if (!runId) return;
+  intakeContextByRunId.delete(runId);
+  intakeContextByRunId.set(runId, context);
+  while (intakeContextByRunId.size > INTAKE_CONTEXT_CACHE_LIMIT) {
+    const oldest = intakeContextByRunId.keys().next().value as string | undefined;
+    if (!oldest) break;
+    intakeContextByRunId.delete(oldest);
+  }
+}
+
+async function planningContextForIntake(req: IntakeRequest): Promise<DesktopPlanningContext> {
+  const continuing = Boolean(req.priorQuestions?.length || req.answers?.length);
+  const cached = continuing && req.clientRunId ? intakeContextByRunId.get(req.clientRunId) : null;
+  if (cached) return cached;
+  const context = await planningContext(req);
+  rememberIntakeContext(req.clientRunId, context);
+  return context;
+}
+
+function intakeExplorationHistory(req: IntakeRequest): Array<{ question: string; answer: string }> {
+  const questions = new Map((req.priorQuestions ?? []).map((question) => [question.id, question.question]));
+  return (req.answers ?? []).flatMap((answer) => {
+    const labels = answer.selected_labels?.map((label) => label.trim()).filter(Boolean)
+      ?? (answer.selected_label?.trim() ? [answer.selected_label.trim()] : []);
+    const answerText = [...labels, answer.other_text?.trim()].filter((value): value is string => Boolean(value)).join("; ");
+    const question = questions.get(answer.question_id)?.trim();
+    return question && answerText ? [{ question, answer: answerText }] : [];
+  });
 }
 
 async function goalDetail(goalId: string): Promise<GoalDetail | null> {
@@ -161,6 +196,7 @@ async function runMilestoneAgent(req: RunMilestoneAgentRequest): Promise<RunMile
   }
   const selectedModel = req.model?.trim()
     || (override?.owner === "agent" ? override.model?.trim() : "")
+    || selected.models.find((candidate) => candidate.id !== "default")?.id
     || selected.models[0]?.id
     || "default";
 
@@ -357,12 +393,12 @@ export function registerIpc(): void {
     };
   });
 
-  ipcMain.handle(IPC.intake, async (event, req: DraftRequest) => {
+  ipcMain.handle(IPC.intake, async (event, req: IntakeRequest) => {
     const runId = planningRunId(req);
     emitPlanningLiveEvent(event, runId, { type: "planning.started", stage: "intake" });
     try {
       emitPlanningLiveEvent(event, runId, { type: "context.started", stage: "intake" });
-      const selectedContext = await planningContext(req);
+      const selectedContext = await planningContextForIntake(req);
       const toolsTrace = planningToolTrace(selectedContext);
       emitPlanningLiveEvent(event, runId, {
         type: "context.completed",
@@ -387,6 +423,8 @@ export function registerIpc(): void {
           research: selectedContext.research,
           researchRequired: selectedContext.researchRequired,
           toolSignals: intakeToolSignals(selectedContext),
+          explorationHistory: intakeExplorationHistory(req),
+          maxQuestions: req.maxQuestions,
         },
         modelRunHooks(event, runId),
       );

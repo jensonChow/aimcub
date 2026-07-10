@@ -214,6 +214,8 @@ export async function runIntakeQuestions(
     research?: ResearchBrief | null;
     researchRequired?: boolean;
     toolSignals?: readonly AimIntakeToolSignal[];
+    explorationHistory?: readonly { question: string; answer: string }[];
+    maxQuestions?: number;
   },
   hooks?: PlanningDebugHooks,
 ): Promise<IntakeQuestionResult> {
@@ -243,6 +245,8 @@ export async function runIntakeQuestions(
     research: input.research,
     researchRequired: input.researchRequired,
     toolSignals: input.toolSignals,
+    explorationHistory: input.explorationHistory,
+    maxQuestions: input.maxQuestions,
   });
   const debugTrace = createDebugTrace("intake", startedAtMs, traced.modelRuns);
   if (!result.validation.ok || !result.report) {

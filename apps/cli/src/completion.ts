@@ -10,6 +10,8 @@ const COMMANDS = [
   "evidence",
   "memories",
   "context",
+  "agents",
+  "run",
   "replan",
   "edit",
   "rm",

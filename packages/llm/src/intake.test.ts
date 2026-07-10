@@ -105,6 +105,30 @@ describe("generateAimIntakeQuestions", () => {
     expect(result.report?.questions[0]!.prompt).not.toMatch(/^Ask\b/i);
   });
 
+  it("preserves an aligned semantic single decision without requiring classifier keywords", async () => {
+    const intake = tarotIntake();
+    const source = intake.questions[0]!;
+    const result = await generateAimIntakeQuestions(gateway({
+      questions: [{
+        source_question_id: source.id,
+        question: "Should the first release be public or invitation-only?",
+        why_high_impact: "Changes distribution, onboarding, and access control.",
+        selection_mode: "single",
+        selection_mode_reason: "mutually_exclusive",
+        options: [
+          { label: "Public", tradeoff: "Anyone can discover and use the release." },
+          { label: "Invitation-only", tradeoff: "Access stays controlled during validation." },
+        ],
+      }],
+    }), { title: "Develop a tarot app", intake });
+
+    expect(result.validation.ok).toBe(true);
+    expect(result.report?.questions[0]).toMatchObject({
+      selectionMode: "single",
+      selectionModeReason: "mutually_exclusive",
+    });
+  });
+
   it("rejects model output that copies template-style Ask prompts", async () => {
     const intake = tarotIntake();
     const gw = gateway({
@@ -314,6 +338,40 @@ describe("generateAimIntakeQuestions", () => {
     });
     expect(nanResult.report?.questions).toHaveLength(2);
     expect(nanGateway.calls[0]!.prompt).toContain("Return at most 6 atomic questions");
+  });
+
+  it("uses prior replies as an adaptive exploration history for the next single turn", async () => {
+    const intake = tarotIntake();
+    const source = intake.questions[0]!;
+    const gw = gateway({
+      questions: [{
+        source_question_id: source.id,
+        question: "What outcome would make the private pilot worth continuing?",
+        why_high_impact: "The threshold changes evidence and the next release decision.",
+        selection_mode: "multiple",
+        selection_mode_reason: "compatible_options",
+        options: [
+          { label: "Repeat weekly use", tradeoff: "Prioritizes retention evidence." },
+          { label: "Trusted reading quality", tradeoff: "Prioritizes expert and user review." },
+        ],
+      }],
+    });
+
+    await generateAimIntakeQuestions(gw, {
+      title: "Develop a tarot app",
+      intake,
+      maxQuestions: 1,
+      explorationHistory: [{
+        question: "Who should use the first release?",
+        answer: "A private group of experienced tarot readers.",
+      }],
+    });
+
+    expect(gw.calls[0]!.system).toContain("adaptive interview");
+    expect(gw.calls[0]!.system).toContain("current baseline");
+    expect(gw.calls[0]!.prompt).toContain("Adaptive exploration history");
+    expect(gw.calls[0]!.prompt).toContain("private group of experienced tarot readers");
+    expect(gw.calls[0]!.prompt).toContain("Return at most 1 atomic questions");
   });
 
   it("preserves internal gaps and cardinality instructions when context sections are large", async () => {

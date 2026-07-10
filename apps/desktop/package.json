@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@core/domain": "workspace:*",
+    "@core/local-agent": "workspace:*",
     "@core/llm": "workspace:*",
     "@core/store": "workspace:*",
     "@core/types": "workspace:*",

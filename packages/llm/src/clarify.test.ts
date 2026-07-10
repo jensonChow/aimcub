@@ -187,6 +187,32 @@ describe("clarify · happy path", () => {
     expect(result.usage).toEqual(FIXED_USAGE);
   });
 
+  it("preserves an aligned semantic single decision without requiring classifier keywords", async () => {
+    const result = await clarify(mockGateway({
+      questions: [{
+        id: "release_access",
+        question: "Should the first release be public or invitation-only?",
+        why_high_impact: "Changes distribution, onboarding, and access control.",
+        kind: "scope",
+        source_dimension: "context_fit",
+        allow_other: true,
+        selection_mode: "single",
+        selection_mode_reason: "mutually_exclusive",
+        options: [
+          { label: "Public", tradeoff: "Anyone can discover and use the release." },
+          { label: "Invitation-only", tradeoff: "Access stays controlled during validation." },
+        ],
+      }],
+      assumptions: [],
+    }), INPUT);
+
+    expect(result.validation.ok).toBe(true);
+    expect(result.output?.questions[0]).toMatchObject({
+      selection_mode: "single",
+      selection_mode_reason: "mutually_exclusive",
+    });
+  });
+
   it("marks constraint-set questions as multi-select while keeping mutually exclusive choices single-select", async () => {
     const result = await clarify(mockGateway({
       questions: [

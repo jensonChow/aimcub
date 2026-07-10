@@ -8,6 +8,12 @@ import type { AimIntakeReport, AimProgressReadModel, ContextHealthRow, ContextLi
 import type { LlmProvider } from "@core/llm/providers";
 import type { ContextSourceSettings, UpsertAimDraftInput } from "@core/store";
 import type {
+  LocalAgentDetection,
+  LocalAgentId,
+  LocalAgentRunRequest,
+  LocalAgentRunResult,
+} from "@core/local-agent";
+import type {
   ClarifyOutput,
   ClarifyQuestion,
   ClarifyAnswer,
@@ -27,6 +33,17 @@ export interface DraftRequest {
   title: string;
   description?: string;
   clientRunId?: string;
+}
+
+/**
+ * One turn of the adaptive pre-draft Context interview. The renderer sends the
+ * accumulated, already-visible questions and answers so the next question can
+ * react to what the user actually said instead of replaying a static form.
+ */
+export interface IntakeRequest extends DraftRequest {
+  priorQuestions?: ClarifyQuestion[];
+  answers?: ClarifyAnswer[];
+  maxQuestions?: number;
 }
 
 export interface ClarifyRequest {
@@ -316,74 +333,15 @@ export interface LocalContextPickResult {
   paths: string[];
 }
 
-export type LocalAgentId = "codex" | "claude";
-
-export type LocalAgentSandboxMode = "read-only" | "workspace-write" | "danger-full-access";
-
-export interface LocalAgentModelOption {
-  id: string;
-  label: string;
-}
-
-export interface LocalAgentDetection {
-  id: LocalAgentId;
-  name: string;
-  runMode: "local_cli";
-  available: boolean;
-  path: string | null;
-  version: string | null;
-  authStatus: "ok" | "missing" | "unknown";
-  authMessage: string | null;
-  models: LocalAgentModelOption[];
-  modelsSource: "live" | "fallback";
-  reasoningOptions: LocalAgentModelOption[];
-  diagnostics: string[];
-}
-
-export interface LocalAgentRunRequest {
-  agentId: LocalAgentId;
-  prompt: string;
-  cwd?: string;
-  model?: string;
-  reasoning?: string;
-  extraAllowedDirs?: string[];
-  timeoutMs?: number;
-  permission?: {
-    sandbox?: LocalAgentSandboxMode;
-    network?: boolean;
-  };
-}
-
-export interface LocalAgentEvent {
-  type:
-    | "agent.run.started"
-    | "agent.message.delta"
-    | "agent.tool.started"
-    | "agent.tool.finished"
-    | "agent.usage.reported"
-    | "agent.run.completed"
-    | "agent.run.failed"
-    | "agent.stderr"
-    | "agent.raw";
-  summary: string;
-  sessionId?: string;
-  toolId?: string;
-  toolName?: string;
-  usage?: Record<string, number>;
-  raw?: unknown;
-}
-
-export interface LocalAgentRunResult {
-  ok: boolean;
-  agentId: LocalAgentId;
-  command: string;
-  args: string[];
-  events: LocalAgentEvent[];
-  outputText: string;
-  exitCode: number | null;
-  error: string | null;
-  durationMs: number;
-}
+export type {
+  LocalAgentDetection,
+  LocalAgentEvent,
+  LocalAgentId,
+  LocalAgentModelOption,
+  LocalAgentRunRequest,
+  LocalAgentRunResult,
+  LocalAgentSandboxMode,
+} from "@core/local-agent";
 
 export interface RunMilestoneAgentRequest {
   goalId: string;
@@ -409,7 +367,7 @@ export interface WindowChromeState {
 
 /** The typed surface exposed on `window.aimcub` by the preload bridge. */
 export interface AimcubApi {
-  intake(req: DraftRequest): Promise<AimIntakeReport>;
+  intake(req: IntakeRequest): Promise<AimIntakeReport>;
   draft(req: DraftRequest): Promise<PlanResult>;
   clarify(req: ClarifyRequest): Promise<ClarifyIpcResult>;
   refine(req: RefineRequest): Promise<PlanResult>;

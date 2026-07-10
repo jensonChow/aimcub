@@ -230,6 +230,7 @@ export {
   createContextLinkedSourcesHandler,
 } from "./context-linked-sources";
 export {
+  buildResearchQueryPlan,
   collectPlanningToolContext,
 } from "./planning-tool-context";
 export type {
@@ -239,6 +240,15 @@ export type {
   PlanningToolObservationEvent,
   ResearchBrief,
   ResearchBriefSource,
+  ResearchConflictSignal,
+  ResearchCoverageReport,
+  ResearchLaneCoverage,
+  ResearchLaneId,
+  ResearchQueryPlanItem,
+  ResearchSourceAuthority,
+  ResearchSourceFreshness,
+  ResearchSufficiencyLevel,
+  ResearchSufficiencySignal,
 } from "./planning-tool-context";
 export {
   generateAimIntakeQuestions,

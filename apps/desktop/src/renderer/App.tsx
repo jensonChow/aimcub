@@ -64,6 +64,7 @@ import { PlanPanel } from "./stages/plan/PlanPanel";
 import { Button, Panel } from "./ui";
 import { C, TYPE } from "./styles";
 import {
+  appendIntakeQuestions,
   answersFor,
   buildDescriptionWithContext,
   hasCjkText,
@@ -127,6 +128,7 @@ import { shortText } from "./workflow/text";
 export { buildSettingsModel };
 
 type AimSurfaceMode = "idle" | "compose" | "summary" | "edit";
+const MAX_ADAPTIVE_INTAKE_TURNS = 6;
 
 interface AimEditBuffer {
   title: string;
@@ -565,7 +567,12 @@ function AimOsApp() {
         setBusy(t("os.busy.context"));
         setMode("contexting");
         setStageOverride("context");
-        const intake = await window.aimcub.intake({ title, description: requestedDescription.trim() || undefined, clientRunId: runId });
+        const intake = await window.aimcub.intake({
+          title,
+          description: requestedDescription.trim() || undefined,
+          clientRunId: runId,
+          maxQuestions: 1,
+        });
         if (!isCurrentPlanningRun(runId, transition)) return;
         setPlanResult({ ok: false, output: null, errors: [], intake });
         if (shouldBlockForIntake(intake) && intake.questions.length > 0) {
@@ -872,7 +879,54 @@ function AimOsApp() {
   ]);
 
   async function continueFromContext() {
-    await startDraft({ skipIntakeGate: true });
+    if (workflowMutationIsLocked()) return;
+    const priorQuestions = intakeClarify?.questions ?? [];
+    if (priorQuestions.length === 0 || priorQuestions.length >= MAX_ADAPTIVE_INTAKE_TURNS) {
+      setClarifyPhase(null);
+      await startDraft({ skipIntakeGate: true });
+      return;
+    }
+
+    const transition = navigationConcurrencyRef.current.workspace;
+    const runId = navigationConcurrencyRef.current.planningRunId ?? startPlanningRun();
+    setBusy(t("os.busy.context"));
+    setError(null);
+    try {
+      const intake = await window.aimcub.intake({
+        title: aimTitle.trim(),
+        description: aimDescription.trim() || undefined,
+        clientRunId: runId,
+        priorQuestions,
+        answers: answersFor(intakeClarify, intakeAnswers),
+        maxQuestions: 1,
+      });
+      if (!isCurrentPlanningRun(runId, transition)) return;
+      setPlanResult({ ok: false, output: null, errors: [], intake });
+      const next = intakeToClarifyOutput(intake, hasCjkText(`${aimTitle}\n${aimDescription}`));
+      const merged = appendIntakeQuestions(intakeClarify, next);
+      if (next.questions.length > 0 && merged.questions.length > priorQuestions.length) {
+        setIntakeClarify(merged);
+        setClarify(merged);
+        setClarifyPhase("intake");
+        return;
+      }
+
+      setClarifyPhase(null);
+      setBusy(null);
+      await startDraft({ skipIntakeGate: true });
+    } catch (err) {
+      if (!isCurrentPlanningRun(runId, transition)) return;
+      setError(formatPlanningFailure({
+        stage: "draft",
+        errors: [err instanceof Error ? err.message : String(err)],
+        t,
+        fallback: t("os.err.draft"),
+      }));
+      setMode("contexting");
+      setStageOverride("context");
+    } finally {
+      if (isCurrentPlanningRun(runId, transition)) setBusy(null);
+    }
   }
 
   async function refinePlan() {
@@ -2066,7 +2120,11 @@ export function SettingsPanel(props: {
   } else if (activeSection === "web") {
     detailPane = (
       <SettingsDetailPane helper={model.webResearchHelper}>
-        <WebResearchForm status={props.webResearch} onSaved={props.onWeb} />
+        <WebResearchForm
+          status={props.webResearch}
+          localAgentReady={props.localAgents.some((agent) => agent.available && agent.authStatus !== "missing")}
+          onSaved={props.onWeb}
+        />
       </SettingsDetailPane>
     );
   } else {

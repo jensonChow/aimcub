@@ -32,6 +32,18 @@ const MULTI_QUESTION: ClarifyQuestion = {
   ],
 };
 
+const SEMANTIC_SINGLE_QUESTION: ClarifyQuestion = {
+  ...QUESTIONS[0]!,
+  id: "release_access",
+  question: "Should the first release be public or invitation-only?",
+  selection_mode: "single",
+  selection_mode_reason: "mutually_exclusive",
+  options: [
+    { label: "Public", tradeoff: "Anyone can discover and use the release." },
+    { label: "Invitation-only", tradeoff: "Access stays controlled during validation." },
+  ],
+};
+
 describe("parseAnswers", () => {
   it("parses a well-formed array and keeps real answers", () => {
     const answers = parseAnswers(
@@ -99,6 +111,13 @@ describe("parseAnswers", () => {
       other_text: "A custom alternative",
     }]), QUESTIONS)).toThrow(/single-select/);
   });
+
+  it("enforces an aligned semantic single decision without classifier keywords", () => {
+    expect(() => parseAnswers(JSON.stringify([{
+      question_id: "release_access",
+      selected_labels: ["Public", "Invitation-only"],
+    }]), [SEMANTIC_SINGLE_QUESTION])).toThrow(/single-select/);
+  });
 });
 
 describe("parseChoiceReply", () => {
@@ -121,14 +140,10 @@ describe("parseChoiceReply", () => {
   });
 
   it("keeps a single-choice reply to one selected label", () => {
-    expect(parseChoiceReply({
-      ...QUESTIONS[0]!,
-      selection_mode: "single",
-      selection_mode_reason: "mutually_exclusive",
-    }, "2")).toEqual({
-      question_id: "scope",
-      selected_label: "Production",
-      selected_labels: ["Production"],
+    expect(parseChoiceReply(SEMANTIC_SINGLE_QUESTION, "2")).toEqual({
+      question_id: "release_access",
+      selected_label: "Invitation-only",
+      selected_labels: ["Invitation-only"],
       other_text: null,
     });
   });

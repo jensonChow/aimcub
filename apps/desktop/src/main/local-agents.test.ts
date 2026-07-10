@@ -118,8 +118,8 @@ describe("desktop local agents", () => {
 
     expect(result.ok).toBe(true);
     expect(result.outputText).toBe("OK");
+    expect(spawnedArgs.slice(0, 2)).toEqual(["--search", "exec"]);
     expect(spawnedArgs).toEqual(expect.arrayContaining([
-      "exec",
       "--json",
       "--skip-git-repo-check",
       "--sandbox",

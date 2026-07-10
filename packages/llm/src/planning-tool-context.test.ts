@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createContextAskUserHandler } from "./context-ask-user";
 import { createContextDistillHandler } from "./context-distill";
 import { createContextLinkedSourcesHandler } from "./context-linked-sources";
-import { collectPlanningToolContext } from "./planning-tool-context";
+import { buildResearchQueryPlan, collectPlanningToolContext } from "./planning-tool-context";
 import { createAimcubToolRegistry } from "./tool-registry";
 import type { AimcubToolHandlerContext } from "./tool-contract";
 
@@ -13,6 +13,31 @@ const context: AimcubToolHandlerContext = {
 };
 
 describe("planning tool context collector", () => {
+  it("builds a bounded multi-lane plan with user and audience evidence when relevant", () => {
+    const plan = buildResearchQueryPlan({
+      title: "Launch a consumer wellness app",
+      description: "Compare the market and define the first user experience.",
+      webQueryLimit: 4,
+    });
+
+    expect(plan).toHaveLength(4);
+    expect(new Set(plan.flatMap((row) => row.lanes))).toEqual(new Set([
+      "aim_facts",
+      "authoritative_requirements",
+      "alternatives_market",
+      "risks_tradeoffs",
+      "user_audience",
+    ]));
+    expect(plan.map((row) => row.id)).toEqual([
+      "aim-facts",
+      "authoritative-requirements",
+      "alternatives-market",
+      "risks-tradeoffs",
+    ]);
+    expect(plan[0]!.query).toContain("target users needs reviews evidence");
+    expect(buildResearchQueryPlan({ title: "Audit a policy", webQueryLimit: 2 })).toHaveLength(2);
+  });
+
   it("collects registry observations into planning memories", async () => {
     const registry = createAimcubToolRegistry({
       "memory.search": async () => ({
@@ -189,6 +214,13 @@ describe("planning tool context collector", () => {
     });
     expect(result.research?.queries).toEqual(searchedQueries);
     expect(result.research?.findings.join("\n")).toContain("Detailed source text");
+    expect(result.research?.coverage).toMatchObject({
+      requiredLaneCount: 5,
+      coveredLaneCount: 3,
+      uniqueDomainCount: 1,
+      primarySourceCount: 2,
+    });
+    expect(result.research?.sufficiency).toMatchObject({ level: "useful", sufficient: false });
     expect(result.observations.map((observation) => observation.summary)).toContain(
       "Built research brief from 2 queries, 3 sources, and 2 fetched pages.",
     );
@@ -197,6 +229,149 @@ describe("planning tool context collector", () => {
       "web.fetch",
       "web.research",
     ]));
+  });
+
+  it("fetches across lanes and diverse domains before taking duplicate-domain results", async () => {
+    const searchRows = [
+      [
+        { title: "Aim overview", url: "https://same.example/aim", snippet: "Current product facts.", publishedAt: "2026-07-01" },
+        { title: "Audience study", url: "https://audience.example/study", snippet: "Interview evidence from target users.", publishedAt: "2026-07-01" },
+      ],
+      [
+        { title: "Requirements repost", url: "https://same.example/requirements", snippet: "A secondary summary of the rules.", publishedAt: "2026-07-01" },
+        { title: "Official requirements", url: "https://agency.gov/requirements", snippet: "The agency publishes the current process.", publishedAt: "2026-07-01" },
+      ],
+      [
+        { title: "Alternative repost", url: "https://same.example/alternatives", snippet: "A secondary comparison.", publishedAt: "2026-07-01" },
+        { title: "Market comparison", url: "https://market.example/comparison", snippet: "Several competing approaches serve different segments.", publishedAt: "2026-07-01" },
+      ],
+      [
+        { title: "Risk repost", url: "https://same.example/risks", snippet: "A secondary risk summary.", publishedAt: "2026-07-01" },
+        { title: "Risk review", url: "https://risk.example/review", snippet: "Cost and implementation tradeoffs vary by route.", publishedAt: "2026-07-01" },
+      ],
+    ];
+    let searchIndex = 0;
+    const fetchedUrls: string[] = [];
+    const registry = createAimcubToolRegistry({
+      "memory.search": async () => ({
+        ok: true,
+        observation: { summary: "Selected 0 planning memories.", data: { memories: [] }, sources: [] },
+      }),
+      "web.search": async () => {
+        const results = searchRows[searchIndex++] ?? [];
+        return {
+          ok: true,
+          observation: {
+            summary: `Found ${results.length} web results.`,
+            data: { results },
+            sources: results.map((result) => ({ kind: "web" as const, url: result.url })),
+          },
+        };
+      },
+      "web.fetch": async (input) => {
+        fetchedUrls.push(input.url);
+        return {
+          ok: true,
+          observation: {
+            summary: `Fetched ${input.url}.`,
+            data: {
+              finalUrl: input.url,
+              status: 200,
+              title: input.url,
+              text: `Detailed evidence from ${input.url}.`,
+              truncated: false,
+            },
+            sources: [{ kind: "web", url: input.url }],
+          },
+        };
+      },
+    });
+
+    const result = await collectPlanningToolContext(
+      registry,
+      { ...context, permissions: ["memory.read", "network.search", "network.fetch"] },
+      {
+        title: "Launch a current consumer wellness app",
+        includeWeb: true,
+        fetchWebResults: true,
+        webQueryLimit: 4,
+        webFetchLimit: 5,
+      },
+    );
+
+    expect(fetchedUrls).toEqual([
+      "https://same.example/aim",
+      "https://audience.example/study",
+      "https://agency.gov/requirements",
+      "https://market.example/comparison",
+      "https://risk.example/review",
+    ]);
+    expect(fetchedUrls.filter((url) => url.includes("same.example"))).toHaveLength(1);
+    expect(result.research?.coverage).toMatchObject({
+      requiredLaneCount: 5,
+      coveredLaneCount: 5,
+      uniqueDomainCount: 5,
+      primarySourceCount: 1,
+      currentSourceCount: 8,
+      timeSensitive: true,
+      conflicts: [],
+      gaps: [],
+    });
+    expect(result.research?.sufficiency).toEqual({
+      level: "strong",
+      score: 100,
+      sufficient: true,
+      reasons: ["Covered 5/5 required lanes across 5 independent domains."],
+    });
+    expect(result.research?.uncertainties).toEqual([]);
+    expect(result.research?.sources.every((source) => source.url.startsWith("https://"))).toBe(true);
+  });
+
+  it("reports potential cross-domain conflicts and unresolved research sufficiency", async () => {
+    let searchIndex = 0;
+    const registry = createAimcubToolRegistry({
+      "memory.search": async () => ({
+        ok: true,
+        observation: { summary: "Selected 0 planning memories.", data: { memories: [] }, sources: [] },
+      }),
+      "web.search": async () => {
+        const result = searchIndex++ === 0
+          ? { title: "Permit guide A", url: "https://rules-a.example/permit", snippet: "A permit is required for every applicant.", publishedAt: "2026-07-01" }
+          : { title: "Permit guide B", url: "https://rules-b.example/permit", snippet: "A permit is not required and remains optional.", publishedAt: "2026-07-01" };
+        return {
+          ok: true,
+          observation: {
+            summary: "Found 1 web result.",
+            data: { results: [result] },
+            sources: [{ kind: "web" as const, url: result.url }],
+          },
+        };
+      },
+    });
+
+    const result = await collectPlanningToolContext(
+      registry,
+      { ...context, permissions: ["memory.read", "network.search"] },
+      {
+        title: "Compare current permit rules",
+        includeWeb: true,
+        webQueryLimit: 2,
+      },
+    );
+
+    expect(result.research?.conflicts).toEqual([
+      expect.objectContaining({
+        kind: "requirement",
+        sourceUrls: ["https://rules-a.example/permit", "https://rules-b.example/permit"],
+      }),
+    ]);
+    expect(result.research?.coverage.gaps).toEqual(expect.arrayContaining([
+      "Fewer than 3 independent web sources were available.",
+      "No source pages were fetched; findings rely on search snippets only.",
+      expect.stringContaining("Potentially conflicting requirement language"),
+    ]));
+    expect(result.research?.sufficiency).toMatchObject({ level: "thin", sufficient: false });
+    expect(result.research?.uncertainties.join("\n")).toContain("Potentially conflicting requirement language");
   });
 
   it("turns distilled missing context into structured user requests when enabled", async () => {

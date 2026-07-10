@@ -21,7 +21,9 @@ Today this means:
 - Desktop is the primary local product surface for aim intake, context review,
   provider/local-agent setup, execution handoff, evidence, eval, and context
   inbox review.
-- CLI is the scriptable and debuggable companion over the same local store.
+- CLI is the scriptable and debuggable companion over the same local store. It
+  can detect authenticated Codex/Claude runtimes and run one ready agent-owned
+  sub-aim at a time.
 - `@core/*` packages own the domain logic. App shells perform I/O, rendering,
   and platform bridging.
 - Local state is local-store first. By default it lives under `~/.aimcub`; use
@@ -74,9 +76,10 @@ For contributor context:
 | `packages/core` | Pure domain kernel: eval, plan merge, evidence normalization, planning reviews, and aim learning. |
 | `packages/store` | Local AimStore implementation, provider/settings files, context-source settings, import/export, and `AIMCUB_HOME` data-root handling. |
 | `packages/llm` | Provider catalog, LLM gateways, structured decomposition, planning context selection, and first-party tool contracts. |
+| `packages/local-agent` | Shared Codex/Claude CLI discovery, permission mapping, structured events, execution, and planning fallback. |
 | `packages/api` | Supabase API client layer for hosted evidence/platform surfaces. Not required for the local store-first loop. |
 | `apps/desktop` | Electron local harness. Primary product surface for the local alpha. |
-| `apps/cli` | Headless companion for planning, saved aims, evidence, context, setup, config, import/export, and diagnostics. |
+| `apps/cli` | Headless companion for planning, saved aims, one-sub-aim local-agent runs, evidence, context, setup, config, import/export, and diagnostics. |
 | `apps/mcp` | Hosted Streamable HTTP MCP evidence server. External extension boundary, not the local tool substrate. |
 | `packages/db` | Hosted Supabase schema, migrations, RLS, Edge Functions, and hosted judging infrastructure. |
 
