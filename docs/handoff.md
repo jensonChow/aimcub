@@ -22,15 +22,17 @@ Branch: `main`
 - Focused verification passed: Desktop 29 test files / 220 tests, Desktop typecheck, Store 64 tests, and `git diff --check`.
 - Repository gates passed: `pnpm build`, `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm core:purity`, and `git diff --check`.
 - Repository tests passed across 90 test files and 918 tests. Package totals were Core 176, LLM 170, local-agent 10, CLI 88, Desktop 220, Store 64, API 40, DB 36, and MCP 114. The expected missing-Supabase stderr came only from the MCP hygiene fixture.
-- `pnpm desktop:pack` passed with Electron 43.0.0 for macOS arm64, without signing. The project-root `Aimcub.app` exactly matches the packaged output; `Resources/app.asar` SHA256 is `0e3442704e79060c9a5e4c7eb047d30c143eafc895cca6a1588b6786fa53d96b`.
+- `pnpm desktop:pack` passed with Electron 43.0.0 for macOS arm64, without signing. The project-root `Aimcub.app` exactly matches the packaged output; the refreshed `Resources/app.asar` SHA256 is `4f1e1fec046c65db165a027f381414b67b3952eb425d8b0d18bd2afbc46ba632`.
 - Packaged UI verification used the exact root app with isolated `HOME`, `AIMCUB_HOME`, and Electron user-data directories under `/tmp`. A legacy aim-stage draft opened directly as a static summary with no input; Edit opened the buffered composer and Cancel restored the summary. A brand-new Aim submitted without any planning runtime also switched immediately to the static summary. A final checkpoint race test first confirmed `aim_surface: "compose"` on disk, submitted the Aim, terminated the app as soon as summary appeared, restarted against the same Store, and reopened the draft as summary with no input; disk held `aim_surface: "summary"`. The isolated instances were closed, and no real `~/.aimcub` data was read or written.
+- The `memory-refresh` audit passed before publication. Root `AGENTS.md` and `CLAUDE.md` remain within their 50-line budgets, and the architecture, Desktop, and design-system memories already contain the durable compose-summary-edit contract, so no duplicate module-memory edits were needed.
 
 ## Commit And Push Status
 
 - Feature commit: `74f792db` (`Fix captured Aim summary persistence`).
 - Local merge commit: `dd2edd43` (`Merge captured Aim summary persistence fix`).
-- This final handoff refresh is the remaining history-only update on local `main`.
-- Push: not authorized and not attempted. Local `main` is ahead of `origin/main`; require fresh explicit authorization before publishing.
+- Regression handoff commit: `1faebadd` (`Finalize Aim summary regression handoff`).
+- The user explicitly authorized commit, merge, and push after invoking `memory-refresh`. The merged fix through `1faebadd` was pushed to `origin/main` on 2026-07-10 after verifying the `jensonChow` GitHub identity, the `jensonChow/aimcub` destination, `ADMIN` permission, and `main` as the default branch.
+- This focused memory-refresh status record is committed on `main` and published as the current `origin/main` tip.
 
 ## Open Risks
 
@@ -40,5 +42,5 @@ Branch: `main`
 ## Next Session Prompt
 
 ```text
-Continue from Aimcub main. Read AGENTS.md, docs/handoff.md, docs/memory/README.md, and the relevant module memory. Preserve the compose-summary-edit contract: first submit and legacy draft recovery show a static Aim summary; only explicit Edit opens the composer. Keep aim_surface persisted, serialize Edit as summary, and never let missing runtime setup, autosave, navigation, or restart reopen a captured Aim as an input. Use isolated HOME, AIMCUB_HOME, and Electron user data for packaged QA. Require fresh explicit authorization before pushing.
+Continue from Aimcub main. Read AGENTS.md, docs/handoff.md, docs/memory/README.md, and the relevant module memory. Preserve the compose-summary-edit contract: first submit and legacy draft recovery show a static Aim summary; only explicit Edit opens the composer. Keep aim_surface persisted, serialize Edit as summary, and never let missing runtime setup, autosave, navigation, or restart reopen a captured Aim as an input. Use isolated HOME, AIMCUB_HOME, and Electron user data for packaged QA. Require fresh explicit authorization before any later push.
 ```
