@@ -648,6 +648,7 @@ describe("App first-run workspace", () => {
     const html = renderToStaticMarkup(<App />);
 
     expect(html).toContain('class="od-initial-workspace"');
+    expect(html).toContain('data-has-drafts="false"');
     expect(html).toContain("Workspace ready");
     expect(html).toContain("Create a new aim when you are ready to start.");
     expect(html).not.toContain('class="od-aim-composer"');
@@ -669,9 +670,13 @@ describe("App first-run workspace", () => {
 
     expect(html).toContain("Drafts in progress");
     expect(html).toContain("Resume aim-building work or discard it explicitly.");
-    expect(html).toContain("Unfinished local-first aim");
+    expect(html).toContain('data-has-drafts="true"');
+    expect(html.match(/aria-label="Recoverable drafts"/g)).toHaveLength(1);
+    expect(html).not.toContain('aria-label="Empty workspace"');
+    expect(html).toContain("Ship a useful contract review");
     expect(html).toContain("Save blocked");
-    expect(html).toContain("More actions for Unfinished local-first aim");
+    expect(html).toContain("More actions for Ship a useful contract review");
+    expect(html).not.toContain("Workspace ready");
     expect(html).not.toContain("od-draft-recovery-action");
     expect(html).not.toContain("od-draft-discard");
     expect(html).not.toContain(">Discard</button>");
@@ -1420,13 +1425,14 @@ describe("CockpitShell", () => {
 
     expect(html).toContain('data-od-id="sidebar-drafts-label"');
     expect(html).toContain("Drafts");
-    expect(html).toContain("Unfinished local-first aim");
-    expect(html).toContain("Save blocked");
+    expect(html).toContain("Ship a useful contract review");
+    expect(html).not.toContain("Unfinished local-first aim");
+    expect(html).not.toContain("Save blocked");
     expect(html).toContain('class="od-content-entry od-draft-card" data-selected="true"');
     expect(html).toContain('class="od-content-entry-main od-draft-card-main" type="button" aria-current="page"');
     expect(html).not.toMatch(/class="od-sidebar-action od-home-panel"[^>]*aria-current="page"/);
     expect(html).not.toMatch(/class="od-sidebar-action od-new-aim"[^>]*aria-current="page"/);
-    expect(html).toContain("More actions for Unfinished local-first aim");
+    expect(html).toContain("More actions for Ship a useful contract review");
     expect(html).not.toContain(">Discard</button>");
     expect(html).toContain("Recent aims");
     expect(html).toContain("Saved aims appear here.");
@@ -1444,6 +1450,8 @@ describe("CockpitShell", () => {
       ...draftRow,
       id: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
       title: `Reachable draft ${index + 1}`,
+      draft_plan: null,
+      final_plan: null,
     }));
     const html = renderToStaticMarkup(
       <I18nProvider>
@@ -1508,6 +1516,66 @@ describe("CockpitShell", () => {
     expect(css).toContain("--od-font-weight-heavy: var(--od-font-weight-strong);");
   });
 
+  it("keeps sidebar Aim rows compact, single-line, and free of status subtitles", () => {
+    const verboseDraftTitle = "Coordinate the entire desktop application layout and ensure every workbench surface shares a coherent alignment system";
+    const goalWithSummary: Goal = {
+      ...savedGoal,
+      title: "I want to ship a coherent desktop workspace with compact navigation",
+      plan_json: {
+        ...contractPlan,
+        goal_summary: "Ship a coherent desktop workspace",
+      },
+    };
+    const html = renderToStaticMarkup(
+      <I18nProvider>
+        <CockpitShell
+          goals={[goalWithSummary]}
+          drafts={[draftRow, {
+            ...draftRow,
+            id: "00000000-0000-4000-8000-000000000099",
+            title: verboseDraftTitle,
+            draft_plan: null,
+            final_plan: null,
+          }]}
+          activeStage="aim"
+          workspaceTarget={{ kind: "home" }}
+          onHome={noop}
+          onNewAim={noop}
+          onOpenGoal={noop}
+          onOpenDraft={noop}
+          onDiscardDraft={noop}
+          onStage={noop}
+          main={<div>Home</div>}
+        />
+      </I18nProvider>,
+    );
+    const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
+
+    expect(html).toContain('<button class="od-aim-card" type="button" aria-label="Ship a coherent desktop workspace" title="Ship a coherent desktop workspace"');
+    expect(html).toContain('class="od-content-entry-main od-draft-card-main" type="button" aria-label="Ship a useful contract review" title="Ship a useful contract review"');
+    expect(html).toContain(`aria-label="More actions for ${verboseDraftTitle}"`);
+    expect(html).toContain("Coordinate the entire desktop application…");
+    expect(html).not.toContain(">active<");
+    expect(html).not.toContain("Save blocked");
+    expect(css).toMatch(/\.od-aim-card\s*{[^}]*min-height:\s*36px;[^}]*padding:\s*0 var\(--sidebar-row-padding-x\);/s);
+    expect(css).toMatch(/\.od-aim-card\.selected,\s*\.od-aim-card\.current\s*{[^}]*background:\s*var\(--od-selection-bg\);[^}]*border-color:\s*transparent;[^}]*box-shadow:\s*none;/s);
+    expect(css).toMatch(/\.od-aim-card\.selected:focus-visible,\s*\.od-aim-card\.current:focus-visible\s*{[^}]*box-shadow:\s*var\(--od-focus\);/s);
+    expect(css).toMatch(/\.od-draft-card \.od-content-entry-main\s*{[^}]*min-height:\s*36px;[^}]*padding:\s*0 2px 0 var\(--sidebar-row-padding-x\);/s);
+    expect(css).toMatch(/\.od-aim-card strong,\s*\.od-draft-card \.od-content-entry-copy strong\s*{[^}]*overflow:\s*hidden;[^}]*text-overflow:\s*ellipsis;[^}]*white-space:\s*nowrap;/s);
+  });
+
+  it("keeps Home drafts and workbench navigation on coherent alignment rails", () => {
+    const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
+
+    expect(css).toMatch(/\.od-main\s*{[^}]*--od-rail-operational:\s*940px;[^}]*--od-rail-reading:\s*760px;[^}]*--od-rail-compose:\s*560px;/s);
+    expect(css).toMatch(/\.od-stage-nav\s*{[^}]*width:\s*min\(100%, var\(--od-rail-operational\)\);[^}]*justify-content:\s*flex-start;/s);
+    expect(css).toMatch(/\.od-workspace\s*{[^}]*width:\s*min\(100%, var\(--od-rail-operational\)\);/s);
+    expect(css).toMatch(/\.od-workspace-aim:has\(> \.od-initial-workspace\[data-has-drafts="true"\]\)\s*{[^}]*align-content:\s*start;[^}]*justify-items:\s*stretch;/s);
+    expect(css).toMatch(/\.od-initial-workspace\[data-has-drafts="true"\]\s*{[^}]*min-height:\s*0;[^}]*align-content:\s*start;[^}]*padding:\s*0;/s);
+    expect(css).toMatch(/\.od-draft-recovery\s*{[^}]*width:\s*min\(100%, var\(--od-rail-compose\)\);[^}]*margin:\s*0 auto;/s);
+    expect(css).toMatch(/\.od-context-focus\s*{[^}]*width:\s*min\(100%, var\(--od-rail-reading\)\);[^}]*padding-top:\s*0;/s);
+  });
+
   it("reserves a stage-nav row for saved Aim overview at compact widths", () => {
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
 
@@ -1558,9 +1626,9 @@ describe("CockpitShell", () => {
     expect(css).toMatch(/\.od-aim-browser\s*{[^}]*width:\s*var\(--sidebar-content-width\);[^}]*justify-self:\s*center;[^}]*padding-right:\s*0;/s);
     expect(css).toMatch(/\.od-section-label\s*{[^}]*justify-content:\s*flex-start;[^}]*padding:\s*0 var\(--sidebar-row-padding-x\);/s);
     expect(css).toMatch(/\.od-sidebar-empty\s*{[^}]*padding:\s*7px var\(--sidebar-row-padding-x\);/s);
-    expect(css).toMatch(/\.od-aim-card\s*{[^}]*padding:\s*8px 10px 8px var\(--sidebar-row-padding-x\);/s);
-    expect(css).toMatch(/\.od-aim-card\.selected,\s*\.od-aim-card\.current\s*{[^}]*background:\s*var\(--od-selection-bg\);[^}]*box-shadow:\s*var\(--od-selection-shadow\);[^}]*color:\s*var\(--od-fg\);/s);
-    expect(css).toMatch(/\.od-aim-card\.selected:focus-visible,\s*\.od-aim-card\.current:focus-visible\s*{[^}]*background:\s*var\(--od-selection-hover-bg\);[^}]*box-shadow:\s*var\(--od-focus\), var\(--od-selection-shadow\);/s);
+    expect(css).toMatch(/\.od-aim-card\s*{[^}]*padding:\s*0 var\(--sidebar-row-padding-x\);/s);
+    expect(css).toMatch(/\.od-aim-card\.selected,\s*\.od-aim-card\.current\s*{[^}]*background:\s*var\(--od-selection-bg\);[^}]*border-color:\s*transparent;[^}]*box-shadow:\s*none;[^}]*color:\s*var\(--od-fg\);/s);
+    expect(css).toMatch(/\.od-aim-card\.selected:focus-visible,\s*\.od-aim-card\.current:focus-visible\s*{[^}]*background:\s*var\(--od-selection-hover-bg\);[^}]*box-shadow:\s*var\(--od-focus\);/s);
     expect(css).toMatch(/\.od-sidebar-search\s*{[^}]*padding:\s*0 var\(--sidebar-row-padding-x\);/s);
     expect(css).toMatch(/\.od-filter-row\s*{[^}]*padding:\s*0 var\(--sidebar-row-padding-x\) 2px;/s);
     expect(css).toMatch(/\.od-user-menu-anchor\s*{[^}]*width:\s*var\(--sidebar-content-width\);[^}]*justify-self:\s*center;/s);
@@ -1700,7 +1768,7 @@ describe("CockpitShell", () => {
     expect(stageSafeAreaRule).toContain("padding-top: max(24px, var(--stage-nav-titlebar-safe-top));");
     expect(css).not.toContain('.od-main:not(.od-main-aim):not(.od-main-settings)');
     expect(stageSafeAreaRule).not.toMatch(/\.od-sidebar|\.od-user-menu-|\.od-window-drag-strip/);
-    expect(css).toMatch(/\.od-stage-nav\s*{[^}]*justify-content:\s*space-between;[^}]*gap:\s*12px;[^}]*min-height:\s*32px;/s);
+    expect(css).toMatch(/\.od-stage-nav\s*{[^}]*justify-content:\s*flex-start;[^}]*gap:\s*12px;[^}]*min-height:\s*32px;/s);
     expect(css).toMatch(/\.od-stage-switcher\s*{[^}]*gap:\s*4px;[^}]*padding:\s*2px;[^}]*border:\s*1px solid var\(--od-border-soft\);/s);
     expect(css).toMatch(/\.od-stage-nav button\s*{[^}]*max-width:\s*112px;[^}]*min-height:\s*28px;[^}]*background:\s*transparent;/s);
     expect(css).not.toContain(".od-stage-index");

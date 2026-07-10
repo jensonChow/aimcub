@@ -159,7 +159,7 @@ export const decompositionJsonSchema = {
   type: "object",
   additionalProperties: false,
   properties: {
-    goal_summary: nullableString("One-sentence restatement of the goal."),
+    goal_summary: nullableString("Concise navigation label that restates the outcome without copying the user's framing."),
     domain: nullableEnum(goalDomainEnum),
     rationale: nullableString("Brief reasoning for the chosen breakdown."),
     nodes: {

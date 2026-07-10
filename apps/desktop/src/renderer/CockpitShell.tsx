@@ -5,6 +5,7 @@ import type { AimDraft, Goal } from "@core/types";
 import type { WindowChromeState } from "../shared/ipc";
 import { useI18n, type Lang } from "./i18n";
 import { AimDraftSidebarRows } from "./stages/aim/AimDraftRecovery";
+import { aimMatchesNavigationQuery, aimNavigationLabels } from "./workflow/aimNavigationTitle";
 import {
   availableWorkbenchStages,
   hasWorkbenchNavigation,
@@ -63,16 +64,6 @@ interface StageItem {
   stage: WorkbenchStage;
   shortcut: string;
   title: string;
-}
-
-function shortText(value: string | undefined | null, max = 96): string {
-  const cleaned = (value ?? "").replace(/\s+/g, " ").trim();
-  if (cleaned.length <= max) return cleaned;
-  return `${cleaned.slice(0, max - 1).trim()}...`;
-}
-
-function statusLabel(goal: Goal): string {
-  return goal.status.replace("_", " ");
 }
 
 function prefersCollapsedSidebar() {
@@ -163,7 +154,12 @@ export function CockpitShell({
       if (filter === "paused" && goal.status !== "paused") return false;
       if (filter === "active" && (goal.status === "achieved" || goal.status === "abandoned")) return false;
       if (!normalizedQuery) return true;
-      return `${goal.title} ${goal.description ?? ""} ${goal.status}`.toLowerCase().includes(normalizedQuery);
+      return aimMatchesNavigationQuery({
+        title: goal.title,
+        plan: goal.plan_json,
+        description: goal.description,
+        status: goal.status,
+      }, normalizedQuery);
     })
     .slice(0, 12);
 
@@ -609,19 +605,20 @@ export function CockpitShell({
                   ) : null}
                   {visibleGoals.map((goal) => {
                     const selectedGoal = workspaceTarget.kind === "goal" && workspaceTarget.id === goal.id;
+                    const navigationTitle = aimNavigationLabels({ title: goal.title, plan: goal.plan_json });
                     return (
                       <button
                         key={goal.id}
                         className={`od-aim-card${selectedGoal ? " selected" : ""}`}
                         type="button"
                         aria-current={selectedGoal ? "page" : undefined}
+                        aria-label={navigationTitle.fullLabel}
+                        title={navigationTitle.fullLabel}
                         onClick={() => onOpenGoal(goal)}
                       >
                         <span className="od-aim-row-main">
-                          <strong>{shortText(goal.title, 58)}</strong>
-                          <span>{statusLabel(goal)}</span>
+                          <strong>{navigationTitle.label}</strong>
                         </span>
-                        <span className="od-aim-row-badge" aria-hidden="true" />
                       </button>
                     );
                   })}

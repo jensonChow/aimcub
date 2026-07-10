@@ -149,6 +149,7 @@ const SYSTEM_PROMPT = [
   "- Produce between 1 and 15 milestones. Fewer, meaningful milestones beat many trivial ones.",
   "- Prefer 3 to 7 milestones unless the goal explicitly requires more. Do not use 15 milestones by default.",
   "- Keep JSON compact: node titles under 60 characters; descriptions, contract fields, and eval signals under 180 characters each.",
+  "- Write goal_summary as a concise navigation label, not a copy of the user's framing: 4 to 10 English words or roughly 8 to 20 Chinese characters, preserving the intended outcome.",
   "- Return a FLAT graph: a `nodes` array plus an `edges` array. Never nest nodes inside nodes.",
   "- Each edge {from, to} means the `from` milestone must be completed before `to` can start.",
   "  The dependency graph MUST be acyclic. Every edge endpoint must reference an existing node key.",
