@@ -5,56 +5,53 @@ Branch: `main`
 
 ## Current Session
 
-- Request: fix repeated misclassification of compatible Context answers as single-select, research the public Claude Design and Claude Code interaction model, and improve Aim/context understanding rather than adding another option-count heuristic.
-- Starting state: clean local `main` at `c3d58d25`, three commits ahead of `origin/main` at `c15345f8`.
-- Evidence reviewed: official Anthropic Claude Code user-input, agent-loop, best-practice, autonomy, and Claude Design materials; the complete pre-draft and post-draft clarification pipelines; `context.ask_user`; Desktop, CLI, draft persistence, store, and type contracts; current product and interaction memories; and the user's reported non-exclusive life-path example.
-- Research boundary: Anthropic publicly exposes an explicit `multiSelect` contract and examples where compatible sections are multiple while mutually exclusive output formats are single. It does not publish Claude's internal classifier or system prompt. The pairwise-coexistence policy and deterministic safeguards below are Aimcub engineering inferences from that public behavior, not copied Claude internals.
+- Request: fix repeated single-select classification of compatible Context answers, research the public Claude interaction contract, then run `$memory-refresh` so project memory matches the implementation and current Git state.
+- Starting state: the feature began from local `main` at `c3d58d25`, three commits ahead of `origin/main`; the memory refresh began from clean `main` at `2769ff4e`, six commits ahead of `origin/main` at `c15345f8`.
+- Evidence reviewed: official Anthropic public materials, the complete choice-mode implementation and adversarial tests, recent diffs and commits, the memory audit, root contracts, module memory map, prior handoffs at `c15345f8` and `c3d58d25`, and three independent read-only audits.
 
 ## Completed Work
 
-- Added one pure core selection policy shared by every Aimcub question surface. A question is single-select only when the answer set is demonstrably mutually exclusive or the prompt is tightly anchored to one primary/default/best/current scalar choice. Compatible answers and unresolved ambiguity default to multiple-select. Model-provided mode or reason alone cannot force single-select.
-- Added structured selection reason codes and propagated them through intake, clarification, tool contracts, shared types, store fixtures, Desktop drafts, and hydration. Legacy drafts are re-normalized on load so old incorrect single-select labels do not silently retain bad behavior.
-- Reworked both clarification prompts around pairwise coexistence, exact Aim wording, existing context, memory, and prior answers. Broad source gaps can split into several atomic questions; empty model output is valid; pre-draft and post-draft flows no longer manufacture a fixed-size form or pad high-confidence output with generic capability and constraint questions.
-- Hardened question quality and budgets: bounded every prompt section independently, enforced runtime question limits, deduplicated option labels and identifiers, preserved `Other`, and kept fallback questions limited to high-impact source and completion-evidence gaps.
-- Updated Desktop answer semantics. Single-select custom text replaces a preset; multiple-select custom text supplements presets. Single questions now expose a real radio-group accessibility model with roving focus and arrow/Home/End navigation, while multiple questions remain pressed toggle buttons.
-- Updated CLI answer semantics. Interactive multiple-select accepts comma-separated choices plus optional custom text; JSON answers validate against the actual question modes and reject conflicting values for single-select questions. Selected labels now survive into the intake signal.
-- Added bilingual adversarial coverage for the reported life-path case, parallel routes, cross-resource availability, contextual versus genuine primary/default wording, binary availability, dates, residency, current scalar state, duplicate options, split-gap identifiers, prompt truncation, zero-question readiness, persistence migration, and keyboard behavior.
-- Updated durable product, architecture, Desktop, and design-system memory to lock the semantic policy and answer-control behavior.
+- Added one shared choice-mode contract across pre-draft intake, post-draft clarification, `context.ask_user`, Desktop, draft hydration, and CLI. Aim-aware generation prompts test same-scope option coexistence; the deterministic Core layer accepts only high-confidence single-choice evidence and otherwise preserves context as multiple-select.
+- Removed option-count and fixed-form heuristics. Pre-draft intake can split a broad gap into atomic questions or return zero when ready. Post-draft clarification keeps any useful non-empty model set without padding; after memory filtering leaves no unresolved question, it may add up to two baseline questions within the runtime budget.
+- Preserved answer semantics end to end: Desktop single custom text replaces a preset while multi custom text supplements presets; radio groups support roving keyboard navigation; legacy migration preserves ambiguous or unknown selections as visible custom text; CLI validates answers against the generated question mode.
+- Added bilingual adversarial coverage for compatible life paths and routes, primary/default/scalar counterexamples, binary availability, migration, CLI parsing, prompt budgets, question counts, and Desktop control semantics.
+- Refreshed memory ownership. `product.md` is the normative semantic source; `architecture.md` now distinguishes model reasoning from the deterministic safety layer and records the public-research boundary; `desktop.md` owns hydration data safety; `design-system.md` owns radio/toggle/custom/keyboard behavior; `operations.md` and the root contracts now require authorization before push.
+- Restored unresolved risks that had been dropped when the prior handoff was replaced, and corrected the stale pending handoff commit state.
 
-## Changed Areas
+## Memory-Refresh Files
 
-- `packages/core`: shared semantic choice-mode policy, reason vocabulary, intake types, exports, and adversarial tests.
-- `packages/llm`: pre-draft intake, post-draft clarification, schemas, `context.ask_user`, tool contracts, prompt budgets, fallbacks, and tests.
-- `apps/desktop`: planner integration, clarification controls, debug rendering, draft persistence and migration, accessibility, and tests.
-- `apps/cli`: interactive and JSON answer parsing, selected-label propagation, and tests.
-- `packages/types` and `packages/store`: persisted reason contract and fixtures.
-- `docs/memory`: product, architecture, Desktop, and design-system rules.
+- `AGENTS.md`
+- `CLAUDE.md`
+- `docs/memory/architecture.md`
+- `docs/memory/desktop.md`
+- `docs/memory/design-system.md`
+- `docs/memory/operations.md`
+- `docs/handoff.md`
 
 ## Verification
 
-- Full required gate passed after the final edits: `pnpm build && pnpm test && pnpm typecheck && pnpm lint && pnpm core:purity && git diff --check`.
-- Test result: 81 files and 868 tests passed. Relevant package totals were Core 171, LLM 164, CLI 84, Desktop 197, Store 62, API 40, DB 36, and MCP 114.
-- The expected MCP missing-Supabase-environment stderr came only from its hygiene fixture; the suite passed.
-- `pnpm desktop:pack` passed with Electron 43.0.0 for macOS arm64, without signing.
-- `ditto apps/desktop/dist/mac-arm64/Aimcub.app Aimcub.app` refreshed the project-root bundle. It is `com.aimcub.desktop`, version `0.0.0`; `Resources/app.asar` SHA256 is `a22b2a4e9c792f3607471a10f10a0ce28201d0bd83dad22617621908c210ebaa`.
-- No live app state was mutated and no real `~/.aimcub` data was written. Logic, persistence migration, SSR rendering, accessibility, and keyboard behavior were verified through automated tests.
-- Independent final review found no P0 or P1 issue in the policy, intake/clarify counts, CLI validation, Desktop radio behavior, or legacy migration.
+- The read-only memory audit passed; `AGENTS.md` and `CLAUDE.md` remain identical, hard-rule-only, and 34 lines each under the 50-line limit.
+- The full required gate passed on the refresh: `pnpm build`, `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm core:purity`, and `git diff --check`.
+- Test result: 81 files and 868 tests passed. Package totals remain Core 171, LLM 164, CLI 84, Desktop 197, Store 62, API 40, DB 36, and MCP 114. The expected missing-Supabase stderr came only from the MCP hygiene fixture.
+- `pnpm desktop:pack` passed with Electron 43.0.0 for macOS arm64, without signing, and the project-root `Aimcub.app` was refreshed. It is `com.aimcub.desktop`, version `0.0.0`; `Resources/app.asar` SHA256 is `a22b2a4e9c792f3607471a10f10a0ce28201d0bd83dad22617621908c210ebaa`.
+- No live app state or real `~/.aimcub` data was changed during this memory refresh.
 
 ## Commit And Push Status
 
-- Feature commit: `8e5ed037` (`Fix semantic context choice modes`).
-- Local merge commit: `74e9a825` (`Merge semantic context choice modes`).
-- Handoff-only commit: pending at the time this file was written.
-- Remote push: not performed. The prior export safety review requires fresh explicit user approval; `origin/main` remains at `c15345f8`.
+- Choice-mode feature commit: `8e5ed037` (`Fix semantic context choice modes`).
+- Choice-mode local merge commit: `74e9a825` (`Merge semantic context choice modes`).
+- Choice-mode handoff commit: `2769ff4e` (`Finalize context choice mode handoff`).
+- This handoff is part of the focused memory-refresh commit on local `main`; no separate branch merge is needed. That commit leaves local `main` seven commits ahead of `origin/main`.
+- Remote push is not performed. The prior export safety review requires fresh explicit user approval; `origin/main` remains at `c15345f8`.
 
 ## Open Risks
 
-- The deterministic core deliberately covers only high-confidence wording and answer-shape evidence. It is a safety layer around model understanding, not an attempt to encode every language pattern. Unknown or ambiguous relations intentionally resolve to multiple-select because that loses less valid context than a false single-select.
-- Anthropic's internal classification logic is not public. Future tuning should continue to use observed product failures and adversarial bilingual examples, without presenting Aimcub's inferred policy as Claude internals.
-- A future deterministic seeded visual pass can supplement the automated radio and multi-toggle coverage, but no known behavior or accessibility blocker remains.
+- Semantic pairwise reasoning currently depends on the model prompt, pure Core tests, and mock-gateway adversarial regressions. The Core layer is intentionally a conservative wording/answer-shape safeguard, and there is not yet a live-provider accuracy benchmark over a broader Aim corpus.
+- An open manual-proof draft is protected from normal in-app navigation but is not checkpointed across process termination or a full reload.
+- A deterministic isolated-seed packaged pass should still cover the new radio/multi controls, the Aim summary at exactly 640 by 520, saved-contract code, the fixed web provider value, and selected Contract/Work layouts. Automated regressions cover related component behavior and responsive selectors; these packaged visual assertions remain pending.
 
 ## Next Session Prompt
 
 ```text
-Continue from Aimcub main. Read AGENTS.md, docs/handoff.md, docs/memory/README.md, docs/memory/product.md, docs/memory/architecture.md, docs/memory/desktop.md, and docs/memory/design-system.md first. Preserve the shared semantic choice policy: require strong evidence for single-select, default uncertain compatible answers to multiple-select, and never reintroduce option-count or fixed-form padding heuristics. Use an isolated AIMCUB_HOME for any state-changing visual QA.
+Continue from Aimcub main. Read AGENTS.md, docs/handoff.md, docs/memory/README.md, and the module memory for the surface you touch. Preserve product.md as the choice-cardinality source of truth, keep model semantic reasoning separate from the conservative Core safeguard, and never reintroduce option-count or fixed-form padding heuristics. Use an isolated AIMCUB_HOME for state-changing visual QA. Do not push the seven local commits until the user gives fresh explicit approval.
 ```

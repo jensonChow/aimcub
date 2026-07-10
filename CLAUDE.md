@@ -6,7 +6,7 @@ Aimcub is a universal aim-management layer: it holds the aim, routes work across
 - Keep this file at 50 lines or fewer. It is the root memory for MUST/NEVER rules only.
 - Put durable module memory in `docs/memory/`; put transient session transfer in `docs/handoff.md`.
 - All committed repo content must be English: code, comments, identifiers, commit messages, docs, and SQL. Only `zh` i18n values may be Chinese.
-- After repository changes, run `pnpm build && pnpm test && pnpm typecheck && pnpm lint && pnpm core:purity`, refresh root `Aimcub.app` from `pnpm desktop:pack`, then create a focused commit, push, and merge completed branch work into `main` unless the user explicitly says not to.
+- After repository changes, run `pnpm build && pnpm test && pnpm typecheck && pnpm lint && pnpm core:purity`, refresh root `Aimcub.app` from `pnpm desktop:pack`, then create a focused commit and merge completed branch work into `main`; push only when authorized and not explicitly declined by the user.
 - Update `docs/handoff.md` before ending a session that changes the repo.
 
 ## Product Contract
