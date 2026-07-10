@@ -324,7 +324,7 @@ If a sidebar/window conflict appears unavoidable, stop and record the conflict i
 - Verify 960x680, 760x600, and 640x520.
 - Keep shell/sidebar/window selectors untouched.
 
-Status: addressed in the stage/workspace CSS pass on 2026-07-07. `.od-main` now owns the compact-width titlebar safe-area offset, and `.od-stage-nav` centers, wraps, and compresses labels without changing the protected shell/sidebar/window selectors. Final visual inspection remains part of the integration verification.
+Status: re-audited on 2026-07-10 after recoverable drafts added workbench navigation to the Aim surface. The safe-area rule now keys only off collapsed/peek shell geometry for every non-Settings main workspace, rather than excluding Aim by stage name or waiting for stage navigation to mount after autosave. `.od-stage-nav` still centers, wraps, and compresses labels without changing native traffic-light ownership. Final packaged visual inspection remains part of the integration verification.
 
 ### Batch 2: Context Primary Task Cleanup
 

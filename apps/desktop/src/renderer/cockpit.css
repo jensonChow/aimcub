@@ -1424,7 +1424,7 @@ kbd {
 }
 
 .od-main {
-  --stage-nav-titlebar-safe-top: 0px;
+  --stage-nav-titlebar-safe-top: calc(var(--titlebar-toggle-top) + var(--titlebar-toggle-size) + 16px);
   grid-column: 2;
   min-width: 0;
   min-height: 0;
@@ -1445,6 +1445,11 @@ kbd {
 
 .od-main-settings {
   grid-template-rows: minmax(0, 1fr);
+}
+
+.od-app[data-sidebar-state="collapsed"] .od-main:not(.od-main-settings),
+.od-app[data-sidebar-state="peek"] .od-main:not(.od-main-settings) {
+  padding-top: max(24px, var(--stage-nav-titlebar-safe-top));
 }
 
 .od-stage-nav {
@@ -2129,6 +2134,19 @@ kbd {
   flex-wrap: wrap;
 }
 
+.od-static-config-value {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-sm);
+  background: var(--od-surface-warm);
+  color: var(--od-fg);
+  padding: 0 11px;
+  font-size: var(--od-type-body);
+  line-height: var(--od-line-body);
+}
+
 .od-first-run-helper {
   display: grid;
   gap: 12px;
@@ -2222,6 +2240,28 @@ kbd {
 .od-aim-overview .od-aim-intake-head {
   justify-content: space-between;
   text-align: left;
+}
+
+.od-aim-edit-mode {
+  width: min(100%, 560px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+}
+
+.od-aim-edit-mode p {
+  margin: 4px 0 0;
+  text-align: left;
+}
+
+.od-draft-aim-overview .od-aim-intake-head > div {
+  min-width: 0;
+}
+
+.od-draft-aim-overview h1,
+.od-draft-aim-overview p {
+  overflow-wrap: anywhere;
 }
 
 .od-aim-kicker {
@@ -4364,7 +4404,8 @@ kbd {
 .od-plan-title-field input,
 .od-plan-field input,
 .od-plan-field textarea,
-.od-plan-rule-input {
+.od-plan-rule-input,
+.od-plan-rule-code {
   width: 100%;
   min-width: 0;
   border: 1px solid var(--od-border-soft);
@@ -4500,6 +4541,21 @@ kbd {
   font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
   font-size: var(--od-type-meta);
   line-height: 1.5;
+}
+
+.od-plan-rule-code {
+  max-height: 240px;
+  margin: 0;
+  overflow: auto;
+  font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
+  font-size: var(--od-type-meta);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.od-plan-rule-code:focus-visible {
+  box-shadow: var(--od-focus);
 }
 
 .od-plan-error,
@@ -5985,11 +6041,6 @@ kbd {
     box-shadow: var(--od-shadow-peek);
   }
 
-  .od-main:not(.od-main-aim):not(.od-main-settings) {
-    --stage-nav-titlebar-safe-top: calc(var(--titlebar-toggle-top) + var(--titlebar-toggle-size) + 16px);
-    padding-top: max(16px, var(--stage-nav-titlebar-safe-top));
-  }
-
   .od-stage-nav {
     flex-wrap: wrap;
     row-gap: 8px;
@@ -6178,7 +6229,8 @@ kbd {
   }
 
   .od-aim-intake-head,
-  .od-aim-intake-footer {
+  .od-aim-intake-footer,
+  .od-aim-edit-mode {
     display: grid;
   }
 

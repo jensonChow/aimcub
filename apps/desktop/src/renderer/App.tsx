@@ -56,12 +56,13 @@ import { ContextReviewPanel } from "./stages/context/ContextReviewPanel";
 import { ContextStage } from "./stages/context/ContextStage";
 import type { ClarifyPhase, ContextAnswerMap } from "./stages/context/types";
 import { AimDraftHomeSection } from "./stages/aim/AimDraftRecovery";
+import { DraftAimOverviewPanel } from "./stages/aim/DraftAimOverviewPanel";
 import { EvalStage } from "./stages/eval/EvalStage";
 import { ExecutePanel } from "./stages/execute/ExecutePanel";
 import { WebResearchForm } from "./WebResearchForm";
 import { PlanPanel } from "./stages/plan/PlanPanel";
 import { Button, Panel } from "./ui";
-import { C, TYPE, WEIGHT, inputStyle, primaryButton } from "./styles";
+import { C, TYPE } from "./styles";
 import {
   answersFor,
   buildDescriptionWithContext,
@@ -125,6 +126,13 @@ import { shortText } from "./workflow/text";
 
 export { buildSettingsModel };
 
+type AimSurfaceMode = "idle" | "compose" | "summary" | "edit";
+
+interface AimEditBuffer {
+  title: string;
+  description: string;
+}
+
 export function App() {
   return (
     <I18nProvider>
@@ -145,9 +153,11 @@ function AimOsApp() {
   const [webResearch, setWebResearch] = useState<WebResearchStatus | null>(null);
   const [contextSources, setContextSources] = useState<ContextSourceStatus | null>(null);
   const [localAgents, setLocalAgents] = useState<LocalAgentDetection[]>([]);
-  const [aimComposerOpen, setAimComposerOpen] = useState(false);
+  const [aimSurfaceMode, setAimSurfaceMode] = useState<AimSurfaceMode>("idle");
   const [aimTitle, setAimTitle] = useState("");
   const [aimDescription, setAimDescription] = useState("");
+  const [aimEditBuffer, setAimEditBuffer] = useState<AimEditBuffer | null>(null);
+  const [restoreAimEditFocus, setRestoreAimEditFocus] = useState(false);
   const [parent, setParent] = useState<{ goalId: string; milestoneId: string } | null>(null);
   const [draft, setDraft] = useState<DecompositionOutput | null>(null);
   const [finalPlan, setFinalPlan] = useState<DecompositionOutput | null>(null);
@@ -257,6 +267,15 @@ function AimOsApp() {
       const message = t("os.proofNavigationBlocked");
       proofNavigationErrorRef.current = message;
       setError(message);
+      return true;
+    }
+    if (aimSurfaceMode === "edit") {
+      setError({
+        title: t("aimDraft.edit.navigationTitle"),
+        message: t("aimDraft.edit.navigationMessage"),
+        recovery: t("aimDraft.edit.navigationRecovery"),
+        details: [],
+      });
       return true;
     }
     return navigationConcurrencyRef.current.saveInFlight || Boolean(discardInFlightDraftIdRef.current);
@@ -404,7 +423,9 @@ function AimOsApp() {
       setSelected(goal);
       setBusy(null);
       setMode("cockpit");
-      setAimComposerOpen(false);
+      setAimSurfaceMode("idle");
+      setAimEditBuffer(null);
+      setRestoreAimEditFocus(false);
       setActiveDraftId(null);
       setDetail(null);
       setProgress(null);
@@ -476,7 +497,9 @@ function AimOsApp() {
     draftPersistence.invalidateSession();
     setStageOverride("aim");
     setActiveDraftId(null);
-    setAimComposerOpen(Boolean(options.openComposer));
+    setAimSurfaceMode(options.openComposer ? "compose" : "idle");
+    setAimEditBuffer(null);
+    setRestoreAimEditFocus(false);
     setAimTitle("");
     setAimDescription("");
     setParent(null);
@@ -501,19 +524,21 @@ function AimOsApp() {
     setError(null);
   }
 
-  function descriptionWithContext(): string | undefined {
+  function descriptionWithContext(baseDescription = aimDescription): string | undefined {
     return buildDescriptionWithContext({
-      baseDescription: aimDescription,
+      baseDescription,
       intakeClarify,
       intakeAnswers,
       contextNote,
     });
   }
 
-  async function startDraft(options: { skipIntakeGate?: boolean } = {}) {
+  async function startDraft(options: { skipIntakeGate?: boolean; aim?: AimEditBuffer } = {}) {
     if (workflowMutationIsLocked()) return;
     const transition = navigationConcurrencyRef.current.workspace;
-    const title = aimTitle.trim();
+    const requestedTitle = options.aim?.title ?? aimTitle;
+    const requestedDescription = options.aim?.description ?? aimDescription;
+    const title = requestedTitle.trim();
     const route = routeAfterAimSubmit({ title, provider, localAgents });
     if (route === "missing_aim") return;
     if (route === "show_helper_guidance") {
@@ -523,6 +548,13 @@ function AimOsApp() {
       setStageOverride("aim");
       return;
     }
+    if (options.aim) {
+      setAimTitle(options.aim.title);
+      setAimDescription(options.aim.description);
+      resetPlanningForAimUpdate();
+    }
+    setAimSurfaceMode("summary");
+    setAimEditBuffer(null);
     setRuntimeGuidanceVisible(false);
     setError(null);
     setDraftSaveBlock(null);
@@ -533,11 +565,11 @@ function AimOsApp() {
         setBusy(t("os.busy.context"));
         setMode("contexting");
         setStageOverride("context");
-        const intake = await window.aimcub.intake({ title, description: aimDescription.trim() || undefined, clientRunId: runId });
+        const intake = await window.aimcub.intake({ title, description: requestedDescription.trim() || undefined, clientRunId: runId });
         if (!isCurrentPlanningRun(runId, transition)) return;
         setPlanResult({ ok: false, output: null, errors: [], intake });
         if (shouldBlockForIntake(intake) && intake.questions.length > 0) {
-          const intakeOutput = intakeToClarifyOutput(intake, hasCjkText(`${title}\n${aimDescription}`));
+          const intakeOutput = intakeToClarifyOutput(intake, hasCjkText(`${title}\n${requestedDescription}`));
           setIntakeClarify(intakeOutput);
           setClarify(intakeOutput);
           setClarifyPhase("intake");
@@ -549,7 +581,15 @@ function AimOsApp() {
       setBusy(t("os.busy.draft"));
       setMode("drafting");
       setStageOverride("contracts");
-      const req = { title, description: descriptionWithContext(), clientRunId: runId };
+      const planningDescription = options.aim
+        ? buildDescriptionWithContext({
+          baseDescription: requestedDescription,
+          intakeClarify: null,
+          intakeAnswers: {},
+          contextNote: "",
+        })
+        : descriptionWithContext(requestedDescription);
+      const req = { title, description: planningDescription, clientRunId: runId };
       const nextDraft = await window.aimcub.draft(req);
       if (!isCurrentPlanningRun(runId, transition)) return;
       setPlanResult(nextDraft);
@@ -697,7 +737,14 @@ function AimOsApp() {
     setDetail(null);
     setProgress(null);
     setActiveDraftId(hydrated.id);
-    setAimComposerOpen(true);
+    const resumeInitialComposition = hydrated.stage === "aim"
+      && !hydrated.phase
+      && !hydrated.draft
+      && !hydrated.finalPlan
+      && !hydrated.saveBlock;
+    setAimSurfaceMode(resumeInitialComposition ? "compose" : "summary");
+    setAimEditBuffer(null);
+    setRestoreAimEditFocus(false);
     setAimTitle(hydrated.title);
     setAimDescription(hydrated.description);
     setParent(hydrated.parent);
@@ -1110,6 +1157,14 @@ function AimOsApp() {
 
   const activePlan = (finalPlan ?? draft ?? detail?.goal.plan_json ?? null) as DecompositionOutput | null;
   const activePlanValidation = activePlan ? validateExecutablePlan(activePlan) : null;
+  const draftAimOverviewState = draftSaveBlock
+    ? "saveBlocked"
+    : activePlanValidation?.ok === false
+      ? "needsRepair"
+      : activePlan && clarifyPhase === null
+        ? "planReady"
+        : "context";
+  const draftAimNextSurface = draftAimOverviewState === "context" ? "context" : "contracts";
   const activePlanValidationMessages = activePlanValidation?.ok === false
     ? formatPlanValidationIssues(activePlanValidation.errors, t)
     : [];
@@ -1122,16 +1177,25 @@ function AimOsApp() {
   const total = progress?.total_milestones ?? detail?.milestones.length ?? 0;
   const aimComplete = hasCompletionRecap(progress) || (total > 0 && completed === total);
   const hasUnsavedAim = aimTitle.trim().length > 0;
-  const showAimComposer = aimComposerOpen || hasUnsavedAim || Boolean(parent) || Boolean(draft);
+  const hasTransientAimWork = aimSurfaceMode !== "idle"
+    || hasUnsavedAim
+    || Boolean(parent)
+    || Boolean(draft)
+    || Boolean(activeDraftId);
+  const showAimEditor = aimSurfaceMode === "compose" || aimSurfaceMode === "edit";
   const activeStage = stageOverride ?? cockpitStageFor(mode, selected, activePlan);
   const workspaceTarget = deriveWorkspaceTarget({
     selectedGoalId: selected?.id ?? null,
     activeDraftId,
-    showAimComposer,
+    showAimComposer: hasTransientAimWork,
   });
   const planningRuntimeReady = hasPlanningRuntime(provider, localAgents);
-  const activeAimTitle = selected?.title ?? aimTitle.trim();
-  const activeAimDescription = selected?.description ?? aimDescription;
+  const activeAimTitle = aimSurfaceMode === "edit" && aimEditBuffer
+    ? aimEditBuffer.title.trim()
+    : selected?.title ?? aimTitle.trim();
+  const activeAimDescription = aimSurfaceMode === "edit" && aimEditBuffer
+    ? aimEditBuffer.description
+    : selected?.description ?? aimDescription;
   const activeAimHelper = useMemo(
     () => deriveAimHelperProfile({ title: activeAimTitle, description: activeAimDescription }),
     [activeAimDescription, activeAimTitle],
@@ -1191,9 +1255,10 @@ function AimOsApp() {
     setPlanResult((current) => (current ? { ...current, output: nextPlan } : current));
   }
 
-  function openCockpitStage(stage: CockpitStage) {
-    if (navigationIsLocked() || pendingTargetNavigationRef.current) return;
-    if (stage !== "settings" && !isWorkbenchStageAvailable(workspaceTarget, stage)) return;
+  function openCockpitStage(stage: CockpitStage): boolean {
+    if (aimSurfaceMode === "edit" && stage === "aim") return true;
+    if (navigationIsLocked() || pendingTargetNavigationRef.current) return false;
+    if (stage !== "settings" && !isWorkbenchStageAvailable(workspaceTarget, stage)) return false;
     if (stage !== activeStage) {
       beginSurfaceTransition();
       interruptPlanningForNavigation();
@@ -1207,22 +1272,67 @@ function AimOsApp() {
       setStageOverride(stage);
       setSettingsSection("overview");
       setMode("settings");
-      return;
+      return true;
     }
     setStageOverride(stage);
     if (stage === "context") {
       setMode("contexting");
-      return;
+      return true;
     }
     if (stage === "contracts") {
       setMode(activePlan ? "reviewing" : "contexting");
-      return;
+      return true;
     }
     if (stage === "run" || stage === "eval") {
       setMode(selected || activePlan ? "reviewing" : "cockpit");
-      return;
+      return true;
     }
     setMode("cockpit");
+    return true;
+  }
+
+  function beginAimEdit() {
+    if (pendingTargetNavigationRef.current || !openCockpitStage("aim")) return;
+    setAimEditBuffer({ title: aimTitle, description: aimDescription });
+    setRestoreAimEditFocus(false);
+    setAimSurfaceMode("edit");
+    setRuntimeGuidanceVisible(false);
+    setError(null);
+  }
+
+  function resetPlanningForAimUpdate() {
+    setDraft(null);
+    setFinalPlan(null);
+    setPlanResult(null);
+    setPlanningDebugTraces([]);
+    setPlanningLiveEvents([]);
+    clearPlanningRun();
+    setIntakeClarify(null);
+    setIntakeAnswers({});
+    setClarifyPhase(null);
+    setClarify(null);
+    setAnswers({});
+    setContextNote("");
+    setDraftSaveBlock(null);
+    setError(null);
+  }
+
+  function changeAimTitle(value: string) {
+    setAimEditBuffer((current) => current ? { ...current, title: value } : current);
+  }
+
+  function changeAimDescription(value: string) {
+    setAimEditBuffer((current) => current ? { ...current, description: value } : current);
+  }
+
+  function cancelAimEdit() {
+    if (!aimEditBuffer) return;
+    setAimEditBuffer(null);
+    setRestoreAimEditFocus(true);
+    setAimSurfaceMode("summary");
+    setMode("cockpit");
+    setRuntimeGuidanceVisible(false);
+    setError(draftSaveBlock ? productErrorFromSaveBlock(draftSaveBlock) : null);
   }
 
   async function startNewAim() {
@@ -1260,7 +1370,7 @@ function AimOsApp() {
   }
 
   function openSettingsForAim() {
-    if (navigationIsLocked() || pendingTargetNavigationRef.current) return;
+    if ((aimSurfaceMode !== "edit" && navigationIsLocked()) || pendingTargetNavigationRef.current) return;
     beginSurfaceTransition();
     interruptPlanningForNavigation();
     settingsReturnStageRef.current = settingsReturnStage(
@@ -1285,21 +1395,14 @@ function AimOsApp() {
 
   function returnFromSettings() {
     if (planningRuntimeReady) setRuntimeGuidanceVisible(false);
+    if (aimSurfaceMode === "edit") {
+      beginSurfaceTransition();
+      setStageOverride("aim");
+      setMode("cockpit");
+      return;
+    }
     openCockpitStage(settingsReturnStageRef.current);
   }
-
-  const composerPanel = (
-    <ComposerPanel
-      title={aimTitle}
-      description={aimDescription}
-      parent={parent}
-      mode={mode}
-      disabled={Boolean(busy)}
-      onTitle={setAimTitle}
-      onDescription={setAimDescription}
-      onDraft={() => void startDraft()}
-    />
-  );
 
   const clarifyPanelActive = clarifyPhase !== null;
   const clarifyPanel = clarify && clarifyPanelActive ? (
@@ -1403,7 +1506,7 @@ function AimOsApp() {
       onBack={returnFromSettings}
     />
   );
-  const continueContextToPlan = parent ? undefined : () => {
+  const continueContextToPlan = () => {
     if (activePlan || selected) {
       openCockpitStage("contracts");
       return;
@@ -1427,7 +1530,6 @@ function AimOsApp() {
       }
       return (
         <ContextStage
-          parentComposer={parent ? composerPanel : null}
           title={selected?.title ?? aimTitle}
           description={selected?.description ?? aimDescription}
           saved={Boolean(selected)}
@@ -1439,7 +1541,7 @@ function AimOsApp() {
           loop={contextLoop}
           showReview={shouldShowContextReviewInContext}
           reviewRunning={mode === "contexting" && Boolean(busy)}
-          onEditAim={selected ? undefined : () => openCockpitStage("aim")}
+          onEditAim={selected || busy ? undefined : beginAimEdit}
           onOpenSettings={openContextSettings}
           onContextSources={setContextSources}
           onContinueToPlan={continueContextToPlan}
@@ -1498,21 +1600,42 @@ function AimOsApp() {
         />
       );
     }
-    return showAimComposer ? (
-      <AimIntakePanel
-        title={aimTitle}
-        description={aimDescription}
-        parent={parent}
-        mode={mode}
-        disabled={Boolean(busy)}
-        onTitle={setAimTitle}
-        onDescription={setAimDescription}
-        onDraft={() => void startDraft()}
-        runtimeGuidance={runtimeGuidanceVisible && !planningRuntimeReady ? activeAimHelper : null}
-        onOpenSettings={openSettingsForAim}
-        onKeepEditing={() => setRuntimeGuidanceVisible(false)}
-      />
-    ) : (
+    if (showAimEditor) {
+      return (
+        <AimIntakePanel
+          title={aimEditBuffer?.title ?? aimTitle}
+          description={aimEditBuffer?.description ?? aimDescription}
+          parent={parent}
+          mode={mode}
+          disabled={Boolean(busy)}
+          editing={aimSurfaceMode === "edit"}
+          restartsPlanning={Boolean(activePlan || clarifyPhase || draftSaveBlock)}
+          onTitle={aimSurfaceMode === "edit" ? changeAimTitle : setAimTitle}
+          onDescription={aimSurfaceMode === "edit" ? changeAimDescription : setAimDescription}
+          onDraft={() => void startDraft(aimSurfaceMode === "edit" && aimEditBuffer ? { aim: aimEditBuffer } : {})}
+          onCancelEdit={cancelAimEdit}
+          runtimeGuidance={runtimeGuidanceVisible && !planningRuntimeReady ? activeAimHelper : null}
+          onOpenSettings={openSettingsForAim}
+          onKeepEditing={() => setRuntimeGuidanceVisible(false)}
+        />
+      );
+    }
+    if (hasTransientAimWork) {
+      return (
+        <DraftAimOverviewPanel
+          title={aimTitle}
+          description={aimDescription}
+          child={Boolean(parent)}
+          state={draftAimOverviewState}
+          disabled={Boolean(busy)}
+          focusEditAction={restoreAimEditFocus}
+          onEditFocusRestored={() => setRestoreAimEditFocus(false)}
+          onEdit={beginAimEdit}
+          onContinue={() => openCockpitStage(draftAimNextSurface)}
+        />
+      );
+    }
+    return (
       <InitialWorkspacePanel
         drafts={aimDrafts}
         onResumeDraft={(draftRow) => void openAimDraft(draftRow)}
@@ -1650,14 +1773,18 @@ function AimIntakePanel(props: {
   parent: { goalId: string; milestoneId: string } | null;
   mode: AppMode;
   disabled: boolean;
+  editing: boolean;
+  restartsPlanning: boolean;
   runtimeGuidance: AimHelperProfile | null;
   onTitle: (value: string) => void;
   onDescription: (value: string) => void;
   onDraft: () => void;
+  onCancelEdit: () => void;
   onOpenSettings: () => void;
   onKeepEditing: () => void;
 }) {
   const { t } = useI18n();
+  const titleInputRef = useRef<HTMLTextAreaElement | null>(null);
   const contextInputRef = useRef<HTMLTextAreaElement | null>(null);
   const [contextOpen, setContextOpen] = useState(() => props.description.trim().length > 0);
   const hasAim = props.title.trim().length > 0;
@@ -1666,10 +1793,19 @@ function AimIntakePanel(props: {
   const intakeTitle = props.parent ? t("os.breakdownTitle") : t("aimIntake.workbenchTitle");
   const intakeBody = props.parent ? t("aimIntake.subAimBody") : t("aimIntake.workbenchBody");
   const composerPlaceholder = props.parent ? t("aimIntake.composerPlaceholder") : t("aimIntake.workbenchTitle");
+  const submitLabel = props.editing
+    ? t(props.restartsPlanning ? "aimDraft.edit.regenerate" : "aimDraft.edit.update")
+    : t("aimIntake.cta");
 
   useEffect(() => {
     if (props.description.trim().length > 0) setContextOpen(true);
   }, [props.description]);
+
+  useEffect(() => {
+    if (!props.editing) return;
+    const timer = window.setTimeout(() => titleInputRef.current?.focus(), 0);
+    return () => window.clearTimeout(timer);
+  }, [props.editing]);
 
   function openContextInput() {
     setContextOpen(true);
@@ -1678,7 +1814,17 @@ function AimIntakePanel(props: {
 
   return (
     <section className={props.parent ? "od-aim-intake od-aim-intake-child" : "od-aim-intake"}>
-      {props.parent ? (
+      {props.editing ? (
+        <div className="od-aim-edit-mode" data-od-id="aim-edit-mode">
+          <div>
+            <div className="od-aim-kicker">{t("aimDraft.edit.kicker")}</div>
+            <p>{t(props.restartsPlanning ? "aimDraft.edit.regenerateBody" : "aimDraft.edit.updateBody")}</p>
+          </div>
+          <button className="od-aim-secondary" type="button" disabled={props.disabled} onClick={props.onCancelEdit}>
+            {t("aimDraft.edit.cancel")}
+          </button>
+        </div>
+      ) : props.parent ? (
         <div className="od-aim-intake-head">
           <div>
             <div className="od-aim-kicker">{t("os.subAimMode")}</div>
@@ -1691,6 +1837,7 @@ function AimIntakePanel(props: {
       <div className="od-aim-composer">
         <textarea
           id="aim-title"
+          ref={titleInputRef}
           className="od-aim-title-input"
           value={props.title}
           onChange={(event) => props.onTitle(event.target.value)}
@@ -1720,14 +1867,16 @@ function AimIntakePanel(props: {
           >
             <ComposerPlusIcon />
           </button>
-          <span aria-hidden={!hasAim}>{hasAim ? t("aimIntake.readyHint") : null}</span>
+          <span aria-hidden={!hasAim}>
+            {hasAim ? t(props.editing && props.restartsPlanning ? "aimDraft.edit.regenerateHint" : "aimIntake.readyHint") : null}
+          </span>
           <button
             className="od-aim-primary od-aim-send-button"
             type="button"
             onClick={props.onDraft}
             disabled={disabled}
-            aria-label={submitting ? t("os.drafting") : t("aimIntake.cta")}
-            title={submitting ? t("os.drafting") : t("aimIntake.cta")}
+            aria-label={submitting ? t("os.drafting") : submitLabel}
+            title={submitting ? t("os.drafting") : submitLabel}
           >
             <ComposerArrowUpIcon />
           </button>
@@ -1864,49 +2013,6 @@ function LockedStagePanel(props: {
       </div>
       <p>{props.body}</p>
     </Panel>
-  );
-}
-
-function ComposerPanel(props: {
-  title: string;
-  description: string;
-  parent: { goalId: string; milestoneId: string } | null;
-  mode: AppMode;
-  disabled: boolean;
-  onTitle: (value: string) => void;
-  onDescription: (value: string) => void;
-  onDraft: () => void;
-}) {
-  const { t } = useI18n();
-  return (
-    <section style={panelStyle()}>
-      <div style={sectionHeaderStyle()}>
-        <div>
-          <div style={eyebrowStyle()}>{props.parent ? t("os.subAimMode") : t("os.stepAim")}</div>
-          <h2 style={sectionTitleStyle()}>{props.parent ? t("os.subAimHeading") : t("os.composeHeading")}</h2>
-        </div>
-        <button
-          onClick={props.onDraft}
-          disabled={props.disabled || !props.title.trim()}
-          style={{ ...primaryButton(props.disabled || !props.title.trim()), marginTop: 0 }}
-        >
-          {props.mode === "contexting" ? t("os.stepContext") : props.mode === "drafting" ? t("os.drafting") : t("os.startPlanning")}
-        </button>
-      </div>
-      <input
-        value={props.title}
-        onChange={(event) => props.onTitle(event.target.value)}
-        placeholder={t("os.aimPlaceholder")}
-        style={inputStyle()}
-      />
-      <textarea
-        value={props.description}
-        onChange={(event) => props.onDescription(event.target.value)}
-        placeholder={t("os.contextPlaceholder")}
-        rows={4}
-        style={{ ...inputStyle(), marginTop: 10, resize: "vertical" }}
-      />
-    </section>
   );
 }
 
@@ -2272,30 +2378,6 @@ function panelStyle(): CSSProperties {
     border: "none",
     borderRadius: 0,
     padding: 0,
-  };
-}
-
-function sectionHeaderStyle(): CSSProperties {
-  return {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: 16,
-    marginBottom: 14,
-  };
-}
-
-function sectionTitleStyle(): CSSProperties {
-  return { margin: "4px 0 0", fontSize: TYPE.title, letterSpacing: 0 };
-}
-
-function eyebrowStyle(): CSSProperties {
-  return {
-    color: C.accent,
-    fontSize: TYPE.meta,
-    fontWeight: WEIGHT.strong,
-    textTransform: "uppercase",
-    letterSpacing: 0,
   };
 }
 

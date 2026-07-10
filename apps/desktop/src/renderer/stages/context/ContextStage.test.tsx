@@ -74,16 +74,16 @@ function renderStage(options: {
   clarifyPanel?: ReactNode;
   loop?: ContextLoopModel;
   showReview?: boolean;
+  disabled?: boolean;
   onContinueToPlan?: () => void;
 }): string {
   return renderToStaticMarkup(
     <I18nProvider>
       <ContextStage
-        parentComposer={null}
         title="Ship context flow"
         description="Make the Context stage stepwise."
         saved={false}
-        disabled={false}
+        disabled={options.disabled ?? false}
         clarifyPhase={options.clarifyPhase}
         clarifyPanel={options.clarifyPanel ?? null}
         contextSources={contextSources}
@@ -294,6 +294,12 @@ describe("ContextStage", () => {
     expect(html).not.toContain('data-od-id="context-blocking-question"');
     expect(html).not.toContain('data-od-id="context-bundle-review"');
     expect(html).not.toContain("Review context before planning");
+  });
+
+  it("hides Aim editing while the Context workspace is busy", () => {
+    const html = renderStage({ clarifyPhase: null, disabled: true });
+
+    expect(html).not.toContain("Edit aim");
   });
 
   it("does not show Continue to Plan while refinement is active", () => {

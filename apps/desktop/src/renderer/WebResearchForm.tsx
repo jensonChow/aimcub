@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { WebResearchConfig, WebResearchStatus } from "../shared/ipc";
 
 import { useI18n } from "./i18n";
-import { C, TYPE, WEIGHT, inputStyle, labelStyle, linkButton, primaryButton, secondaryButton } from "./styles";
+import { C, TYPE, WEIGHT, inputStyle, labelStyle, primaryButton, secondaryButton } from "./styles";
 
 interface WebResearchFormProps {
   status: WebResearchStatus | null;
@@ -81,7 +81,7 @@ export function WebResearchForm({ status, onSaved }: WebResearchFormProps) {
       </label>
 
       <label style={labelStyle()}>{t("wf.provider")}</label>
-      <button type="button" style={{ ...linkButton(), cursor: "default", textDecoration: "none" }}>Brave Search</button>
+      <output className="od-static-config-value" aria-label={t("wf.provider")}>Brave Search</output>
 
       <label style={{ ...labelStyle(), marginTop: 14 }}>{t("wf.apiKey")}</label>
       <input
