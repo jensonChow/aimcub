@@ -21,10 +21,14 @@ const TAG_BY_KIND: Record<YourMoveKind, string> = {
   blocked: "glass.move.tagBlocked",
 };
 
+/** Run statuses that mean a milestone's work is already in flight (not a move for the user). */
+const IN_FLIGHT_RUN_STATUSES = new Set(["queued", "running"]);
+
 function isPendingWork(row: ExecuteMilestoneRow): boolean {
   if (row.milestone.status === "skipped" || row.completed) return false;
-  // Work an agent is actively running is ambient, not a move for the user.
-  return row.latest_run?.status !== "running";
+  // Work an agent has already picked up (queued or running) is ambient, not a move for the user.
+  const runStatus = row.latest_run?.status;
+  return !(runStatus && IN_FLIGHT_RUN_STATUSES.has(runStatus));
 }
 
 function completedNeedsReview(row: ExecuteMilestoneRow): boolean {

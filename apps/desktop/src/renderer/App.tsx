@@ -1772,6 +1772,12 @@ function AimOsApp() {
       );
     }
     if (selected && !draft && !parent) {
+      // Aims (other than this one) with a turn waiting on the user → the header "N turns
+      // elsewhere" jump chip. `needs_you` is the faithful "your move waiting" signal; blocked
+      // aims are excluded (they may be waiting on an agent/dependency, not the user).
+      const elsewhere = goals.filter(
+        (candidate) => candidate.id !== selected.id && progressSummaries[candidate.id]?.status === "needs_you",
+      );
       return (
         <JourneyView
           key={selected.id}
@@ -1780,9 +1786,14 @@ function AimOsApp() {
           runEvents={journalEvents}
           researchMemories={memories.filter((memory) => memory.goal_id === selected.id || memory.goal_id === null)}
           disabled={Boolean(busy)}
+          elsewhereCount={elsewhere.length}
           onOpenStage={openCockpitStage}
           onRunAgent={(milestone) => void runAgent(milestone)}
           onNewAim={startNewAim}
+          onJumpElsewhere={() => {
+            const next = elsewhere[0];
+            if (next) void openGoal(next);
+          }}
         />
       );
     }

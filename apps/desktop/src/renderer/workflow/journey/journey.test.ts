@@ -9,6 +9,9 @@ import {
   buildJourneyStations,
   buildJourneyTurns,
   buildJourneyYourMove,
+  canConfirmInteraction,
+  resolveSelectedOption,
+  type JourneyStationOption,
 } from "./index";
 
 const OWNER = "owner-1";
@@ -218,6 +221,12 @@ describe("buildJourneyYourMove / Ambient", () => {
     expect(buildJourneyYourMove(mkProgress(rows), t)).toBeNull();
   });
 
+  it("skips work an agent has already queued (in flight, not a move)", () => {
+    const queued = mkRow({ id: "m1", title: "Queued" });
+    queued.latest_run = mkRun({ id: "r1", milestoneId: "m1", status: "queued" });
+    expect(buildJourneyYourMove(mkProgress([queued]), t)).toBeNull();
+  });
+
   it("returns null when everything is complete", () => {
     const rows = [mkRow({ id: "m1", title: "Done", completed: true, evalPassed: true })];
     expect(buildJourneyYourMove(mkProgress(rows), t)).toBeNull();
@@ -322,5 +331,88 @@ describe("buildJourneyStationSheet", () => {
     const sheet = buildJourneyStationSheet("eval", mkProgress(rows));
     expect(sheet.rows[0]).toMatchObject({ chip: "eval.met" });
     expect(sheet.rows[1]).toMatchObject({ chip: "eval.open", meta: "run it" });
+  });
+
+  it("only the Run station carries an interactive payload", () => {
+    const rows = [mkRow({ id: "m1", title: "Agent work" })];
+    for (const station of ["aim", "research", "context", "plan", "eval"] as const) {
+      expect(buildJourneyStationSheet(station, mkProgress(rows)).interaction ?? null).toBeNull();
+    }
+    expect(buildJourneyStationSheet("run", mkProgress(rows)).interaction).not.toBeNull();
+  });
+});
+
+describe("Run station interaction", () => {
+  it("partitions pending work into dispatchable options and read-only context, leaving rows intact", () => {
+    const queued = mkRow({ id: "m5", title: "Queued agent" });
+    queued.latest_run = mkRun({ id: "r5", milestoneId: "m5", status: "queued" });
+    const rows = [
+      mkRow({ id: "m1", title: "Agent work" }),               // dispatchable → option
+      mkRow({ id: "m2", title: "Human work", human: true }),  // human → context
+      mkRow({ id: "m3", title: "Blocked work", blocked: true }), // blocked → context
+      mkRow({ id: "m4", title: "Running agent", running: true }), // in flight → context
+      queued,                                                  // queued → context (not re-dispatchable)
+      mkRow({ id: "m6", title: "Done", completed: true }),     // completed → dropped entirely
+    ];
+    const sheet = buildJourneyStationSheet("run", mkProgress(rows));
+    const interaction = sheet.interaction;
+    expect(interaction).not.toBeNull();
+    expect(interaction?.actionKind).toBe("run_agent");
+    // Only the unblocked, agent-routed, not-in-flight milestone is dispatchable.
+    expect(interaction?.options.map((o) => o.milestoneId)).toEqual(["m1"]);
+    expect(interaction?.options[0]).toMatchObject({ chip: "owner.agent", text: "Agent work" });
+    // The rest of the pending set stays visible as read-only context (m6 is completed → dropped).
+    expect(interaction?.contextRows.map((r) => r.text)).toEqual([
+      "Human work",
+      "Blocked work",
+      "Running agent",
+      "Queued agent",
+    ]);
+    expect(interaction?.contextRows.map((r) => r.chip)).toEqual([
+      "owner.you",
+      "status.blocked",
+      "owner.agent",
+      "owner.agent",
+    ]);
+    // options ∪ contextRows == the plain read-only rows (no duplication, nothing hidden).
+    expect(sheet.rows.map((r) => r.text)).toEqual([
+      "Agent work",
+      "Human work",
+      "Blocked work",
+      "Running agent",
+      "Queued agent",
+    ]);
+  });
+
+  it("is null when nothing is dispatchable (falls back to plain read-only rows)", () => {
+    const rows = [
+      mkRow({ id: "m1", title: "Human", human: true }),
+      mkRow({ id: "m2", title: "Blocked", blocked: true }),
+      mkRow({ id: "m3", title: "Running", running: true }),
+    ];
+    const sheet = buildJourneyStationSheet("run", mkProgress(rows));
+    expect(sheet.interaction).toBeNull();
+    expect(sheet.rows).toHaveLength(3);
+  });
+});
+
+describe("canConfirmInteraction / resolveSelectedOption", () => {
+  const options: JourneyStationOption[] = [
+    { milestoneId: "m1", text: "A", chip: "owner.agent" },
+    { milestoneId: "m2", text: "B", chip: "owner.agent" },
+  ];
+
+  it("gates confirm on a live selection and the not-disabled flag", () => {
+    expect(canConfirmInteraction(null, options)).toBe(false);
+    expect(canConfirmInteraction("m1", options)).toBe(true);
+    expect(canConfirmInteraction("m1", options, true)).toBe(false); // busy
+    // stale: the selected id dropped out of the options on a background refresh
+    expect(canConfirmInteraction("gone", options)).toBe(false);
+  });
+
+  it("resolves the selected option, or null when unselected or stale", () => {
+    expect(resolveSelectedOption(options, null)).toBeNull();
+    expect(resolveSelectedOption(options, "gone")).toBeNull();
+    expect(resolveSelectedOption(options, "m2")).toBe(options[1]);
   });
 });

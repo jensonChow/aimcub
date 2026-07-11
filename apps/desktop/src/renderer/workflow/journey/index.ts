@@ -4,4 +4,4 @@ export { buildJourneyStations } from "./stationModel";
 export { buildJourneyYourMove, buildJourneyAmbient } from "./yourMove";
 export { buildJourneyTurns } from "./turnsRoster";
 export { buildJourneyJournal } from "./journal";
-export { buildJourneyStationSheet } from "./stationSheet";
+export { buildJourneyStationSheet, canConfirmInteraction, resolveSelectedOption } from "./stationSheet";

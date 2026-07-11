@@ -10,6 +10,12 @@
  * site, so it never touches the App's workspace/surface navigation epochs and is cleared
  * automatically on any real navigation (stage change unmounts this view; goal change
  * remounts it). Actual mutations route through the existing epoch-safe App handlers.
+ *
+ * A station sheet can also be *interactive*: the Run station lists the aim's dispatchable
+ * agent work as selectable options gated behind a confirm that calls the existing `runAgent`
+ * handler in place (see `JourneyRunSheetBody`). Selection is component-local and reset on
+ * every station change; the confirm is membership-gated so a background progress refresh
+ * can't dispatch a milestone that dropped out of the option set.
  */
 import type { AimProgressReadModel, Goal, Memory, Milestone, RunEvent } from "@core/domain";
 import { useEffect, useRef, useState } from "react";
@@ -23,9 +29,12 @@ import {
   buildJourneyStations,
   buildJourneyTurns,
   buildJourneyYourMove,
+  canConfirmInteraction,
+  resolveSelectedOption,
   type JourneyActorKind,
   type JourneyChip,
   type JourneyStationId,
+  type JourneyStationInteraction,
   type JourneyStationKind,
   type JourneyStationSheetRow,
 } from "../../workflow/journey";
@@ -37,6 +46,16 @@ const STATION_NAME_KEY: Record<JourneyStationId, StringKey> = {
   plan: "glass.station.plan",
   run: "glass.station.run",
   eval: "glass.station.eval",
+};
+
+/** Static, data-free descriptor shown under each station-sheet title (mirrors the reference sub). */
+const SHEET_SUB_KEY: Record<JourneyStationId, StringKey> = {
+  aim: "glass.journey.sheetSub.aim",
+  research: "glass.journey.sheetSub.research",
+  context: "glass.journey.sheetSub.context",
+  plan: "glass.journey.sheetSub.plan",
+  run: "glass.journey.sheetSub.run",
+  eval: "glass.journey.sheetSub.eval",
 };
 
 const CHIP_KEY: Record<JourneyChip, StringKey> = {
@@ -86,8 +105,19 @@ const STATION_META_KEY: Record<string, StringKey> = {
   cancelled: "glass.station.meta.cancelled",
 };
 
+/** Localizes a status-literal meta (run/milestone status) via `STATION_META_KEY`, else passes it through. */
+function statusMetaLabel(meta: string | undefined, tk: (key: string) => string): string {
+  if (!meta) return "";
+  const key = STATION_META_KEY[meta];
+  return key ? tk(key) : meta;
+}
+
 function stationGlyphClass(kind: JourneyStationKind): string {
   return `od-journey-dot od-journey-dot-${kind}`;
+}
+
+function chipClass(chip: JourneyChip): string {
+  return `od-journey-chip od-journey-chip-${chip.split(".")[0]}`;
 }
 
 function formatClock(iso: string): string {
@@ -100,6 +130,70 @@ function formatClock(iso: string): string {
   }
 }
 
+/**
+ * The interactive body of the Run station sheet: dispatchable milestones as a single-select
+ * radiogroup, the non-dispatchable remainder read-only below, and an enable-gated confirm.
+ * Stateless and prop-driven so it renders (and is asserted) in both the un-selected and
+ * selected states under `renderToStaticMarkup` — the parent owns the selection state.
+ */
+export interface JourneyRunSheetBodyProps {
+  interaction: JourneyStationInteraction;
+  selectedOptionId: string | null;
+  disabled: boolean;
+  onSelect: (milestoneId: string) => void;
+  onConfirm: () => void;
+}
+
+export function JourneyRunSheetBody(props: JourneyRunSheetBodyProps) {
+  const { interaction, selectedOptionId, disabled, onSelect, onConfirm } = props;
+  const { t } = useI18n();
+  const tk = (key: string, vars?: Record<string, string | number>) => t(key as StringKey, vars);
+  const hasSelection = resolveSelectedOption(interaction.options, selectedOptionId) !== null;
+  const canConfirm = canConfirmInteraction(selectedOptionId, interaction.options, disabled);
+
+  return (
+    <div className="od-journey-interactive">
+      <div className="od-journey-options" role="radiogroup" aria-label={t("glass.station.run")}>
+        {interaction.options.map((option) => {
+          const selected = option.milestoneId === selectedOptionId;
+          return (
+            <button
+              key={option.milestoneId}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              className={`od-journey-option${selected ? " od-journey-option-open" : ""}`}
+              onClick={() => onSelect(option.milestoneId)}
+            >
+              <span className="od-journey-option-title">{option.text}</span>
+              {option.note ? <span className="od-journey-option-note">{statusMetaLabel(option.note, tk)}</span> : null}
+            </button>
+          );
+        })}
+      </div>
+
+      {interaction.contextRows.length > 0 ? (
+        <div className="od-journey-sheet-rows">
+          {interaction.contextRows.map((row, index) => (
+            <div className="od-journey-sheet-row" key={`ctx-${row.chip}-${index}`}>
+              <span className={chipClass(row.chip)}>{t(CHIP_KEY[row.chip])}</span>
+              <span className="od-journey-sheet-text">{row.text}</span>
+              {row.meta ? <span className="od-journey-sheet-meta">{statusMetaLabel(row.meta, tk)}</span> : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      <div className="od-journey-sheet-hint">
+        <span className="od-journey-sheet-hint-text">{t("glass.journey.interactiveHint")}</span>
+        <button className="od-journey-primary" type="button" disabled={!canConfirm} onClick={onConfirm}>
+          {hasSelection ? t("glass.journey.confirmRun") : t("glass.journey.confirmPick")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export interface JourneyViewProps {
   goal: Goal;
   progress: AimProgressReadModel | null;
@@ -108,9 +202,22 @@ export interface JourneyViewProps {
   /** Active context/research memories in play for this aim (aim-scoped + global). */
   researchMemories?: Memory[];
   disabled?: boolean;
+  /** Count of OTHER aims with a turn waiting on the user, for the header jump chip. */
+  elsewhereCount?: number;
   onOpenStage: (stage: CockpitStage) => void;
   onRunAgent: (milestone: Milestone) => void;
   onNewAim: () => void;
+  /** Jump to the next aim with a turn waiting elsewhere (header chip). */
+  onJumpElsewhere?: () => void;
+  /**
+   * Secondary "Your move" / ambient affordances. Each renders only when its handler is
+   * provided; the routing/scheduling backends land in Stage 6, so App passes none today
+   * and these stay hidden (the markup + CSS ship as forward-ready infrastructure).
+   */
+  onHandToAgent?: () => void;
+  onSchedule?: () => void;
+  onLater?: () => void;
+  onTakeBack?: () => void;
 }
 
 export function JourneyView(props: JourneyViewProps) {
@@ -124,17 +231,19 @@ export function JourneyView(props: JourneyViewProps) {
       const catKey = MEMORY_CAT_KEY[row.meta];
       return catKey ? tk(catKey) : row.meta;
     }
-    const metaKey = STATION_META_KEY[row.meta];
-    return metaKey ? tk(metaKey) : row.meta;
+    return statusMetaLabel(row.meta, tk);
   };
   const [openStation, setOpenStation] = useState<JourneyStationId | null>(null);
+  const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
   const sheetCloseRef = useRef<HTMLButtonElement | null>(null);
   const sheetTriggerRef = useRef<HTMLElement | null>(null);
   const { progress, goal } = props;
 
   // Modal-sheet focus management: move focus into the dialog on open, close on Escape, and
   // restore focus to the control that opened it on close. `aria-modal` alone does not do this.
+  // Also resets any interactive selection whenever the open station changes.
   useEffect(() => {
+    setSelectedOptionId(null);
     if (!openStation) return;
     sheetTriggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const focusFrame = requestAnimationFrame(() => sheetCloseRef.current?.focus());
@@ -177,6 +286,9 @@ export function JourneyView(props: JourneyViewProps) {
   const journal = buildJourneyJournal(progress, props.runEvents ?? []);
   const sheet = openStation ? buildJourneyStationSheet(openStation, progress, researchMemories) : null;
   const headMeta = `${progress.completed_milestones}/${progress.total_milestones}`;
+  const elsewhereCount = props.elsewhereCount ?? 0;
+  const showElsewhere = elsewhereCount > 0 && Boolean(props.onJumpElsewhere);
+  const hasMoveSecondary = Boolean(props.onHandToAgent || props.onSchedule || props.onLater);
 
   const moveMilestone = move
     ? progress.milestones.find((row) => row.milestone.id === move.milestoneId)?.milestone ?? null
@@ -191,6 +303,17 @@ export function JourneyView(props: JourneyViewProps) {
     props.onOpenStage(move.kind === "review_eval" ? "eval" : "run");
   }
 
+  function confirmInteraction(): void {
+    if (!progress || !sheet?.interaction) return;
+    if (!canConfirmInteraction(selectedOptionId, sheet.interaction.options, Boolean(props.disabled))) return;
+    const option = resolveSelectedOption(sheet.interaction.options, selectedOptionId);
+    if (!option) return;
+    const milestone = progress.milestones.find((row) => row.milestone.id === option.milestoneId)?.milestone;
+    if (!milestone) return;
+    props.onRunAgent(milestone);
+    setOpenStation(null);
+  }
+
   return (
     <section className="od-journey" data-od-id="journey-view">
       <header className="od-journey-head">
@@ -198,7 +321,21 @@ export function JourneyView(props: JourneyViewProps) {
           <h1 className="od-journey-title">{goal.title}</h1>
           <p className="od-journey-sub">{t("glass.journey.headerSub")}</p>
         </div>
-        <span className="od-journey-meta" aria-label={t("shell.progress")}>{headMeta}</span>
+        <div className="od-journey-head-meta">
+          {showElsewhere ? (
+            <button
+              className="od-journey-elsewhere"
+              type="button"
+              onClick={props.onJumpElsewhere}
+              title={t("glass.journey.headerSub")}
+            >
+              {elsewhereCount === 1
+                ? t("glass.journey.turnsElsewhereOne")
+                : tk("glass.journey.turnsElsewhereMany", { n: elsewhereCount })}
+            </button>
+          ) : null}
+          <span className="od-journey-meta" aria-label={t("shell.progress")}>{headMeta}</span>
+        </div>
       </header>
 
       <div className="od-journey-stations" role="group" aria-label={t("cockpit.workflow")}>
@@ -224,6 +361,7 @@ export function JourneyView(props: JourneyViewProps) {
         <div className="od-journey-move" data-od-id="journey-move">
           <div className="od-journey-move-head">
             <span className="od-journey-move-tag">{tk(move.tagKey)}</span>
+            <span className="od-journey-chip od-journey-chip-you">{t("glass.actor.you")}</span>
           </div>
           <div className="od-journey-move-title">{move.title}</div>
           {move.body ? <p className="od-journey-move-body">{move.body}</p> : null}
@@ -232,6 +370,25 @@ export function JourneyView(props: JourneyViewProps) {
               {move.primaryLabel}
             </button>
           </div>
+          {hasMoveSecondary ? (
+            <div className="od-journey-move-secondary">
+              {props.onHandToAgent ? (
+                <button className="od-journey-secondary" type="button" onClick={props.onHandToAgent}>
+                  {t("glass.journey.handToAgent")}
+                </button>
+              ) : null}
+              {props.onSchedule ? (
+                <button className="od-journey-secondary" type="button" onClick={props.onSchedule}>
+                  {t("glass.journey.schedule")}
+                </button>
+              ) : null}
+              {props.onLater ? (
+                <button className="od-journey-later" type="button" onClick={props.onLater}>
+                  {t("glass.journey.later")}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ) : (
         <div className="od-journey-ambient" data-od-id="journey-ambient">
@@ -240,6 +397,11 @@ export function JourneyView(props: JourneyViewProps) {
             <div className="od-journey-ambient-title">{tk(ambient.titleKey)}</div>
             {ambient.body ? <div className="od-journey-ambient-body">{ambient.body}</div> : null}
           </div>
+          {props.onTakeBack ? (
+            <button className="od-journey-ambient-btn" type="button" onClick={props.onTakeBack}>
+              {t("glass.journey.takeBack")}
+            </button>
+          ) : null}
         </div>
       )}
 
@@ -301,6 +463,7 @@ export function JourneyView(props: JourneyViewProps) {
           >
             <div className="od-journey-sheet-head">
               <span className="od-journey-sheet-title">{tk(STATION_NAME_KEY[sheet.station])}</span>
+              <span className="od-journey-sheet-sub">{t(SHEET_SUB_KEY[sheet.station])}</span>
               <button
                 ref={sheetCloseRef}
                 className="od-journey-sheet-close"
@@ -311,13 +474,21 @@ export function JourneyView(props: JourneyViewProps) {
                 ✕
               </button>
             </div>
-            {sheet.rows.length === 0 ? (
+            {sheet.interaction ? (
+              <JourneyRunSheetBody
+                interaction={sheet.interaction}
+                selectedOptionId={selectedOptionId}
+                disabled={Boolean(props.disabled)}
+                onSelect={setSelectedOptionId}
+                onConfirm={confirmInteraction}
+              />
+            ) : sheet.rows.length === 0 ? (
               <p className="od-journey-sheet-empty">{t("glass.journey.sheetEmpty")}</p>
             ) : (
               <div className="od-journey-sheet-rows">
                 {sheet.rows.map((row, index) => (
                   <div className="od-journey-sheet-row" key={`${row.chip}-${index}`}>
-                    <span className={`od-journey-chip od-journey-chip-${row.chip.split(".")[0]}`}>{tk(CHIP_KEY[row.chip])}</span>
+                    <span className={chipClass(row.chip)}>{tk(CHIP_KEY[row.chip])}</span>
                     <span className="od-journey-sheet-text">{row.text}</span>
                     {row.meta ? <span className="od-journey-sheet-meta">{sheetMetaLabel(row)}</span> : null}
                   </div>

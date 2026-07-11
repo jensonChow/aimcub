@@ -6470,12 +6470,40 @@ kbd {
   color: var(--faint);
 }
 
+.od-journey-head-meta {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .od-journey-meta {
   flex: none;
   font-size: var(--od-type-body);
   color: var(--mut);
   font-variant-numeric: tabular-nums;
 }
+
+/* "N turns elsewhere" jump chip — an accent-soft pill that opens the next waiting aim.
+   Text is --ink2 (not --acc): --acc on the translucent --acc-soft only reaches ~3.8:1, below
+   WCAG AA for small text (same reason the you/agent chips at .od-journey-chip-you use --ink2).
+   The soft accent tint + pointer + hover brightness carry the "clickable action" cue. */
+.od-journey-elsewhere {
+  flex: none;
+  border: 0;
+  border-radius: var(--od-radius-pill);
+  padding: 4px 11px;
+  background: var(--acc-soft);
+  color: var(--ink2);
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-semibold);
+  cursor: pointer;
+  transition: filter 150ms ease, transform 120ms ease;
+}
+
+.od-journey-elsewhere:hover { filter: brightness(1.06); }
+.od-journey-elsewhere:active { transform: scale(0.97); }
+.od-journey-elsewhere:focus-visible { outline: 0; box-shadow: var(--od-focus); }
 
 .od-journey-stations {
   display: grid;
@@ -6571,6 +6599,13 @@ kbd {
   padding: 24px 28px;
 }
 
+.od-journey-move-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .od-journey-move-tag {
   font-size: var(--od-type-meta);
   font-weight: var(--od-font-weight-strong);
@@ -6599,6 +6634,29 @@ kbd {
   gap: 10px;
   align-items: center;
 }
+
+/* Secondary "Your move" actions (hand-to-agent / schedule / Later). Rendered only when a
+   real handler is passed; Stage 2 wires none (routing/scheduling land in Stage 6), so this
+   row stays hidden — the CSS ships as forward-ready infrastructure. */
+.od-journey-move-secondary {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.od-journey-later {
+  border: 0;
+  background: transparent;
+  color: var(--faint);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: color 150ms ease;
+}
+
+.od-journey-later:hover { color: var(--mut); }
+.od-journey-later:focus-visible { outline: 0; border-radius: 8px; box-shadow: var(--od-focus); }
 
 .od-journey-primary {
   min-height: 42px;
@@ -6647,6 +6705,31 @@ kbd {
   box-shadow: inset 0 0 0 1px var(--ring);
   padding: 22px 28px;
 }
+
+.od-journey-ambient-main {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Ambient "take it back" / "do it now" affordance. Gated on a handler App doesn't pass in
+   Stage 2 (the routing/scheduling backends land in Stage 6), so it stays hidden today. */
+.od-journey-ambient-btn {
+  flex: none;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 11px;
+  background: var(--island2);
+  color: var(--ink2);
+  font-size: 12.5px;
+  font-weight: var(--od-font-weight-medium);
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px var(--ring);
+  transition: background 150ms ease;
+}
+
+.od-journey-ambient-btn:hover { background: var(--field); }
+.od-journey-ambient-btn:focus-visible { outline: 0; box-shadow: var(--od-focus); }
 
 .od-journey-ambient-title {
   font-size: var(--od-type-title);
@@ -6835,12 +6918,22 @@ kbd {
 }
 
 .od-journey-sheet-title {
-  flex: 1;
+  flex: none;
   font-size: var(--od-type-meta);
   font-weight: var(--od-font-weight-strong);
   letter-spacing: 0;
   color: var(--acc);
   text-transform: uppercase;
+}
+
+.od-journey-sheet-sub {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--od-type-meta);
+  color: var(--faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .od-journey-sheet-close {
@@ -6895,6 +6988,71 @@ kbd {
   flex: none;
   font-size: var(--od-type-meta);
   color: var(--faint);
+}
+
+/* Interactive station sheet (Run station): selectable dispatch options → enable-gated confirm.
+   The confirm reuses .od-journey-primary; the fallback "open full stage" CTA stays below in
+   .od-journey-sheet-foot (roadmap invariant). */
+.od-journey-interactive {
+  display: grid;
+  gap: 14px;
+}
+
+.od-journey-options {
+  margin-top: 8px;
+  display: grid;
+  gap: 9px;
+}
+
+.od-journey-option {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  padding: 13px 16px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--island2);
+  cursor: pointer;
+  text-align: left;
+  box-shadow: inset 0 0 0 1px var(--ring);
+  transition: box-shadow 150ms ease;
+}
+
+.od-journey-option:hover { box-shadow: var(--sh-md), inset 0 0 0 1px var(--ring); }
+.od-journey-option:focus-visible { outline: 0; box-shadow: var(--od-focus); }
+
+.od-journey-option-open {
+  background: var(--acc-soft);
+  box-shadow: inset 0 0 0 1.5px var(--acc);
+}
+
+.od-journey-option-open:hover { box-shadow: var(--sh-md), inset 0 0 0 1.5px var(--acc); }
+
+.od-journey-option-title {
+  font-size: var(--od-type-body);
+  font-weight: var(--od-font-weight-semibold);
+  color: var(--ink);
+}
+
+.od-journey-option-note {
+  font-size: var(--od-type-meta);
+  color: var(--faint);
+}
+
+.od-journey-sheet-hint {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.od-journey-sheet-hint-text {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--od-type-meta);
+  color: var(--faint);
+  line-height: 1.45;
 }
 
 .od-journey-sheet-foot {

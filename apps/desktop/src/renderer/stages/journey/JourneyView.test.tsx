@@ -3,7 +3,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { I18nProvider } from "../../i18n";
-import { JourneyView } from "./JourneyView";
+import type { JourneyStationInteraction } from "../../workflow/journey";
+import { JourneyRunSheetBody, JourneyView, type JourneyViewProps } from "./JourneyView";
 
 const OWNER = "owner-1";
 const noop = () => {};
@@ -73,10 +74,10 @@ function progressOf(rows: AimProgressMilestoneRead[], extra: Partial<AimProgress
   } as AimProgressReadModel;
 }
 
-function render(progress: AimProgressReadModel | null): string {
+function render(progress: AimProgressReadModel | null, extra: Partial<JourneyViewProps> = {}): string {
   return renderToStaticMarkup(
     <I18nProvider>
-      <JourneyView goal={goal} progress={progress} onOpenStage={noop} onRunAgent={noop} onNewAim={noop} />
+      <JourneyView goal={goal} progress={progress} onOpenStage={noop} onRunAgent={noop} onNewAim={noop} {...extra} />
     </I18nProvider>,
   );
 }
@@ -109,5 +110,97 @@ describe("JourneyView", () => {
     const html = render(null);
     expect(html).toContain("Two weeks in Japan");
     expect(html).toContain("Gather context");
+  });
+
+  it("renders a You chip in the Your-move head", () => {
+    const html = render(progressOf([row({ id: "m1", title: "Book flights", human: true })]));
+    expect(html).toContain("od-journey-move-head");
+    expect(html).toContain("od-journey-chip-you");
+  });
+
+  it("shows the 'N turns elsewhere' jump chip only when there are turns elsewhere", () => {
+    const p = progressOf([row({ id: "m1", title: "x", human: true })]);
+    const many = render(p, { elsewhereCount: 2, onJumpElsewhere: noop });
+    expect(many).toContain("od-journey-elsewhere");
+    expect(many).toContain("2 turns elsewhere");
+
+    const one = render(p, { elsewhereCount: 1, onJumpElsewhere: noop });
+    expect(one).toContain("1 turn elsewhere");
+
+    const none = render(p, { elsewhereCount: 0, onJumpElsewhere: noop });
+    expect(none).not.toContain("od-journey-elsewhere");
+  });
+
+  it("hides the secondary move actions unless their handlers are provided", () => {
+    const p = progressOf([row({ id: "m1", title: "Book flights", human: true })]);
+    expect(render(p)).not.toContain("od-journey-move-secondary");
+
+    const withHandlers = render(p, { onHandToAgent: noop, onLater: noop });
+    expect(withHandlers).toContain("od-journey-move-secondary");
+    expect(withHandlers).toContain("Hand to agent");
+    expect(withHandlers).toContain("Later");
+    expect(withHandlers).not.toContain("Schedule"); // onSchedule not passed
+  });
+
+  it("shows the ambient take-back button only when its handler is provided", () => {
+    const p = progressOf([row({ id: "m1", title: "Drafting", running: true })]);
+    const bare = render(p);
+    expect(bare).toContain("od-journey-ambient");
+    expect(bare).not.toContain("od-journey-ambient-btn");
+
+    const withTakeBack = render(p, { onTakeBack: noop });
+    expect(withTakeBack).toContain("od-journey-ambient-btn");
+    expect(withTakeBack).toContain("Take it back");
+  });
+});
+
+describe("JourneyRunSheetBody", () => {
+  const interaction: JourneyStationInteraction = {
+    actionKind: "run_agent",
+    options: [
+      { milestoneId: "m1", text: "Draft the copy", note: "pending", chip: "owner.agent" },
+      { milestoneId: "m2", text: "Book the venue", note: "pending", chip: "owner.agent" },
+    ],
+    contextRows: [{ chip: "status.blocked", text: "Blocked bit", meta: "blocked" }],
+  };
+
+  function renderBody(selectedOptionId: string | null, disabled = false): string {
+    return renderToStaticMarkup(
+      <I18nProvider>
+        <JourneyRunSheetBody
+          interaction={interaction}
+          selectedOptionId={selectedOptionId}
+          disabled={disabled}
+          onSelect={noop}
+          onConfirm={noop}
+        />
+      </I18nProvider>,
+    );
+  }
+
+  it("renders a radiogroup of options plus read-only context, confirm disabled until a pick", () => {
+    const html = renderBody(null);
+    expect(html).toContain('role="radiogroup"');
+    expect(html).toContain('role="radio"');
+    expect(html).toContain("Draft the copy");
+    expect(html).toContain("Book the venue");
+    expect(html).toContain("Blocked bit"); // non-dispatchable context stays visible
+    expect(html).toContain('aria-checked="false"');
+    expect(html).toContain("Pick one to continue");
+    expect(html).toContain("disabled"); // the confirm button
+  });
+
+  it("enables confirm and marks the chosen option once a selection is made", () => {
+    const html = renderBody("m2");
+    expect(html).toContain("Run with agent");
+    expect(html).toContain('aria-checked="true"');
+    expect(html).toContain("od-journey-option-open");
+    expect(html).not.toContain("Pick one to continue");
+  });
+
+  it("keeps confirm disabled while busy even with a valid selection", () => {
+    const html = renderBody("m2", true);
+    expect(html).toContain("Run with agent"); // label reflects the live selection
+    expect(html).toContain("disabled"); // but busy → not confirmable
   });
 });
