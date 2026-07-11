@@ -86,6 +86,38 @@ export interface JourneyStationSheetRow {
   meta?: string;
 }
 
+/**
+ * Which existing App handler a station sheet's interactive confirm invokes. Only
+ * `run_agent` (→ the existing `runAgent` handler) exists in Stage 2; `confirm_milestone`
+ * arrives with the evidence form in Stage 5. Kept as a union so the component can switch
+ * without a boolean explosion later.
+ */
+export type JourneySheetActionKind = "run_agent";
+
+/** One selectable, dispatchable option in an interactive station sheet. */
+export interface JourneyStationOption {
+  /** Milestone the confirm acts on (looked up in `progress.milestones`). */
+  milestoneId: string;
+  /** Milestone title (already user-authored text, not a translation key). */
+  text: string;
+  /** Honest secondary label — the raw milestone status. */
+  note?: string;
+  /** Semantic chip token; the component maps it to a localized label + tone. */
+  chip: JourneyChip;
+}
+
+/**
+ * The interactive payload for a station sheet: a set of dispatchable `options` the user
+ * selects among, plus the non-dispatchable `contextRows` (blocked / human / in-flight work)
+ * kept read-only so the sheet never hides part of the picture. `options ∪ contextRows`
+ * covers the station's full pending set. Pure — the component owns selection state and i18n.
+ */
+export interface JourneyStationInteraction {
+  actionKind: JourneySheetActionKind;
+  options: JourneyStationOption[];
+  contextRows: JourneyStationSheetRow[];
+}
+
 export interface JourneyStationSheet {
   station: JourneyStationId;
   rows: JourneyStationSheetRow[];
@@ -94,4 +126,10 @@ export interface JourneyStationSheet {
    * or `null` for read-only stations (e.g. the synthetic Research station).
    */
   actionStage: CockpitStage | null;
+  /**
+   * An in-place interactive affordance (selectable options → enable-gated confirm), or
+   * `null`/absent when the station is read-only or has nothing dispatchable. Rendered in
+   * addition to — never instead of — the `actionStage` fallback CTA.
+   */
+  interaction?: JourneyStationInteraction | null;
 }

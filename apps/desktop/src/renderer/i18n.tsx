@@ -1548,6 +1548,33 @@ export const STRINGS = {
   "glass.journey.noPlan": { en: "This aim doesn't have a plan yet.", zh: "这个目标还没有计划。" },
   "glass.journey.noPlanCta": { en: "Gather context", zh: "收集背景" },
   "glass.journey.later": { en: "Later", zh: "稍后" },
+  // ── Stage 2: header jump chip, secondary move/ambient actions, interactive run sheet ──
+  "glass.journey.turnsElsewhereOne": { en: "1 turn elsewhere", zh: "别处有 1 个轮次" },
+  "glass.journey.turnsElsewhereMany": { en: "{n} turns elsewhere", zh: "别处有 {n} 个轮次" },
+  "glass.journey.handToAgent": { en: "Hand to agent", zh: "交给 agent" },
+  "glass.journey.schedule": { en: "Schedule", zh: "安排时间" },
+  "glass.journey.takeBack": { en: "Take it back", zh: "收回" },
+  "glass.journey.confirmPick": { en: "Pick one to continue", zh: "选择一项以继续" },
+  "glass.journey.confirmRun": { en: "Run with agent", zh: "用 agent 运行" },
+  "glass.journey.interactiveHint": {
+    en: "The agent takes this turn — its result shows up in Turns and the Journal.",
+    zh: "由 agent 接手这一轮——结果会出现在「轮次」和「记录」中。",
+  },
+  "glass.journey.sheetSub.aim": {
+    en: "restatable — the loop re-plans if it changes",
+    zh: "可随时重述——目标一变，循环就会重新规划",
+  },
+  "glass.journey.sheetSub.research": { en: "gathered context — re-runnable", zh: "已收集的背景——可重新运行" },
+  "glass.journey.sheetSub.context": { en: "living — grows from every step", zh: "持续生长——每一步都在充实" },
+  "glass.journey.sheetSub.plan": {
+    en: "how the work splits between you and agents",
+    zh: "工作如何在你和 agent 之间划分",
+  },
+  "glass.journey.sheetSub.run": { en: "turn-taking — you and agents alternate", zh: "轮流出手——你和 agent 交替" },
+  "glass.journey.sheetSub.eval": {
+    en: "continuous — checks as evidence arrives",
+    zh: "持续进行——证据到达即校验",
+  },
   "glass.chip.you": { en: "You", zh: "你" },
   "glass.chip.agent": { en: "Agent", zh: "Agent" },
   "glass.chip.aim": { en: "Aim", zh: "目标" },
