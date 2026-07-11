@@ -1,9 +1,9 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-11
-Branch: `main`. Prior Glass polish + Journey-first **Stage 1** (New Aim composer) are committed, merged,
-and **pushed** (origin/main = `4c5e3b88`). This session's Journey-first **Stage 2** is committed +
-merged to **local** `main`, **not pushed** — offer to push.
+Branch: `main`. Journey-first **Stage 1** (New Aim composer) and this session's **Stage 2** (Journey
+parity + interactive-sheet infra) are both committed, merged, and **pushed** (origin/main =
+`b70f7b9e`).
 
 ## Active epic — Journey-first rebuild (staged)
 
@@ -68,8 +68,8 @@ Two live/visible features + forward-ready infra, **no new backend/IPC**, honest-
 
 ## Commit / push
 
-- Journey-first Stage 2: committed + merged to **local** `main`, **not pushed** — ask before
-  `git push origin main`. (origin/main is still `4c5e3b88` = Stage 1.)
+- Journey-first Stage 2: committed + merged to `main` and **pushed** (origin/main = `b70f7b9e`;
+  commits `ab89dcc4` feature + `b70f7b9e` merge).
 
 ## Open risks / notes
 
@@ -85,8 +85,8 @@ Two live/visible features + forward-ready infra, **no new backend/IPC**, honest-
 ## Next session prompt
 
 ```text
-Journey-first rebuild: Stages 1–2 done (Stage 2 = Journey visual parity + interactive Run-dispatch
-sheet, on LOCAL main but NOT pushed — offer to push). Read docs/handoff.md + the epic plan
+Journey-first rebuild: Stages 1–2 done + pushed (Stage 2 = Journey visual parity + interactive
+Run-dispatch sheet; origin/main=b70f7b9e). Read docs/handoff.md + the epic plan
 (~/.claude/plans/resilient-drifting-quail.md). Next is Stage 3 (Fold Context + Research into the
 Journey sheet): the Context station sheet hosts ContextClarifyPanel (Q&A), ContextReviewPanel
 (compact), ContextActivityPanel, ContextInbox; Research stays a read-only receipt; the old `context`
