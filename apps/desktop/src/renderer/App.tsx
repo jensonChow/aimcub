@@ -60,10 +60,11 @@ import { AimDraftHomeSection } from "./stages/aim/AimDraftRecovery";
 import { DraftAimOverviewPanel } from "./stages/aim/DraftAimOverviewPanel";
 import { EvalStage } from "./stages/eval/EvalStage";
 import { ExecutePanel } from "./stages/execute/ExecutePanel";
+import { JourneyView } from "./stages/journey/JourneyView";
 import { WebResearchForm } from "./WebResearchForm";
 import { PlanPanel } from "./stages/plan/PlanPanel";
 import { Button, Panel } from "./ui";
-import { C, TYPE } from "./styles";
+import { C } from "./styles";
 import {
   appendIntakeQuestions,
   answersFor,
@@ -76,7 +77,6 @@ import { createPlanningRunId, latestLiveValue } from "./workflow/planningLiveEve
 import { formatRoutingValidation, routingAgentsFromDetections } from "./workflow/routingAgents";
 import {
   cockpitStageFor,
-  pct,
   planNodeForMilestone,
   progressRows,
   type AppMode,
@@ -1286,9 +1286,6 @@ function AimOsApp() {
     () => activePlan ? validatePlanRouting({ plan: activePlan, agents: routingAgents, allowHuman: true }) : null,
     [activePlan, routingAgents],
   );
-  const completed = progress?.completed_milestones ?? detail?.milestones.filter((m) => m.status === "completed").length ?? 0;
-  const total = progress?.total_milestones ?? detail?.milestones.length ?? 0;
-  const aimComplete = hasCompletionRecap(progress) || (total > 0 && completed === total);
   const hasUnsavedAim = aimTitle.trim().length > 0;
   const hasTransientAimWork = aimSurfaceMode !== "idle"
     || hasUnsavedAim
@@ -1700,14 +1697,13 @@ function AimOsApp() {
     }
     if (selected && !draft && !parent) {
       return (
-        <AimOverviewPanel
+        <JourneyView
+          key={selected.id}
           goal={selected}
           progress={progress}
-          completed={completed}
-          total={total}
-          complete={aimComplete}
-          onContext={() => openCockpitStage("context")}
-          onRecap={() => openCockpitStage("eval")}
+          disabled={Boolean(busy)}
+          onOpenStage={openCockpitStage}
+          onRunAgent={(milestone) => void runAgent(milestone)}
           onNewAim={startNewAim}
         />
       );
@@ -1830,59 +1826,6 @@ export function InitialWorkspacePanel(props: {
           <p>{t("initialWorkspace.body")}</p>
         </div>
       )}
-    </section>
-  );
-}
-
-function AimOverviewPanel(props: {
-  goal: Goal;
-  progress: AimProgressReadModel | null;
-  completed: number;
-  total: number;
-  complete: boolean;
-  onContext: () => void;
-  onRecap: () => void;
-  onNewAim: () => void;
-}) {
-  const { t } = useI18n();
-  const completion = pct(props.completed, props.total);
-  const nextAction = props.complete ? t("completion.nextAction") : props.progress?.next_action || t("shell.noNextAction");
-  const summary = props.goal.description?.trim() || nextAction;
-  return (
-    <section className="od-aim-overview">
-      <div className="od-aim-intake-head">
-        <div>
-          <div className="od-aim-kicker">{t("shell.currentAim")}</div>
-          <h1>{props.goal.title}</h1>
-          <p>{shortText(summary, 260)}</p>
-        </div>
-        <ProgressDonut done={props.completed} total={props.total} />
-      </div>
-
-      <div className="od-aim-overview-strip">
-        <div>
-          <span>{t("shell.progress")}</span>
-          <strong>{completion}%</strong>
-          <small>{t("shell.progressValue", { done: props.completed, total: props.total })}</small>
-        </div>
-        <div>
-          <span>{t("shell.nextAction")}</span>
-          <strong>{shortText(nextAction, 120)}</strong>
-          <small>{props.complete ? t("completion.reuseShort") : t("aimIntake.contextGate")}</small>
-        </div>
-      </div>
-
-      <div className="od-aim-intake-footer">
-        <p>{props.complete ? t("completion.overviewHint") : t("aimIntake.currentHint")}</p>
-        <div className="od-aim-intake-actions">
-          <button className="od-aim-secondary" type="button" onClick={props.onNewAim}>
-            {t("os.newAim")}
-          </button>
-          <button className="od-aim-primary" type="button" onClick={props.complete ? props.onRecap : props.onContext}>
-            {props.complete ? t("completion.reviewRecap") : t("aimIntake.cta")}
-          </button>
-        </div>
-      </div>
     </section>
   );
 }
@@ -2482,54 +2425,11 @@ function SettingsAimContextPanel(props: {
   );
 }
 
-function ProgressDonut({ done, total }: { done: number; total: number }) {
-  const value = pct(done, total);
-  return (
-    <div style={donutWrapStyle()}>
-      <div style={donutStyle(value)}>
-        <div style={donutInnerStyle()}>
-          <strong>{value}%</strong>
-          <span>{done}/{total}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function panelStyle(): CSSProperties {
   return {
     background: C.surface,
     border: "none",
     borderRadius: 0,
     padding: 0,
-  };
-}
-
-function donutWrapStyle(): CSSProperties {
-  return { display: "grid", placeItems: "center", flex: "0 0 auto" };
-}
-
-function donutStyle(value: number): CSSProperties {
-  return {
-    width: 96,
-    height: 96,
-    borderRadius: "50%",
-    background: `conic-gradient(${C.accent} ${value * 3.6}deg, ${C.border} 0deg)`,
-    display: "grid",
-    placeItems: "center",
-  };
-}
-
-function donutInnerStyle(): CSSProperties {
-  return {
-    width: 70,
-    height: 70,
-    borderRadius: "50%",
-    background: C.surface,
-    display: "grid",
-    placeItems: "center",
-    alignContent: "center",
-    fontSize: TYPE.meta,
-    color: C.muted,
   };
 }

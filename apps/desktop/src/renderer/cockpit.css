@@ -6402,3 +6402,455 @@ kbd {
     scrollbar-gutter: stable;
   }
 }
+
+/* ── Aimcub Glass — Journey work surface ─────────────────────────────────── */
+.od-journey {
+  width: min(100%, 820px);
+  margin: 0 auto;
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.od-journey-head {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+}
+
+.od-journey-head-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.od-journey-title {
+  margin: 0;
+  font-size: var(--od-type-title);
+  font-weight: var(--od-font-weight-strong);
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.od-journey-sub {
+  margin: 2px 0 0;
+  font-size: var(--od-type-meta);
+  color: var(--faint);
+}
+
+.od-journey-meta {
+  flex: none;
+  font-size: var(--od-type-body);
+  color: var(--mut);
+  font-variant-numeric: tabular-nums;
+}
+
+.od-journey-stations {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.od-journey-station {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  padding: 11px 13px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--island2);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  box-shadow: inset 0 0 0 1px var(--ring);
+  cursor: pointer;
+  text-align: left;
+  transition: box-shadow 150ms ease;
+}
+
+.od-journey-station:hover {
+  box-shadow: var(--sh-md), inset 0 0 0 1px var(--ring);
+}
+
+.od-journey-station-open {
+  box-shadow: var(--sh-md), inset 0 0 0 1.5px var(--acc);
+}
+
+.od-journey-station:focus-visible {
+  outline: 0;
+  box-shadow: var(--od-focus);
+}
+
+.od-journey-station-name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  width: 100%;
+  font-size: 12.5px;
+  font-weight: var(--od-font-weight-semibold);
+  color: var(--ink);
+}
+
+.od-journey-station-line {
+  width: 100%;
+  font-size: 10.5px;
+  color: var(--faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.od-journey-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--faint);
+}
+
+.od-journey-dot-done { background: var(--acc); }
+.od-journey-dot-living { background: var(--okdot); }
+.od-journey-dot-partial { background: var(--warndot); }
+.od-journey-dot-up { background: transparent; box-shadow: inset 0 0 0 1.5px var(--faint); }
+.od-journey-dot-active { background: var(--acc); animation: od-journey-pulse 1.4s ease-in-out infinite; }
+
+@keyframes od-journey-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.od-journey-move {
+  border-radius: 22px;
+  background: var(--island);
+  backdrop-filter: blur(36px);
+  -webkit-backdrop-filter: blur(36px);
+  box-shadow: var(--sh-lg), inset 0 0 0 1px var(--ring);
+  padding: 24px 28px;
+}
+
+.od-journey-move-tag {
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-strong);
+  letter-spacing: 0.06em;
+  color: var(--acc);
+}
+
+.od-journey-move-title {
+  margin-top: 12px;
+  font-size: 19px;
+  font-weight: var(--od-font-weight-strong);
+  line-height: 1.3;
+  color: var(--ink);
+}
+
+.od-journey-move-body {
+  margin: 6px 0 0;
+  font-size: var(--od-type-body);
+  color: var(--mut);
+  line-height: 1.5;
+}
+
+.od-journey-move-actions {
+  margin-top: 18px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.od-journey-primary {
+  min-height: 42px;
+  padding: 0 24px;
+  border: 0;
+  border-radius: 13px;
+  background: var(--acc);
+  color: var(--acc-on);
+  font-size: var(--od-type-body);
+  font-weight: var(--od-font-weight-medium);
+  cursor: pointer;
+  box-shadow: var(--sh-btn);
+  transition: filter 150ms ease, transform 120ms ease;
+}
+
+.od-journey-primary:hover:not(:disabled) { filter: brightness(1.07); }
+.od-journey-primary:active:not(:disabled) { transform: scale(0.98); }
+.od-journey-primary:disabled { opacity: 0.55; cursor: default; }
+.od-journey-primary:focus-visible { outline: 0; box-shadow: var(--od-focus); }
+
+.od-journey-secondary {
+  min-height: 34px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 11px;
+  background: var(--island2);
+  color: var(--ink2);
+  font-size: 12.5px;
+  font-weight: var(--od-font-weight-medium);
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.od-journey-secondary:hover { background: var(--field); }
+.od-journey-secondary:focus-visible { outline: 0; box-shadow: var(--od-focus); }
+
+.od-journey-ambient {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 22px;
+  background: var(--island2);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  box-shadow: inset 0 0 0 1px var(--ring);
+  padding: 22px 28px;
+}
+
+.od-journey-ambient-title {
+  font-size: var(--od-type-title);
+  font-weight: var(--od-font-weight-semibold);
+  color: var(--ink);
+}
+
+.od-journey-ambient-body {
+  margin-top: 2px;
+  font-size: 12.5px;
+  color: var(--mut);
+}
+
+.od-journey-turns {
+  border-radius: 18px;
+  background: var(--island2);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: inset 0 0 0 1px var(--ring);
+  padding: 6px 18px 10px;
+}
+
+.od-journey-eyebrow {
+  padding: 10px 0 4px;
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-strong);
+  letter-spacing: 0.08em;
+  color: var(--faint);
+}
+
+.od-journey-turn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 8px 0;
+  border-top: 1px solid var(--edge);
+}
+
+.od-journey-turn-doing {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--mut);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.od-journey-turn-since {
+  flex: none;
+  font-size: var(--od-type-meta);
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.od-journey-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-semibold);
+  padding: 3px 10px;
+  border-radius: var(--od-radius-pill);
+  background: var(--field);
+  color: var(--ink2);
+  box-shadow: inset 0 0 0 1px var(--edge);
+}
+
+.od-journey-chip-you,
+.od-journey-chip-agent {
+  background: var(--acc-soft);
+  color: var(--acc);
+  box-shadow: none;
+}
+
+.od-journey-journal {
+  display: grid;
+  gap: 8px;
+}
+
+.od-journey-journal-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0 4px;
+}
+
+.od-journey-journal-hint {
+  font-size: var(--od-type-meta);
+  color: var(--faint);
+}
+
+.od-journey-journal-empty {
+  padding: 14px 10px;
+  font-size: 12.5px;
+  color: var(--faint);
+}
+
+.od-journey-journal-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  transition: background 150ms ease;
+}
+
+.od-journey-journal-row:hover {
+  background: var(--island2);
+}
+
+.od-journey-journal-time {
+  flex: none;
+  width: 46px;
+  font-size: 10.5px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+  font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
+}
+
+.od-journey-journal-what {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--mut);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.od-journey-journal-view {
+  flex: none;
+  border: 0;
+  background: transparent;
+  color: var(--acc);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.od-journey-journal-view:hover { text-decoration: underline; }
+
+.od-journey-sheet-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--dim);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.od-journey-sheet {
+  width: 560px;
+  max-width: 100%;
+  max-height: 78vh;
+  overflow-y: auto;
+  border-radius: 24px;
+  background: var(--island);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  box-shadow: var(--sh-lg), inset 0 0 0 1px var(--ring);
+  padding: 24px 28px;
+}
+
+.od-journey-sheet-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.od-journey-sheet-title {
+  flex: 1;
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-strong);
+  letter-spacing: 0.06em;
+  color: var(--acc);
+  text-transform: uppercase;
+}
+
+.od-journey-sheet-close {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border: 0;
+  border-radius: 9px;
+  background: var(--island2);
+  color: var(--mut);
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.od-journey-sheet-close:hover { background: var(--field); }
+.od-journey-sheet-close:focus-visible { outline: 0; box-shadow: var(--od-focus); }
+
+.od-journey-sheet-empty {
+  margin: 14px 0 0;
+  font-size: var(--od-type-body);
+  color: var(--mut);
+  line-height: 1.55;
+}
+
+.od-journey-sheet-rows {
+  margin-top: 8px;
+  display: grid;
+}
+
+.od-journey-sheet-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+  padding: 11px 0;
+  border-top: 1px solid var(--edge);
+}
+
+.od-journey-sheet-text {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--od-type-body);
+  color: var(--ink);
+  line-height: 1.45;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.od-journey-sheet-meta {
+  flex: none;
+  font-size: var(--od-type-meta);
+  color: var(--faint);
+}
+
+.od-journey-sheet-foot {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 760px) {
+  .od-journey-stations {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
