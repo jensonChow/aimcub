@@ -277,7 +277,12 @@ Reference links:
 - Content width: writing/intake surfaces max ~760px; operational grids/review surfaces ~940px.
   Use explicit shared rails — 560px composition/compact draft lists, 760px reading/focused
   questions, 940px operational workbench, 1080px Settings control groups. Related headings, rows,
-  and actions keep one visible left-edge system.
+  and actions keep one visible left-edge system. The Journey is a workbench surface, not a reading
+  column: it uses the wider 820px rail (`.od-workspace-aim:has(> .od-journey)`), not the 760 cap.
+- Any centered, scrollable workspace must center **safely** (`align-content: safe center`) so tall
+  content (a full Journey, a long saved-aims Home) anchors to the scrollable start edge instead of
+  being clipped above `scrollTop: 0` and made unreachable at small window heights. The aim-stage
+  workspace base (`.od-workspace-aim`) centers safely for this reason; verify at 640×520.
 - Sidebar width: default 280px, stable bounds ~216–360px, transparent resize hot zone with the
   native cursor (not a permanent divider). The normal Aim sidebar may auto-collapse before the
   workspace is squeezed below a usable width; a user-pinned sidebar reserves space and never
@@ -336,6 +341,11 @@ Reference links:
 - Avoid dominant one-note palettes, purple/purple-blue gradients, dark slate themes, beige/brown
   themes, decorative orbs, bokeh, and purely atmospheric imagery. Glass uses one restrained
   desktop gradient, not a themed wallpaper.
+- Glass color tokens are tuned to meet WCAG AA over the gradient and translucent islands; this
+  takes precedence over exact fidelity to the imported reference palette. Concretely: `--faint`
+  is `#61616a` (light) / `#9b9ba5` (dark) and the light `--acc` is `#0064cc` so meta text clears
+  4.5:1; the you/agent actor chips keep the `--acc-soft` tint but use `--ink2` text (not `--acc`)
+  to clear the floor on the pill. Do not revert these to the lower-contrast reference values.
 
 ## Radius, Borders, and Elevation
 
@@ -400,6 +410,12 @@ Reference links:
 - Motion is fast, direct, functional (~120–180ms). The only sanctioned loop is the gentle
   running-status dot pulse; avoid decorative animation. Text must never overlap, clip without
   intentional ellipsis, or occlude neighbors at supported sizes and Chinese/English lengths.
+- Journey drill-in controls follow the shared quiet idiom completely: station tiles and Home cards
+  press with `transform: scale(0.99)` on `:active`; every focusable control (including the journal
+  "view" links) carries the `--od-focus` ring and a ≥24px target. The station "sheet" is a real
+  modal — on open it moves focus into the dialog (the close button), closes on Escape, and restores
+  focus to the control that opened it. Not-started ("up") station names read one level quieter
+  (`--mut`) than done/current ones.
 
 ## Accessibility and Localization
 
@@ -410,9 +426,12 @@ Reference links:
   tooltip. Preserve focus order matching reading order: sidebar → stage nav → workspace → overlays.
 - English repo prose is required; Chinese only in `zh` i18n values. Every user-facing string routes
   through `t(...)` (no literals); keep en+zh parity (the `satisfies` guard + a parity test enforce
-  it). Dynamic i18n keys (e.g. `glass.journal.event.*`, `glass.station.line.*`, `glass.progress.*`)
-  must all exist — `translate()` throws on a missing key. Design labels to wrap or truncate
-  predictably in both languages.
+  it). Dynamic i18n keys (e.g. `glass.journal.event.*`, `glass.station.line.*`,
+  `glass.station.meta.*`, `glass.turns.*`, `glass.progress.*`) must all exist — `translate()`
+  throws on a missing key. The station-sheet meta status tokens (plan/run/eval milestone and run
+  statuses) and the Turns relative-time labels route through `t(...)`; unmapped free-text metas
+  (e.g. an eval row's `next_action`) fall through verbatim so `translate()` is never called with an
+  unknown key. Design labels to wrap or truncate predictably in both languages.
 
 ## Electron Desktop Engineering Details
 

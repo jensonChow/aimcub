@@ -9,14 +9,14 @@ import type { I18n } from "../../i18n";
 import { isHumanExecuteRoute } from "../../stages/execute/executePrimaryAction";
 import type { JourneyTurn } from "./types";
 
-function relativeSince(iso: string | null | undefined, now: number): string {
+function relativeSince(iso: string | null | undefined, now: number, t: I18n["t"]): string {
   if (!iso) return "";
   const started = Date.parse(iso);
   if (Number.isNaN(started)) return "";
   const minutes = Math.floor((now - started) / 60000);
-  if (minutes < 1) return "now";
-  if (minutes < 60) return `${minutes}m`;
-  return `${Math.floor(minutes / 60)}h`;
+  if (minutes < 1) return t("glass.turns.now");
+  if (minutes < 60) return t("glass.turns.minutes", { n: minutes });
+  return t("glass.turns.hours", { n: Math.floor(minutes / 60) });
 }
 
 function actorLabel(progress: AimProgressReadModel, actorId: string | null, fallback: string): string {
@@ -55,7 +55,7 @@ export function buildJourneyTurns(progress: AimProgressReadModel, t: I18n["t"], 
       who: isHuman ? "you" : "agent",
       label: actorLabel(progress, run.actor_id, t(isHuman ? "glass.actor.you" : "glass.actor.agent")),
       doing: run.summary || milestoneTitle(progress, run.milestone_id),
-      since: relativeSince(run.started_at ?? run.created_at, now),
+      since: relativeSince(run.started_at ?? run.created_at, now, t),
     });
   }
 

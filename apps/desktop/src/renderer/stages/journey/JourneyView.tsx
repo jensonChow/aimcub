@@ -12,7 +12,7 @@
  * remounts it). Actual mutations route through the existing epoch-safe App handlers.
  */
 import type { AimProgressReadModel, Goal, Memory, Milestone, RunEvent } from "@core/domain";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useI18n, type StringKey } from "../../i18n";
 import type { CockpitStage } from "../../workflow/workspaceNavigation";
@@ -67,6 +67,25 @@ const MEMORY_CAT_KEY: Record<string, StringKey> = {
   procedure: "glass.memory.cat.procedure",
 };
 
+/**
+ * Localized labels for the status-token `meta` on plan/run/eval sheet rows (the milestone/run
+ * status literals). Free-text metas — e.g. an eval row's `next_action` — are not in this map and
+ * pass through verbatim, so `translate()` is never called with an unknown key.
+ */
+const STATION_META_KEY: Record<string, StringKey> = {
+  done: "glass.station.meta.done",
+  blocked: "glass.station.meta.blocked",
+  met: "glass.station.meta.met",
+  pending: "glass.station.meta.pending",
+  in_progress: "glass.station.meta.inProgress",
+  completed: "glass.station.meta.completed",
+  skipped: "glass.station.meta.skipped",
+  queued: "glass.station.meta.queued",
+  running: "glass.station.meta.running",
+  failed: "glass.station.meta.failed",
+  cancelled: "glass.station.meta.cancelled",
+};
+
 function stationGlyphClass(kind: JourneyStationKind): string {
   return `od-journey-dot od-journey-dot-${kind}`;
 }
@@ -101,11 +120,38 @@ export function JourneyView(props: JourneyViewProps) {
   // pass other metas (run/eval status, "done"/"blocked") through verbatim.
   const sheetMetaLabel = (row: JourneyStationSheetRow): string => {
     if (!row.meta) return "";
-    const catKey = row.chip === "context" ? MEMORY_CAT_KEY[row.meta] : undefined;
-    return catKey ? tk(catKey) : row.meta;
+    if (row.chip === "context") {
+      const catKey = MEMORY_CAT_KEY[row.meta];
+      return catKey ? tk(catKey) : row.meta;
+    }
+    const metaKey = STATION_META_KEY[row.meta];
+    return metaKey ? tk(metaKey) : row.meta;
   };
   const [openStation, setOpenStation] = useState<JourneyStationId | null>(null);
+  const sheetCloseRef = useRef<HTMLButtonElement | null>(null);
+  const sheetTriggerRef = useRef<HTMLElement | null>(null);
   const { progress, goal } = props;
+
+  // Modal-sheet focus management: move focus into the dialog on open, close on Escape, and
+  // restore focus to the control that opened it on close. `aria-modal` alone does not do this.
+  useEffect(() => {
+    if (!openStation) return;
+    sheetTriggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const focusFrame = requestAnimationFrame(() => sheetCloseRef.current?.focus());
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      event.stopPropagation();
+      setOpenStation(null);
+    }
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => {
+      cancelAnimationFrame(focusFrame);
+      window.removeEventListener("keydown", onKeyDown, true);
+      const trigger = sheetTriggerRef.current;
+      sheetTriggerRef.current = null;
+      if (trigger) requestAnimationFrame(() => trigger.focus());
+    };
+  }, [openStation]);
 
   if (!progress) {
     return (
@@ -155,13 +201,12 @@ export function JourneyView(props: JourneyViewProps) {
         <span className="od-journey-meta" aria-label={t("shell.progress")}>{headMeta}</span>
       </header>
 
-      <div className="od-journey-stations" role="list" aria-label={t("cockpit.workflow")}>
+      <div className="od-journey-stations" role="group" aria-label={t("cockpit.workflow")}>
         {stations.map((station) => (
           <button
             key={station.id}
             type="button"
-            role="listitem"
-            className={`od-journey-station${openStation === station.id ? " od-journey-station-open" : ""}`}
+            className={`od-journey-station${station.kind === "up" ? " od-journey-station-up" : ""}${openStation === station.id ? " od-journey-station-open" : ""}`}
             onClick={() => setOpenStation(station.id)}
           >
             <span className="od-journey-station-name">
@@ -230,6 +275,7 @@ export function JourneyView(props: JourneyViewProps) {
                 <button
                   className="od-journey-journal-view"
                   type="button"
+                  aria-label={`${t("glass.journey.view")} · ${tk(STATION_NAME_KEY[entry.stationId])}`}
                   onClick={() => setOpenStation(entry.stationId ?? null)}
                 >
                   {t("glass.journey.view")}
@@ -256,6 +302,7 @@ export function JourneyView(props: JourneyViewProps) {
             <div className="od-journey-sheet-head">
               <span className="od-journey-sheet-title">{tk(STATION_NAME_KEY[sheet.station])}</span>
               <button
+                ref={sheetCloseRef}
                 className="od-journey-sheet-close"
                 type="button"
                 aria-label={t("glass.journey.close")}
