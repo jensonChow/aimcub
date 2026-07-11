@@ -238,7 +238,7 @@ describe("buildJourneyTurns", () => {
     const rows = [mkRow({ id: "m1", title: "Human task", human: true }), agentRow];
     const turns = buildJourneyTurns(mkProgress(rows), t, now);
     expect(turns[0]).toMatchObject({ who: "you", doing: 'glass.turns.waiting:{"n":1}' });
-    expect(turns[1]).toMatchObject({ who: "agent", doing: "drafting", since: "6m" });
+    expect(turns[1]).toMatchObject({ who: "agent", doing: "drafting", since: 'glass.turns.minutes:{"n":6}' });
   });
 
   it("reports the human idle when no human turns are waiting", () => {

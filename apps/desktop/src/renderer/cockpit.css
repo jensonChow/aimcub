@@ -64,8 +64,8 @@
   --ink: #1d1d1f;
   --ink2: #3f3f45;
   --mut: #5d5d63;
-  --faint: #8a8a91;
-  --acc: #0071e3;
+  --faint: #61616a;
+  --acc: #0064cc;
   --acc-on: #ffffff;
   --acc-soft: rgba(0, 113, 227, 0.12);
   --ok: #1a7f4b;
@@ -127,7 +127,7 @@
     --ink: #f2f2f7;
     --ink2: #d6d6de;
     --mut: #a9a9b4;
-    --faint: #84848f;
+    --faint: #9b9ba5;
     --acc: #409cff;
     --acc-on: #ffffff;
     --acc-soft: rgba(64, 156, 255, 0.2);
@@ -189,7 +189,7 @@
   --ink: #f2f2f7;
   --ink2: #d6d6de;
   --mut: #a9a9b4;
-  --faint: #84848f;
+  --faint: #9b9ba5;
   --acc: #409cff;
   --acc-on: #ffffff;
   --acc-soft: rgba(64, 156, 255, 0.2);
@@ -1664,9 +1664,17 @@ kbd {
 .od-workspace-aim {
   width: min(100%, var(--od-rail-reading));
   display: grid;
-  align-content: center;
+  /* "safe center" so tall aim-stage content (a full Journey, a long saved-aims Home) anchors to
+     the scrollable start edge instead of being clipped above scrollTop:0 and made unreachable. */
+  align-content: safe center;
   justify-items: center;
   scrollbar-gutter: stable both-edges;
+}
+
+/* The Journey is a workbench surface, not a reading column — give it the wider 820px rail it
+   declares (the reading-rail cap would otherwise silently narrow it to 760px). */
+.od-workspace-aim:has(> .od-journey) {
+  width: min(100%, 820px);
 }
 
 .od-workspace-aim:has(> .od-aim-overview) {
@@ -6490,7 +6498,7 @@ kbd {
   box-shadow: inset 0 0 0 1px var(--ring);
   cursor: pointer;
   text-align: left;
-  transition: box-shadow 150ms ease;
+  transition: box-shadow 150ms ease, transform 120ms ease;
 }
 
 .od-journey-station:hover {
@@ -6499,6 +6507,10 @@ kbd {
 
 .od-journey-station-open {
   box-shadow: var(--sh-md), inset 0 0 0 1.5px var(--acc);
+}
+
+.od-journey-station:active {
+  transform: scale(0.99);
 }
 
 .od-journey-station:focus-visible {
@@ -6515,6 +6527,11 @@ kbd {
   font-size: 12.5px;
   font-weight: var(--od-font-weight-semibold);
   color: var(--ink);
+}
+
+/* Not-started ("up") stations read one level quieter than done/current ones. */
+.od-journey-station-up .od-journey-station-name {
+  color: var(--mut);
 }
 
 .od-journey-station-line {
@@ -6557,7 +6574,7 @@ kbd {
 .od-journey-move-tag {
   font-size: var(--od-type-meta);
   font-weight: var(--od-font-weight-strong);
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
   color: var(--acc);
 }
 
@@ -6613,6 +6630,7 @@ kbd {
   font-weight: var(--od-font-weight-medium);
   cursor: pointer;
   box-shadow: inset 0 0 0 1px var(--ring);
+  transition: background 150ms ease;
 }
 
 .od-journey-secondary:hover { background: var(--field); }
@@ -6655,7 +6673,7 @@ kbd {
   padding: 10px 0 4px;
   font-size: var(--od-type-meta);
   font-weight: var(--od-font-weight-strong);
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   color: var(--faint);
 }
 
@@ -6701,8 +6719,9 @@ kbd {
 
 .od-journey-chip-you,
 .od-journey-chip-agent {
+  /* acc-soft tint keeps the actor cue; ink2 text (not acc) clears WCAG AA on the translucent pill. */
   background: var(--acc-soft);
-  color: var(--acc);
+  color: var(--ink2);
   box-shadow: none;
 }
 
@@ -6764,14 +6783,25 @@ kbd {
 
 .od-journey-journal-view {
   flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 4px 8px;
   border: 0;
+  border-radius: 8px;
   background: transparent;
   color: var(--acc);
   font-size: 11.5px;
   cursor: pointer;
+  transition: background 150ms ease;
 }
 
 .od-journey-journal-view:hover { text-decoration: underline; }
+
+.od-journey-journal-view:focus-visible {
+  outline: 0;
+  box-shadow: var(--od-focus);
+}
 
 .od-journey-sheet-scrim {
   position: fixed;
@@ -6808,7 +6838,7 @@ kbd {
   flex: 1;
   font-size: var(--od-type-meta);
   font-weight: var(--od-font-weight-strong);
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
   color: var(--acc);
   text-transform: uppercase;
 }
@@ -6823,6 +6853,7 @@ kbd {
   color: var(--mut);
   cursor: pointer;
   box-shadow: inset 0 0 0 1px var(--ring);
+  transition: background 150ms ease;
 }
 
 .od-journey-sheet-close:hover { background: var(--field); }
@@ -6997,11 +7028,15 @@ kbd {
   -webkit-backdrop-filter: blur(28px);
   box-shadow: var(--sh-md), inset 0 0 0 1px var(--ring);
   cursor: pointer;
-  transition: box-shadow 150ms ease;
+  transition: box-shadow 150ms ease, transform 120ms ease;
 }
 
 .od-home-card:hover {
   box-shadow: var(--sh-lg), inset 0 0 0 1px var(--ring);
+}
+
+.od-home-card:active {
+  transform: scale(0.99);
 }
 
 .od-home-card:focus-visible {

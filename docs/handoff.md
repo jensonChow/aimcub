@@ -1,103 +1,83 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-11
-Branch: `main` (Stages D and E merged to `main` and **pushed to origin**; origin/main == `b92e3733`)
+Branch: `main` (Glass stages 0/A/B/C/D/E previously merged + pushed; origin/main == `c23255ef`).
+This session's polish work is **committed and merged to `main` locally, not yet pushed** — see
+Commit status.
 
-## Current Session
+## Current Session — Aimcub Glass UI/UX polish pass
 
-Completed the **Aimcub Glass** desktop redesign: **Stage D** (net-new `@core` / store / IPC —
-the only boundary-crossing work) and **Stage E** (docs rewrite + theme-toggle native-bg sync +
-repack + packaged QA). With this, the full staged plan (`~/.claude/plans/giggly-herding-pine.md`,
-stages 0/A/B/C/D/E) is shipped and green. Stages 0/A/C/B were already on `main`.
+Re-imported the `Aimcub Glass.dc.html` reference from the founder's claude.ai/design project
+(DesignSync) and did a focused **polish pass** on the already-shipped Glass desktop UI. Confirmed
+the shipped CSS is highly faithful to the reference; the gains are in states, a11y, i18n, contrast,
+and one real layout bug. Verification was done against a faithful static harness of `cockpit.css`
+(scratchpad) screenshotted in both themes at 1180×820 / 960×680 / 640×520, plus a 5-lens adversarial
+audit workflow (19 candidates → 13 verified; 6 false positives dropped).
 
-## Completed — Stage D (net-new core: journal + Research station + progress dots)
+Changes (all in `apps/desktop/src/renderer`, plus design-system docs):
 
-Committed as `766d278a` on branch `glass-stage-d`, merged to `main`.
-
-1. **Run-lifecycle journal.** `store.listRunEvents(goalId)` joins run→goal (run events carry no
-   goal id) + a **separate** `getAimJournal` IPC across `shared/ipc.ts` + `main/ipc.ts` +
-   `preload/index.ts` (kept off the hot `getAimProgress`). `workflow/journey/journal.ts` now
-   merges appended evidence with real run-lifecycle events (started/completed/failed/cancelled/
-   artifact.created), dropping `run.queued`/`run.log`/`tool.*` noise; `who` resolved from the read
-   model with a neutral "cub" fallback; empty-summary events localize via `glass.journal.event.*`.
-2. **Research station real in `@core`.** `summarizeAimResearch` (`packages/core/src/aim-os.ts`,
-   pure + unit-tested) derives none/gathering/ready from an aim's active memories + pending
-   candidates, replacing the synthetic plan-exists proxy. `stationModel.ts` / `stationSheet.ts`
-   consume it; the read-only Research sheet shows the real gathered context (aim-scoped + global),
-   with category labels localized in `JourneyView`.
-3. **Batch per-aim progress.** `summarizeAimProgress` (`@core`, coarse/cheap) +
-   `store.listAimProgressSummaries` (one pass, no N× `evaluate()`) + `listAimProgressSummaries`
-   IPC. `App` loads `progressSummaries` + `journalEvents` (transition-guarded, cleared with
-   progress on navigation) and refreshes both **list surfaces** after every side effect via
-   `refreshListSurfaces` (including the `confirmMilestone` path that bypasses
-   `refreshGoalAfterSideEffect`). `CockpitShell` renders a trailing status **dot** per sidebar aim
-   row (marker, not subtitle); `HomeView` renders a dot + 6px progress bar per card. Dots carry
-   aria-labels. New pure helper `workflow/progressSummary.ts`.
-
-**Adversarial multi-agent review** of the Stage D diff (5 lenses → adversarial verify) confirmed
-and fixed 6 issues: (1)/(2) `confirmMilestone` + context-accept not refreshing the new list
-surfaces → stale dots/research count [MED]; (3) research count stale after context accept/reject
-[LOW]; (4) raw untranslated memory-category enum in the sheet meta [LOW]; (5) off-spec 4px
-progress bar (→6px) [LOW]; (6) a run-event sort test that didn't exercise its comparator [LOW].
-7 candidate findings were adversarially rejected as false positives.
-
-## Completed — Stage E (docs + native theme sync + packaged QA)
-
-Committed on branch `glass-stage-e`, merged to `main`.
-
-- **Theme-toggle native-bg sync** (deferred from Stage B): a validated `setThemeSource` IPC
-  (`shared/ipc.ts` + `main/ipc.ts` + `preload/index.ts`) sets `nativeTheme.themeSource`; the
-  existing `nativeTheme.on("updated")` listener repaints `win.setBackgroundColor` and re-emits
-  chrome state. `CockpitShell` syncs `themePref` → `setThemeSource` on mount and every toggle, so
-  an in-app light/dark override no longer desyncs the native titlebar/traffic-light context.
-- **Docs**: rewrote `docs/memory/design-system.md` to the Glass system (tokens, Journey IA,
-  status-dot markers, theme toggle, native-chrome rules, the font-size ramp constraint); updated
-  `docs/memory/desktop.md` (Glass shell / Journey / Memory page / theme sync / status dots),
-  `docs/memory/architecture.md` (the two new `@core` read derivations + `listRunEvents`), and
-  `docs/desktop-polish-audit.md` (dated Glass reframe; the unchanged stage panels remain the
-  backlog).
-- **Repack + refresh**: `pnpm desktop:pack` → `apps/desktop/dist/mac-arm64/Aimcub.app`; refreshed
-  the root `Aimcub.app` (untracked local artifact) from it.
+1. **Unsafe-centering clip [HIGH, layout].** `.od-workspace-aim` centered with `align-content:
+   center`; a tall Journey / populated Home had its title + station strip + Your-move heading pushed
+   above the scroll pane and **unreachable** (verified 263px clipped, scrollTop clamps to 0 at
+   640×520). Fixed to `align-content: safe center`.
+2. **Journey width [layout].** `.od-journey` declared 820px but the 760px reading-rail parent capped
+   it; added `.od-workspace-aim:has(> .od-journey) { width: min(100%, 820px) }` so it gets its rail.
+3. **WCAG AA contrast [HIGH/MED].** Founder chose "fix for AA" over exact reference-palette fidelity
+   ([[aimcub-glass-contrast-aa]]). `--faint` #8a8a91→#61616a (light) / #84848f→#9b9ba5 (dark), light
+   `--acc` #0071e3→#0064cc, and you/agent chips switched from `--acc` text to `--ink2` (keeping the
+   acc-soft tint). All Glass meta text + chips now clear 4.5:1. `--od-accent` (legacy) untouched.
+4. **States/motion.** Added `:active` scale(0.99) to `.od-journey-station` and `.od-home-card`
+   (+transform transition); added `transition` to `.od-journey-secondary` and `-sheet-close` hover
+   swaps; gave `.od-journey-journal-view` a real ≥24px target + the `--od-focus` ring.
+5. **Fidelity/typography.** Not-started ("up") station names now `--mut`; removed positive
+   letter-spacing (→0) on the three uppercase eyebrow/tag labels per the "letter-spacing always 0"
+   rule.
+6. **A11y.** Station strip `role="list"`+`listitem`→`role="group"` + plain buttons (listitem was
+   clobbering the button role). Station **sheet** is now a real modal: focus moves to the close
+   button on open, Escape closes, focus restores to the opener. Journal "view" buttons got a
+   disambiguating `aria-label` (`view · {station}`).
+7. **i18n.** Turns relative-time (`now`/`{n}m`/`{n}h`) and station-sheet meta status tokens
+   (milestone/run statuses) were raw English — now routed through `t(...)` with new
+   `glass.turns.*` + `glass.station.meta.*` keys (en+zh); free-text metas fall through verbatim.
 
 ## Verification
 
-- **Full gate green**: `pnpm build && pnpm test` (246 desktop + core/store additions) `&&
-  typecheck && lint && core:purity`; build verified no `@core` leakage into Electron bundles.
-- **Packaged light+dark QA** at 960×680 / 760×600 / 640×520 via CDP (Node built-in WebSocket, no
-  deps) against the packaged root `Aimcub.app`, launched with an **isolated `AIMCUB_HOME`** +
-  `--user-data-dir`. Real `~/.aimcub/store.json` mtime unchanged (zero touches). Verified on
-  screen: first-run Glass Home (both themes); the Journey work surface (6-station strip with the
-  real Research "3 facts in play" + Run "1 running" derivations, the "Your move" card, Turns, and
-  a Journal whose seeded `run.log` noise was correctly filtered to lifecycle receipts); the
-  Research station sheet with **localized** category labels; and sidebar status dots
-  (`is-running`/"Agents working", `is-needs_you`/"Needs you"). **No horizontal overflow** at any
-  size in either theme; the 6-station strip degrades to a horizontal scroll at the smallest width.
-- **Native-chrome caveat**: CDP captures web content, not the native macOS titlebar, so the
-  `setThemeSource` native-titlebar-bg follow is verified by wiring (IPC → `nativeTheme.themeSource`
-  → repaint) but not by an on-screen native screenshot. A computer-use pass would confirm the
-  native titlebar/traffic-light appearance under an in-app override; interactive computer-use QA
-  was not run this session (as in the prior session).
+- **Full gate green**: `pnpm build && test (246 desktop) && typecheck && lint && core:purity`; build
+  re-verified no `@core` leakage. Fixed one stale test expectation (`journey.test.ts` `since:"6m"` →
+  the i18n-key stub form) caused by the Turns-time i18n change.
+- **Visual QA** via the static `cockpit.css` harness in both themes: Journey (light+dark, move +
+  ambient + sheet), Home (first-run + populated), Memory (light+dark), at 1180×820 / 960×680 /
+  640×520. Confirmed the clip fix (title/stations reachable at 640×520), the darker/lighter faint
+  meta text is legible (esp. Memory provenance, previously 2.6:1), ink2 chips read well, and the
+  un-tracked eyebrows and muted "up" station read fine.
+- Repacked (`pnpm desktop:pack`) and refreshed the untracked root `Aimcub.app`.
+- **Not run**: on-screen Electron / computer-use pass (the harness renders the real `cockpit.css`
+  but not the live IPC/data). The sheet focus-management + Escape are wired + typechecked but were
+  not exercised in a live keyboard session.
 
 ## Commit And Push Status
 
-- Stage D (`766d278a`) and Stage E (`b92e3733`) are committed, merged to `main`, and **pushed to
-  origin** (user-authorized 2026-07-11). origin/main == local `main` == `b92e3733`. All Glass
-  stages (0/A/B/C/D/E) are now on origin.
-- Root `Aimcub.app` refreshed to the Stage D+E build (untracked local artifact).
+- Polish work is committed on a focused branch and **merged to local `main`, not pushed**. The
+  prior Glass stages (0/A/B/C/D/E, up to `c23255ef`) are what remains on origin/main. Push needs the
+  user's authorization (`git push origin main`).
 
 ## Open Risks / Notes
 
-- **Bundle-id mismatch** (independent of Glass): dist builds as `com.aimcub.desktop` while App
-  Store Connect records `com.jensonchow.aimcub`. Reconcile before store distribution.
-- The Glass redesign is complete (stages 0/A/B/C/D/E). Optional follow-up noted across sessions: a
-  **Cmd/Ctrl+K command-palette entry for Memory** (only the sidebar row exists today).
+- **Bundle-id mismatch** (pre-existing): dist builds `com.aimcub.desktop` while App Store Connect
+  records `com.jensonchow.aimcub`. Reconcile before store distribution.
+- Dead i18n keys remain (`glass.home.yourMove`, `glass.journey.later`, `glass.journey.receipt`) —
+  leftovers from reference affordances the shipped design intentionally simplified (dots-not-
+  subtitles, no Later/receipt). Left in place (removal risks parity churn for no user gain).
+- Optional follow-up still open: Cmd/Ctrl+K Memory palette entry; a live computer-use pass to
+  confirm the sheet keyboard flow and the native titlebar theme-follow.
 
 ## Next Session Prompt
 
 ```text
-The Aimcub Glass desktop redesign is complete (stages 0/A/B/C/D/E), green on the full gate, and
-on origin/main. Read docs/handoff.md and docs/memory/design-system.md (now the Glass system).
-Possible next work: the Cmd/Ctrl+K Memory palette entry, a computer-use on-screen pass to confirm
-the native titlebar background follows the in-app theme toggle, or reconcile the bundle-id
-mismatch (com.aimcub.desktop vs com.jensonchow.aimcub) before store distribution.
+The Aimcub Glass UI/UX polish pass is done, green on the full gate, and merged to LOCAL main but
+NOT pushed (see docs/handoff.md) — offer to `git push origin main` when the user is ready. Read
+docs/handoff.md and docs/memory/design-system.md (Glass + the new AA/contrast, safe-center, and
+station/sheet interaction rules). Possible next work: live computer-use QA of the station-sheet
+keyboard flow, the Cmd/Ctrl+K Memory palette entry, or the com.aimcub.desktop vs
+com.jensonchow.aimcub bundle-id reconciliation.
 ```
