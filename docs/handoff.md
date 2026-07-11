@@ -32,6 +32,15 @@ Branch: `glass-redesign` (feature branch off `main`)
   backdrop-blurred island. Scoped to container surfaces only (none test-pinned), so the
   tuned sidebar peek/collapse/resize geometry, native traffic lights, the 15 `data-od-id`
   anchors, and every exact-string interaction-state test are untouched.
+- **Stage C — Journey work surface** (commit `f8df1b84`). New `JourneyView`
+  (`stages/journey/JourneyView.tsx` + `.od-journey-*` CSS) replaces `AimOverviewPanel` for a
+  saved goal: 6-station strip, a "Your move" card (or an "Ambient" card), a "Turns" roster,
+  and a "Journal" receipt timeline, all derived from `AimProgressReadModel` via the Stage-0
+  helpers. The station "sheet" is component-local overlay state keyed by `goal.id`, so it
+  never touches the workspace/surface navigation epochs. Your-move CTAs reuse the existing
+  epoch-safe handlers (`runAgent` single-flight, `openCockpitStage`). Removed the now-dead
+  `AimOverviewPanel`/`ProgressDonut`/donut-style helpers. Added 4 render tests; the 12 pure
+  Journey derivation tests already cover the data logic.
 
 ## Verification
 
@@ -52,12 +61,8 @@ Branch: `glass-redesign` (feature branch off `main`)
   "Forget" reuses `archiveContextMemory`. Add the sidebar Memory nav row + `~/.aimcub · local`
   footer + theme toggle here. Preserve the compose→summary invariant on New aim. Delete the
   dead `HomeView.tsx`. Row/card glassification (repointing the test-pinned `--od-*`
-  interaction rules) also happens here — update those exact-string tests deliberately.
-- **Stage C** — Journey work surface: replace the `AimOverviewPanel` branch at
-  `App.tsx:1701-1713` with `<JourneyView>` using the Stage-0 helpers. Station sheet + receipt
-  are **local overlay state** (like `CommandPalette`) — must not touch workspace/surface
-  epochs. Your-move CTA reuses `runAgent`/`confirmMilestone`/`openCockpitStage`; the manual-
-  proof lock stays inside `ExecutePanel`/`EvidenceSubmissionForm` reached via the Run station.
+  interaction rules — e.g. `App.test.tsx` sidebar-action/aim-card/hover assertions) also
+  happens here; update those exact-string tests deliberately.
 - **Stage D** — Net-new core: `store.listRunEvents` + a separate `getAimJournal` IPC for the
   full run-lifecycle journal; a real vs synthetic Research station; a batch per-aim progress
   summary for the sidebar/home "needs you" dot. Keep `@core` purity.
@@ -65,10 +70,21 @@ Branch: `glass-redesign` (feature branch off `main`)
   `docs/memory/desktop.md` and `docs/desktop-polish-audit.md`; full gate + `pnpm desktop:pack`
   + refresh root `Aimcub.app`; light-mode packaged QA at 960×680 / 760×600 / 640×520.
 
+### Verifying the Journey surface visually
+`JourneyView` only renders for a **saved goal** (it replaces the goal overview). To see it in
+the packaged app you need a seeded aim: create one through the app with a provider configured,
+or seed an isolated store. Ad-hoc `node`/`seedLocalAlphaDemo` scripting hits ESM/bundler
+resolution friction (these packages build for the app bundler, not raw node); prefer creating
+an aim through the running app, or add a small CLI `demo` seed command. The Journey render and
+all its data derivations are covered by tests (`stages/journey/JourneyView.test.tsx`,
+`workflow/journey/journey.test.ts`).
+
 ## Commit And Push Status
 
-- Two focused commits on `glass-redesign` (`f245cbc9`, `3905c691`), both green. Branch is
-  not merged to `main` (rebuild is mid-feature).
+- Focused commits on `glass-redesign`: `f245cbc9` (stage 0), `3905c691` (stage A),
+  `8b83f86e` (handoff), `f8df1b84` (stage C) — all green on the full gate. Branch is not
+  merged to `main` (rebuild is mid-feature); the root `Aimcub.app` still reflects `main`
+  (not repacked from this branch — that is a Stage E finalization step).
 - `main` still carries one earlier unpushed commit (`8455cc09 Center draft workspace
   surfaces`) from the prior session. Nothing has been pushed; fresh explicit user approval is
   required before pushing.
@@ -86,10 +102,11 @@ Branch: `glass-redesign` (feature branch off `main`)
 
 ```text
 Continue the Aimcub Glass redesign on branch glass-redesign. Read docs/handoff.md and the
-approved plan at ~/.claude/plans/giggly-herding-pine.md. Stage 0 (tokens + Journey helpers)
-and Stage A (Glass shell containers) are committed and green. Continue with Stage B
-(Home/New/Memory/Settings + listMemories IPC + row/card glassification), then Stage C
-(JourneyView), Stage D (core surface), Stage E (design-system.md rewrite + repack). Keep each
-stage green on the full gate and preserve the draft/navigation/proof invariants and native
-traffic lights. Do not push without explicit approval.
+approved plan at ~/.claude/plans/giggly-herding-pine.md. Stage 0 (tokens + Journey helpers),
+Stage A (Glass shell containers), and Stage C (JourneyView work surface) are committed and
+green. Continue with Stage B (Home/New/Memory/Settings + listMemories IPC + row/card
+glassification + sidebar Memory nav/theme toggle), then Stage D (core surface), Stage E
+(design-system.md rewrite + repack + light-mode QA). Keep each stage green on the full gate
+and preserve the draft/navigation/proof invariants and native traffic lights. Do not push
+without explicit approval.
 ```
