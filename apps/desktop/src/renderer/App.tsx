@@ -61,6 +61,7 @@ import type { ClarifyPhase, ContextAnswerMap } from "./stages/context/types";
 import { DraftAimOverviewPanel } from "./stages/aim/DraftAimOverviewPanel";
 import { EvalStage } from "./stages/eval/EvalStage";
 import { ExecutePanel } from "./stages/execute/ExecutePanel";
+import { NewAimComposer } from "./stages/aim/NewAimComposer";
 import { HomeView } from "./stages/home/HomeView";
 import { JourneyView } from "./stages/journey/JourneyView";
 import { MemoryView } from "./stages/memory/MemoryView";
@@ -1786,6 +1787,30 @@ function AimOsApp() {
       );
     }
     if (showAimEditor) {
+      // Top-level new aim (not editing, not a child breakdown) → the Glass NEW AIM composer.
+      // Edit mode and child/parent breakdown keep the AimIntakePanel surface unchanged.
+      if (aimSurfaceMode === "compose" && !parent) {
+        const composerGuidance = runtimeGuidanceVisible && !planningRuntimeReady && activeAimHelper ? (
+          <AimHelperGuidancePanel
+            title={aimTitle}
+            profile={activeAimHelper}
+            onOpenSettings={openSettingsForAim}
+            onKeepEditing={() => setRuntimeGuidanceVisible(false)}
+          />
+        ) : null;
+        return (
+          <NewAimComposer
+            title={aimTitle}
+            description={aimDescription}
+            disabled={Boolean(busy)}
+            memoryCount={memories.length}
+            guidance={composerGuidance}
+            onTitle={setAimTitle}
+            onDescription={setAimDescription}
+            onSubmit={() => void startDraft({})}
+          />
+        );
+      }
       return (
         <AimIntakePanel
           title={aimEditBuffer?.title ?? aimTitle}
