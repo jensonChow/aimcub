@@ -1,13 +1,19 @@
 /**
  * Derives the Glass "Journal" — a time-ordered ledger of receipts — from an
- * `AimProgressReadModel`. Pure, no i18n.
+ * `AimProgressReadModel` plus the aim's run-lifecycle `RunEvent` stream. Pure, no i18n.
  *
- * This is the *evidence-only* journal: it merges appended evidence with run
- * lifecycle summaries and sorts newest-first. The richer run-event/attribution
- * timeline (`RunEvent` / `EvidenceAttribution`) is net-new store/IPC surface and
- * lands in Stage D; until then those rows are simply absent, not fabricated.
+ * Two sources are merged newest-first:
+ *  - Appended evidence (station `eval`) — the trust-bearing receipts.
+ *  - Run-lifecycle events (station `run`) — start/finish/artifact receipts. Only the
+ *    product-facing lifecycle types are kept; raw `run.log` / `tool.*` traces and the
+ *    redundant `run.queued` / `evidence.reported` events are filtered out (evidence rows
+ *    already cover reported evidence, and internal traces belong in a developer surface).
+ *
+ * `who` for a run event is resolved from the owning run in `progress.runs`; events whose
+ * run is not (yet) in the read model fall back to the neutral "cub" actor. Lifecycle
+ * events with no summary carry a `detailKey` the component localizes.
  */
-import type { AimProgressReadModel, EvidenceKind } from "@core/domain";
+import type { AimProgressReadModel, EvidenceKind, RunEvent, RunEventType } from "@core/domain";
 
 import type { JourneyActorKind, JourneyJournalEntry } from "./types";
 
@@ -17,8 +23,20 @@ function whoForEvidenceKind(kind: EvidenceKind): JourneyActorKind {
   return "cub";
 }
 
+/** Run-lifecycle event types that read as a product receipt, mapped to their label suffix. */
+const LIFECYCLE_EVENT_KEY: Partial<Record<RunEventType, string>> = {
+  "run.started": "started",
+  "run.completed": "completed",
+  "run.failed": "failed",
+  "run.cancelled": "cancelled",
+  "artifact.created": "artifact",
+};
+
 /** Newest-first ledger. Entries with no timestamp are dropped (cannot be placed). */
-export function buildJourneyJournal(progress: AimProgressReadModel): JourneyJournalEntry[] {
+export function buildJourneyJournal(
+  progress: AimProgressReadModel,
+  runEvents: readonly RunEvent[] = [],
+): JourneyJournalEntry[] {
   const entries: JourneyJournalEntry[] = [];
 
   for (const row of progress.milestones) {
@@ -34,13 +52,22 @@ export function buildJourneyJournal(progress: AimProgressReadModel): JourneyJour
     }
   }
 
-  for (const run of progress.runs) {
-    if (!run.summary) continue;
+  const runById = new Map(progress.runs.map((run) => [run.id, run]));
+  for (const event of runEvents) {
+    const detailKey = LIFECYCLE_EVENT_KEY[event.type];
+    if (!detailKey) continue;
+    const run = runById.get(event.run_id);
+    const who: JourneyActorKind = run
+      ? run.actor_kind === "human"
+        ? "you"
+        : "agent"
+      : "cub";
     entries.push({
-      id: `run:${run.id}`,
-      at: run.finished_at || run.started_at || run.created_at || "",
-      who: run.actor_kind === "human" ? "you" : "agent",
-      what: run.summary,
+      id: `rev:${event.id}`,
+      at: event.created_at || "",
+      who,
+      what: event.summary || "",
+      detailKey,
       stationId: "run",
     });
   }

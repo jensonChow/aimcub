@@ -3,8 +3,8 @@
  * Renderer imports these as `import type` only, so this module is erased from the
  * renderer bundle — only main/preload pull in the channel constants at runtime.
  */
-import type { AimDraft, DecompositionOutput, Goal, ManualEvidenceRequiredItem, Memory, Milestone } from "@core/types";
-import type { AimIntakeReport, AimProgressReadModel, ContextHealthRow, ContextLineageLearningReport, ContextProfileReport, DecompositionLearningReport, DecompositionStrategyReport, PlanQualityReport, PlanReviewReport } from "@core/domain";
+import type { AimDraft, DecompositionOutput, Goal, ManualEvidenceRequiredItem, Memory, Milestone, RunEvent } from "@core/types";
+import type { AimIntakeReport, AimProgressReadModel, AimProgressSummary, ContextHealthRow, ContextLineageLearningReport, ContextProfileReport, DecompositionLearningReport, DecompositionStrategyReport, PlanQualityReport, PlanReviewReport } from "@core/domain";
 import type { LlmProvider } from "@core/llm/providers";
 import type { ContextSourceSettings, UpsertAimDraftInput } from "@core/store";
 import type {
@@ -375,6 +375,10 @@ export interface AimcubApi {
   listGoals(): Promise<Goal[]>;
   getGoal(id: string): Promise<GoalDetail | null>;
   getAimProgress(id: string): Promise<AimProgressReadModel | null>;
+  /** The run-lifecycle event stream for one aim — a separate call so it never bloats the hot `getAimProgress`. */
+  getAimJournal(id: string): Promise<RunEvent[]>;
+  /** A coarse per-aim progress rollup for every aim, so list surfaces avoid firing N `getAimProgress` calls. */
+  listAimProgressSummaries(): Promise<AimProgressSummary[]>;
   deleteGoal(id: string): Promise<void>;
   listAimDrafts(): Promise<AimDraft[]>;
   getAimDraft(id: string): Promise<AimDraft | null>;
@@ -422,6 +426,8 @@ export const IPC = {
   listGoals: "aimcub:listGoals",
   getGoal: "aimcub:getGoal",
   getAimProgress: "aimcub:getAimProgress",
+  getAimJournal: "aimcub:getAimJournal",
+  listAimProgressSummaries: "aimcub:listAimProgressSummaries",
   deleteGoal: "aimcub:deleteGoal",
   listAimDrafts: "aimcub:listAimDrafts",
   getAimDraft: "aimcub:getAimDraft",

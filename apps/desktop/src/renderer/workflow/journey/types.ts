@@ -60,8 +60,10 @@ export interface JourneyJournalEntry {
   /** ISO timestamp used only for ordering; the component formats the clock label. */
   at: string;
   who: JourneyActorKind;
-  /** Raw event text. */
+  /** Raw event text; empty for lifecycle events with no summary (fall back to `detailKey`). */
   what: string;
+  /** Suffix under the `glass.journal.event.*` namespace, for run-lifecycle rows with no raw summary. */
+  detailKey?: string;
   /** Station this entry drills into, if any. */
   stationId?: JourneyStationId;
 }

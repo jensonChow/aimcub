@@ -1,4 +1,4 @@
-import type { AimProgressMilestoneRead, AimProgressReadModel, Evidence, Run } from "@core/domain";
+import type { AimProgressMilestoneRead, AimProgressReadModel, Evidence, Memory, Run, RunEvent } from "@core/domain";
 import { describe, expect, it } from "vitest";
 
 import type { I18n } from "../../i18n";
@@ -86,6 +86,33 @@ function mkRun(o: { id: string; milestoneId: string; status: string; summary?: s
   } as Run;
 }
 
+function mkRunEvent(o: { id: string; runId: string; type: string; summary?: string; at: string }): RunEvent {
+  return {
+    id: o.id,
+    owner_id: OWNER,
+    run_id: o.runId,
+    type: o.type as never,
+    summary: o.summary ?? "",
+    payload: {},
+    created_at: o.at,
+  } as RunEvent;
+}
+
+function mkMemory(o: { id: string; content: string; category?: string; goalId?: string | null; status?: string }): Memory {
+  return {
+    id: o.id,
+    owner_id: OWNER,
+    goal_id: o.goalId ?? null,
+    kind: "semantic",
+    category: (o.category ?? "project_fact") as never,
+    content: o.content,
+    confidence: 1,
+    source: "user_stated",
+    status: (o.status ?? "active") as never,
+    superseded_by: null,
+  } as Memory;
+}
+
 function mkEvidence(o: { id: string; kind: string; summary: string; at: string }): AimProgressMilestoneRead["evidence"][number] {
   return {
     evidence: {
@@ -150,6 +177,20 @@ describe("buildJourneyStations", () => {
     expect(stations[5]).toMatchObject({ id: "eval", kind: "partial", lineVars: { done: 1, total: 2 } });
   });
 
+  it("derives a real research signal from gathered memories", () => {
+    const memories = [mkMemory({ id: "mem1", content: "User is on macOS" })];
+    const gathering = buildJourneyStations(mkProgress([]), memories);
+    expect(gathering[1]).toMatchObject({ id: "research", kind: "living", lineKey: "researchGathering", lineVars: { n: 1 } });
+
+    const ready = buildJourneyStations(mkProgress([mkRow({ id: "m1", title: "A" })]), memories);
+    expect(ready[1]).toMatchObject({ id: "research", kind: "done", lineKey: "researchReady", lineVars: { n: 1 } });
+  });
+
+  it("keeps research folded when a plan exists but no distinct memory was gathered", () => {
+    const stations = buildJourneyStations(mkProgress([mkRow({ id: "m1", title: "A" })]));
+    expect(stations[1]).toMatchObject({ id: "research", kind: "done", lineKey: "researchFolded" });
+  });
+
   it("marks run and eval done when the completion recap is complete", () => {
     const rows = [mkRow({ id: "m1", title: "A", completed: true })];
     const progress = mkProgress(rows, { completion_recap: { complete: true, final_outcome: "", completed_sub_aims: [], passing_evidence: [], eval_results: [], learned_context: [], evidence_empty_reason: "", context_empty_reason: "" } });
@@ -207,17 +248,44 @@ describe("buildJourneyTurns", () => {
 });
 
 describe("buildJourneyJournal", () => {
-  it("merges evidence and run summaries newest-first and drops timestampless rows", () => {
+  it("merges evidence and run-lifecycle events newest-first and drops timestampless rows", () => {
     const rows = [mkRow({ id: "m1", title: "A", evidence: [
       mkEvidence({ id: "e1", kind: "manual_check", summary: "you confirmed", at: "2026-07-11T13:00:00.000Z" }),
       mkEvidence({ id: "e2", kind: "mcp_report", summary: "agent report", at: "2026-07-11T14:00:00.000Z" }),
     ] })];
     const progress = mkProgress(rows);
-    progress.runs = [mkRun({ id: "r1", milestoneId: "m1", status: "completed", summary: "run done", finishedAt: "2026-07-11T13:30:00.000Z" })];
-    const journal = buildJourneyJournal(progress);
-    expect(journal.map((e) => e.id)).toEqual(["ev:e2", "run:r1", "ev:e1"]);
+    progress.runs = [mkRun({ id: "r1", milestoneId: "m1", status: "completed", summary: "run done" })];
+    const events = [
+      mkRunEvent({ id: "rev1", runId: "r1", type: "run.completed", summary: "run done", at: "2026-07-11T13:30:00.000Z" }),
+    ];
+    const journal = buildJourneyJournal(progress, events);
+    expect(journal.map((e) => e.id)).toEqual(["ev:e2", "rev:rev1", "ev:e1"]);
     expect(journal[0]).toMatchObject({ who: "agent", stationId: "eval" });
-    expect(journal[1]).toMatchObject({ who: "agent", stationId: "run" });
+    expect(journal[1]).toMatchObject({ who: "agent", stationId: "run", what: "run done" });
+  });
+
+  it("keeps only product-facing lifecycle events (drops queued / log / tool traces)", () => {
+    const progress = mkProgress([mkRow({ id: "m1", title: "A" })]);
+    progress.runs = [mkRun({ id: "r1", milestoneId: "m1", status: "running", actorKind: "human" })];
+    const events = [
+      mkRunEvent({ id: "q", runId: "r1", type: "run.queued", at: "2026-07-11T10:00:00.000Z" }),
+      mkRunEvent({ id: "l", runId: "r1", type: "run.log", summary: "chatter", at: "2026-07-11T10:01:00.000Z" }),
+      mkRunEvent({ id: "t", runId: "r1", type: "tool.started", at: "2026-07-11T10:02:00.000Z" }),
+      mkRunEvent({ id: "s", runId: "r1", type: "run.started", at: "2026-07-11T10:03:00.000Z" }),
+    ];
+    const journal = buildJourneyJournal(progress, events);
+    expect(journal.map((e) => e.id)).toEqual(["rev:s"]);
+    // No summary on the started event → the component falls back to detailKey; `who` from the human run.
+    expect(journal[0]).toMatchObject({ who: "you", what: "", detailKey: "started", stationId: "run" });
+  });
+
+  it("falls back to the neutral cub actor when a run event has no matching run", () => {
+    const progress = mkProgress([mkRow({ id: "m1", title: "A" })]);
+    progress.runs = [];
+    const journal = buildJourneyJournal(progress, [
+      mkRunEvent({ id: "orphan", runId: "gone", type: "run.failed", at: "2026-07-11T10:00:00.000Z" }),
+    ]);
+    expect(journal[0]).toMatchObject({ who: "cub", detailKey: "failed" });
   });
 });
 
@@ -233,7 +301,14 @@ describe("buildJourneyStationSheet", () => {
     expect(sheet.rows[1]).toMatchObject({ chip: "owner.agent", text: "Agent bit" });
   });
 
-  it("keeps the synthetic research station read-only", () => {
+  it("fills the read-only research station with gathered context memories", () => {
+    const memories = [mkMemory({ id: "mem1", content: "Prefers CLI tools", category: "preference" })];
+    const sheet = buildJourneyStationSheet("research", mkProgress([mkRow({ id: "m1", title: "x" })]), memories);
+    expect(sheet.actionStage).toBeNull();
+    expect(sheet.rows).toEqual([{ chip: "context", text: "Prefers CLI tools", meta: "preference" }]);
+  });
+
+  it("shows an empty read-only research station when nothing was gathered", () => {
     const sheet = buildJourneyStationSheet("research", mkProgress([mkRow({ id: "m1", title: "x" })]));
     expect(sheet.actionStage).toBeNull();
     expect(sheet.rows).toEqual([]);

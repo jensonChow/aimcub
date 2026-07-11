@@ -655,6 +655,10 @@ export function registerIpc(): void {
 
   ipcMain.handle(IPC.getAimProgress, (_e, id: string) => aimStore.getAimProgress(id));
 
+  ipcMain.handle(IPC.getAimJournal, (_e, id: string) => aimStore.listRunEvents(id));
+
+  ipcMain.handle(IPC.listAimProgressSummaries, () => aimStore.listAimProgressSummaries());
+
   ipcMain.handle(IPC.deleteGoal, (_e, id: string): Promise<void> => aimStore.deleteGoal(id));
 
   ipcMain.handle(IPC.listAimDrafts, () => aimStore.listAimDrafts());

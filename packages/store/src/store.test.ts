@@ -1578,3 +1578,37 @@ describe("context source settings (context-sources.json)", () => {
     expect(mode).toBe(0o600);
   });
 });
+
+describe("createJsonFileStore · run journal + progress summaries", () => {
+  it("lists an aim's run-lifecycle events oldest-first, scoped by goal", async () => {
+    // A monotonic clock gives every event a distinct, ascending created_at so the assertion
+    // exercises the sort comparator (a reversed sort would flip started/completed and fail),
+    // not merely insertion order.
+    let tick = 0;
+    const now = () => `2026-07-11T09:00:00.${String(tick++).padStart(3, "0")}Z`;
+    const store = createJsonFileStore(mkdtempSync(join(tmpdir(), "aimcub-store-")), { now });
+    const { goal, milestones } = await store.createGoal({ title: "Journal aim", plan: PLAN });
+    const other = await store.createGoal({ title: "Other aim", plan: PLAN });
+
+    const run = await store.createRun({ goalId: goal.id, milestoneId: milestones[0]!.id, actorKind: "agent", status: "running", summary: "started" });
+    await store.finishRun({ runId: run.id, status: "completed", summary: "done" });
+    // A run on a different aim must never leak into this aim's journal.
+    await store.createRun({ goalId: other.goal.id, milestoneId: other.milestones[0]!.id, actorKind: "agent", status: "running", summary: "other" });
+
+    const events = await store.listRunEvents(goal.id);
+    expect(events.every((event) => event.run_id === run.id)).toBe(true);
+    expect(events.map((event) => event.type)).toEqual(["run.started", "run.completed"]);
+  });
+
+  it("summarizes each aim coarsely in one pass", async () => {
+    const store = freshStore();
+    const { goal, milestones } = await store.createGoal({ title: "Summary aim", plan: PLAN });
+
+    const [pending] = await store.listAimProgressSummaries();
+    expect(pending).toMatchObject({ goal_id: goal.id, status: "needs_you", total: 2, completed: 0, running: 0 });
+
+    await store.createRun({ goalId: goal.id, milestoneId: milestones[0]!.id, actorKind: "agent", status: "running", summary: "x" });
+    const [running] = await store.listAimProgressSummaries();
+    expect(running).toMatchObject({ status: "running", running: 1 });
+  });
+});

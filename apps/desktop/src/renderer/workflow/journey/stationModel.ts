@@ -4,16 +4,18 @@
  *
  * Honest-data notes:
  * - Aim is "done" whenever a saved goal exists (the strip only renders for goals).
- * - Research has no distinct milestone/stage concept today (it is folded into
- *   planning/context), so it is a *synthetic* station keyed off whether a plan exists.
- *   Stage D may promote it to a real concept.
+ * - Research is derived from a real `@core` signal (`summarizeAimResearch`) over the
+ *   aim's gathered context memories + pending candidates, not a synthetic plan proxy.
  * - The remaining stations are derived from real milestone/run counts.
  */
-import type { AimProgressReadModel } from "@core/domain";
+import { summarizeAimResearch, type AimProgressReadModel, type Memory } from "@core/domain";
 
 import type { JourneyStation, JourneyStationKind } from "./types";
 
-export function buildJourneyStations(progress: AimProgressReadModel): JourneyStation[] {
+export function buildJourneyStations(
+  progress: AimProgressReadModel,
+  researchMemories: readonly Memory[] = [],
+): JourneyStation[] {
   const total = progress.total_milestones || progress.milestones.length;
   const completed = progress.completed_milestones;
   const planExists = total > 0;
@@ -22,9 +24,26 @@ export function buildJourneyStations(progress: AimProgressReadModel): JourneySta
 
   const aim: JourneyStation = { id: "aim", kind: "done", lineKey: "set" };
 
-  const research: JourneyStation = planExists
-    ? { id: "research", kind: "done", lineKey: "researchFolded" }
-    : { id: "research", kind: "up", lineKey: "notStarted" };
+  const researchSignal = summarizeAimResearch({
+    planExists,
+    memories: researchMemories,
+    contextCandidates: progress.context_candidates,
+  });
+  let research: JourneyStation;
+  if (researchSignal.status === "none") {
+    research = { id: "research", kind: "up", lineKey: "notStarted" };
+  } else if (researchSignal.status === "gathering") {
+    research = {
+      id: "research",
+      kind: "living",
+      lineKey: "researchGathering",
+      lineVars: { n: researchSignal.memoryCount + researchSignal.pendingCount },
+    };
+  } else if (researchSignal.memoryCount > 0) {
+    research = { id: "research", kind: "done", lineKey: "researchReady", lineVars: { n: researchSignal.memoryCount } };
+  } else {
+    research = { id: "research", kind: "done", lineKey: "researchFolded" };
+  }
 
   const context: JourneyStation = planExists
     ? { id: "context", kind: "living", lineKey: "contextLiving" }

@@ -5,6 +5,8 @@ import type {
   ActorKind,
   AimCompletionRecapRead,
   AimProgressReadModel,
+  AimProgressSummary,
+  AimProgressSummaryStatus,
   Assignment,
   AssignmentSource,
   AssignmentStatus,
@@ -845,6 +847,72 @@ export function buildAimProgressReadModel(input: BuildAimProgressInput): AimProg
     blocked_count: milestones.filter((row) => row.blocked).length,
     next_action: incomplete?.next_action ?? "Aim is complete.",
   };
+}
+
+/**
+ * A cheap per-aim progress rollup for list surfaces (sidebar rows, Home cards).
+ * Coarse on purpose — it reads milestone/assignment/run *status* only, so a batch
+ * endpoint can summarize every aim in one store pass instead of firing N
+ * `getAimProgress` calls (each of which runs the full `evaluate()` pipeline).
+ */
+export function summarizeAimProgress(input: {
+  goal: Goal;
+  milestones: readonly Milestone[];
+  assignments?: readonly Assignment[];
+  runs?: readonly Run[];
+}): AimProgressSummary {
+  const assignments = input.assignments ?? [];
+  const runs = input.runs ?? [];
+  const total = input.milestones.length;
+  const completed = input.milestones.filter((milestone) => milestone.status === "completed").length;
+  const running = runs.filter((run) => run.status === "running").length;
+  const blocked = input.milestones.filter((milestone) =>
+    milestone.status === "blocked"
+    || assignments.some((assignment) => assignment.milestone_id === milestone.id && assignment.status === "blocked"),
+  ).length;
+
+  let status: AimProgressSummaryStatus;
+  if (input.goal.status === "achieved" || (total > 0 && completed >= total)) status = "complete";
+  else if (total === 0) status = "planning";
+  else if (running > 0) status = "running";
+  else if (blocked > 0) status = "blocked";
+  else status = "needs_you";
+
+  return { goal_id: input.goal.id, status, total, completed, blocked, running };
+}
+
+export type AimResearchStatus = "none" | "gathering" | "ready";
+
+export interface AimResearchSignal {
+  status: AimResearchStatus;
+  /** Count of gathered context/research memories in play for this aim. */
+  memoryCount: number;
+  /** Count of pending research/context candidates still being distilled. */
+  pendingCount: number;
+}
+
+/**
+ * Derives a real research/context-gathering signal for an aim from the memory
+ * substrate, replacing the earlier synthetic "a plan exists → research is done"
+ * proxy. Research has no distinct milestone/stage concept — it is the context an
+ * aim accrued before and during planning — so the honest signal is the gathered
+ * memory count plus any pending candidates still being distilled. Pure: callers
+ * pass the aim-relevant active memories (aim-scoped + global) and pending candidates.
+ */
+export function summarizeAimResearch(input: {
+  planExists: boolean;
+  memories?: readonly Memory[];
+  contextCandidates?: readonly Memory[];
+}): AimResearchSignal {
+  const memoryCount = (input.memories ?? []).filter((memory) => memory.status === "active").length;
+  const pendingCount = (input.contextCandidates ?? []).length;
+
+  let status: AimResearchStatus;
+  if (input.planExists) status = "ready";
+  else if (memoryCount > 0 || pendingCount > 0) status = "gathering";
+  else status = "none";
+
+  return { status, memoryCount, pendingCount };
 }
 
 export function attributeEvidence(input: {

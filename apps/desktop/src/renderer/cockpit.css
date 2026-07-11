@@ -756,7 +756,8 @@ kbd {
   width: 100%;
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 8px;
   align-items: center;
   min-height: 36px;
   padding: 0 var(--sidebar-row-padding-x);
@@ -820,6 +821,21 @@ kbd {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Per-aim status marker — a quiet trailing dot, not a status subtitle. */
+.od-aim-progress-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--faint);
+}
+
+.od-aim-progress-dot.is-complete { background: var(--okdot); }
+.od-aim-progress-dot.is-running { background: var(--acc); animation: od-journey-pulse 1.4s ease-in-out infinite; }
+.od-aim-progress-dot.is-needs_you { background: var(--warndot); }
+.od-aim-progress-dot.is-blocked { background: var(--danger); }
+.od-aim-progress-dot.is-planning { background: transparent; box-shadow: inset 0 0 0 1.5px var(--faint); }
 
 .od-aim-card .od-aim-row-main > span,
 .od-content-entry-copy > span,
@@ -6997,6 +7013,7 @@ kbd {
   flex: 1;
   min-width: 0;
   display: grid;
+  gap: 5px;
 }
 
 .od-home-card-title {
@@ -7008,6 +7025,50 @@ kbd {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.od-home-card-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.od-home-card-bar {
+  flex: 1;
+  min-width: 0;
+  height: 6px;
+  border-radius: var(--od-radius-pill);
+  background: var(--edge);
+  overflow: hidden;
+}
+
+.od-home-card-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--od-radius-pill);
+  background: var(--acc);
+  transition: width 180ms ease;
+}
+
+.od-home-card-progress-text {
+  flex: none;
+  font-size: var(--od-type-meta);
+  color: var(--mut);
+}
+
+.od-home-card-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--faint);
+}
+
+.od-home-card-dot.is-complete { background: var(--okdot); }
+.od-home-card-dot.is-running { background: var(--acc); animation: od-journey-pulse 1.4s ease-in-out infinite; }
+.od-home-card-dot.is-needs_you { background: var(--warndot); }
+.od-home-card-dot.is-blocked { background: var(--danger); }
+.od-home-card-dot.is-planning { background: transparent; box-shadow: inset 0 0 0 1.5px var(--faint); }
 
 /* ── Home — first run ── */
 .od-home-firstrun {

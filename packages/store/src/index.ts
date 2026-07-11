@@ -28,6 +28,7 @@ import {
   isPromptLikeContextCandidate,
   planMerge,
   routeMilestones,
+  summarizeAimProgress,
   validatePlan,
 } from "@core/domain";
 // DecompositionOutput is imported as a VALUE (the Zod schema) so the store can re-validate
@@ -47,6 +48,7 @@ import type {
   AimDraftStatus,
   AimDraftSurface,
   AimProgressReadModel,
+  AimProgressSummary,
   Assignment,
   AssignmentSource,
   AssignmentStatus,
@@ -353,10 +355,14 @@ export interface AimStore {
   createRun(input: CreateRunInput): Promise<Run>;
   appendRunEvent(input: AppendRunEventInput): Promise<RunEvent | null>;
   finishRun(input: FinishRunInput): Promise<Run | null>;
+  /** The full run-lifecycle event stream for one aim (run events carry no goal id, so this joins run → goal). */
+  listRunEvents(goalId: string): Promise<RunEvent[]>;
   recordToolTrace(input: RecordToolTraceInput): Promise<ToolTrace>;
   createContextIntakeSession(input: CreateContextIntakeSessionInput): Promise<ContextIntakeSession>;
   sedimentContextFromGoal(goalId: string): Promise<Memory[]>;
   getAimProgress(goalId: string): Promise<AimProgressReadModel | null>;
+  /** A cheap coarse progress rollup for every aim (list surfaces), in one store pass. */
+  listAimProgressSummaries(): Promise<AimProgressSummary[]>;
   exportData(): Promise<LocalStore>;
   importData(snapshot: LocalStore, mode?: "merge" | "replace"): Promise<ImportStoreResult>;
 }
@@ -1860,6 +1866,15 @@ export function createJsonFileStore(dataDir: string = defaultDataDir(), options:
       return run;
     },
 
+    async listRunEvents(goalId: string): Promise<RunEvent[]> {
+      const store = load();
+      const runIds = new Set(store.runs.filter((run) => run.goal_id === goalId).map((run) => run.id));
+      return store.runEvents
+        .filter((event) => runIds.has(event.run_id))
+        .slice()
+        .sort((a, b) => (a.created_at ?? "").localeCompare(b.created_at ?? ""));
+    },
+
     async recordToolTrace(input: RecordToolTraceInput): Promise<ToolTrace> {
       const store = load();
       const now = nowIso();
@@ -1977,6 +1992,18 @@ export function createJsonFileStore(dataDir: string = defaultDataDir(), options:
         contextCandidates,
         acceptedContext,
       });
+    },
+
+    async listAimProgressSummaries(): Promise<AimProgressSummary[]> {
+      const store = load();
+      return store.goals.map((goal) =>
+        summarizeAimProgress({
+          goal,
+          milestones: store.milestonesByGoal[goal.id] ?? [],
+          assignments: store.assignments.filter((assignment) => assignment.goal_id === goal.id),
+          runs: store.runs.filter((run) => run.goal_id === goal.id),
+        }),
+      );
     },
 
     async exportData(): Promise<LocalStore> {

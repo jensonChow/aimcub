@@ -10,15 +10,17 @@
  * The empty/first-run state must never auto-render the aim composer — the primary
  * action is a "Set your first aim" button that opens New Aim explicitly.
  */
-import type { AimDraft, Goal } from "@core/types";
+import type { AimDraft, AimProgressSummary, Goal } from "@core/types";
 
 import { useI18n } from "../../i18n";
 import { aimNavigationLabels } from "../../workflow/aimNavigationTitle";
+import { PROGRESS_STATUS_KEY, progressRatio } from "../../workflow/progressSummary";
 import { AimDraftHomeSection } from "../aim/AimDraftRecovery";
 
 export interface HomeViewProps {
   goals?: Goal[];
   drafts?: AimDraft[];
+  progressSummaries?: Record<string, AimProgressSummary>;
   planningRuntimeReady?: boolean;
   onOpenGoal?: (goal: Goal) => void;
   onNewAim?: () => void;
@@ -55,6 +57,8 @@ export function HomeView(props: HomeViewProps) {
           <div className="od-home-card-list">
             {goals.map((goal) => {
               const nav = aimNavigationLabels({ title: goal.title, plan: goal.plan_json });
+              const summary = props.progressSummaries?.[goal.id];
+              const statusLabel = summary ? t(PROGRESS_STATUS_KEY[summary.status]) : "";
               return (
                 <button
                   className="od-home-card"
@@ -66,7 +70,25 @@ export function HomeView(props: HomeViewProps) {
                 >
                   <span className="od-home-card-main">
                     <strong className="od-home-card-title">{nav.label}</strong>
+                    {summary && summary.total > 0 ? (
+                      <span className="od-home-card-progress">
+                        <span className="od-home-card-bar">
+                          <span className="od-home-card-bar-fill" style={{ width: `${progressRatio(summary) * 100}%` }} />
+                        </span>
+                        <span className="od-home-card-progress-text">{summary.completed}/{summary.total}</span>
+                      </span>
+                    ) : summary ? (
+                      <span className="od-home-card-progress-text">{statusLabel}</span>
+                    ) : null}
                   </span>
+                  {summary ? (
+                    <span
+                      className={`od-home-card-dot is-${summary.status}`}
+                      role="img"
+                      aria-label={statusLabel}
+                      title={statusLabel}
+                    />
+                  ) : null}
                 </button>
               );
             })}

@@ -11,7 +11,7 @@
  * automatically on any real navigation (stage change unmounts this view; goal change
  * remounts it). Actual mutations route through the existing epoch-safe App handlers.
  */
-import type { AimProgressReadModel, Goal, Milestone } from "@core/domain";
+import type { AimProgressReadModel, Goal, Memory, Milestone, RunEvent } from "@core/domain";
 import { useState } from "react";
 
 import { useI18n, type StringKey } from "../../i18n";
@@ -27,6 +27,7 @@ import {
   type JourneyChip,
   type JourneyStationId,
   type JourneyStationKind,
+  type JourneyStationSheetRow,
 } from "../../workflow/journey";
 
 const STATION_NAME_KEY: Record<JourneyStationId, StringKey> = {
@@ -56,6 +57,16 @@ const ACTOR_KEY: Record<JourneyActorKind, StringKey> = {
   cub: "glass.actor.cub",
 };
 
+/** Localized labels for the memory-category `meta` shown on context/research sheet rows. */
+const MEMORY_CAT_KEY: Record<string, StringKey> = {
+  preference: "glass.memory.cat.preference",
+  constraint: "glass.memory.cat.constraint",
+  capability: "glass.memory.cat.capability",
+  eval_signal: "glass.memory.cat.eval_signal",
+  project_fact: "glass.memory.cat.project_fact",
+  procedure: "glass.memory.cat.procedure",
+};
+
 function stationGlyphClass(kind: JourneyStationKind): string {
   return `od-journey-dot od-journey-dot-${kind}`;
 }
@@ -73,6 +84,10 @@ function formatClock(iso: string): string {
 export interface JourneyViewProps {
   goal: Goal;
   progress: AimProgressReadModel | null;
+  /** The aim's run-lifecycle event stream (loaded separately from progress). */
+  runEvents?: RunEvent[];
+  /** Active context/research memories in play for this aim (aim-scoped + global). */
+  researchMemories?: Memory[];
   disabled?: boolean;
   onOpenStage: (stage: CockpitStage) => void;
   onRunAgent: (milestone: Milestone) => void;
@@ -82,6 +97,13 @@ export interface JourneyViewProps {
 export function JourneyView(props: JourneyViewProps) {
   const { t } = useI18n();
   const tk = (key: string, vars?: Record<string, string | number>) => t(key as StringKey, vars);
+  // Sheet `meta` is a raw memory-category enum only on context/research rows; localize those,
+  // pass other metas (run/eval status, "done"/"blocked") through verbatim.
+  const sheetMetaLabel = (row: JourneyStationSheetRow): string => {
+    if (!row.meta) return "";
+    const catKey = row.chip === "context" ? MEMORY_CAT_KEY[row.meta] : undefined;
+    return catKey ? tk(catKey) : row.meta;
+  };
   const [openStation, setOpenStation] = useState<JourneyStationId | null>(null);
   const { progress, goal } = props;
 
@@ -101,12 +123,13 @@ export function JourneyView(props: JourneyViewProps) {
     );
   }
 
-  const stations = buildJourneyStations(progress);
+  const researchMemories = props.researchMemories ?? [];
+  const stations = buildJourneyStations(progress, researchMemories);
   const move = buildJourneyYourMove(progress, t);
   const ambient = buildJourneyAmbient(progress);
   const turns = buildJourneyTurns(progress, t, Date.now());
-  const journal = buildJourneyJournal(progress);
-  const sheet = openStation ? buildJourneyStationSheet(openStation, progress) : null;
+  const journal = buildJourneyJournal(progress, props.runEvents ?? []);
+  const sheet = openStation ? buildJourneyStationSheet(openStation, progress, researchMemories) : null;
   const headMeta = `${progress.completed_milestones}/${progress.total_milestones}`;
 
   const moveMilestone = move
@@ -200,7 +223,9 @@ export function JourneyView(props: JourneyViewProps) {
             <div className="od-journey-journal-row" key={entry.id}>
               <span className="od-journey-journal-time">{formatClock(entry.at)}</span>
               <span className={`od-journey-chip od-journey-chip-${entry.who}`}>{tk(ACTOR_KEY[entry.who])}</span>
-              <span className="od-journey-journal-what">{entry.what}</span>
+              <span className="od-journey-journal-what">
+                {entry.what || (entry.detailKey ? tk(`glass.journal.event.${entry.detailKey}`) : "")}
+              </span>
               {entry.stationId ? (
                 <button
                   className="od-journey-journal-view"
@@ -247,7 +272,7 @@ export function JourneyView(props: JourneyViewProps) {
                   <div className="od-journey-sheet-row" key={`${row.chip}-${index}`}>
                     <span className={`od-journey-chip od-journey-chip-${row.chip.split(".")[0]}`}>{tk(CHIP_KEY[row.chip])}</span>
                     <span className="od-journey-sheet-text">{row.text}</span>
-                    {row.meta ? <span className="od-journey-sheet-meta">{row.meta}</span> : null}
+                    {row.meta ? <span className="od-journey-sheet-meta">{sheetMetaLabel(row)}</span> : null}
                   </div>
                 ))}
               </div>

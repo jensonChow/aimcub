@@ -775,6 +775,31 @@ export const AimProgressReadModel = z.object({
 });
 export type AimProgressReadModel = z.infer<typeof AimProgressReadModel>;
 
+export const AimProgressSummaryStatus = z.enum([
+  "planning",
+  "needs_you",
+  "running",
+  "blocked",
+  "complete",
+]);
+export type AimProgressSummaryStatus = z.infer<typeof AimProgressSummaryStatus>;
+
+/**
+ * A coarse per-aim progress rollup for list surfaces (sidebar rows, Home cards).
+ * Cheap to compute in one pass so a batch endpoint can summarize every aim without
+ * running the full `evaluate()` pipeline per milestone — the derivation lives in
+ * `@core` (`summarizeAimProgress`), never in the app shell.
+ */
+export const AimProgressSummary = z.object({
+  goal_id: DbId,
+  status: AimProgressSummaryStatus,
+  total: z.number().int().nonnegative().default(0),
+  completed: z.number().int().nonnegative().default(0),
+  blocked: z.number().int().nonnegative().default(0),
+  running: z.number().int().nonnegative().default(0),
+});
+export type AimProgressSummary = z.infer<typeof AimProgressSummary>;
+
 export const Subscription = z.object({
   owner_id: DbId,
   source: SubscriptionSource,

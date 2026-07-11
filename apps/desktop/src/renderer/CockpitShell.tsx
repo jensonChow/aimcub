@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
-import type { AimDraft, Goal } from "@core/types";
+import type { AimDraft, AimProgressSummary, Goal } from "@core/types";
 
 import type { WindowChromeState } from "../shared/ipc";
 import { useI18n, type Lang } from "./i18n";
 import { AimDraftSidebarRows } from "./stages/aim/AimDraftRecovery";
 import { aimMatchesNavigationQuery, aimNavigationLabels } from "./workflow/aimNavigationTitle";
+import { PROGRESS_STATUS_KEY } from "./workflow/progressSummary";
 import {
   availableWorkbenchStages,
   hasWorkbenchNavigation,
@@ -48,6 +49,7 @@ export interface CockpitCommand {
 interface CockpitShellProps {
   goals: Goal[];
   drafts?: AimDraft[];
+  progressSummaries?: Record<string, AimProgressSummary>;
   activeStage: CockpitStage;
   workspaceTarget: WorkspaceTarget;
   onHome: () => void;
@@ -111,6 +113,7 @@ function persistThemePref(pref: ThemePref) {
 export function CockpitShell({
   goals,
   drafts = [],
+  progressSummaries,
   activeStage,
   workspaceTarget,
   onHome,
@@ -633,6 +636,7 @@ export function CockpitShell({
                   {visibleGoals.map((goal) => {
                     const selectedGoal = workspaceTarget.kind === "goal" && workspaceTarget.id === goal.id && activeStage !== "memory";
                     const navigationTitle = aimNavigationLabels({ title: goal.title, plan: goal.plan_json });
+                    const summary = progressSummaries?.[goal.id];
                     return (
                       <button
                         key={goal.id}
@@ -646,6 +650,14 @@ export function CockpitShell({
                         <span className="od-aim-row-main">
                           <strong>{navigationTitle.label}</strong>
                         </span>
+                        {summary ? (
+                          <span
+                            className={`od-aim-progress-dot is-${summary.status}`}
+                            role="img"
+                            aria-label={t(PROGRESS_STATUS_KEY[summary.status])}
+                            title={t(PROGRESS_STATUS_KEY[summary.status])}
+                          />
+                        ) : null}
                       </button>
                     );
                   })}

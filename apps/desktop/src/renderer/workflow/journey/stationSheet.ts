@@ -4,7 +4,7 @@
  * the component localizes). The sheet is an overlay: opening it must never touch the
  * workspace/surface navigation epochs.
  */
-import type { AimProgressReadModel } from "@core/domain";
+import type { AimProgressReadModel, Memory } from "@core/domain";
 
 import { isHumanExecuteRoute } from "../../stages/execute/executePrimaryAction";
 import type { CockpitStage } from "../workspaceNavigation";
@@ -12,7 +12,10 @@ import type { JourneyStationId, JourneyStationSheet, JourneyStationSheetRow } fr
 
 const ACTION_STAGE: Record<JourneyStationId, CockpitStage | null> = {
   aim: "aim",
-  research: null, // synthetic station — read-only until Stage D
+  // Research is a read-only receipt of what the aim has gathered; the actionable
+  // context surface is the Context station, so this stays CTA-less to avoid two
+  // stations pointing at the same stage.
+  research: null,
   context: "context",
   plan: "contracts",
   run: "run",
@@ -45,8 +48,8 @@ function evalRows(progress: AimProgressReadModel): JourneyStationSheetRow[] {
   }));
 }
 
-function contextRows(progress: AimProgressReadModel): JourneyStationSheetRow[] {
-  return progress.context_candidates.map((memory) => ({
+function memoryRows(memories: readonly Memory[]): JourneyStationSheetRow[] {
+  return memories.map((memory) => ({
     chip: "context",
     text: memory.content,
     meta: memory.category,
@@ -56,6 +59,7 @@ function contextRows(progress: AimProgressReadModel): JourneyStationSheetRow[] {
 export function buildJourneyStationSheet(
   station: JourneyStationId,
   progress: AimProgressReadModel,
+  researchMemories: readonly Memory[] = [],
 ): JourneyStationSheet {
   let rows: JourneyStationSheetRow[];
   switch (station) {
@@ -63,8 +67,12 @@ export function buildJourneyStationSheet(
       rows = [{ chip: "aim", text: progress.goal.title, meta: undefined }];
       if (progress.goal.description) rows.push({ chip: "aim", text: progress.goal.description });
       break;
+    case "research":
+      // The real gathered context in play for this aim (aim-scoped + global memories).
+      rows = memoryRows(researchMemories);
+      break;
     case "context":
-      rows = contextRows(progress);
+      rows = memoryRows(progress.context_candidates);
       break;
     case "plan":
       rows = planRows(progress);
@@ -75,7 +83,6 @@ export function buildJourneyStationSheet(
     case "eval":
       rows = evalRows(progress);
       break;
-    case "research":
     default:
       rows = [];
       break;

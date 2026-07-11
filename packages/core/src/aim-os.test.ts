@@ -21,6 +21,8 @@ import {
   evaluateWithRuntimeReport,
   recommendAssignmentForMilestone,
   routingRecommendationForPlanNode,
+  summarizeAimProgress,
+  summarizeAimResearch,
   validatePlanRouting,
 } from "./aim-os";
 
@@ -736,5 +738,94 @@ describe("Aim OS cockpit read model", () => {
     });
 
     expect(model.completion_recap).toBeNull();
+  });
+});
+
+describe("summarizeAimProgress", () => {
+  it("reports planning when an aim has no milestones yet", () => {
+    const summary = summarizeAimProgress({ goal: goal(), milestones: [] });
+    expect(summary).toMatchObject({ goal_id: GOAL, status: "planning", total: 0, completed: 0 });
+  });
+
+  it("reports needs_you when work is incomplete and nothing is running", () => {
+    const summary = summarizeAimProgress({
+      goal: goal(),
+      milestones: [milestone({ id: "m1", status: "pending" }), milestone({ id: "m2", status: "completed" })],
+    });
+    expect(summary).toMatchObject({ status: "needs_you", total: 2, completed: 1, running: 0 });
+  });
+
+  it("prefers running over blocked, and blocked over needs_you", () => {
+    const running = summarizeAimProgress({
+      goal: goal(),
+      milestones: [milestone({ id: "m1", status: "blocked" }), milestone({ id: "m2", status: "pending" })],
+      runs: [runRow({ id: "r1", milestone_id: "m2", assignment_id: null, status: "running" })],
+    });
+    expect(running).toMatchObject({ status: "running", blocked: 1, running: 1 });
+
+    const blocked = summarizeAimProgress({
+      goal: goal(),
+      milestones: [milestone({ id: "m1", status: "blocked" }), milestone({ id: "m2", status: "pending" })],
+    });
+    expect(blocked).toMatchObject({ status: "blocked", blocked: 1, running: 0 });
+  });
+
+  it("counts an assignment-level block even when the milestone status is not blocked", () => {
+    const summary = summarizeAimProgress({
+      goal: goal(),
+      milestones: [milestone({ id: "m1", status: "pending" })],
+      assignments: [assignmentRow({ id: "a1", milestone_id: "m1", actor_kind: "agent", status: "blocked" })],
+    });
+    expect(summary).toMatchObject({ status: "blocked", blocked: 1 });
+  });
+
+  it("reports complete when every milestone is done or the goal is achieved", () => {
+    const done = summarizeAimProgress({
+      goal: goal(),
+      milestones: [milestone({ id: "m1", status: "completed" }), milestone({ id: "m2", status: "completed" })],
+    });
+    expect(done).toMatchObject({ status: "complete", total: 2, completed: 2 });
+
+    const achieved = summarizeAimProgress({
+      goal: { ...goal(), status: "achieved" },
+      milestones: [milestone({ id: "m1", status: "pending" })],
+    });
+    expect(achieved.status).toBe("complete");
+  });
+});
+
+describe("summarizeAimResearch", () => {
+  it("reports none when nothing has been gathered and no plan exists", () => {
+    expect(summarizeAimResearch({ planExists: false })).toMatchObject({ status: "none", memoryCount: 0, pendingCount: 0 });
+  });
+
+  it("reports gathering from active memories or pending candidates before a plan exists", () => {
+    const fromMemories = summarizeAimResearch({
+      planExists: false,
+      memories: [memoryRow({ id: "mem1", content: "macOS user", category: "project_fact", status: "active" })],
+    });
+    expect(fromMemories).toMatchObject({ status: "gathering", memoryCount: 1 });
+
+    const fromCandidates = summarizeAimResearch({
+      planExists: false,
+      contextCandidates: [memoryRow({ id: "cand1", content: "pending fact", category: "project_fact", status: "pending" })],
+    });
+    expect(fromCandidates).toMatchObject({ status: "gathering", pendingCount: 1 });
+  });
+
+  it("ignores non-active memories when counting gathered research", () => {
+    const signal = summarizeAimResearch({
+      planExists: false,
+      memories: [memoryRow({ id: "mem1", content: "archived", category: "project_fact", status: "deleted" })],
+    });
+    expect(signal).toMatchObject({ status: "none", memoryCount: 0 });
+  });
+
+  it("reports ready once a plan exists, carrying the gathered memory count", () => {
+    const signal = summarizeAimResearch({
+      planExists: true,
+      memories: [memoryRow({ id: "mem1", content: "macOS user", category: "project_fact", status: "active" })],
+    });
+    expect(signal).toMatchObject({ status: "ready", memoryCount: 1 });
   });
 });

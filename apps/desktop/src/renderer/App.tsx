@@ -4,6 +4,7 @@ import {
   validateExecutablePlan,
   validatePlanRouting,
   type AimProgressReadModel,
+  type AimProgressSummary,
 } from "@core/domain";
 import type { ClarifyAnswer, ClarifyOutput } from "@core/llm";
 import type {
@@ -13,6 +14,7 @@ import type {
   Goal,
   Memory,
   Milestone,
+  RunEvent,
 } from "@core/types";
 import type {
   ClarifyIpcResult,
@@ -162,6 +164,8 @@ function AimOsApp() {
   const [selected, setSelectedState] = useState<Goal | null>(null);
   const [detail, setDetail] = useState<GoalDetail | null>(null);
   const [progress, setProgress] = useState<AimProgressReadModel | null>(null);
+  const [journalEvents, setJournalEvents] = useState<RunEvent[]>([]);
+  const [progressSummaries, setProgressSummaries] = useState<Record<string, AimProgressSummary>>({});
   const [provider, setProvider] = useState<ProviderStatus | null>(null);
   const [webResearch, setWebResearch] = useState<WebResearchStatus | null>(null);
   const [contextSources, setContextSources] = useState<ContextSourceStatus | null>(null);
@@ -372,6 +376,31 @@ function AimOsApp() {
     setBusy(null);
   }
 
+  function applyProgressSummaries(summaries: AimProgressSummary[]) {
+    setProgressSummaries(Object.fromEntries(summaries.map((summary) => [summary.goal_id, summary])));
+  }
+
+  async function refreshProgressSummaries() {
+    // Goal-independent list rollup (all aims): safe to fire-and-forget after any side
+    // effect. On failure keep the last known dots rather than clearing them.
+    try {
+      applyProgressSummaries(await window.aimcub.listAimProgressSummaries());
+    } catch {
+      /* keep last-known summaries */
+    }
+  }
+
+  async function refreshListSurfaces() {
+    // The goal-independent list rollups that Stage-D surfaces read: the sidebar/Home
+    // status dots (progressSummaries) and the Journey research station + memory count
+    // (memories). Fire-and-forget after any side effect that can change them; keep the
+    // last-known values on failure rather than clearing a live surface.
+    await Promise.all([
+      refreshProgressSummaries(),
+      window.aimcub.listMemories().then(setMemories).catch(() => undefined),
+    ]);
+  }
+
   async function refreshAll(options: { autoOpenFirstGoal?: boolean } = {}) {
     const transitionAtStart = navigationConcurrencyRef.current.workspace;
     const surfaceAtStart = navigationConcurrencyRef.current.surface;
@@ -381,6 +410,7 @@ function AimOsApp() {
       window.aimcub.getContextSourceConfig().then(setContextSources).catch(() => setContextSources(null)),
       window.aimcub.listLocalAgents().then(setLocalAgents).catch(() => setLocalAgents([])),
       window.aimcub.listMemories().then(setMemories).catch(() => setMemories([])),
+      window.aimcub.listAimProgressSummaries().then(applyProgressSummaries).catch(() => setProgressSummaries({})),
     ]).then(() => undefined);
     const [nextGoals, nextDrafts] = await Promise.all([
       window.aimcub.listGoals().catch(() => []),
@@ -444,6 +474,7 @@ function AimOsApp() {
       setActiveDraftId(null);
       setDetail(null);
       setProgress(null);
+      setJournalEvents([]);
       setStageOverride("aim");
       setError(null);
       setDraftSaveBlock(null);
@@ -477,13 +508,16 @@ function AimOsApp() {
     options: { route?: boolean } = {},
   ) {
     if (!goal) return;
-    const [nextDetail, nextProgress] = await Promise.all([
+    const [nextDetail, nextProgress, nextJournal] = await Promise.all([
       window.aimcub.getGoal(goal.id),
       window.aimcub.getAimProgress(goal.id),
+      // The run-lifecycle journal is non-critical: a failure here must not break goal loading.
+      window.aimcub.getAimJournal(goal.id).catch(() => [] as RunEvent[]),
     ]);
     if (!isCurrentWorkspaceTransition(transition)) return;
     setDetail(nextDetail);
     setProgress(nextProgress);
+    setJournalEvents(nextJournal);
     if (options.route !== false && isCurrentSurfaceTransition(surfaceTransition)) {
       setStageOverride(stageForOpenedAim(nextProgress));
     }
@@ -494,6 +528,7 @@ function AimOsApp() {
     transition: number,
     surfaceTransition: number,
   ) {
+    void refreshListSurfaces();
     if (isCurrentWorkspaceTransition(transition)) {
       await refreshGoalState(goal, transition, surfaceTransition, { route: false });
       return;
@@ -536,6 +571,7 @@ function AimOsApp() {
     setBusy(null);
     setDetail(null);
     setProgress(null);
+    setJournalEvents([]);
     setError(null);
   }
 
@@ -806,6 +842,7 @@ function AimOsApp() {
     setBusy(null);
     setDetail(null);
     setProgress(null);
+    setJournalEvents([]);
     setActiveDraftId(hydrated.id);
     setAimSurfaceMode(hydrated.aimSurface);
     setAimEditBuffer(null);
@@ -1183,6 +1220,10 @@ function AimOsApp() {
         }
         return false;
       }
+      // Confirmation mutated the store (a milestone completed → the aim's rollup can flip
+      // to complete): this path bypasses refreshGoalAfterSideEffect, so refresh the
+      // list-surface dots/counts explicitly. Goal-independent, safe to fire-and-forget.
+      void refreshListSurfaces();
       const mutationTargetIsCurrent = isCurrentWorkspaceTransition(transition)
         || selectedGoalRef.current?.id === goal.id;
       if (mutationTargetIsCurrent) setDetail(outcome.detail);
@@ -1735,6 +1776,8 @@ function AimOsApp() {
           key={selected.id}
           goal={selected}
           progress={progress}
+          runEvents={journalEvents}
+          researchMemories={memories.filter((memory) => memory.goal_id === selected.id || memory.goal_id === null)}
           disabled={Boolean(busy)}
           onOpenStage={openCockpitStage}
           onRunAgent={(milestone) => void runAgent(milestone)}
@@ -1783,6 +1826,7 @@ function AimOsApp() {
       <HomeView
         goals={goals}
         drafts={aimDrafts}
+        progressSummaries={progressSummaries}
         planningRuntimeReady={planningRuntimeReady}
         onOpenGoal={(goal) => void openGoal(goal)}
         onNewAim={() => void startNewAim()}
@@ -1797,6 +1841,7 @@ function AimOsApp() {
     <CockpitShell
       goals={goals}
       drafts={aimDrafts}
+      progressSummaries={progressSummaries}
       activeStage={activeStage}
       workspaceTarget={workspaceTarget}
       onHome={() => void openHomePanel()}
