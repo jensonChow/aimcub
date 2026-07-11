@@ -1,7 +1,7 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-11
-Branch: `glass-stage-b` (feature branch off `main`; Stage B committed, ready to merge to `main`)
+Branch: `main` (Stage B merged to `main` and pushed to origin; built on branch `glass-stage-b`)
 
 ## Current Session
 
@@ -88,9 +88,10 @@ Approved plan: `~/.claude/plans/giggly-herding-pine.md`.
 
 ## Commit And Push Status
 
-- Stage B is committed on `glass-stage-b`, green on the full gate. Not yet merged to `main`.
-- Nothing pushed. Fresh explicit user approval is required before any push (and before merging if
-  the user prefers to review the branch first).
+- Stage B (`f0ffee10`) is committed, green on the full gate, merged to `main`, and **pushed to
+  origin** (user-authorized this session). Stages 0/A/C were already on origin/main.
+- The root `Aimcub.app` was NOT repacked (Stage E step). Future pushes still require explicit
+  per-session approval.
 
 ## Open Risks / Notes
 
