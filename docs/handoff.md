@@ -1,9 +1,8 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-11
-Branch: `main`. Journey-first **Stages 1 & 2** are committed, merged, and **pushed** (origin/main =
-`04f799b1`). This session's **Stage 3** (fold Context into the Journey sheet) is committed + merged to
-**local** `main`, **not pushed** — offer to push.
+Branch: `main`. Journey-first **Stages 1–3** are committed, merged, and **pushed** (origin/main =
+`fdfb238f`). Stage 3 = fold Context into the Journey sheet.
 
 ## Active epic — Journey-first rebuild (staged)
 
@@ -63,8 +62,8 @@ Plan: `~/.claude/plans/drifting-singing-pebble.md`.
 
 ## Commit / push
 
-- Journey-first Stage 3: committed + merged to **local** `main`, **not pushed** — ask before
-  `git push origin main`. (origin/main is still `04f799b1` = Stages 1–2.)
+- Journey-first Stage 3: committed + merged to `main` and **pushed** (origin/main = `fdfb238f`;
+  commits `4429c4e1` feature + `fdfb238f` merge).
 
 ## Open risks / notes
 
@@ -78,8 +77,8 @@ Plan: `~/.claude/plans/drifting-singing-pebble.md`.
 ## Next session prompt
 
 ```text
-Journey-first rebuild: Stages 1–3 done (Stage 3 = Context folded into the Journey sheet; on LOCAL main
-but NOT pushed — offer to push). Read docs/handoff.md + the epic plan
+Journey-first rebuild: Stages 1–3 done + pushed (Stage 3 = Context folded into the Journey sheet;
+origin/main=fdfb238f). Read docs/handoff.md + the epic plan
 (~/.claude/plans/resilient-drifting-quail.md). Next is Stage 4 (Fold Plan into the Journey sheet): the
 Plan station sheet hosts PlanContractCard/PlanPanel (node select + rule drafts) with revise-in-place
 via applyPlanEdit; the old `contracts` stage stays reachable via openCockpitStage until the flip. Reuse
