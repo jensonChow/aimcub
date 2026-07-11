@@ -8,6 +8,29 @@ This is the durable visual and interaction design system for Aimcub frontends, w
 
 When the user gives any frontend or visual-design requirement, update this file in the same change. Keep the requirement durable here, then implement it in the relevant app.
 
+## Active Direction (2026-07-11): Aimcub Glass
+
+The founder explicitly changed the desktop design direction to **Aimcub Glass** (imported
+from his claude.ai/design project via the DesignSync MCP) and asked for a full rebuild.
+Glass is a **glassmorphism** visual system (a gradient "desktop", translucent backdrop-blurred
+"islands", soft shadows, pill chips, full light+dark token sets) plus a new **"Journey"**
+information architecture (a 6-station strip Aim · Research · Context · Plan · Run · Eval, a
+"Your move" card, an "Ambient" card, a "Turns" roster, a "Journal" receipt timeline with a
+station drill-in sheet, Memory promoted to a top-level page, and reworked Home/New/Settings).
+
+**This supersedes the calm-flat rules below where they conflict** — in particular the
+"No style churn / no glass effects / no gradients / no atmospheric backgrounds" guidance and
+the "protect the shell" constraints. Those sections are retained as history until this
+document is rewritten to the Glass system (a tracked Stage E task).
+
+Shipped so far (branch `glass-redesign`, merged to `main`): the additive Glass token set in
+`cockpit.css` (`--desk/--island/--ink/--acc/--sh-*/...`, present in all three theme blocks),
+the gradient-desktop + translucent-island shell containers, and the `JourneyView` work surface
+(`apps/desktop/src/renderer/stages/journey/`). Remaining: Home/New/Memory/Settings Glass pages,
+row/card glassification, net-new core (run-event journal, Research station), and this rewrite.
+Before making desktop visual changes, read `docs/handoff.md` and the approved plan for the
+current state.
+
 ## Research Inputs
 
 - Microsoft Windows app design principles and guidelines: calm, coherent, familiar, accessible, clear hierarchy, predictable navigation, task-first commands, consistent typography.
