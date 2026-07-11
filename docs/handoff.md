@@ -1,7 +1,7 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-11
-Branch: `main` (Stages D and E merged to `main` locally; **not pushed** — awaiting approval)
+Branch: `main` (Stages D and E merged to `main` and **pushed to origin**; origin/main == `b92e3733`)
 
 ## Current Session
 
@@ -80,10 +80,10 @@ Committed on branch `glass-stage-e`, merged to `main`.
 
 ## Commit And Push Status
 
-- Stage D (`766d278a`) and Stage E are committed on their branches and merged to `main` locally.
-  **Neither is pushed** — pushing still requires explicit per-session approval. Stages 0/A/C/B are
-  already on origin/main.
-- Root `Aimcub.app` refreshed to the Stage D+E build (untracked).
+- Stage D (`766d278a`) and Stage E (`b92e3733`) are committed, merged to `main`, and **pushed to
+  origin** (user-authorized 2026-07-11). origin/main == local `main` == `b92e3733`. All Glass
+  stages (0/A/B/C/D/E) are now on origin.
+- Root `Aimcub.app` refreshed to the Stage D+E build (untracked local artifact).
 
 ## Open Risks / Notes
 
@@ -95,10 +95,9 @@ Committed on branch `glass-stage-e`, merged to `main`.
 ## Next Session Prompt
 
 ```text
-The Aimcub Glass desktop redesign is complete (stages 0/A/B/C/D/E) and green on the full gate;
-Stages D and E are merged to local `main` but NOT pushed. Read docs/handoff.md and
-docs/memory/design-system.md (now the Glass system). Possible next work: push to origin (needs
-explicit approval), the Cmd/Ctrl+K Memory palette entry, a computer-use on-screen pass to confirm
+The Aimcub Glass desktop redesign is complete (stages 0/A/B/C/D/E), green on the full gate, and
+on origin/main. Read docs/handoff.md and docs/memory/design-system.md (now the Glass system).
+Possible next work: the Cmd/Ctrl+K Memory palette entry, a computer-use on-screen pass to confirm
 the native titlebar background follows the in-app theme toggle, or reconcile the bundle-id
 mismatch (com.aimcub.desktop vs com.jensonchow.aimcub) before store distribution.
 ```
