@@ -20,7 +20,10 @@
 import type { AimProgressReadModel, Goal, Memory, Milestone, RunEvent } from "@core/domain";
 import { useEffect, useRef, useState } from "react";
 
+import { ContextInbox, type ContextInboxScope } from "../../ContextInbox";
+import type { ContextBundleReview } from "../../contextReview";
 import { useI18n, type StringKey } from "../../i18n";
+import { pendingContextCandidates } from "../../labels";
 import type { CockpitStage } from "../../workflow/workspaceNavigation";
 import {
   buildJourneyAmbient,
@@ -38,6 +41,9 @@ import {
   type JourneyStationKind,
   type JourneyStationSheetRow,
 } from "../../workflow/journey";
+import { ContextActivityPanel } from "../context/ContextActivityPanel";
+import type { ContextLoopModel } from "../context/contextLoop";
+import { ContextReviewPanel } from "../context/ContextReviewPanel";
 
 const STATION_NAME_KEY: Record<JourneyStationId, StringKey> = {
   aim: "glass.station.aim",
@@ -194,6 +200,54 @@ export function JourneyRunSheetBody(props: JourneyRunSheetBodyProps) {
   );
 }
 
+/**
+ * The Context station sheet's interior: the pending-candidate inbox (actionable triage), an
+ * honest activity/sufficiency panel shown ONLY while research is live, and a read-only receipt of
+ * the context behind the contracts. Stateless and prop-driven so it renders (and is asserted)
+ * under `renderToStaticMarkup`; the accept/reject side effects route through the App handlers.
+ */
+export interface JourneyContextSheetBodyProps {
+  loop: ContextLoopModel;
+  review: ContextBundleReview;
+  pendingCandidates: Memory[];
+  currentAimTitle: string;
+  disabled: boolean;
+  onAccept: (candidate: Memory, content: string, scope: ContextInboxScope) => void;
+  onReject: (candidate: Memory) => void;
+}
+
+export function JourneyContextSheetBody(props: JourneyContextSheetBodyProps) {
+  const { loop, review, pendingCandidates, currentAimTitle, disabled, onAccept, onReject } = props;
+  const { t } = useI18n();
+  const reviewCount =
+    review.usedContext.length +
+    review.skippedContext.length +
+    review.permissionGaps.length +
+    review.decompositionRisks.length;
+  const hasInbox = pendingCandidates.length > 0;
+  // On a settled goal the activity rows resolve to misleading "waiting" states, so the panel is
+  // shown only when research is actually in flight.
+  const showActivity = loop.hasLiveResearchData;
+  const isEmpty = !hasInbox && !showActivity && reviewCount === 0;
+
+  return (
+    <div className="od-journey-context">
+      {hasInbox ? (
+        <ContextInbox
+          candidates={pendingCandidates}
+          currentAimTitle={currentAimTitle}
+          disabled={disabled}
+          onAccept={onAccept}
+          onReject={onReject}
+        />
+      ) : null}
+      {showActivity ? <ContextActivityPanel model={loop} /> : null}
+      <ContextReviewPanel bundle={review} running={false} compact />
+      {isEmpty ? <p className="od-journey-context-empty">{t("glass.journey.contextEmpty")}</p> : null}
+    </div>
+  );
+}
+
 export interface JourneyViewProps {
   goal: Goal;
   progress: AimProgressReadModel | null;
@@ -201,6 +255,15 @@ export interface JourneyViewProps {
   runEvents?: RunEvent[];
   /** Active context/research memories in play for this aim (aim-scoped + global). */
   researchMemories?: Memory[];
+  /**
+   * Pure Context view-models for the Context station sheet (the saved-goal Context interior).
+   * When present alongside the candidate handlers, the Context sheet hosts the inbox / activity /
+   * review instead of read-only rows.
+   */
+  contextLoop?: ContextLoopModel;
+  contextReview?: ContextBundleReview;
+  onAcceptContextCandidate?: (candidate: Memory, content: string, scope: ContextInboxScope) => void;
+  onRejectContextCandidate?: (candidate: Memory) => void;
   disabled?: boolean;
   /** Count of OTHER aims with a turn waiting on the user, for the header jump chip. */
   elsewhereCount?: number;
@@ -286,6 +349,18 @@ export function JourneyView(props: JourneyViewProps) {
   const journal = buildJourneyJournal(progress, props.runEvents ?? []);
   const sheet = openStation ? buildJourneyStationSheet(openStation, progress, researchMemories) : null;
   const headMeta = `${progress.completed_milestones}/${progress.total_milestones}`;
+  // The Context station sheet hosts the live saved-goal Context interior when App supplies the
+  // pure view-models + candidate handlers; otherwise it falls back to read-only rows.
+  const contextBody =
+    sheet?.station === "context" && props.contextLoop && props.contextReview
+      && props.onAcceptContextCandidate && props.onRejectContextCandidate
+      ? {
+          loop: props.contextLoop,
+          review: props.contextReview,
+          onAccept: props.onAcceptContextCandidate,
+          onReject: props.onRejectContextCandidate,
+        }
+      : null;
   const elsewhereCount = props.elsewhereCount ?? 0;
   const showElsewhere = elsewhereCount > 0 && Boolean(props.onJumpElsewhere);
   const hasMoveSecondary = Boolean(props.onHandToAgent || props.onSchedule || props.onLater);
@@ -481,6 +556,16 @@ export function JourneyView(props: JourneyViewProps) {
                 disabled={Boolean(props.disabled)}
                 onSelect={setSelectedOptionId}
                 onConfirm={confirmInteraction}
+              />
+            ) : contextBody ? (
+              <JourneyContextSheetBody
+                loop={contextBody.loop}
+                review={contextBody.review}
+                pendingCandidates={pendingContextCandidates(progress.context_candidates)}
+                currentAimTitle={goal.title}
+                disabled={Boolean(props.disabled)}
+                onAccept={contextBody.onAccept}
+                onReject={contextBody.onReject}
               />
             ) : sheet.rows.length === 0 ? (
               <p className="od-journey-sheet-empty">{t("glass.journey.sheetEmpty")}</p>

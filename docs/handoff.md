@@ -1,96 +1,88 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-11
-Branch: `main`. Journey-first **Stage 1** (New Aim composer) and this session's **Stage 2** (Journey
-parity + interactive-sheet infra) are both committed, merged, and **pushed** (origin/main =
-`b70f7b9e`).
+Branch: `main`. Journey-first **Stages 1 & 2** are committed, merged, and **pushed** (origin/main =
+`04f799b1`). This session's **Stage 3** (fold Context into the Journey sheet) is committed + merged to
+**local** `main`, **not pushed** — offer to push.
 
 ## Active epic — Journey-first rebuild (staged)
 
-Plan: `~/.claude/plans/resilient-drifting-quail.md` (the epic). Stage 2's detailed plan:
-`~/.claude/plans/drifting-singing-pebble.md`. The founder wants the WHOLE working flow to match the
-reference `Aimcub Glass.dc.html`: set aim → straight to the Journey; all work through the Journey's
-station strip + drill-in **sheets** + the single "Your move" card, absorbing the separate heavy stage
-panels. Delivered **in stages**, each green on the full gate.
+Epic plan: `~/.claude/plans/resilient-drifting-quail.md`. The founder wants the WHOLE working flow to
+match the reference `Aimcub Glass.dc.html`: set aim → straight to the Journey; all work through the
+station strip + drill-in **sheets** + the single "Your move" card, absorbing the heavy stage panels.
+Delivered **in stages**, each green on the full gate.
 
-**Routing bridge (unchanged):** `saveGoal` needs a validated plan and the Goal is only created at the
-end of the intake→draft→clarify funnel, so true goal-first can't ship green in one step. Approach:
+**Routing bridge (unchanged):** `saveGoal` needs a validated plan; the Goal is created only at the end
+of the intake→draft→clarify funnel, so true goal-first can't ship green in one step. Approach:
 **bridge** (Stages 1–5 keep the funnel; the Journey already mounts post-save; fold panels into sheets
 *behind* the existing `openCockpitStage` fallbacks) → **goal-first flip** at Stage 6.
 
-Roadmap: 1 New Aim composer (DONE) · **2 Journey visual parity + interactive-sheet infra (DONE this
-session)** · 3 Context/Research sheet · 4 Plan sheet · 5 Run/Evidence + Eval sheets · 6 goal-first
-routing flip · 7 cleanup. Each later stage gets its own detailed plan when reached.
+Roadmap: 1 New Aim composer (DONE) · 2 Journey parity + interactive-sheet infra (DONE) · **3 Fold
+Context into the Journey sheet (DONE this session)** · 4 Plan sheet · 5 Run/Evidence + Eval sheets ·
+6 goal-first routing flip · 7 cleanup. Each later stage gets its own detailed plan when reached.
 
-## Stage 2 — Journey visual parity + interactive-sheet infra (DONE this session)
+## Stage 3 — Fold Context into the Journey sheet (DONE this session)
 
-Two live/visible features + forward-ready infra, **no new backend/IPC**, honest-data-only:
+The Journey's **Context station sheet** now hosts the live saved-goal Context interior instead of
+read-only rows, reusing the existing prop-driven panels + accept/reject handlers. No new backend/IPC.
+Plan: `~/.claude/plans/drifting-singing-pebble.md`.
 
-- **"N turns elsewhere" jump chip** (header): `App.tsx` computes other aims whose `progressSummaries`
-  status is `needs_you` (excl. the current aim; `blocked` deliberately not counted) and passes
-  `elsewhereCount` + `onJumpElsewhere` (→ existing `openGoal`). `JourneyView` renders the pill only
-  when count > 0. Pill text uses `--ink2` (not `--acc`) on `--acc-soft` — `--acc` there only reaches
-  ~3.8:1, below WCAG AA (same call as the you/agent chips; see [[aimcub-glass-contrast-aa]]).
-- **Interactive Run-station sheet** (the core deliverable): the pure sheet model now returns an
-  optional `interaction` for the Run station — dispatchable agent milestones become selectable
-  `options` (a `role=radiogroup`), the non-dispatchable remainder (blocked / human / in-flight) stays
-  visible as read-only `contextRows`. Dispatchable = agent-routed & !blocked & not `queued`/`running`.
-  An **enable-gated** confirm (membership-checked against live options, so a background `progress`
-  refresh can't fire a stale selection) calls the **existing `runAgent` handler** in place, closes the
-  sheet, and the run lands as a receipt in Turns/Journal. Read-only stations are unchanged; the
-  `openCockpitStage` "Continue" fallback stays on every sheet (roadmap invariant).
-- **Forward-ready infra (renders hidden today):** the Your-move "You" chip is live; the secondary
-  actions (hand-to-agent / schedule / Later) and the ambient **take-back** button are handler-gated —
-  App passes no handler, so they stay hidden until the Stage-6 routing/scheduling backends. Each
-  station sheet gained a static, data-free **sub** line.
-- Files: `workflow/journey/{types,stationSheet,yourMove,index}.ts`, `stages/journey/JourneyView.tsx`
-  (+ exported stateless `JourneyRunSheetBody` for SSR-testable interior), `cockpit.css`, `i18n.tsx`,
-  `App.tsx`. Also tightened `yourMove.ts` `isPendingWork` to treat `queued` (not just `running`) as
-  in-flight. Consumed the previously-dead `glass.journey.later`; `glass.journey.receipt` +
-  `glass.home.yourMove` remain unused (Stage 5/7).
+- **New stateless `JourneyContextSheetBody`** (`stages/journey/JourneyView.tsx`, exported for SSR
+  tests) renders, in a `.od-journey-context` wrapper: `ContextInbox` (pending-candidate triage — shown
+  when there are pending candidates), `ContextActivityPanel` (**only when `loop.hasLiveResearchData`**
+  — on a settled goal the activity rows read as misleading "waiting/idle" states, so it's suppressed;
+  the full stage still shows it), `ContextReviewPanel` (compact, self-nulls when empty), and an honest
+  **empty hint** (`glass.journey.contextEmpty`) when none apply.
+- **`JourneyView`** gains optional `contextLoop` / `contextReview` / `onAcceptContextCandidate` /
+  `onRejectContextCandidate`. When the Context station is open AND those are supplied, the sheet renders
+  the rich body; else the read-only rows. Accept/reject route through the existing epoch-safe App
+  handlers and do **not** close the sheet (multi-triage); the sheet updates on refresh. The
+  `openCockpitStage("context")` "Continue" fallback stays (bridge).
+- **Correction to the epic sketch:** for a saved goal `clarifyPhase === null` (reset in `openGoal`), so
+  the clarify Q&A wizard is NOT live post-save → correctly **out of scope** (re-planning stays in the
+  old funnel until Stage 6). `ContextSourcesPanel` (the only IPC-embedding panel) stays in the old stage.
+- **Single source of truth:** added `pendingContextCandidates(candidates)` to `labels.ts` (keeps global
+  `goal_id === null` candidates, unlike `pendingContextForGoal`); refactored EvalStage to use it; the
+  Journey sheet + the read-only fallback rows both filter to `status === "pending"`.
+- Files: `stages/journey/JourneyView.tsx`, `App.tsx` (mount props), `labels.ts`,
+  `stages/eval/EvalStage.tsx`, `workflow/journey/stationSheet.ts`, `cockpit.css`, `i18n.tsx`. Reused as-is
+  (untouched): `ContextInbox`, `ContextActivityPanel`, `ContextReviewPanel`, `contextLoop`/`contextReview`.
 
-## Verification (Stage 2)
+## Verification (Stage 3)
 
-- Full gate green: `build` (+ `@core` no-leak) + **267 tests** (was 254; +13: interactive partition,
-  gates, stale-selection, queued, elsewhere/You/secondary/take-back render, `JourneyRunSheetBody` both
-  states) + `typecheck` + `lint` + `core:purity`.
-- Static `cockpit.css` harness (real CSS, light + dark): header elsewhere pill (AA-verified `--ink2`,
-  contrast computed 7.0:1), You chip, secondary actions, ambient take-back, and the interactive Run
-  sheet (options → gated confirm, both disabled & enabled) — matches the reference.
-- **Live packaged-app QA** (isolated `AIMCUB_HOME` seeded via `seedLocalAlphaDemo`, real `~/.aimcub`
-  untouched — mtime unchanged): the Journey renders with the live You chip; opening **Run** shows the
-  interactive sheet (2 agent options + 1 human "You" context row); confirm is gated ("Pick one to
-  continue" → select → "Run with agent"); confirming dispatched the milestone via `runAgent`, closed
-  the sheet, and dropped a receipt in the Journal (the seeded home has no provider, so the agent
-  exited code 1 — the existing graceful error path, no crash). Read-only Plan sheet shows the new sub
-  line + rows + Continue fallback. Native traffic lights stay native.
+- Full gate green: `build` (+ `@core` no-leak) + **271 tests** (+4 `JourneyContextSheetBody`: empty
+  hint, inbox render, activity honesty-gate, review receipt) + `typecheck` + `lint` + `core:purity`.
+- **Live packaged-app QA** (isolated `AIMCUB_HOME` via `seedLocalAlphaDemo`; real `~/.aimcub` untouched
+  — mtime unchanged): opening the Journey **Context** station shows the inbox with the seeded pending
+  candidate (meta chips, editable content, scope toggle, Accept/Reject) — fits the 560px sheet cleanly,
+  no activity panel (settled goal → honesty gate), review self-nulled; clicking **Accept** triaged it
+  in place, the sheet stayed open, the inbox emptied, and the honest empty hint appeared; **Continue**
+  opened the full old Context stage (which *does* show the idle activity panel — confirming the gate).
+  Native traffic lights native.
 - Repacked (`pnpm desktop:pack`) + refreshed root `Aimcub.app`.
 
 ## Commit / push
 
-- Journey-first Stage 2: committed + merged to `main` and **pushed** (origin/main = `b70f7b9e`;
-  commits `ab89dcc4` feature + `b70f7b9e` merge).
+- Journey-first Stage 3: committed + merged to **local** `main`, **not pushed** — ask before
+  `git push origin main`. (origin/main is still `04f799b1` = Stages 1–2.)
 
 ## Open risks / notes
 
-- Stage 2 changes zero save/plan-gen logic (bridge intact). The interactive dispatch reuses the
-  already-tested `runAgent`; the sheet stays component-local overlay state keyed by `goal.id`.
-- **Divergence from the mockup (intentional):** the reference put its one curated interactive decision
-  on a separate `"decide"` pseudo-station off the move card; we realize "selectable options" honestly
-  as the Run-station dispatcher over real pending agent milestones. Two dispatch paths (move-card
-  primary + run-sheet confirm) both funnel through `runAgent` + busy-gating, so no double-fire.
-- Dead keys remaining: `glass.journey.receipt` (Stage 5 rich receipt sheet) and `glass.home.yourMove`
-  (Stage 7 prune). Pre-existing `com.aimcub.desktop` vs ASC `com.jensonchow.aimcub` bundle-id mismatch.
+- The context-candidate inbox now appears in BOTH the Journey Context sheet and EvalStage (both use the
+  same handlers → consistent). Stage 5 (Eval fold) removes the Eval duplicate.
+- New cross-stage import edge (`stages/journey` → `stages/context` panels + renderer-root `ContextInbox`
+  / `labels`); no guard blocks it, but the seam is brittle to context-panel prop changes.
+- Pre-existing: `com.aimcub.desktop` vs ASC `com.jensonchow.aimcub` bundle-id mismatch. Dead i18n keys
+  `glass.journey.receipt` (Stage 5 rich receipt) + `glass.home.yourMove` (Stage 7 prune).
 
 ## Next session prompt
 
 ```text
-Journey-first rebuild: Stages 1–2 done + pushed (Stage 2 = Journey visual parity + interactive
-Run-dispatch sheet; origin/main=b70f7b9e). Read docs/handoff.md + the epic plan
-(~/.claude/plans/resilient-drifting-quail.md). Next is Stage 3 (Fold Context + Research into the
-Journey sheet): the Context station sheet hosts ContextClarifyPanel (Q&A), ContextReviewPanel
-(compact), ContextActivityPanel, ContextInbox; Research stays a read-only receipt; the old `context`
-stage stays reachable via openCockpitStage until the flip. Reuse the Stage-2 interactive-sheet seam
-(selectable options → gated confirm via an existing App handler). Detail Stage 3 in a plan before
-coding. Same gate + harness + live-packaged-app QA discipline.
+Journey-first rebuild: Stages 1–3 done (Stage 3 = Context folded into the Journey sheet; on LOCAL main
+but NOT pushed — offer to push). Read docs/handoff.md + the epic plan
+(~/.claude/plans/resilient-drifting-quail.md). Next is Stage 4 (Fold Plan into the Journey sheet): the
+Plan station sheet hosts PlanContractCard/PlanPanel (node select + rule drafts) with revise-in-place
+via applyPlanEdit; the old `contracts` stage stays reachable via openCockpitStage until the flip. Reuse
+the Stage-2/3 sheet-body seam (a stateless exported JourneyPlanSheetBody + re-passed App handlers).
+Detail Stage 4 in a plan before coding. Same gate + harness + live-packaged-app QA discipline.
 ```

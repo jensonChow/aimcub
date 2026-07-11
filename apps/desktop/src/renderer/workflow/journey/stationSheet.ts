@@ -145,7 +145,8 @@ export function buildJourneyStationSheet(
       rows = memoryRows(researchMemories);
       break;
     case "context":
-      rows = memoryRows(progress.context_candidates);
+      // Only candidates still awaiting triage — accepted/rejected ones have left the inbox.
+      rows = memoryRows(progress.context_candidates.filter((candidate) => candidate.status === "pending"));
       break;
     case "plan":
       rows = planRows(progress);
