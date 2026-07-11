@@ -56,11 +56,12 @@ import { buildContextLoopModel } from "./stages/context/contextLoop";
 import { ContextReviewPanel } from "./stages/context/ContextReviewPanel";
 import { ContextStage } from "./stages/context/ContextStage";
 import type { ClarifyPhase, ContextAnswerMap } from "./stages/context/types";
-import { AimDraftHomeSection } from "./stages/aim/AimDraftRecovery";
 import { DraftAimOverviewPanel } from "./stages/aim/DraftAimOverviewPanel";
 import { EvalStage } from "./stages/eval/EvalStage";
 import { ExecutePanel } from "./stages/execute/ExecutePanel";
+import { HomeView } from "./stages/home/HomeView";
 import { JourneyView } from "./stages/journey/JourneyView";
+import { MemoryView } from "./stages/memory/MemoryView";
 import { WebResearchForm } from "./WebResearchForm";
 import { PlanPanel } from "./stages/plan/PlanPanel";
 import { Button, Panel } from "./ui";
@@ -165,6 +166,7 @@ function AimOsApp() {
   const [webResearch, setWebResearch] = useState<WebResearchStatus | null>(null);
   const [contextSources, setContextSources] = useState<ContextSourceStatus | null>(null);
   const [localAgents, setLocalAgents] = useState<LocalAgentDetection[]>([]);
+  const [memories, setMemories] = useState<Memory[]>([]);
   const [aimSurfaceMode, setAimSurfaceMode] = useState<AimSurfaceMode>("idle");
   const [aimTitle, setAimTitle] = useState("");
   const [aimDescription, setAimDescription] = useState("");
@@ -378,6 +380,7 @@ function AimOsApp() {
       window.aimcub.getWebResearchConfig().then(setWebResearch).catch(() => setWebResearch(null)),
       window.aimcub.getContextSourceConfig().then(setContextSources).catch(() => setContextSources(null)),
       window.aimcub.listLocalAgents().then(setLocalAgents).catch(() => setLocalAgents([])),
+      window.aimcub.listMemories().then(setMemories).catch(() => setMemories([])),
     ]).then(() => undefined);
     const [nextGoals, nextDrafts] = await Promise.all([
       window.aimcub.listGoals().catch(() => []),
@@ -1513,6 +1516,27 @@ function AimOsApp() {
     openCockpitStage(settingsReturnStageRef.current);
   }
 
+  async function refreshMemories() {
+    setMemories(await window.aimcub.listMemories().catch(() => []));
+  }
+
+  function openMemory() {
+    if (navigationIsLocked() || pendingTargetNavigationRef.current) return;
+    beginSurfaceTransition();
+    interruptPlanningForNavigation();
+    void refreshMemories();
+    setStageOverride("memory");
+  }
+
+  async function forgetMemory(memory: Memory) {
+    setMemories((current) => current.filter((row) => row.id !== memory.id));
+    try {
+      await window.aimcub.archiveContextMemory(memory.id);
+    } finally {
+      await refreshMemories();
+    }
+  }
+
   const clarifyPanelActive = clarifyPhase !== null;
   const clarifyPanel = clarify && clarifyPanelActive ? (
     <ContextClarifyPanel
@@ -1625,6 +1649,16 @@ function AimOsApp() {
 
   const mainStageContent = (() => {
     if (activeStage === "settings") return settingsPanel;
+    if (activeStage === "memory") {
+      return (
+        <MemoryView
+          memories={memories}
+          goals={goals}
+          disabled={Boolean(busy)}
+          onForget={(memory) => void forgetMemory(memory)}
+        />
+      );
+    }
     if (activeStage === "context") {
       if (!selected && !parent && !hasUnsavedAim) {
         return (
@@ -1746,10 +1780,15 @@ function AimOsApp() {
       );
     }
     return (
-      <InitialWorkspacePanel
+      <HomeView
+        goals={goals}
         drafts={aimDrafts}
+        planningRuntimeReady={planningRuntimeReady}
+        onOpenGoal={(goal) => void openGoal(goal)}
+        onNewAim={() => void startNewAim()}
         onResumeDraft={(draftRow) => void openAimDraft(draftRow)}
         onDiscardDraft={(draftRow) => void discardAimDraft(draftRow)}
+        onOpenSettings={() => openCockpitStage("settings")}
       />
     );
   })();
@@ -1766,6 +1805,8 @@ function AimOsApp() {
       onOpenDraft={(draftRow) => void openAimDraft(draftRow)}
       onDiscardDraft={(draftRow) => void discardAimDraft(draftRow)}
       onStage={openCockpitStage}
+      onMemory={openMemory}
+      memoryCount={memories.length}
       settingsSidebar={settingsSidebar}
       main={(
         <>
@@ -1797,36 +1838,6 @@ function ProductErrorNotice(props: { error: string | ProductError }) {
         </details>
       ) : null}
     </Notice>
-  );
-}
-
-export function InitialWorkspacePanel(props: {
-  drafts?: AimDraft[];
-  onResumeDraft?: (draft: AimDraft) => void;
-  onDiscardDraft?: (draft: AimDraft) => void;
-}) {
-  const { t } = useI18n();
-  const drafts = props.drafts ?? [];
-  const hasRecoverableDrafts = drafts.length > 0 && Boolean(props.onResumeDraft) && Boolean(props.onDiscardDraft);
-  return (
-    <section
-      className="od-initial-workspace"
-      aria-label={hasRecoverableDrafts ? undefined : t("initialWorkspace.label")}
-      data-has-drafts={hasRecoverableDrafts ? "true" : "false"}
-    >
-      {hasRecoverableDrafts && props.onResumeDraft && props.onDiscardDraft ? (
-        <AimDraftHomeSection
-          drafts={drafts}
-          onResume={props.onResumeDraft}
-          onDiscard={props.onDiscardDraft}
-        />
-      ) : (
-        <div className="od-initial-workspace-copy">
-          <h1>{t("initialWorkspace.title")}</h1>
-          <p>{t("initialWorkspace.body")}</p>
-        </div>
-      )}
-    </section>
   );
 }
 

@@ -380,6 +380,7 @@ export interface AimcubApi {
   getAimDraft(id: string): Promise<AimDraft | null>;
   upsertAimDraft(req: UpsertAimDraftRequest): Promise<AimDraft>;
   discardAimDraft(id: string): Promise<void>;
+  listMemories(goalId?: string | null): Promise<Memory[]>;
   listContextCandidates(): Promise<Memory[]>;
   listContextHistory(): Promise<Memory[]>;
   listContextProfile(): Promise<ContextProfileReport>;
@@ -426,6 +427,7 @@ export const IPC = {
   getAimDraft: "aimcub:getAimDraft",
   upsertAimDraft: "aimcub:upsertAimDraft",
   discardAimDraft: "aimcub:discardAimDraft",
+  listMemories: "aimcub:listMemories",
   listContextCandidates: "aimcub:listContextCandidates",
   listContextHistory: "aimcub:listContextHistory",
   listContextProfile: "aimcub:listContextProfile",

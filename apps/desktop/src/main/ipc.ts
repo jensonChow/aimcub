@@ -665,6 +665,8 @@ export function registerIpc(): void {
 
   ipcMain.handle(IPC.discardAimDraft, (_e, id: string): Promise<void> => aimStore.discardAimDraft(id));
 
+  ipcMain.handle(IPC.listMemories, (_e, goalId?: string | null) => aimStore.listMemories(goalId ?? null));
+
   ipcMain.handle(IPC.listContextCandidates, () => aimStore.listMemoryCandidates());
 
   ipcMain.handle(IPC.listContextHistory, () => aimStore.listMemoryHistory());

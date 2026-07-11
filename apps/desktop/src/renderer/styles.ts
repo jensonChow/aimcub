@@ -42,8 +42,8 @@ export function card(): CSSProperties {
   return {
     background: C.surface,
     border: `1px solid ${C.border}`,
-    borderRadius: 8,
-    boxShadow: "none",
+    borderRadius: 14,
+    boxShadow: "var(--sh-md, 0 3px 12px rgba(30, 40, 70, 0.06))",
     padding: "16px 18px",
     marginBottom: 12,
   };
@@ -54,11 +54,11 @@ export function labelStyle(): CSSProperties {
 }
 
 export function inputStyle(): CSSProperties {
-  return { width: "100%", boxSizing: "border-box", minHeight: 40, padding: "9px 11px", border: `1px solid ${C.border}`, borderRadius: 8, fontSize: TYPE.body, fontFamily: "inherit", background: C.surface, color: C.text };
+  return { width: "100%", boxSizing: "border-box", minHeight: 40, padding: "9px 11px", border: `1px solid ${C.border}`, borderRadius: 11, fontSize: TYPE.body, fontFamily: "inherit", background: C.surface, color: C.text };
 }
 
 export function primaryButton(disabled: boolean): CSSProperties {
-  return { marginTop: 16, minHeight: 40, padding: "0 16px", borderRadius: 999, border: "none", background: disabled ? C.disabledBg : C.accent, color: disabled ? C.disabledText : C.accentOn, fontSize: TYPE.body, fontWeight: WEIGHT.strong, cursor: disabled ? "default" : "pointer", boxShadow: "none" };
+  return { marginTop: 16, minHeight: 40, padding: "0 16px", borderRadius: 12, border: "none", background: disabled ? C.disabledBg : C.accent, color: disabled ? C.disabledText : C.accentOn, fontSize: TYPE.body, fontWeight: WEIGHT.strong, cursor: disabled ? "default" : "pointer", boxShadow: disabled ? "none" : "var(--sh-btn, 0 2px 8px rgba(0, 113, 227, 0.2))" };
 }
 
 export function secondaryButton(): CSSProperties {

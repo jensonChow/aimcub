@@ -1,5 +1,5 @@
-export type CockpitStage = "aim" | "context" | "contracts" | "run" | "eval" | "settings";
-export type WorkbenchStage = Exclude<CockpitStage, "settings">;
+export type CockpitStage = "aim" | "context" | "contracts" | "run" | "eval" | "settings" | "memory";
+export type WorkbenchStage = Exclude<CockpitStage, "settings" | "memory">;
 export type WorkspaceTarget =
   | { kind: "home" }
   | { kind: "newAim" }
@@ -45,7 +45,7 @@ export function hasWorkbenchNavigation(target: WorkspaceTarget): boolean {
 }
 
 export function isWorkbenchStageAvailable(target: WorkspaceTarget, stage: CockpitStage): stage is WorkbenchStage {
-  return stage !== "settings" && availableWorkbenchStages(target).includes(stage);
+  return stage !== "settings" && stage !== "memory" && availableWorkbenchStages(target).includes(stage);
 }
 
 export function settingsReturnStage(

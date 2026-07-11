@@ -16,6 +16,7 @@ const api: AimcubApi = {
   getAimDraft: (id) => ipcRenderer.invoke(IPC.getAimDraft, id),
   upsertAimDraft: (req) => ipcRenderer.invoke(IPC.upsertAimDraft, req),
   discardAimDraft: (id) => ipcRenderer.invoke(IPC.discardAimDraft, id),
+  listMemories: (goalId) => ipcRenderer.invoke(IPC.listMemories, goalId),
   listContextCandidates: () => ipcRenderer.invoke(IPC.listContextCandidates),
   listContextHistory: () => ipcRenderer.invoke(IPC.listContextHistory),
   listContextProfile: () => ipcRenderer.invoke(IPC.listContextProfile),

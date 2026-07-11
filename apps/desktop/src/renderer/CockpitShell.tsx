@@ -24,6 +24,7 @@ type SidebarState = "pinned" | "collapsed" | "peek";
 const USER_MENU_ID = "od-sidebar-user-menu";
 const LANGUAGE_MENU_ID = "od-sidebar-language-menu";
 const SIDEBAR_WIDTH_STORAGE_KEY = "aimcub.sidebarWidth";
+const THEME_PREF_STORAGE_KEY = "aimcub.themePref";
 const SIDEBAR_REVEAL_DELAY_MS = 180;
 const SIDEBAR_CLOSE_DELAY_MS = 180;
 const SIDEBAR_AUTO_COLLAPSE_QUERY = "(max-width: 1040px)";
@@ -55,6 +56,8 @@ interface CockpitShellProps {
   onOpenDraft?: (draft: AimDraft) => void;
   onDiscardDraft?: (draft: AimDraft) => void;
   onStage: (stage: CockpitStage) => void;
+  onMemory?: () => void;
+  memoryCount?: number;
   main: ReactNode;
   settingsSidebar?: ReactNode;
   commands?: CockpitCommand[];
@@ -91,6 +94,20 @@ function persistSidebarWidth(width: number) {
   window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(width));
 }
 
+type ThemePref = "system" | "light" | "dark";
+
+function readInitialThemePref(): ThemePref {
+  if (typeof window === "undefined") return "system";
+  const raw = window.localStorage.getItem(THEME_PREF_STORAGE_KEY);
+  return raw === "light" || raw === "dark" ? raw : "system";
+}
+
+function persistThemePref(pref: ThemePref) {
+  if (typeof window === "undefined") return;
+  if (pref === "system") window.localStorage.removeItem(THEME_PREF_STORAGE_KEY);
+  else window.localStorage.setItem(THEME_PREF_STORAGE_KEY, pref);
+}
+
 export function CockpitShell({
   goals,
   drafts = [],
@@ -102,6 +119,8 @@ export function CockpitShell({
   onOpenDraft,
   onDiscardDraft,
   onStage,
+  onMemory,
+  memoryCount,
   main,
   settingsSidebar,
   commands,
@@ -115,6 +134,8 @@ export function CockpitShell({
   const [sidebarWidth, setSidebarWidth] = useState(readInitialSidebarWidth);
   const [sidebarResizing, setSidebarResizing] = useState(false);
   const [windowChrome, setWindowChrome] = useState<WindowChromeState>(DEFAULT_WINDOW_CHROME_STATE);
+  const [themePref, setThemePref] = useState<ThemePref>(readInitialThemePref);
+  const effectiveAppearance = themePref === "system" ? windowChrome.colorScheme : themePref;
   const sidebarHoverZoneRef = useRef<HTMLDivElement | null>(null);
   const sidebarRef = useRef<HTMLElement | null>(null);
   const sidebarWidthRef = useRef(sidebarWidth);
@@ -256,6 +277,12 @@ export function CockpitShell({
     setSidebarPeeking(false);
     suppressSidebarPeekUntilExit.current = sidebarPinned;
     setSidebarPinned((current) => !current);
+  }
+
+  function toggleTheme() {
+    const next: ThemePref = effectiveAppearance === "dark" ? "light" : "dark";
+    persistThemePref(next);
+    setThemePref(next);
   }
 
   function updateSidebarWidth(nextWidth: number) {
@@ -468,7 +495,7 @@ export function CockpitShell({
         style={appStyle}
         data-empty-aim={firstRunAim ? "true" : "false"}
         data-sidebar-state={sidebarState}
-        data-system-appearance={windowChrome.colorScheme}
+        data-system-appearance={effectiveAppearance}
         data-window-fullscreen={windowChrome.fullscreen ? "true" : "false"}
       >
         <div className="od-window-drag-strip" aria-hidden="true" data-od-id="window-drag-strip" />
@@ -529,7 +556,7 @@ export function CockpitShell({
                 <button
                   className="od-sidebar-action od-home-panel"
                   type="button"
-                  aria-current={workspaceTarget.kind === "home" ? "page" : undefined}
+                  aria-current={workspaceTarget.kind === "home" && activeStage !== "memory" ? "page" : undefined}
                   data-od-id="sidebar-home-panel-action"
                   onClick={onHome}
                 >
@@ -545,7 +572,7 @@ export function CockpitShell({
                 <button
                   className="od-sidebar-action od-new-aim"
                   type="button"
-                  aria-current={workspaceTarget.kind === "newAim" ? "page" : undefined}
+                  aria-current={workspaceTarget.kind === "newAim" && activeStage !== "memory" ? "page" : undefined}
                   data-od-id="sidebar-new-aim-action"
                   onClick={onNewAim}
                 >
@@ -604,7 +631,7 @@ export function CockpitShell({
                     </div>
                   ) : null}
                   {visibleGoals.map((goal) => {
-                    const selectedGoal = workspaceTarget.kind === "goal" && workspaceTarget.id === goal.id;
+                    const selectedGoal = workspaceTarget.kind === "goal" && workspaceTarget.id === goal.id && activeStage !== "memory";
                     const navigationTitle = aimNavigationLabels({ title: goal.title, plan: goal.plan_json });
                     return (
                       <button
@@ -626,6 +653,40 @@ export function CockpitShell({
               </section>
 
             </>
+          )}
+
+          {usingSettingsSidebar ? null : (
+            <div className="od-sidebar-footer" data-od-id="sidebar-footer">
+              <button
+                className="od-sidebar-action od-memory"
+                type="button"
+                aria-current={activeStage === "memory" ? "page" : undefined}
+                data-od-id="sidebar-memory-action"
+                onClick={onMemory}
+              >
+                <span className="od-sidebar-action-icon" aria-hidden="true">
+                  <MemoryIcon />
+                </span>
+                <span className="od-sidebar-action-label">{t("glass.shell.memory")}</span>
+                {typeof memoryCount === "number" && memoryCount > 0 ? (
+                  <span className="od-sidebar-memory-count" aria-label={t("glass.shell.memoryCount", { n: memoryCount })}>
+                    {memoryCount}
+                  </span>
+                ) : null}
+              </button>
+              <div className="od-sidebar-footer-meta">
+                <span className="od-sidebar-footer-path">{t("glass.shell.localFooter")}</span>
+                <button
+                  className="od-theme-toggle"
+                  type="button"
+                  aria-label={t("glass.shell.themeToggle")}
+                  title={t("glass.shell.themeToggle")}
+                  onClick={toggleTheme}
+                >
+                  {effectiveAppearance === "dark" ? <ThemeSunIcon /> : <ThemeMoonIcon />}
+                </button>
+              </div>
+            </div>
           )}
 
           <SidebarUserMenu onSettings={() => onStage("settings")} />
@@ -651,7 +712,7 @@ export function CockpitShell({
         ) : null}
 
         <main className={`od-main od-main-${activeStage}`} data-od-id="main-delivery-workbench">
-          {activeStage !== "settings" && hasWorkbenchNavigation(workspaceTarget) ? (
+          {activeStage !== "settings" && activeStage !== "memory" && hasWorkbenchNavigation(workspaceTarget) ? (
             <nav className="od-stage-nav" aria-label={t("cockpit.workflow")}>
               <div className="od-stage-current" aria-live="polite">
                 <span className="od-stage-current-label">{t("cockpit.surface.current")}</span>
@@ -713,6 +774,32 @@ function HomePanelIcon() {
       <path d="M4 8.5 10 3.75 16 8.5" />
       <path d="M5.75 7.75v8h8.5v-8" />
       <path d="M8.5 15.75v-4h3v4" />
+    </svg>
+  );
+}
+
+function MemoryIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
+      <path d="M10 3.5c-2.9 0-4.75 1.9-4.75 4.35 0 1.25.5 2.2 1.2 2.95v2.45c0 .8.65 1.45 1.45 1.45h4.2c.8 0 1.45-.65 1.45-1.45v-2.45c.7-.75 1.2-1.7 1.2-2.95C14.75 5.4 12.9 3.5 10 3.5Z" />
+      <path d="M8 16.75h4" />
+    </svg>
+  );
+}
+
+function ThemeMoonIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
+      <path d="M15.5 11.5A6.5 6.5 0 0 1 8.5 4.5 6.5 6.5 0 1 0 15.5 11.5Z" />
+    </svg>
+  );
+}
+
+function ThemeSunIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
+      <circle cx="10" cy="10" r="4" />
+      <path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.4 4.4l1.4 1.4M14.2 14.2l1.4 1.4M15.6 4.4l-1.4 1.4M5.8 14.2l-1.4 1.4" />
     </svg>
   );
 }

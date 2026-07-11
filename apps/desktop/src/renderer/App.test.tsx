@@ -7,7 +7,8 @@ import { routingRecommendationForPlanNode, type RoutingRuntimeAgentOption } from
 import type { AimDraft, AimProgressReadModel, DecompositionOutput, Goal, Milestone } from "@core/types";
 import type { ContextSourceStatus, GoalDetail, ProviderStatus, WebResearchStatus } from "../shared/ipc";
 
-import { App, buildSettingsModel, InitialWorkspacePanel, SettingsPanel } from "./App";
+import { App, buildSettingsModel, SettingsPanel } from "./App";
+import { HomeView } from "./stages/home/HomeView";
 import { CockpitShell, WORKBENCH_STAGE_IDS } from "./CockpitShell";
 import { I18nProvider, STRINGS, translate, type I18n } from "./i18n";
 import { EvidenceSubmissionForm } from "./stages/execute/EvidenceSubmissionForm";
@@ -648,10 +649,10 @@ describe("App first-run workspace", () => {
   it("keeps the initial main workspace free of the aim composer", () => {
     const html = renderToStaticMarkup(<App />);
 
-    expect(html).toContain('class="od-initial-workspace"');
+    expect(html).toContain("od-initial-workspace");
     expect(html).toContain('data-has-drafts="false"');
-    expect(html).toContain("Workspace ready");
-    expect(html).toContain("Create a new aim when you are ready to start.");
+    expect(html).toContain("Point Aimcub at an outcome.");
+    expect(html).toContain("Set your first aim");
     expect(html).not.toContain('class="od-aim-composer"');
     expect(html).not.toContain('id="aim-title"');
     expect(html).not.toContain('id="aim-context"');
@@ -661,7 +662,7 @@ describe("App first-run workspace", () => {
   it("shows recoverable drafts on the Home panel without calling them saved aims", () => {
     const html = renderToStaticMarkup(
       <I18nProvider>
-        <InitialWorkspacePanel
+        <HomeView
           drafts={[draftRow]}
           onResumeDraft={noop}
           onDiscardDraft={noop}
@@ -1384,10 +1385,10 @@ describe("CockpitShell", () => {
     expect(css).toMatch(/\.od-sidebar-global-actions\s*{[^}]*width:\s*var\(--sidebar-content-width\);[^}]*display:\s*grid;[^}]*justify-self:\s*center;[^}]*gap:\s*3px;/s);
     expect(css).toMatch(/\.od-sidebar-action\s*{[^}]*min-height:\s*34px;[^}]*grid-template-columns:\s*var\(--sidebar-action-icon-slot\) minmax\(0, 1fr\) auto;[^}]*column-gap:\s*var\(--sidebar-action-label-gap\);[^}]*background:\s*transparent;[^}]*box-shadow:\s*none;/s);
     expect(css).toMatch(/\.od-sidebar-action\s*{[^}]*padding:\s*0 var\(--sidebar-row-padding-x\);/s);
-    expect(css).toMatch(/\.od-sidebar-action:hover,\s*\.od-sidebar-action:focus-visible\s*{[^}]*background:\s*var\(--od-interaction-hover-bg\);[^}]*box-shadow:\s*var\(--od-interaction-hover-shadow\);[^}]*color:\s*var\(--od-fg\);/s);
-    expect(css).toMatch(/\.od-sidebar-action\[aria-current="page"\]\s*{[^}]*background:\s*var\(--od-selection-bg\);[^}]*border-color:\s*transparent;[^}]*box-shadow:\s*none;[^}]*color:\s*var\(--od-fg\);/s);
-    expect(css).toMatch(/\.od-sidebar-action:focus-visible\s*{[^}]*box-shadow:\s*var\(--od-interaction-focus-shadow\);/s);
-    expect(css).toMatch(/\.od-sidebar-action\[aria-current="page"\]:focus-visible\s*{[^}]*background:\s*var\(--od-selection-hover-bg\);[^}]*border-color:\s*transparent;[^}]*box-shadow:\s*var\(--od-focus\);/s);
+    expect(css).toMatch(/\.od-sidebar-action:hover,\s*\.od-sidebar-action:focus-visible\s*{[^}]*background:\s*var\(--island2\);[^}]*box-shadow:\s*none;[^}]*color:\s*var\(--od-fg\);/s);
+    expect(css).toMatch(/\.od-sidebar-action\[aria-current="page"\]\s*{[^}]*background:\s*var\(--field\);[^}]*border-color:\s*transparent;[^}]*box-shadow:\s*none;[^}]*color:\s*var\(--od-fg\);/s);
+    expect(css).toMatch(/\.od-sidebar-action:focus-visible\s*{[^}]*box-shadow:\s*var\(--od-focus\);/s);
+    expect(css).toMatch(/\.od-sidebar-action\[aria-current="page"\]:focus-visible\s*{[^}]*background:\s*var\(--field\);[^}]*border-color:\s*transparent;[^}]*box-shadow:\s*var\(--od-focus\);/s);
     expect(css).toMatch(/\.od-sidebar-action-icon\s*{[^}]*width:\s*var\(--sidebar-action-icon-slot\);[^}]*height:\s*20px;[^}]*justify-items:\s*start;[^}]*transform:\s*translateX\(var\(--sidebar-action-icon-offset-x\)\);/s);
     expect(css).toMatch(/\.od-sidebar-action-icon svg\s*{[^}]*width:\s*18px;[^}]*height:\s*18px;[^}]*stroke-width:\s*var\(--od-icon-stroke\);/s);
     expect(css).toMatch(/\.od-sidebar-action-label\s*{[^}]*font-weight:\s*var\(--od-font-weight-medium\);[^}]*line-height:\s*16px;/s);
@@ -1574,7 +1575,7 @@ describe("CockpitShell", () => {
     expect(html).not.toContain(">active<");
     expect(html).not.toContain("Save blocked");
     expect(css).toMatch(/\.od-aim-card\s*{[^}]*min-height:\s*36px;[^}]*padding:\s*0 var\(--sidebar-row-padding-x\);/s);
-    expect(css).toMatch(/\.od-aim-card\.selected,\s*\.od-aim-card\.current\s*{[^}]*background:\s*var\(--od-selection-bg\);[^}]*border-color:\s*transparent;[^}]*box-shadow:\s*none;/s);
+    expect(css).toMatch(/\.od-aim-card\.selected,\s*\.od-aim-card\.current\s*{[^}]*background:\s*var\(--field\);[^}]*border-color:\s*transparent;[^}]*box-shadow:\s*none;/s);
     expect(css).toMatch(/\.od-aim-card\.selected:focus-visible,\s*\.od-aim-card\.current:focus-visible\s*{[^}]*box-shadow:\s*var\(--od-focus\);/s);
     expect(css).toMatch(/\.od-draft-card \.od-content-entry-main\s*{[^}]*min-height:\s*36px;[^}]*padding:\s*0 2px 0 var\(--sidebar-row-padding-x\);/s);
     expect(css).toMatch(/\.od-aim-card strong,\s*\.od-draft-card \.od-content-entry-copy strong\s*{[^}]*overflow:\s*hidden;[^}]*text-overflow:\s*ellipsis;[^}]*white-space:\s*nowrap;/s);
@@ -1643,8 +1644,8 @@ describe("CockpitShell", () => {
     expect(css).toMatch(/\.od-section-label\s*{[^}]*justify-content:\s*flex-start;[^}]*padding:\s*0 var\(--sidebar-row-padding-x\);/s);
     expect(css).toMatch(/\.od-sidebar-empty\s*{[^}]*padding:\s*7px var\(--sidebar-row-padding-x\);/s);
     expect(css).toMatch(/\.od-aim-card\s*{[^}]*padding:\s*0 var\(--sidebar-row-padding-x\);/s);
-    expect(css).toMatch(/\.od-aim-card\.selected,\s*\.od-aim-card\.current\s*{[^}]*background:\s*var\(--od-selection-bg\);[^}]*border-color:\s*transparent;[^}]*box-shadow:\s*none;[^}]*color:\s*var\(--od-fg\);/s);
-    expect(css).toMatch(/\.od-aim-card\.selected:focus-visible,\s*\.od-aim-card\.current:focus-visible\s*{[^}]*background:\s*var\(--od-selection-hover-bg\);[^}]*box-shadow:\s*var\(--od-focus\);/s);
+    expect(css).toMatch(/\.od-aim-card\.selected,\s*\.od-aim-card\.current\s*{[^}]*background:\s*var\(--field\);[^}]*border-color:\s*transparent;[^}]*box-shadow:\s*none;[^}]*color:\s*var\(--od-fg\);/s);
+    expect(css).toMatch(/\.od-aim-card\.selected:focus-visible,\s*\.od-aim-card\.current:focus-visible\s*{[^}]*background:\s*var\(--field\);[^}]*box-shadow:\s*var\(--od-focus\);/s);
     expect(css).toMatch(/\.od-sidebar-search\s*{[^}]*padding:\s*0 var\(--sidebar-row-padding-x\);/s);
     expect(css).toMatch(/\.od-filter-row\s*{[^}]*padding:\s*0 var\(--sidebar-row-padding-x\) 2px;/s);
     expect(css).toMatch(/\.od-user-menu-anchor\s*{[^}]*width:\s*var\(--sidebar-content-width\);[^}]*justify-self:\s*center;/s);
