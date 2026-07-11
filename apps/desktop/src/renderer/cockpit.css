@@ -7055,6 +7055,21 @@ kbd {
   line-height: 1.45;
 }
 
+/* Context station sheet interior: hosts the reused Context panels (inbox / activity / review).
+   Descendant-only overrides reflow the full-width panels for the narrower sheet — never edit the
+   pinned .od-context-* base rules (guarded by the ContextSourcesPanel cockpit.css snapshot). */
+.od-journey-context {
+  display: grid;
+  gap: 16px;
+}
+
+.od-journey-context-empty {
+  margin: 2px 0 0;
+  font-size: var(--od-type-body);
+  color: var(--mut);
+  line-height: 1.55;
+}
+
 .od-journey-sheet-foot {
   margin-top: 16px;
   display: flex;

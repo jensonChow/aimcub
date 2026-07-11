@@ -3,6 +3,7 @@ import type { Evidence, Memory } from "@core/types";
 
 import { ContextInbox, type ContextInboxScope } from "../../ContextInbox";
 import { useI18n, type I18n } from "../../i18n";
+import { pendingContextCandidates } from "../../labels";
 
 export type EvalStageMilestoneRow = AimProgressReadModel["milestones"][number];
 type EvalEvidenceReviewItem = EvalStageMilestoneRow["evidence"][number];
@@ -157,10 +158,6 @@ function matchedEvidenceText(row: EvalStageMilestoneRow, evidenceIds: readonly s
     .filter((item) => ids.has(item.evidence.id))
     .map((item) => shortText(evidenceTitle(item), 64))
     .join(", ");
-}
-
-function pendingContextCandidates(progress: AimProgressReadModel | null): Memory[] {
-  return progress?.context_candidates.filter((candidate) => candidate.status === "pending") ?? [];
 }
 
 function EvalStageMetric({ label, value }: { label: string; value: string }) {
@@ -503,7 +500,7 @@ function EvalContextReviewSection(props: {
 
 export function EvalStage(props: EvalStageProps) {
   const { t } = useI18n();
-  const pendingCandidates = pendingContextCandidates(props.progress);
+  const pendingCandidates = pendingContextCandidates(props.progress?.context_candidates ?? []);
 
   if (props.progress?.completion_recap?.complete) {
     return (

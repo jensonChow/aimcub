@@ -496,3 +496,12 @@ export function planningToolsOf(g: Goal): PlanningToolIpcTrace | null {
 export function pendingContextForGoal(goal: Goal, candidates: readonly Memory[]): Memory[] {
   return candidates.filter((candidate) => candidate.goal_id === goal.id && candidate.status === "pending");
 }
+
+/**
+ * The context candidates still awaiting triage (accept/reject). Keeps global-scoped
+ * (`goal_id === null`) candidates — unlike `pendingContextForGoal` — so both the Eval inbox and
+ * the Journey Context sheet operate on the same pending set.
+ */
+export function pendingContextCandidates(candidates: readonly Memory[]): Memory[] {
+  return candidates.filter((candidate) => candidate.status === "pending");
+}

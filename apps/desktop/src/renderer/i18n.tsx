@@ -1560,6 +1560,10 @@ export const STRINGS = {
     en: "The agent takes this turn — its result shows up in Turns and the Journal.",
     zh: "由 agent 接手这一轮——结果会出现在「轮次」和「记录」中。",
   },
+  "glass.journey.contextEmpty": {
+    en: "Context is folded into the plan — nothing is waiting on you here.",
+    zh: "背景已并入计划——这里没有待你处理的事项。",
+  },
   "glass.journey.sheetSub.aim": {
     en: "restatable — the loop re-plans if it changes",
     zh: "可随时重述——目标一变，循环就会重新规划",

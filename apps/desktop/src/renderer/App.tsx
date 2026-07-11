@@ -1785,11 +1785,15 @@ function AimOsApp() {
           progress={progress}
           runEvents={journalEvents}
           researchMemories={memories.filter((memory) => memory.goal_id === selected.id || memory.goal_id === null)}
+          contextLoop={contextLoop}
+          contextReview={contextReview}
           disabled={Boolean(busy)}
           elsewhereCount={elsewhere.length}
           onOpenStage={openCockpitStage}
           onRunAgent={(milestone) => void runAgent(milestone)}
           onNewAim={startNewAim}
+          onAcceptContextCandidate={acceptContextCandidate}
+          onRejectContextCandidate={rejectContextCandidate}
           onJumpElsewhere={() => {
             const next = elsewhere[0];
             if (next) void openGoal(next);

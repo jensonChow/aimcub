@@ -1,10 +1,12 @@
-import type { AimProgressMilestoneRead, AimProgressReadModel, Goal } from "@core/domain";
+import type { AimProgressMilestoneRead, AimProgressReadModel, Goal, Memory } from "@core/domain";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
+import type { ContextBundleReview } from "../../contextReview";
 import { I18nProvider } from "../../i18n";
 import type { JourneyStationInteraction } from "../../workflow/journey";
-import { JourneyRunSheetBody, JourneyView, type JourneyViewProps } from "./JourneyView";
+import { buildContextLoopModel } from "../context/contextLoop";
+import { JourneyContextSheetBody, JourneyRunSheetBody, JourneyView, type JourneyViewProps } from "./JourneyView";
 
 const OWNER = "owner-1";
 const noop = () => {};
@@ -202,5 +204,88 @@ describe("JourneyRunSheetBody", () => {
     const html = renderBody("m2", true);
     expect(html).toContain("Run with agent"); // label reflects the live selection
     expect(html).toContain("disabled"); // but busy → not confirmable
+  });
+});
+
+describe("JourneyContextSheetBody", () => {
+  const emptyReview: ContextBundleReview = {
+    usedContext: [],
+    skippedContext: [],
+    permissionGaps: [],
+    decompositionRisks: [],
+    sourceCount: 0,
+  };
+  const reviewWithItems: ContextBundleReview = {
+    usedContext: [{ id: "u1", title: "Prefers nonstop flights", body: "From the Japan trip", meta: [], tone: "neutral" }],
+    skippedContext: [],
+    permissionGaps: [],
+    decompositionRisks: [],
+    sourceCount: 1,
+  };
+  // Real builder → valid i18n message keys; running:true flips hasLiveResearchData on.
+  const idleLoop = buildContextLoopModel({ contextSources: null, review: emptyReview });
+  const liveLoop = buildContextLoopModel({ contextSources: null, review: emptyReview, running: true });
+
+  function candidate(): Memory {
+    return {
+      id: "aaaaaaaa-1111-4111-8111-111111111111",
+      owner_id: "bbbbbbbb-2222-4222-8222-222222222222",
+      goal_id: "g1",
+      kind: "semantic",
+      category: "preference",
+      content: "Prefers nonstop flights when traveling with kids.",
+      confidence: 0.9,
+      source: "user_stated",
+      status: "pending",
+      superseded_by: null,
+      created_at: "2026-07-05T08:00:00.000Z",
+    } as Memory;
+  }
+
+  function renderBody(
+    over: Partial<{ loop: typeof idleLoop; review: ContextBundleReview; pendingCandidates: Memory[]; disabled: boolean }> = {},
+  ): string {
+    return renderToStaticMarkup(
+      <I18nProvider>
+        <JourneyContextSheetBody
+          loop={over.loop ?? idleLoop}
+          review={over.review ?? emptyReview}
+          pendingCandidates={over.pendingCandidates ?? []}
+          currentAimTitle="Two weeks in Japan"
+          disabled={over.disabled ?? false}
+          onAccept={noop}
+          onReject={noop}
+        />
+      </I18nProvider>,
+    );
+  }
+
+  it("shows the honest empty hint when nothing is pending, live, or reviewed", () => {
+    const html = renderBody();
+    expect(html).toContain("Context is folded into the plan");
+    expect(html).not.toContain("od-context-inbox");
+    expect(html).not.toContain("context-activity-surface");
+    expect(html).not.toContain("context-bundle-review");
+  });
+
+  it("renders the pending-candidate inbox (actionable triage)", () => {
+    const html = renderBody({ pendingCandidates: [candidate()] });
+    expect(html).toContain("od-context-inbox");
+    expect(html).toContain("Prefers nonstop flights when traveling with kids.");
+    expect(html).toContain("Accept");
+    expect(html).toContain("Reject");
+    expect(html).not.toContain("Context is folded into the plan");
+  });
+
+  it("shows the activity panel only while research is live", () => {
+    expect(renderBody({ loop: liveLoop })).toContain("context-activity-surface");
+    expect(renderBody({ loop: idleLoop })).not.toContain("context-activity-surface");
+  });
+
+  it("renders the context review receipt when there are review items", () => {
+    const html = renderBody({ review: reviewWithItems });
+    expect(html).toContain("context-bundle-review");
+    expect(html).toContain("Prefers nonstop flights");
+    expect(html).not.toContain("Context is folded into the plan");
   });
 });
