@@ -1,115 +1,104 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-11
-Branch: `main` (Stage B merged to `main` and pushed to origin; built on branch `glass-stage-b`)
+Branch: `main` (Stages D and E merged to `main` locally; **not pushed** — awaiting approval)
 
 ## Current Session
 
-Continued the **Aimcub Glass** desktop redesign (glassmorphism visual system + a "Journey"
-information architecture, imported from the founder's `Aimcub Glass.dc.html` design). Stages 0
-(tokens + pure Journey helpers), A (gradient desktop + translucent shell islands), and C
-(JourneyView work surface) were already merged to `main` and green. This session delivered
-**Stage B** on a fresh branch off `main`.
+Completed the **Aimcub Glass** desktop redesign: **Stage D** (net-new `@core` / store / IPC —
+the only boundary-crossing work) and **Stage E** (docs rewrite + theme-toggle native-bg sync +
+repack + packaged QA). With this, the full staged plan (`~/.claude/plans/giggly-herding-pine.md`,
+stages 0/A/B/C/D/E) is shipped and green. Stages 0/A/C/B were already on `main`.
 
-Approved plan: `~/.claude/plans/giggly-herding-pine.md`.
+## Completed — Stage D (net-new core: journal + Research station + progress dots)
 
-## Completed This Session — Stage B (Home / New / Memory / Settings + sidebar IA)
+Committed as `766d278a` on branch `glass-stage-d`, merged to `main`.
 
-- **`listMemories` IPC** end-to-end over the existing `store.listMemories` (active-only,
-  newest-first): `AimcubApi` + `IPC` channel in `apps/desktop/src/shared/ipc.ts`, handler in
-  `apps/desktop/src/main/ipc.ts`, passthrough in `apps/desktop/src/preload/index.ts`. "Forget"
-  reuses the already-wired `archiveContextMemory`.
-- **Memory** — net-new top-level page (`stages/memory/MemoryView.tsx`): active memories grouped
-  by `category`, provenance line (`source` + aim/global scope), Forget action, honest empty
-  state. Added as a new non-workbench `CockpitStage` `"memory"` (mirrors `settings`; excluded
-  from `WorkbenchStage`), driven by `stageOverride` via a lightweight `openMemory()` overlay
-  handler that bumps the surface epoch + interrupts planning (like `openContextSettings`) so a
-  resolving planning run can't clobber the overlay. App owns a `memories` state (loaded on mount
-  + after Forget); `memoryCount` feeds the sidebar row.
-- **Home** — rebuilt as Glass (`stages/home/HomeView.tsx`), replacing `InitialWorkspacePanel`
-  (removed from `App.tsx`): drafts → existing recovery surface; else saved aims → "Welcome back"
-  glass card list; else first-run → glass hero + "Set your first aim" + a planning-runtime setup
-  card bound to `planningRuntimeReady`. The empty/first-run state still renders **no composer**
-  (invariant preserved); the `.od-initial-workspace` + `data-has-drafts` anchors and the pinned
-  draft-recovery centering CSS are kept.
-- **New aim** — kept `AimIntakePanel` + the whole compose→summary invariant chain untouched
-  (`startDraft`/`aimSurfaceAfterSubmit`/`checkpointSubmittedAim`); only glassified the
-  `.od-aim-composer` container (translucent `--island2` fill + blur), which is test-safe.
-- **Settings** — Glass reskin via `styles.ts` (`card()`/`inputStyle()`/`primaryButton()` radii +
-  `--sh-*` shadows, token indirection kept). The split-view IA + all forms preserved.
-- **Sidebar IA** — added a Glass footer block above the user menu: a **Memory nav row**
-  (`.od-sidebar-action`, active when `activeStage==="memory"`), a `~/.aimcub · local` line, and a
-  **theme toggle** (OS-follow default). Row/card glassification: `.od-sidebar-action`,
-  `.od-aim-card`, `.od-content-entry` hover/selected states repointed from the flat `--od-*`
-  grays to translucent `--island2`/`--field` washes; the matching exact-string assertions in
-  `App.test.tsx` were updated deliberately. All 15 `data-od-id` anchors preserved (+ 3 new
-  ones); native macOS traffic lights untouched.
-- **Theme toggle** — renderer-owned `themePref` ("system" default, `localStorage`-persisted)
-  drives `data-system-appearance` off an `effectiveAppearance`. The dark `@media
-  (prefers-color-scheme: dark)` block now yields to an explicit light override
-  (`:root:not(:has(.od-app[data-system-appearance="light"]))`) so the toggle can force light on a
-  dark-mode OS. The visible surface (the `.od-window` `--desk` gradient + content) follows the
-  toggle. **Deferred to Stage E:** syncing the *native* window background on an in-app override
-  (needs an IPC → `nativeTheme.themeSource` / `win.setBackgroundColor`, per the plan).
-- **Deleted** the dead `renderer/HomeView.tsx` (whole file — verified zero references).
-- **i18n** — added `glass.home.*`, `glass.memory.*`, `glass.shell.*` keys (en + zh); parity holds
-  via the `satisfies` typecheck guard.
+1. **Run-lifecycle journal.** `store.listRunEvents(goalId)` joins run→goal (run events carry no
+   goal id) + a **separate** `getAimJournal` IPC across `shared/ipc.ts` + `main/ipc.ts` +
+   `preload/index.ts` (kept off the hot `getAimProgress`). `workflow/journey/journal.ts` now
+   merges appended evidence with real run-lifecycle events (started/completed/failed/cancelled/
+   artifact.created), dropping `run.queued`/`run.log`/`tool.*` noise; `who` resolved from the read
+   model with a neutral "cub" fallback; empty-summary events localize via `glass.journal.event.*`.
+2. **Research station real in `@core`.** `summarizeAimResearch` (`packages/core/src/aim-os.ts`,
+   pure + unit-tested) derives none/gathering/ready from an aim's active memories + pending
+   candidates, replacing the synthetic plan-exists proxy. `stationModel.ts` / `stationSheet.ts`
+   consume it; the read-only Research sheet shows the real gathered context (aim-scoped + global),
+   with category labels localized in `JourneyView`.
+3. **Batch per-aim progress.** `summarizeAimProgress` (`@core`, coarse/cheap) +
+   `store.listAimProgressSummaries` (one pass, no N× `evaluate()`) + `listAimProgressSummaries`
+   IPC. `App` loads `progressSummaries` + `journalEvents` (transition-guarded, cleared with
+   progress on navigation) and refreshes both **list surfaces** after every side effect via
+   `refreshListSurfaces` (including the `confirmMilestone` path that bypasses
+   `refreshGoalAfterSideEffect`). `CockpitShell` renders a trailing status **dot** per sidebar aim
+   row (marker, not subtitle); `HomeView` renders a dot + 6px progress bar per card. Dots carry
+   aria-labels. New pure helper `workflow/progressSummary.ts`.
+
+**Adversarial multi-agent review** of the Stage D diff (5 lenses → adversarial verify) confirmed
+and fixed 6 issues: (1)/(2) `confirmMilestone` + context-accept not refreshing the new list
+surfaces → stale dots/research count [MED]; (3) research count stale after context accept/reject
+[LOW]; (4) raw untranslated memory-category enum in the sheet meta [LOW]; (5) off-spec 4px
+progress bar (→6px) [LOW]; (6) a run-event sort test that didn't exercise its comparator [LOW].
+7 candidate findings were adversarially rejected as false positives.
+
+## Completed — Stage E (docs + native theme sync + packaged QA)
+
+Committed on branch `glass-stage-e`, merged to `main`.
+
+- **Theme-toggle native-bg sync** (deferred from Stage B): a validated `setThemeSource` IPC
+  (`shared/ipc.ts` + `main/ipc.ts` + `preload/index.ts`) sets `nativeTheme.themeSource`; the
+  existing `nativeTheme.on("updated")` listener repaints `win.setBackgroundColor` and re-emits
+  chrome state. `CockpitShell` syncs `themePref` → `setThemeSource` on mount and every toggle, so
+  an in-app light/dark override no longer desyncs the native titlebar/traffic-light context.
+- **Docs**: rewrote `docs/memory/design-system.md` to the Glass system (tokens, Journey IA,
+  status-dot markers, theme toggle, native-chrome rules, the font-size ramp constraint); updated
+  `docs/memory/desktop.md` (Glass shell / Journey / Memory page / theme sync / status dots),
+  `docs/memory/architecture.md` (the two new `@core` read derivations + `listRunEvents`), and
+  `docs/desktop-polish-audit.md` (dated Glass reframe; the unchanged stage panels remain the
+  backlog).
+- **Repack + refresh**: `pnpm desktop:pack` → `apps/desktop/dist/mac-arm64/Aimcub.app`; refreshed
+  the root `Aimcub.app` (untracked local artifact) from it.
 
 ## Verification
 
-- Full gate green: `pnpm build && pnpm test` (241 desktop tests) `&& pnpm typecheck && pnpm lint
-  && pnpm core:purity`; `git diff --check` clean.
-- **Adversarial multi-agent review** of the diff before commit found and fixed 4 real issues:
-  (1) theme toggle couldn't force light on a dark OS [HIGH]; (2) `openMemory` didn't bump the
-  surface epoch / interrupt planning, letting a resolving plan yank the user off Memory [MED];
-  (3) `.od-main-memory` lacked `grid-template-rows: minmax(0,1fr)`, so tall Memory lists
-  overflowed and were clipped with no scroll [MED]; (4) the Forget button was ~22px tall (< 24px
-  target) [LOW]. Two other findings were adversarially verified as false positives.
-- Packaged the app (`pnpm desktop:pack` → `apps/desktop/dist/mac-arm64/Aimcub.app`) and launched
-  it with an **isolated HOME** — real `~/.aimcub/store.json` mtime unchanged, zero isolated
-  writes. **Interactive computer-use visual QA was declined by the user this session**, so the
-  on-screen light+dark / multi-size inspection is still pending (rolls into the Stage E packaged
-  QA). The root `Aimcub.app` was NOT repacked (still reflects `main`; that is a Stage E step).
-
-## Remaining Work (per the approved plan)
-
-- **Stage D** — Net-new core (the only boundary-crossing work): a real vs synthetic Research
-  station; `store.listRunEvents` + a separate `getAimJournal` IPC for the full run-lifecycle
-  journal; a batch per-aim progress summary so the Home cards / sidebar can show a real
-  "needs you" dot + progress (currently deferred as an honest placeholder). Keep `@core` purity.
-- **Stage E** — Rewrite `docs/memory/design-system.md` to the Glass system; update
-  `docs/memory/desktop.md` and `docs/desktop-polish-audit.md`; wire the theme-toggle native-bg
-  sync via IPC; `pnpm desktop:pack` + refresh root `Aimcub.app`; light+dark packaged QA at
-  960×680 / 760×600 / 640×520.
-
-### Possible follow-ups noted this session
-- A Cmd/Ctrl+K command-palette entry for Memory (only the sidebar row exists today).
-- Home aim cards + sidebar carry no per-aim progress yet (Stage D batch summary is the real fix).
+- **Full gate green**: `pnpm build && pnpm test` (246 desktop + core/store additions) `&&
+  typecheck && lint && core:purity`; build verified no `@core` leakage into Electron bundles.
+- **Packaged light+dark QA** at 960×680 / 760×600 / 640×520 via CDP (Node built-in WebSocket, no
+  deps) against the packaged root `Aimcub.app`, launched with an **isolated `AIMCUB_HOME`** +
+  `--user-data-dir`. Real `~/.aimcub/store.json` mtime unchanged (zero touches). Verified on
+  screen: first-run Glass Home (both themes); the Journey work surface (6-station strip with the
+  real Research "3 facts in play" + Run "1 running" derivations, the "Your move" card, Turns, and
+  a Journal whose seeded `run.log` noise was correctly filtered to lifecycle receipts); the
+  Research station sheet with **localized** category labels; and sidebar status dots
+  (`is-running`/"Agents working", `is-needs_you`/"Needs you"). **No horizontal overflow** at any
+  size in either theme; the 6-station strip degrades to a horizontal scroll at the smallest width.
+- **Native-chrome caveat**: CDP captures web content, not the native macOS titlebar, so the
+  `setThemeSource` native-titlebar-bg follow is verified by wiring (IPC → `nativeTheme.themeSource`
+  → repaint) but not by an on-screen native screenshot. A computer-use pass would confirm the
+  native titlebar/traffic-light appearance under an in-app override; interactive computer-use QA
+  was not run this session (as in the prior session).
 
 ## Commit And Push Status
 
-- Stage B (`f0ffee10`) is committed, green on the full gate, merged to `main`, and **pushed to
-  origin** (user-authorized this session). Stages 0/A/C were already on origin/main.
-- The root `Aimcub.app` was NOT repacked (Stage E step). Future pushes still require explicit
-  per-session approval.
+- Stage D (`766d278a`) and Stage E are committed on their branches and merged to `main` locally.
+  **Neither is pushed** — pushing still requires explicit per-session approval. Stages 0/A/C/B are
+  already on origin/main.
+- Root `Aimcub.app` refreshed to the Stage D+E build (untracked).
 
 ## Open Risks / Notes
 
-- Bundle-id mismatch (independent of Glass): dist builds as `com.aimcub.desktop` while App Store
-  Connect records `com.jensonchow.aimcub`. Reconcile before store distribution.
-- Theme toggle native-titlebar-bg desync on an in-app override is a known, plan-sanctioned Stage E
-  follow-up (the visible content already follows the toggle).
+- **Bundle-id mismatch** (independent of Glass): dist builds as `com.aimcub.desktop` while App
+  Store Connect records `com.jensonchow.aimcub`. Reconcile before store distribution.
+- The Glass redesign is complete (stages 0/A/B/C/D/E). Optional follow-up noted across sessions: a
+  **Cmd/Ctrl+K command-palette entry for Memory** (only the sidebar row exists today).
 
 ## Next Session Prompt
 
 ```text
-Continue the Aimcub Glass redesign. Read docs/handoff.md and the approved plan at
-~/.claude/plans/giggly-herding-pine.md. Stages 0/A/C are on main; Stage B (Home/New/Memory/
-Settings + sidebar IA + listMemories IPC + row/card glassification + theme toggle) is committed
-on branch glass-stage-b and green on the full gate. Do Stage D (net-new core: Research station,
-run-event journal via listRunEvents + getAimJournal IPC, batch per-aim progress summary), then
-Stage E (rewrite design-system.md to Glass, theme-toggle native-bg IPC sync, repack + refresh
-root Aimcub.app + light+dark packaged QA). Keep each stage green on the full gate; preserve the
-draft/navigation/proof/compose-summary invariants, data-od-id anchors, and native traffic lights.
-Do not push without explicit approval.
+The Aimcub Glass desktop redesign is complete (stages 0/A/B/C/D/E) and green on the full gate;
+Stages D and E are merged to local `main` but NOT pushed. Read docs/handoff.md and
+docs/memory/design-system.md (now the Glass system). Possible next work: push to origin (needs
+explicit approval), the Cmd/Ctrl+K Memory palette entry, a computer-use on-screen pass to confirm
+the native titlebar background follows the in-app theme toggle, or reconcile the bundle-id
+mismatch (com.aimcub.desktop vs com.jensonchow.aimcub) before store distribution.
 ```

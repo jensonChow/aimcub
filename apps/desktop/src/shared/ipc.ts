@@ -360,6 +360,9 @@ export interface RunMilestoneAgentResult {
 
 export type SystemColorScheme = "light" | "dark";
 
+/** Renderer theme preference pushed to the main process to drive native window chrome. */
+export type WindowThemeSource = "system" | "light" | "dark";
+
 export interface WindowChromeState {
   fullscreen: boolean;
   colorScheme: SystemColorScheme;
@@ -412,6 +415,8 @@ export interface AimcubApi {
   runMilestoneAgent(req: RunMilestoneAgentRequest): Promise<RunMilestoneAgentResult>;
   confirmMilestone(req: ConfirmMilestoneRequest): Promise<GoalDetail | null>;
   getWindowChromeState(): Promise<WindowChromeState>;
+  /** Drive the native window appearance (titlebar/background/traffic-light context) from the in-app theme toggle. */
+  setThemeSource(source: WindowThemeSource): Promise<void>;
   onWindowChromeState(handler: (state: WindowChromeState) => void): () => void;
   onPlanningLiveEvent(handler: (event: PlanningLiveEvent) => void): () => void;
 }
@@ -461,6 +466,7 @@ export const IPC = {
   runMilestoneAgent: "aimcub:runMilestoneAgent",
   confirmMilestone: "aimcub:confirmMilestone",
   getWindowChromeState: "aimcub:getWindowChromeState",
+  setThemeSource: "aimcub:setThemeSource",
   windowChromeState: "aimcub:windowChromeState",
   planningLiveEvent: "aimcub:planningLiveEvent",
 } as const;

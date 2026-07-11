@@ -425,6 +425,14 @@ export function CockpitShell({
     };
   }, []);
 
+  // Drive the NATIVE window chrome (titlebar/background/traffic-light context) from the
+  // in-app theme toggle so an explicit light/dark override doesn't desync from the visible
+  // content. Runs on mount to apply a persisted override and on every toggle. "system"
+  // hands appearance back to the OS.
+  useEffect(() => {
+    void window.aimcub?.setThemeSource(themePref);
+  }, [themePref]);
+
   useEffect(() => {
     function resetTransientSidebarState() {
       clearSidebarTimers();

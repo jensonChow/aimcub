@@ -1,6 +1,6 @@
 # Desktop Local Alpha Polish Audit
 
-Last updated: 2026-07-09
+Last updated: 2026-07-11
 
 ## Scope
 
@@ -79,6 +79,32 @@ iterative Context research loop, and planning-error hardening worktrees:
 Seeded visual inspection in the refreshed root app at 960x680, 760x600, and
 640x520 confirmed the integrated surfaces avoid visible horizontal overflow,
 preserve native window chrome, and keep the tuned sidebar rail/pinned behavior.
+
+## 2026-07-11 Aimcub Glass Update
+
+The founder changed the desktop direction to **Aimcub Glass** (glassmorphism visual system +
+a "Journey" information architecture), shipped as stages 0/A/B/C/D on `main`. This reframes
+parts of this audit — read it alongside `docs/memory/design-system.md` (now the Glass system):
+
+- Shell and work view are Glass: a gradient desktop behind translucent blurred islands; the
+  saved-aim work surface is the new `JourneyView` (6-station strip · Your move · Turns ·
+  Journal), replacing the old aim overview; Home / New / Memory / Settings are reworked in the
+  same language; Memory is a top-level page; sidebar rows/cards carry a per-aim status **dot**
+  marker; the sidebar footer adds a Memory nav row, a `~/.aimcub · local` line, and a light/dark
+  theme toggle synced to the native window chrome.
+- The "What Must Not Be Touched" list below is partly superseded: Glass **intentionally**
+  restyled the sidebar rows/hover/selected states (translucent washes), added the footer
+  block (Memory nav / theme toggle / local path), and added per-aim status dots. Still
+  protected: native macOS traffic lights + window-chrome geometry, the drag strip, the sidebar
+  state model (pinned / collapsed / peek) and reveal rail, sidebar resize behavior/bounds, and
+  the shell grid push/overlay behavior.
+- The heavy interactive stage panels (Context, Plan/Contracts, Execute, Eval) are **unchanged**
+  under Glass — the Journey routes into them via the existing epoch-safe `openCockpitStage`. So
+  the stage-loop findings and batches below remain the valid backlog for a future stage-panel
+  Glass pass; they were not re-audited on-screen for this redesign.
+- Verification bar is unchanged: packaged QA at 960×680 / 760×600 / 640×520 in **both light and
+  dark**, no horizontal overflow, native traffic lights stay native, one dominant action per
+  surface.
 
 ## Top 10 Issues
 

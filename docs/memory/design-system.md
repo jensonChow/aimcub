@@ -1,45 +1,86 @@
 # Design System Memory
 
-Last updated: 2026-07-10
+Last updated: 2026-07-11
 
 ## Scope
 
-This is the durable visual and interaction design system for Aimcub frontends, with Desktop as the primary product surface. Future Desktop work must follow this document unless the user explicitly changes the design direction.
+This is the durable visual and interaction design system for Aimcub frontends, with Desktop
+as the primary product surface. Future Desktop work must follow this document unless the user
+explicitly changes the design direction.
 
-When the user gives any frontend or visual-design requirement, update this file in the same change. Keep the requirement durable here, then implement it in the relevant app.
+When the user gives any frontend or visual-design requirement, update this file in the same
+change. Keep the requirement durable here, then implement it in the relevant app.
 
-## Active Direction (2026-07-11): Aimcub Glass
+## Active Direction: Aimcub Glass
 
-The founder explicitly changed the desktop design direction to **Aimcub Glass** (imported
-from his claude.ai/design project via the DesignSync MCP) and asked for a full rebuild.
-Glass is a **glassmorphism** visual system (a gradient "desktop", translucent backdrop-blurred
-"islands", soft shadows, pill chips, full light+dark token sets) plus a new **"Journey"**
-information architecture (a 6-station strip Aim · Research · Context · Plan · Run · Eval, a
-"Your move" card, an "Ambient" card, a "Turns" roster, a "Journal" receipt timeline with a
-station drill-in sheet, Memory promoted to a top-level page, and reworked Home/New/Settings).
+The founder chose **Aimcub Glass** (imported from his claude.ai/design project via the
+DesignSync MCP) as the desktop direction and asked for a full rebuild. Glass is now the
+system this document describes — it supersedes the earlier "calm-flat" direction, whose
+"no glass / no gradients / no atmospheric backgrounds / no style churn" guidance no longer
+applies. The durable cross-cutting rules that Glass still honors (the type ramp, layout rails,
+target sizes, accessibility, native macOS chrome, Electron engineering) are retained below.
 
-**This supersedes the calm-flat rules below where they conflict** — in particular the
-"No style churn / no glass effects / no gradients / no atmospheric backgrounds" guidance and
-the "protect the shell" constraints. Those sections are retained as history until this
-document is rewritten to the Glass system (a tracked Stage E task).
+Glass is two things at once:
 
-Shipped so far (branch `glass-redesign`, merged to `main`): the additive Glass token set in
-`cockpit.css` (`--desk/--island/--ink/--acc/--sh-*/...`, present in all three theme blocks),
-the gradient-desktop + translucent-island shell containers, and the `JourneyView` work surface
-(`apps/desktop/src/renderer/stages/journey/`). Remaining: Home/New/Memory/Settings Glass pages,
-row/card glassification, net-new core (run-event journal, Research station), and this rewrite.
-Before making desktop visual changes, read `docs/handoff.md` and the approved plan for the
-current state.
+- **A glassmorphism visual system** — a gradient "desktop" background behind translucent,
+  backdrop-blurred "islands" (sidebar, workspace, cards, sheets), soft shadows, pill chips,
+  14–24px radii, and full light+dark token sets.
+- **A "Journey" information architecture** for the work surface — a 6-station strip
+  (Aim · Research · Context · Plan · Run · Eval), a single "Your move" card (or an "Ambient"
+  card when nothing is waiting on the human), a "Turns" roster, a "Journal" receipt/evidence
+  timeline, and a read-only station drill-in **sheet**. Memory is promoted to a top-level page;
+  Home / New / Settings are reworked in the same visual language.
+
+**Shipped** (stages 0/A/B/C/D on `main`): the additive Glass token set in `cockpit.css`
+(present identically in all three theme blocks), the gradient-desktop + translucent-island
+shell, the `JourneyView` work surface, Glass Home / New / Memory / Settings pages, row/card
+glassification, the sidebar Memory nav row + `~/.aimcub · local` footer + theme toggle, the
+`listMemories` / `getAimJournal` / `listAimProgressSummaries` IPC, the real (`@core`) Research
+station and run-lifecycle journal, and the batch per-aim progress dots. Before making desktop
+visual changes, read `docs/handoff.md` and the loading order in `docs/memory/desktop.md`.
+
+## Design Tokens
+
+The source of truth for Desktop is `apps/desktop/src/renderer/cockpit.css`. Glass tokens are
+additive over the legacy `--od-*` operational palette (which still backs un-migrated
+selectors); surfaces adopt Glass tokens as they are restyled. **Every Glass token must appear
+identically in all three theme blocks** — `:root` (light), `@media (prefers-color-scheme: dark)`,
+and `:root:has(...[data-system-appearance="dark"])` (native/toggle-driven dark). A guard test
+asserts the hand-duplicated dark blocks match.
+
+Core Glass tokens (light values shown; each has a dark counterpart):
+
+- **Desktop / islands** — `--desk` (the gradient backdrop), `--island` / `--island2` (translucent
+  fills, ~0.62 / ~0.42 white in light, low-alpha white in dark), `--field` (input/selected fill),
+  `--ring` (inner hairline highlight), `--edge` (structural hairline), `--dim` (scrim).
+- **Ink** — `--ink` (primary text), `--ink2` (secondary), `--mut` (muted), `--faint` (meta/idle).
+- **Accent** — `--acc`, `--acc-on`, `--acc-soft` (tinted wash).
+- **Status** — `--ok` / `--okdot` (success), `--warn` / `--warndot` (attention), `--danger`.
+- **Elevation** — `--sh-lg`, `--sh-md` (soft ambient shadows), `--sh-btn` (accent button glow).
+
+Migration is surface-by-surface, not a blanket `--od-*` rename (`--od-bg` is opaque; `--island`
+is translucent — a blind remap breaks un-migrated panels and the dark-token tests). Each
+surface adopts Glass tokens when its stage restyles it, and that stage updates the matching
+CSS-string assertion. `styles.ts` keeps the token indirection for its inline `card()` /
+`inputStyle()` / `primaryButton()` helpers.
 
 ## Research Inputs
 
-- Microsoft Windows app design principles and guidelines: calm, coherent, familiar, accessible, clear hierarchy, predictable navigation, task-first commands, consistent typography.
-- Microsoft typography guidance: system fonts, few type styles, left alignment, minimum readable UI sizes, concise strings, semibold emphasis instead of excessive bold/italic.
-- GNOME HIG: design for people, make each view simple, reduce user effort, avoid interruptions, keep each view focused, avoid deep navigation, adapt smoothly across window sizes.
-- GNOME styling and accessibility guidance: default light style unless content demands dark, support high contrast, avoid color-only meaning, prefer system/component style variables, test with keyboard and screen readers.
-- W3C WCAG 2.2: text contrast should meet 4.5:1 for normal text and 3:1 for large text; keyboard focus must be visible; pointer targets should be at least 24 by 24 CSS pixels or have enough spacing.
-- Electron security and performance guidance: keep Electron current, isolate renderers, avoid remote code with Node integration, define CSP, validate IPC senders, avoid blocking main/renderer processes, defer expensive work, and profile real bottlenecks.
-- Apple Human Interface Guidelines remain a platform reference for macOS feel, but the current public HIG page requires JavaScript in the research environment. Treat stable macOS principles as native-feeling behavior, restrained chrome, system typography, and predictable window/menu conventions, not as permission to chase every visual trend.
+- Microsoft Windows app design principles: calm, coherent, familiar, accessible, clear
+  hierarchy, predictable navigation, task-first commands, consistent typography.
+- Microsoft typography: system fonts, few type styles, left alignment, minimum readable UI
+  sizes, concise strings, semibold emphasis over excessive bold/italic.
+- GNOME HIG: design for people, keep each view simple and focused, reduce user effort, avoid
+  interruptions and deep navigation, adapt smoothly across window sizes.
+- GNOME styling/accessibility: support high contrast, avoid color-only meaning, prefer
+  system/component style variables, test with keyboard and screen readers.
+- W3C WCAG 2.2: 4.5:1 contrast for normal text, 3:1 for large text/state icons; visible
+  keyboard focus; pointer targets at least 24×24 CSS px or with enough spacing.
+- Electron security/performance: keep Electron current, isolate renderers, avoid remote code
+  with Node integration, define a CSP, validate IPC senders, avoid blocking main/renderer,
+  defer expensive work, profile real bottlenecks.
+- Apple HIG remains a macOS-feel reference: native-feeling behavior, restrained chrome, system
+  typography, predictable window/menu conventions.
 
 Reference links:
 
@@ -63,221 +104,364 @@ Reference links:
 
 ## Product Principles
 
-- Aim-first: the aim, next action, current stage, context quality, and evidence state are the product. Decorative or avatar-like surfaces must not compete with the aim.
-- Product-first, debug-second: the default Desktop shell must not show model calls, prompt previews, runtime logs, trace streams, or stacked debug panels. Developer diagnostics belong behind an explicit developer surface.
-- One primary task per screen: a view should make one user action obvious. Secondary facts can be visible only when they support that action.
-- Desktop quality bar: Aimcub should feel like a focused desktop workbench, not a web dashboard inside Electron. Prefer stable panes, compact command surfaces, native-feeling shortcuts, complete control states, and strict row/spacing rhythm over page-by-page component stacks.
-- Calm density: Aimcub is an operational desktop tool. Prefer compact, scannable, quiet layouts over marketing-like hero sections, decorative cards, large illustrations, or expressive gradients.
-- First-run quality bar: an empty Aimcub workspace must not auto-render a chat or intake composer in the main area. Keep the initial main workspace as a quiet placeholder until the user explicitly starts a New Aim; the future default main content is intentionally undecided.
-- First-run shell chrome must stay quiet while no aim has started. Do not show idle status text, duplicate product labels, heavy focus rings, large helper copy, or oversized empty surfaces in the initial empty workspace.
-- Home draft recovery and recovered Aim summary surfaces should sit vertically centered in the available right workspace instead of crowding its top edge. Preserve their existing constrained horizontal rails, and use safe centering so taller content remains reachable from the scrollable start edge.
-- Aim creation, reading, and editing are distinct product states. New Aim and unsent child breakdown work may use the composer; after the first submit or draft recovery, the Aim surface defaults to a readable summary with explicit Edit and Continue actions. Persist the compose-versus-summary distinction explicitly for new drafts, and recover legacy drafts into the summary state. Runtime setup gaps, autosave, navigation, and restart must never reopen a captured Aim as an input. Re-enter the composer only through Edit, keep edits in a separate buffer so the committed Aim and plan remain intact until Update, explain when Update will regenerate a plan, and block normal navigation until the user updates or cancels. The same rule applies to top-level and child aims.
-- User-entered aim-building work must be auto-saved as recoverable local product data or made explicitly discardable before navigation hides it. Draft recovery UI should call the work a draft, not a saved aim.
-- Context is a substrate: show context health as concise status, setup controls, and review affordances. Do not turn memory/context into a profile page or a decorative feed.
-- Context source setup must keep one clear summary plus one editable control surface; do not repeat local, online, web, deep research, context-session, or questionnaire controls as separate card, table, and toggle representations. Planning readiness gates may sit under the summary as compact rows when they explain why planning can proceed or what remains blocked.
-- Context stage workbench must be stepwise and sparse. Keep provider setup, web capability, online connectors, and permission configuration in onboarding or Settings. While a blocking question or optional draft refinement is active, that question flow is the whole task surface: hide the Aim summary and edit action, automated activity, sufficiency, source controls, bundle review, and future questions. Show one reply lane plus one bottom primary action. After the question flow ends, restore aim-local attachments or notes and planning/review state with a single Continue to Plan action when no refinement panel is active.
-- Context stage intake is an iterative context-building loop, not a dashboard or blocking form. Derive automated activity and context sufficiency from live planning events, planning context/tools, intake, review buckets, answers, notes, and source status, but show that overview only while collection is running without a user question or after the focused question flow. Never place the activity pipeline ahead of an active question. Activity copy must summarize tool/action state such as local reads, linked context, web research, distillation, follow-up questions, and access gaps without exposing raw prompts, traces, or chain-of-thought. A question must remain visible while the user selects multiple choices or types a custom answer, and advance only through an explicit Next action. After each answer, generate the next highest-value question from the same intake run and its cumulative answer history; do not reveal a pre-generated static questionnaire one row at a time. Stop when no consequential unknown remains or the bounded exploration limit is reached. Pending draft refinement must survive current-tab clicks and stage re-entry; only a successful refinement or explicit accept/skip completes it. Do not show a question-specific custom answer and a general context note at the same time. If all intake paths are disabled, replace the question with one Settings recovery action.
-- Choice-card controls must render the normalized domain mode instead of inferring it from option count or question category. Both single- and multiple-select questions must remain representable; do not flatten a generated intake into one control mode. Expose single selection as a `radiogroup` of `radio` choices with one roving tab stop and Arrow/Home/End keyboard navigation; expose multiple selection as pressed toggle buttons. Keep the custom-answer lane available in both modes: it replaces the preset choice in single-select and supplements selected choices in multi-select.
-- Context bundle review is a default product surface before/inside planning. It should separate used context, skipped or unread context, permission/setup gaps, and unresolved decomposition risks without exposing raw prompts, model traces, or chain-of-thought, and it should omit empty buckets so setup gaps and risks appear only when they exist.
-- Evidence is trustworthy UI: completion, progress, warnings, and quality claims must show the evidence or review path behind them without exposing private chain-of-thought.
-- Eval is the trust center for an aim: its default view should make evidence, matched rule/evaluator, trust score, missing or low-trust proof, and learned context review clear without sending users to Settings or debug surfaces. Empty Context Inbox states should not render as a full review block; the overview metric can carry zero, and the full inbox appears only when pending candidates exist.
-- No style churn: do not adopt platform fashion changes, glass effects, 3D depth, or animation-heavy treatments unless they improve Aimcub's actual workflow.
+- Aim-first: the aim, next action, current stage, context quality, and evidence state are the
+  product. Glass surface treatment must dramatize the aim's state, never decorate for its own
+  sake — the glassmorphism is a material, not an ornament.
+- Product-first, debug-second: the default Desktop shell must not show model calls, prompt
+  previews, runtime logs, trace streams, or stacked debug panels. Developer diagnostics belong
+  behind an explicit developer surface. The run-lifecycle Journal shows product-facing receipts
+  (run started/finished, evidence, artifacts), never raw `run.log` / `tool.*` traces.
+- One primary task per screen: a view should make one user action obvious. On the Journey that
+  is the single "Your move" card; secondary facts (Turns, Journal, stations) support it.
+- Desktop quality bar: Aimcub should feel like a focused desktop workbench, not a web dashboard
+  inside Electron. Prefer stable panes, compact command surfaces, native-feeling shortcuts,
+  complete control states, and strict row/spacing rhythm.
+- Calm glass: the gradient + blur are a quiet backdrop, not a light show. Avoid heavy or
+  animated gradients, decorative orbs, bokeh, or motion loops. One desktop gradient, restrained
+  translucency, soft shadows. Reserve the accent color for the current step, primary actions,
+  and selected emphasis; do not flood whole islands with accent.
+- First-run quality bar: an empty Aimcub workspace must not auto-render a chat or intake
+  composer in the main area. First-run Home is a quiet glass hero with an explicit "Set your
+  first aim" action and a planning-runtime setup card — no composer until New Aim is chosen.
+- First-run shell chrome stays quiet while no aim has started: no idle status text, duplicate
+  product labels, heavy focus rings, or oversized empty surfaces.
+- Home draft recovery and recovered-Aim summary surfaces sit vertically centered in the
+  available workspace, keep their constrained horizontal rails, and use safe centering so
+  taller content stays reachable from the scrollable start edge.
+- Aim creation, reading, and editing are distinct product states. New Aim and unsent child
+  breakdown may use the composer; after the first submit or draft recovery, the Aim surface
+  defaults to a readable summary with explicit Edit and Continue actions. Persist the
+  compose-versus-summary distinction explicitly; recover legacy drafts into summary. Runtime
+  setup gaps, autosave, navigation, and restart must never reopen a captured Aim as an input.
+  Re-enter the composer only through Edit, keep edits in a separate buffer until Update, explain
+  when Update regenerates a plan, and block normal navigation until the user updates or cancels.
+- User-entered aim-building work must be auto-saved as recoverable local product data or made
+  explicitly discardable before navigation hides it. Draft recovery UI calls the work a draft,
+  not a saved aim.
+- Context is a substrate: show context health as concise status, setup controls, and review
+  affordances. Do not turn memory/context into a profile page or a decorative feed. Memory is a
+  top-level page that lists what Aimcub has learned (grouped by category, with provenance and a
+  Forget action) and an honest empty state — not a dashboard.
+- Context source setup keeps one clear summary plus one editable control surface; do not repeat
+  local, online, web, deep-research, context-session, or questionnaire controls as separate
+  card, table, and toggle representations. Planning-readiness gates may sit under the summary as
+  compact rows when they explain why planning can proceed or what remains blocked.
+- Context stage workbench is stepwise and sparse. Keep provider setup, web capability, online
+  connectors, and permission configuration in onboarding or Settings. While a blocking question
+  or optional draft refinement is active, that question flow is the whole task surface: hide the
+  Aim summary and edit action, automated activity, sufficiency, source controls, bundle review,
+  and future questions. Show one reply lane plus one bottom primary action. After the question
+  flow ends, restore aim-local attachments/notes and planning/review state with a single
+  Continue to Plan action when no refinement panel is active.
+- Context stage intake is an iterative context-building loop, not a dashboard or blocking form.
+  Derive automated activity and sufficiency from live planning events, planning context/tools,
+  intake, review buckets, answers, notes, and source status; show that overview only while
+  collection runs without a user question or after the focused question flow. Activity copy
+  summarizes tool/action state (local reads, linked context, web research, distillation,
+  follow-up questions, access gaps) without exposing raw prompts, traces, or chain-of-thought.
+  A question stays visible while the user selects choices or types a custom answer, and advances
+  only through an explicit Next. After each answer, generate the next highest-value question
+  from the same intake run and cumulative history; stop when no consequential unknown remains or
+  the bounded limit is reached. Pending draft refinement survives current-tab clicks and stage
+  re-entry; only a successful refinement or explicit accept/skip completes it. Do not show a
+  question-specific custom answer and a general context note at once. If all intake paths are
+  disabled, replace the question with one Settings recovery action.
+- Choice-card controls render the normalized domain mode instead of inferring it from option
+  count or question category. Expose single selection as a `radiogroup` of `radio` choices with
+  one roving tab stop and Arrow/Home/End navigation; expose multiple selection as pressed toggle
+  buttons. Keep the custom-answer lane available in both modes.
+- Context bundle review is a default product surface before/inside planning: separate used
+  context, skipped/unread context, permission/setup gaps, and unresolved decomposition risks
+  without exposing raw prompts or traces, and omit empty buckets.
+- Evidence is trustworthy UI: completion, progress, warnings, and quality claims show the
+  evidence or review path behind them without exposing private chain-of-thought. The Journey's
+  station sheets and Journal are read-only receipts derived from real orchestration state — bind
+  them to real data with honest empty states; never fabricate rows.
+- Eval is the trust center for an aim: its default view makes evidence, matched rule/evaluator,
+  trust score, missing/low-trust proof, and learned-context review clear without sending users
+  to Settings or debug surfaces. Empty Context Inbox states do not render a full review block.
+- Completed aims use the Eval stage for a factual, compact completion recap (final outcome,
+  completed sub-aims, passing evidence, eval result, learned context, future reuse). Not a
+  celebration or marketing page.
 
 ## Desktop Information Architecture
 
-- Default shell: no visible top titlebar/status strip, left aim sidebar, center workspace. macOS window controls may sit in the sidebar-safe top area, but the app must not reserve a full-width bar above the workbench. No default right inspector.
-- Native macOS traffic lights must stay native and standard-feeling. Follow Claude/Codex's shell pattern: AppKit/Electron draws and owns the red/yellow/green controls, while Aimcub's main process manages their position with Electron window APIs such as `titleBarStyle`, `trafficLightPosition`, `setWindowButtonPosition`, and `setWindowButtonVisibility`. Desktop currently uses Electron 43.0.0. Electron 33 rendered 12 pt traffic lights on this machine while the current desktop toolchain matches Claude/Finder at 14 pt, measured as 28 physical pixels in active window screenshots. Use a fixed 46 px titlebar-safe row with a 14 px traffic-light metric, and keep the invisible top drag strip broad enough for comfortable window movement. Do not draw red/yellow/green or inactive traffic-light substitutes in React/CSS; active/inactive appearance belongs to macOS. Custom titlebar controls such as the sidebar toggle must sit beside the native controls, outside transform/zoom/filter containers, with button hit targets marked `no-drag` and the background drag region kept separate. Fullscreen product content may move custom controls left because traffic lights are not part of the product page, but the app must not hide native traffic lights from the macOS fullscreen titlebar when that titlebar is revealed.
-- Sidebar: the top-left area is app-level/workspace navigation for global sidebar actions, currently Home Panel plus a Codex Desktop-like New Aim navigation item. Home Panel returns to the main initial workspace panel. These actions must behave like normal sidebar action rows, not cards or CTAs: transparent ghost/default background, compact 32 to 36 px height, visually substantial icons, normal sidebar text weight, Command-symbol keyboard hints that are visually revealed only on hover or keyboard focus, and a stable selected/current state for the active Home Panel or New Aim surface. Selected sidebar rows use a quiet gray fill and normal text weight with no visible border, inset outline, or selected-state shadow; avoid primary-button colors, large card treatment, strong borders, or an elevated CTA feel. The action rows' hover/focus rounded rectangles must be centered in the sidebar with equal left and right inset, even when the sidebar reserves a scrollbar gutter. Keep each icon and label tightly grouped while aligning the icon's visual left edge to the sidebar list inset, not just centering it inside a loose slot. Hover/focus may use a very subtle background plus slight shadow elevation. Future global actions can join this group, while aim search/filter, recent aim list, and footer user menu trigger remain separate. Do not repeat the Aimcub brand or Workbench label in the normal top-left sidebar chrome.
-- Sidebar alignment should feel Claude-like: app action rows and the footer user trigger share one icon column and one text baseline, while recent-aim section labels, search/filter controls, aim rows, and empty states share one consistent list inset. Do not show a `0` count beside the Recent aims label in an empty sidebar.
-- Aim and draft rows in the sidebar use one display-only navigation title, never the raw user statement plus a second status line. Preserve the canonical Aim title for editing, planning, search, CLI, and agent work; prefer a concise generated plan `goal_summary`, then use conservative intent-prefix cleanup plus a grapheme-safe display bound before a plan exists. Keep every row on one 36 px line with responsive CSS ellipsis and expose the full cleaned summary from the focusable row tooltip. Do not show workflow status subtitles such as Context needed, Plan ready, Save blocked, active, or paused under sidebar titles; selected background and the workbench surface carry navigation state.
-- Sidebar footer user menu: the lower-left account/user trigger opens an account-style popover menu. Put Settings and Language inside this menu; do not scatter these global controls across the sidebar header and footer. The popover interior should stay compact and menu-like: small meta-sized labels, tighter 32 px rows, consistent icon/text/action columns, and no automatic first-item focus ring when opened by pointer. Language options should use a Claude-like side submenu: hovering or focusing Language opens options beside the menu without requiring a click, and the pointer path into the option list must remain stable.
-- Sidebar toggle: provide a Claude Desktop-like icon button as part of the top-left titlebar control cluster, immediately after the macOS traffic lights with an 8 px gap in normal window mode. In macOS fullscreen, move the product-page toggle left into the traffic-light-safe space instead of preserving the normal window offset, while leaving the native traffic lights available in the revealed system titlebar. It must support three states: pinned sidebar, collapsed sidebar, and peek sidebar. Clicking toggles pinned/collapsed; pinned must reserve layout space and never cover the workspace, while hovering the button or the 32 px left-edge reveal rail while collapsed reveals a temporary overlay sidebar without resizing the workspace.
-- Center workspace: compact workbench navigation when appropriate, then the active stage surface. The workspace should sit in a constrained max width so text lines and controls do not stretch across large windows.
-- Home is either a quiet empty placeholder or a recoverable-drafts surface, never both at once. When drafts exist, hide the empty Workspace ready message and top-align one compact draft-recovery task on the compose rail so headings, rows, and actions share one left edge.
-- New/empty Aim stage: hide workflow step navigation until there is an Aim or the user moves into later stages. The initial empty workspace should be a quiet placeholder without chat, textarea, or continue controls. Only show the concise command-composer workbench after the user explicitly starts a New Aim, with one outcome input, optional supporting context, and one primary continue action.
-- Empty sidebar state: when there are no aims, do not show search, filters, or a large dashed empty card. Show a compact history placeholder under Recent aims. Add search/filter only after aim history exists.
-- Explicit new-aim composer should follow a Claude-inspired prompt-well pattern when opened: one rounded input container, outcome text as the dominant prompt area, a bottom toolbar with icon buttons, optional context revealed from the toolbar instead of always occupying vertical space, and an icon-only submit affordance. Keep it compact, visually centered within the workspace, bounded below the main task width when the workspace is wide, avoid automatic heavy focus rings on launch, avoid visible top titlebar or titlebar "ready" text competing with the input, and avoid large shadow that makes the surface feel like a floating card. The composer border should be effectively absent at rest and appear only as a subtle light hover/focus-visible outline; do not leave a persistent bright border around the input. Composer placeholder text should sit slightly lower than the top edge, matching Claude's relaxed prompt-well alignment. The empty composer toolbar should not show redundant instructional text; the placeholder carries that guidance. Composer icon controls must use fixed square targets with centered SVGs so plus and submit affordances do not drift when sharing generic button classes.
-- Command palette: Desktop must provide a Cmd/Ctrl+K command surface for common navigation and actions. Keyboard shortcuts should be real, visible where useful, and not merely decorative labels.
-- Optional inspector: process, context, quality, activity, and debug details may exist as an opt-in overlay, drawer, popover, or developer-mode surface. It must be independently scrollable and cannot displace the primary task by default.
-- Stage model: Aim, Context, Plan/Contracts, Execute/Work, and Eval/Review are iterative workbench surfaces, not a strict wizard. Stage navigation may be visible, but it must read as a compact non-linear mode switcher with a current-surface label and quiet segmented controls, not as large numbered step pills. Each stage must still present a single dominant action.
-- Keep the current-surface label and segmented stage switcher as one start-aligned local group. Do not push them to opposite ends of a wide operational rail.
-- New aim title and description belong to the Aim stage. The Context stage should confirm the captured aim and collect answers, attachments, and sources; it must not show a second title/description composer unless the user explicitly opens child-aim breakdown or an unsaved-aim edit path.
-- Context and Plan/Contracts stages should keep context bundle review in the workflow without letting it displace the current task. Omit an empty review. In Contracts, summarize a non-empty review in a default-closed disclosure ahead of the contract surface; full buckets remain available on demand rather than pushing Save and the current contract below the fold. When a plan has multiple sub-aims, use one compact contract selector and render only the selected contract detail instead of stacking every editable contract on the page.
-- Plan/Contracts defaults to execution contract review, not a JSON/debug editor. Keep Save Aim visible in the header, then use a compact selector plus one selected sub-aim contract detail. The selected contract should be summary-first by default: title, selected owner or agent route, validation state when present, definition of done, required evidence, and routing rationale. Mark contracts that need attention in the selector, keep their repair controls available, and prevent structure edits from discarding an invalid rule draft. Contract-local selector, disclosure, and rule-edit state must reset when the active Aim or draft changes. Description/body, why this exists, full eval signal, detailed routing override controls, and structure edits belong behind secondary disclosures. Raw `acceptance_rule` JSON belongs only behind an explicit per-sub-aim Developer details disclosure.
-- Execute and Eval are distinct stages. Execute answers "Who/what should do the next work?" with assignments, agent run, human proof, and child-breakdown actions. Eval answers "What evidence exists, did it satisfy the rule, and what needs review?" with evidence counts/details, evaluator status, trust/explanation, and pending context candidates when present.
-- Execute must use a selected-work pattern by default: a bounded, independently scrolling sub-aim selector, one selected detail surface, and one state-dependent primary action placed before runtime or activity details. Run agent, Submit proof, and Review in Eval should be the only visually dominant Execute actions; Break Down and alternate run/proof actions stay secondary. Runtime metadata and activity stay in a default-closed disclosure. When proof submission is open, that form replaces the normal primary and secondary action group, locks sub-aim and workbench navigation, and keeps its draft visible after a failed confirmation until the user submits successfully or cancels. Treat evidence confirmation and its follow-up progress refresh as separate outcomes: once evidence is accepted, close the submitted draft even if refresh fails, then report the refresh error without inviting duplicate submission. Move focus into the proof form on open and back to its trigger on cancel.
-- Execute and Eval must be evidence-detail-first. Counts alone are insufficient: evidence rows should show summaries, trust, matched acceptance rule indexes/evaluators, pass/fail reasoning, and actionable missing/low-trust states from the core read model.
-- Local agent execution summaries must stay inside the Execute stage and show the selected sub-aim, selected local agent, model/reasoning/workspace when recorded, run state, produced or low-trust evidence, and the next required human/eval action. Use clear placeholders when the current read model lacks a field, and keep raw run events out of the default view except for compact user-facing activity summaries.
-- Context Inbox belongs in the Eval review flow, not Settings or developer/debug surfaces. Candidate rows should use compact review cards with provenance chips, editable text, explicit aim/global scope controls, and primary accept plus secondary reject actions. Copy must make clear that accepted global context is reused for future aim planning.
-- Completed aims use the Eval stage for a completion recap. The recap should stay factual and compact: final outcome, completed sub-aims, passing evidence, eval result, learned context, and future reuse. Do not turn this into celebration, marketing copy, or a decorative success page. Pending context candidates must remain reviewable from Eval after the recap appears, but the recap must not duplicate an empty Context Inbox when no candidates are pending.
-- Existing aims open to Aim overview first. Do not jump users into Run details or show an empty composer on the Context stage.
-- Settings are an aim-helper setup surface, not a flat runtime control panel. Frame provider setup, local CLI agent detection, web research, and context sources as helpers needed to complete aims; keep their configuration clear and thin unless setup is the user's current task.
-- Settings must use a split-view information architecture where the primary left app sidebar becomes the settings category navigation and the center workspace becomes the selected detail pane. Do not add a second settings navigation inside the workspace, and do not stack provider, local CLI agent, web research, and context-source forms into one long settings page.
-- Settings must feel like a control panel, not a status report or onboarding checklist. The settings sidebar uses compact 32 to 36 px icon-plus-label navigation rows with a quiet Codex-like selected background, no blue active rail, and at most tiny status dots; the detail pane uses Codex-like wider control-group width around 1080 px while keeping headers and explanatory copy on narrower readable line lengths. Settings row groups can use Codex-like thin bordered rounded control panels with internal dividers, but they must stay functional and sparse rather than becoming decorative cards. Settings sidebar controls must follow the same strict left-alignment discipline as the main sidebar: shared content width, shared row inset, one icon column, one text baseline, and no per-control padding drift. The Settings search field should follow the Codex pattern with an inline magnifying-glass icon in the shared icon column and placeholder text aligned to nav labels. Keep "next setup" guidance in Overview only; detail row controls should be quiet gray surfaces, with status rendered as muted text plus a tiny readiness dot instead of colored pills. Reserve green for real success, and avoid large helper cards, progress bars, repeated green rails, and stacked bordered containers.
-- Settings mode has a locked, always-visible category sidebar. Do not show the normal Aim workspace sidebar toggle, peek rail, or Aimcub/workspace brand header inside Settings; Settings starts with its own back control and category navigation.
-- First-run with no provider or local CLI agent must stay aim-first. Capture the aim before helper setup, then explain the required helper capability from that aim and link to contextual Aim helpers settings.
+- Default shell: no visible full-width top titlebar/status strip. A left aim sidebar island and
+  a center workspace island float over the `--desk` gradient. macOS window controls sit in the
+  sidebar-safe top area; the app must not reserve a full-width bar above the workbench. No
+  default right inspector.
+- **Native macOS traffic lights must stay native.** AppKit/Electron draws and owns the
+  red/yellow/green controls; Aimcub's main process only positions them (`titleBarStyle:
+  "hiddenInset"`, `trafficLightPosition`, `setWindowButtonPosition`, `setWindowButtonVisibility`).
+  Desktop uses Electron 43; keep the fixed 46px titlebar-safe row with a 14px traffic-light
+  metric, and keep the geometry constants (16/46/14 in `main/index.ts`) in sync with the CSS
+  `--traffic-light-*`. **Do not draw red/yellow/green or inactive substitute dots in React/CSS.**
+  Custom titlebar controls (sidebar toggle) sit beside the native controls, outside
+  transform/zoom/filter containers, with `no-drag` hit targets and a separate drag region.
+- **Theme toggle.** Desktop follows macOS system appearance by default. The Glass sidebar footer
+  has an explicit light/dark toggle: a renderer-owned `themePref` ("system" default,
+  `localStorage`-persisted) drives Glass tokens off `data-system-appearance`, and it is synced to
+  the **native** window chrome through an IPC → `nativeTheme.themeSource` handler (which triggers
+  the main process to repaint `win.setBackgroundColor` and re-emit chrome state), so an in-app
+  override does not desync the native titlebar/traffic-light context from the visible content.
+  "system" hands appearance back to the OS. Renderer dark tokens respond to both
+  `prefers-color-scheme: dark` and `data-system-appearance="dark"`.
+- Sidebar: the top-left area is app-level navigation (Home Panel, New Aim) as normal action
+  rows — transparent rest, compact 32–36px height, substantial icons aligned to the list inset,
+  normal-weight labels, Command-symbol hints revealed on hover/focus, and a stable selected
+  state. Glass hover/selected states use translucent `--island2` / `--field` washes (not flat
+  gray fills); selected rows show a quiet fill with no border/outline/selected-shadow. Below the
+  recent-aims list, a Glass footer block holds a **Memory nav row**, a `~/.aimcub · local` line,
+  and the theme toggle. Recent-aim rows carry a small trailing **status dot marker** (see
+  Status markers) — a marker, never a status subtitle.
+- Sidebar aim and draft rows are compact one-line navigation rows: prefer a concise generated
+  `goal_summary`, else conservative intent-prefix cleanup with a grapheme-safe bound; keep the
+  canonical title for editing/planning/search/CLI/agents. One 36px line with CSS ellipsis; the
+  full cleaned summary is exposed from the focusable row tooltip. Do not show workflow status
+  subtitles ("Context needed", "Plan ready", "active", …) under titles.
+- Sidebar footer user menu: the lower-left account trigger opens an account-style popover with
+  Settings and Language (Language as a Claude-like hover side submenu). Compact menu-like
+  interior, no auto first-item focus ring on pointer open.
+- Sidebar toggle: a top-left titlebar-cluster icon button (pinned / collapsed / peek). Clicking
+  toggles pinned/collapsed; pinned reserves layout space and never covers the workspace; while
+  collapsed, hovering the button or the 32px left-edge rail reveals a transient overlay peek
+  sidebar without resizing the workspace. In fullscreen the product toggle moves left into
+  traffic-light-safe space, but native traffic lights must remain in the revealed system titlebar.
+- Center workspace: a constrained-max-width workbench. For a saved aim the default surface is
+  the **Journey** work view (replacing the old `AimOverviewPanel`); compact non-linear workbench
+  navigation (Aim · Context · Contracts · Work · Review) sits above the heavier interactive stage
+  panels, which are unchanged and still reached through the epoch-safe `openCockpitStage(...)`.
+- **The Journey work surface** renders from pure, unit-tested helpers under
+  `renderer/workflow/journey/` off the existing `AimProgressReadModel` (+ the run-event journal
+  and the aim's memories): a 6-station strip (Aim · Research · Context · Plan · Run · Eval) with
+  per-station status glyphs and one-line summaries; a single "Your move" card (reusing the
+  Execute stage's `executePrimaryAction` mapping) or an "Ambient" card when an agent is running
+  or the aim is idle/complete; a "Turns" roster of who is doing what now; and a "Journal" ledger
+  merging appended evidence with run-lifecycle events, newest-first. Clicking a station opens a
+  read-only **sheet** (local component state — it never touches the workspace/surface navigation
+  epochs and clears on any real navigation); the sheet footer CTA routes into the interactive
+  stage via `openCockpitStage`. Research is a real `@core`-derived station (gathered-context
+  signal) shown as a read-only receipt; do not fabricate demo content.
+- Status markers: per-aim rollup state on list surfaces (sidebar rows, Home cards) is a small
+  colored **dot** with an accessible name — never a text subtitle. Dot semantics: complete
+  (`--okdot`), running (`--acc`, gentle pulse), needs-you (`--warndot`), blocked (`--danger`),
+  planning (hollow ring). Home cards additionally show a thin 6px progress bar + `{done}/{total}`.
+  These read from the cheap batch `listAimProgressSummaries` endpoint, not N per-aim progress
+  calls.
+- Optional inspector: process/context/quality/activity/debug detail may exist as an opt-in
+  overlay/drawer/developer surface — independently scrollable, never displacing the primary task.
+- Stage model: Aim, Context, Plan/Contracts, Execute/Work, Eval/Review are iterative workbench
+  surfaces, not a strict wizard. Stage navigation reads as a compact non-linear mode switcher
+  with a current-surface label and quiet segmented controls, not large numbered step pills. Each
+  stage presents a single dominant action.
+- Existing aims open to the Journey (aim overview) first, not Run details; completed aims
+  (`completion_recap.complete`) open Eval with the recap.
+- Settings use a split-view IA: the primary left sidebar becomes settings-category navigation and
+  the workspace becomes the selected detail pane. Do not add a second in-workspace settings nav
+  or stack provider / local-agent / web-research / context-source forms into one long page.
+  Settings mode locks its category sidebar (no Aim workspace toggle / peek rail / brand header);
+  it uses quiet gray selected rows (no blue rail), thin bordered control groups with internal
+  dividers, muted status text plus tiny readiness dots, and a wider ~1080px control panel with
+  narrower readable header copy. Keep "next setup" guidance in Overview only. Command palette
+  (Cmd/Ctrl+K) provides keyboard-first navigation; add entries when a workflow becomes top-level
+  (Memory is a candidate follow-up).
 
 ## Layout Rules
 
-- UI cleanup passes should be layout-stability work, not visual restyling. Fix missing grid/flex/gap constraints, stray margin/padding positioning, inconsistent row/control heights, mobile overflow, and CSS that lets elements drift, while avoiding new gradients, shadows, decoration, or feature work.
-- Use a 4 px base grid. UI cleanup work should converge touched layout spacing to 4, 8, 12, 16, 24, and 32 px. Older 6, 10, 14, 18, 40, 56, and 72 px values are legacy allowances only until their local layout is touched.
-- Page/workspace padding: 24 px minimum on desktop, expanding to a restrained max such as 32 px for dense workbench views. Use 16 px on narrow desktop and mobile windows.
-- Content width: main task surfaces should generally max at 760 px for writing/intake and 940 px for operational grids or review surfaces.
-- Use explicit shared workspace rails instead of unrelated local widths: 560 px for composition and compact draft lists, 760 px for reading and focused questions, 940 px for operational workbench surfaces, and 1080 px for Settings control groups. A surface may use a narrower internal paragraph measure, but related headings, rows, and actions must retain one visible left-edge system.
-- Sidebar width: default 280 px. Fixed sidebars need a transparent resize hot zone and native resize cursor at the sidebar edge, not a permanently visible divider. Keep stable bounds around 216 to 360 px and auto-collapse the normal Aim sidebar before it squeezes the main workspace below a usable width.
-- Desktop window sizing should stay compact by default. Avoid launching a large window that dominates the desktop; current default bounds are about 960 by 680 px with minimum bounds around 640 by 520 px.
-- Vertical rhythm: 22 to 24 px between major page bands, 12 to 16 px between controls inside a group, 6 to 10 px inside compact repeated items.
-- Lists: use stable row heights and predictable alignment. Aim cards and context rows should not resize dramatically on hover, loading, selection, or locale changes.
-- Sidebar rows should behave like desktop navigation rows: stable 36 to 48 px rhythm, subtle hover, clear selected state, compact status badge or marker, and no card-like stacking unless the row contains genuinely multi-line content.
-- Cards: use cards only for repeated items, forms, modals, and genuinely framed tools. Do not put cards inside cards, and do not turn whole page sections into floating cards.
-- Tables/grids: use explicit grid tracks with `minmax(0, 1fr)` so long text truncates or wraps intentionally.
-- Responsive behavior: start from the smallest viable window and scale up. At narrow widths, collapse the sidebar, wrap stage controls, stack multi-column grids, and preserve all functionality.
-- Workbench navigation must respect the native titlebar/sidebar-toggle safe area at compact desktop widths. Solve overlap from stage/workspace layout (`.od-main`, `.od-stage-nav`, `.od-workspace`) by using compact rows, subdued active states, and compressed labels at narrow widths, without changing shell/sidebar/window-chrome selectors.
-- Window-chrome clearance is geometric, never stage-name-specific or dependent on whether navigation has mounted yet. Whenever a collapsed or overlay sidebar leaves native traffic lights and the custom sidebar toggle over the main workspace, every non-Settings main workspace uses the same titlebar-safe top inset, including transient busy/notice states before draft autosave completes. Aim, Context, Contracts, Work, and Review must not jump between conflicting top baselines.
-- Large windows: do not let controls drift apart. Use max-width containers and local alignment groups so related labels, inputs, and actions remain visually connected.
+- UI cleanup passes are layout-stability work: fix missing grid/flex/gap constraints, stray
+  margin/padding, inconsistent row/control heights, mobile overflow, and drift — not restyling.
+- Use a 4px base grid; converge touched spacing to 4, 8, 12, 16, 24, 32px. Older 6/10/14/18/40/
+  56/72px values are legacy allowances until their local layout is touched.
+- Page/workspace padding: 24px minimum on desktop, up to ~32px for dense workbench views, 16px on
+  narrow desktop and mobile windows.
+- Content width: writing/intake surfaces max ~760px; operational grids/review surfaces ~940px.
+  Use explicit shared rails — 560px composition/compact draft lists, 760px reading/focused
+  questions, 940px operational workbench, 1080px Settings control groups. Related headings, rows,
+  and actions keep one visible left-edge system.
+- Sidebar width: default 280px, stable bounds ~216–360px, transparent resize hot zone with the
+  native cursor (not a permanent divider). The normal Aim sidebar may auto-collapse before the
+  workspace is squeezed below a usable width; a user-pinned sidebar reserves space and never
+  covers the workspace. Settings keeps its always-visible category sidebar.
+- Window sizing stays compact: default ~960×680px, minimum ~640×520px. The Journey's 6-station
+  strip must degrade gracefully (wrap/stack) at 760×600 and 640×520 with no horizontal overflow.
+- Vertical rhythm: 22–24px between major page bands, 12–16px between controls in a group, 6–10px
+  inside compact repeated items.
+- Cards (including Glass cards) are for repeated items, forms, modals, and genuinely framed
+  tools. Do not nest cards or turn whole page sections into floating cards. Glass islands use
+  `minmax(0, 1fr)` grid tracks so long text truncates/wraps intentionally.
+- Responsive: start from the smallest viable window and scale up — collapse the sidebar, wrap
+  stage controls, stack multi-column grids, preserve all functionality. Workbench navigation must
+  respect the native titlebar/sidebar-toggle safe area at compact widths; solve overlap from stage
+  content (`.od-main`, `.od-stage-nav`, `.od-workspace`), not shell/sidebar/window-chrome
+  selectors. Window-chrome clearance is geometric, never stage-name-specific.
 
 ## Typography
 
-- Desktop font stack: `"SF Pro Text", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif`.
-- Display/title stack: `"SF Pro Display", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif`.
-- Monospace stack: `"SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace`.
-- Windows fallback, when needed: `"Segoe UI Variable", "Segoe UI", Arial, sans-serif`.
-- Use one UI type family per app surface. Do not mix decorative fonts into product UI.
-- Letter spacing is always `0`. Do not use negative letter spacing.
-- Do not scale fonts directly with viewport width. Use defined text styles. Existing `clamp()` hero-like sizing should be replaced when the next visual pass touches it.
-- Desktop type ramp is capped at three visible sizes. Use `--od-type-meta` 12 px / 16 px line-height for meta text, captions, small labels, chips, and keyboard hints; `--od-type-body` 13 px / 18 px line-height for navigation, body, controls, rows, and form copy; and `--od-type-title` 16 px / 22 px line-height for page, panel, section, composer, and card titles.
-- Desktop font weights must stay light and tokenized: regular and medium both resolve to 400, semibold resolves to 450, and strong resolves to 500. Treat any heavier title/emphasis token as an alias of strong unless the user explicitly asks for a bolder surface.
-- Use regular or medium weight for navigation and body text, and reserve strong weight only for true hierarchy, selected actions, or primary commands. Avoid defaulting to 600+ weights in shell chrome, sidebar rows, compact labels, or Chinese UI text. Desktop line icons should generally use a refined 1.5 to 1.6 px stroke unless a selected/primary state needs more emphasis. Avoid italics and all caps.
-- Use sentence case for UI labels and action text. Buttons should use short action verbs such as "Save", "Review", "Continue", "Add files".
-- Keep paragraph line length roughly 50 to 70 characters. Use tighter widths for explanatory copy and summaries.
-- Truncation: single-line rows use ellipsis; multi-line content should wrap deliberately with a maximum line count when the surrounding layout is fixed.
+- Desktop font stack: `"SF Pro Text", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial,
+  sans-serif`. Display/title: `"SF Pro Display", …`. Mono: `"SF Mono", ui-monospace, Menlo,
+  Monaco, Consolas, monospace`. Windows fallback: `"Segoe UI Variable", "Segoe UI", Arial,
+  sans-serif`. One UI family per surface; no decorative fonts in product UI.
+- Letter spacing is always `0` (no negative tracking). Do not scale fonts with viewport width;
+  use the defined ramp.
+- **Type ramp (capped at three visible sizes).** `--od-type-meta` 12px / 16px line-height for
+  meta, captions, small labels, chips, keyboard hints; `--od-type-body` 13px / 18px for
+  navigation, body, controls, rows, form copy; `--od-type-title` 16px / 22px for page/panel/
+  section/composer/card titles. New CSS `font-size` must use a ramp token or a value outside the
+  guarded integer set — a test forbids raw `font-size:` at {9,10,11,12,13,14,15,16,18,20,22,28,
+  32}px, so non-listed decimals (13.5, 19) are the escape hatch for a one-off.
+- Weights stay light and tokenized: regular and medium both 400, semibold 450, strong 500. Treat
+  any heavier title/emphasis token as an alias of strong. Use regular/medium for navigation and
+  body; reserve strong only for true hierarchy, selected actions, or primary commands. Avoid
+  600+ in shell chrome, sidebar rows, compact labels, or Chinese UI text. Line icons use a 1.5–
+  1.6px stroke unless a selected/primary state needs more. Avoid italics and all caps.
+- Sentence case for labels and action text; short action verbs on buttons. Keep paragraph line
+  length ~50–70 characters. Single-line rows use ellipsis; multi-line content wraps with a max
+  line count when the surrounding layout is fixed.
 
 ## Color, Surfaces, and Materials
 
-- Desktop supports light and dark appearances and must follow the macOS system appearance by default. Use Electron `nativeTheme` and CSS `prefers-color-scheme`/`data-system-appearance` tokens; do not add an in-app theme switch until there is a concrete product reason.
-- Current desktop palette:
-  - Background: `#ffffff`
-  - Surface: `#f5f5f7`
-  - Warm surface: `#fbfbfd`
-  - Text: `#1d1d1f`
-  - Secondary text: `#424245`
-  - Muted text: `#6e6e73`
-  - Meta text: `#86868b`
-  - Border: `#d2d2d7`
-  - Soft border: `#e8e8ed`
-  - Accent: `#0071e3`
-  - Success: `#16a34a`
-  - Warning: `#b7791f`
-  - Danger: `#dc2626`
-- Current dark desktop palette:
-  - Background: `#1c1c1e`
-  - Surface: `#2c2c2e`
-  - Warm surface: `#242426`
-  - Text: `#e8e8ed`
-  - Secondary text: `#c9c9cf`
-  - Muted text: `#a8a8af`
-  - Meta text: `#8f8f99`
-  - Border: `#4a4a4f`
-  - Soft border: `#38383d`
-  - Accent: `#0a84ff`
-  - Success: `#32d74b`
-  - Warning: `#ffd60a`
-  - Danger: `#ff453a`
-- Use accent for primary actions, current step indicators, focused progress, and selected command emphasis. Do not flood whole panels with accent color.
-- Semantic states must not rely on color alone. Pair color with label text, icon, position, or shape.
-- Borders should do most separation work. Shadows are rare and shallow, reserved for overlays, popovers, floating restore controls, or modal-like layers.
-- Avoid dominant one-note palettes, purple/purple-blue gradients, dark slate themes, beige/brown themes, decorative orbs, bokeh backgrounds, and purely atmospheric images in app UI.
-- The old cross-platform `@ui/tokens` package was removed. Future token work should start from this light operational system and only add a shared package when multiple active surfaces need it.
+- Desktop supports light and dark and follows macOS system appearance by default, with the
+  in-app theme toggle as an explicit override synced to native chrome (see IA → Theme toggle).
+- The visible material is Glass: the `--desk` gradient backdrop, translucent backdrop-blurred
+  `--island` / `--island2` / `--field` surfaces, an inner `--ring` highlight, and structural
+  `--edge` hairlines. Blur is applied on islands/cards/sheets (`backdrop-filter: blur(...)`).
+  Keep translucency restrained enough that text meets contrast over the gradient in both themes.
+- The legacy operational palette still backs `--od-*` tokens for un-migrated selectors:
+  light bg `#ffffff`, surface `#f5f5f7`, text `#1d1d1f`, accent `#0071e3`, success `#16a34a`,
+  danger `#dc2626`; dark bg `#1c1c1e`, text `#e8e8ed`, accent `#0a84ff`. Prefer Glass tokens for
+  new surfaces; do not reintroduce a separate flat theme.
+- Use the accent for primary actions, the current step, focused progress, and selected emphasis.
+  Do not flood whole islands with accent. Semantic state must never rely on color alone — pair
+  color with label text, icon, position, or shape (status dots carry an accessible name/tooltip).
+- Avoid dominant one-note palettes, purple/purple-blue gradients, dark slate themes, beige/brown
+  themes, decorative orbs, bokeh, and purely atmospheric imagery. Glass uses one restrained
+  desktop gradient, not a themed wallpaper.
 
 ## Radius, Borders, and Elevation
 
-- Radius tokens: 8 px small, 12 px medium, 16 px large, pill for compact rounded controls.
-- Cards and fixed tool surfaces should generally use 8 px or 12 px radius. Use 16 px only for larger, soft containers where it does not make the tool feel childish.
-- Use 1 px borders for structure. Prefer soft borders for normal containers and stronger borders for selection, focus-adjacent states, and active rows.
-- Active/selected list items should change background and border, not only text color.
-- Hover and focus states for non-primary desktop controls should converge on the New Aim treatment: transparent/default rest state, a subtle shared hover background, and slight shadow elevation only while hovered or keyboard-focused. Avoid hover states that turn controls into white bordered cards. Focus must keep the visible accent focus ring plus the subtle elevation. Reserve persistent filled backgrounds or borders for selected/current, active, disabled, primary, or destructive semantic states.
+- Radii: Glass islands and large soft containers use 14–24px; cards/sheets ~16–22px; compact
+  controls use 8–12px; chips are pill. Do not make tools feel childish with oversized radii on
+  small controls.
+- Structure comes from hairlines and translucency, not heavy borders: use the `--ring` inner
+  highlight + `--edge` hairline on islands, and 1px borders where a control genuinely needs one.
+  Active/selected list items change background (translucent `--field`) rather than only text
+  color, with no visible border/outline/selected-shadow.
+- Elevation is soft and shallow: `--sh-md` for resting cards, `--sh-lg` on hover/overlays,
+  `--sh-btn` for the accent primary. Reserve stronger elevation for overlays, popovers, the
+  station sheet, and modal-like layers. Non-primary controls converge on the shared quiet
+  interaction state: transparent rest, subtle translucent hover, slight shadow only on
+  hover/keyboard-focus, plus the accent focus ring. Reserve persistent fills/borders for
+  selected/current, active, disabled, primary, or destructive states.
 
 ## Controls
 
-- Primary buttons: min-height 40 to 44 px, pill or 8 px radius depending on local surface, 14 px semibold/heavy text, accent background, disabled state visually distinct.
-- Secondary buttons: min-height 32 to 44 px, surface background, border, 12 to 14 px semibold text.
-- Icon buttons: use recognizable icons with accessible names and tooltips. Prefer an icon for universal commands like search, close, collapse, settings, folder, file, refresh, save, download, and undo.
-- Text buttons: use when the command needs language for clarity, especially primary task actions and destructive decisions.
-- Segmented controls: use for mode switching and mutually exclusive filters. Keep labels short and ensure active state has border/background distinction.
-- Toggles/checkboxes: use for binary settings. Do not use pills as toggles unless the state is explicit.
-- Menus/popovers: use for option sets and overflow commands. They must not hide the primary next action.
-- Content-entry and navigation rows use one primary row action to open, resume, or select content. Put secondary or destructive actions behind a trailing More Actions menu with an accessible label and tooltip. Review task rows may show Accept/Reject, and editor/control rows may show Submit/Cancel, toggles, or remove controls when those controls are the row's purpose. Row overflow menus should use a shared primitive with Escape close, outside-pointer close, keyboard navigation, focus return, and destructive item states.
-- Inputs: 36 px minimum for compact search, 44 to 56 px for main task forms. Labels sit above inputs, not only as placeholders.
-- Static values must use static semantics. Do not render fixed configuration values as inert buttons, or saved/read-only content as disabled inputs and textareas; use text, output, or selectable code surfaces until the user explicitly enters an edit task.
-- Command-composer inputs are the one exception to visible label placement: when the composer is the primary task surface, use accessible labels plus clear placeholder text, and keep supporting context visually subordinate.
-- Textareas: use at least 140 to 160 px height for aim/context input, with clear resize or fixed growth behavior.
-- Progress: use thin 6 px bars for passive progress and explicit text for milestone/evidence status.
-- Pills/chips: use for compact status, filters, and lightweight commands. Avoid long chip labels and do not stack many chip rows in the main task area.
+- Primary buttons: min-height 40–44px, pill or 8px radius per surface, ~14px semibold text,
+  accent background with `--sh-btn`, distinct disabled state.
+- Secondary buttons: min-height 32–44px, translucent surface, 12–14px semibold text.
+- Icon buttons: recognizable icons with accessible names and tooltips for universal commands.
+  Text buttons where language adds clarity. Segmented controls for mode switching with a clear
+  active state. Toggles/checkboxes for binary settings.
+- Content-entry and navigation rows use one primary row action; secondary/destructive actions go
+  behind a trailing More Actions menu (Escape/outside-close, keyboard nav, focus return,
+  destructive item states). Review rows may show Accept/Reject; editor rows Submit/Cancel.
+- Inputs: 36px minimum for compact search, 44–56px for main task forms; labels above inputs, not
+  only placeholders (command-composer is the one exception — accessible label + clear
+  placeholder). Textareas ≥140–160px for aim/context input. Static values use static semantics
+  (text/output/selectable code), not inert buttons or disabled inputs.
+- Progress: thin **6px** bars for passive progress plus explicit text for milestone/evidence
+  status. Chips/pills for compact status, filters, and lightweight commands — avoid long labels
+  and stacked chip rows in the main task area.
+- Command-composer: a Claude-inspired prompt-well — one rounded input container, dominant outcome
+  text, a bottom icon toolbar, optional context revealed from the toolbar, an icon-only submit.
+  Compact, centered, bounded below the task width; effectively borderless at rest with only a
+  subtle hover/focus outline; no heavy launch focus ring or floating-card shadow.
 
 ## Interaction and State
 
-- Every interactive element needs visible hover, active, focus-visible, disabled, selected/current, loading, and error states where applicable.
-- Desktop navigation must have exactly one primary current content target: Home, transient New Aim, one persisted draft, or one saved aim. Once New Aim work is checkpointed, its draft row owns the selected state and New Aim is no longer current. Drafts expose only Aim, Context, and Contracts; saved aims expose Aim, Context, Contracts, Work, and Review. Never render one surface's content under another surface's active label. Settings is a temporary detour and Back returns to the same content target and workbench surface.
-- Sidebar peek must be transient and hover/focus driven: it should open after a short hover delay, stay open while the pointer is over the toggle, reveal rail, revealed sidebar, or brief transition path between them, and close without changing the pinned/collapsed preference only after the pointer leaves that whole hover zone.
-- Hover-revealed overlays, including sidebar peek, must have symmetric enter and exit motion. Keep the overlay rendered and visible until the collapse transition finishes; do not hide or unmount it instantly on pointer leave.
-- Manual sidebar toggle actions take precedence over peek behavior: clicking or keyboard-toggling collapsed must not immediately reopen from the same pointer/focus state, but a fresh hover over the button or left-edge rail must still reveal the overlay sidebar. Draggable chrome must not cover the toggle or reveal hit targets, and window drag hit areas must stay stable across window focus and activation cycles instead of depending only on transient hover/peek sidebar DOM.
-- Keyboard focus must remain visible. Current focus token is a 4 px accent-tinted ring; keep or improve it, do not remove it.
-- Core desktop commands should be available through keyboard-first flows. Add command palette entries alongside visible controls when a workflow becomes top-level navigation or a frequent action.
-- Pointer targets should be at least 24 by 24 CSS px, with practical Aimcub targets usually 32 to 44 px.
-- Do not interrupt the user with modal dialogs for recoverable actions. Prefer inline banners, undo, or a review surface.
-- Planning question surfaces must distinguish blocking pre-draft context from optional post-draft refinements. Pre-draft intake should make the blocked next step explicit; post-draft clarification should keep accepting the draft available without implying the user is stuck.
-- Generated plan review must support direct pre-save editing of sub-aim text, eval/acceptance rules, routing overrides, merge/split, and reorder without leaving the Plan/Contracts stage, even when those controls are in secondary disclosures. Validation issues should be inline and must disable saving until the plan is executable, but they must not disable the repair controls needed to make the plan executable.
-- Manual proof confirmation must open an evidence submission surface before recording confirmation. The surface should collect proof note, URL, local file references when available, and required-evidence checklist mapping; Eval should show the submitted evidence details. Normal Desktop navigation must not silently discard an open proof draft: block navigation with concise recovery copy until submit or cancel, and retain the form plus its values when confirmation fails.
-- Destructive actions need undo when possible. If undo is not possible, require explicit confirmation with action-specific button labels.
-- Loading states should preserve layout dimensions. Avoid spinners that replace large content areas without a stable skeleton, label, or status.
-- Motion should be fast, direct, and functional. Keep transitions around 120 to 180 ms. Avoid decorative animation loops.
-- Text must never overlap, clip inside buttons without intentional ellipsis, or occlude neighboring content at supported window sizes and Chinese/English locale lengths.
+- Every interactive element needs visible hover, active, focus-visible, disabled,
+  selected/current, loading, and error states where applicable.
+- Desktop navigation has exactly one primary current content target: Home, transient New Aim, one
+  persisted draft, or one saved aim. Drafts expose Aim/Context/Contracts; saved aims add
+  Work/Review. Memory and Settings are overlays/detours that return to the same content target
+  and workbench surface without disturbing the workspace/surface navigation epochs. Never render
+  one surface's content under another surface's active label.
+- Sidebar peek is transient and hover/focus driven with symmetric enter/exit motion; manual
+  toggle actions take precedence over peek. Draggable chrome must not cover the toggle or reveal
+  hit targets; window drag surfaces stay stable across focus/activation cycles.
+- Keyboard focus stays visible (a 4px accent-tinted ring). Core commands are keyboard-first; add
+  command-palette entries alongside visible controls for top-level or frequent actions. Pointer
+  targets ≥24×24 CSS px (practically 32–44px). Do not interrupt recoverable actions with modal
+  dialogs — prefer inline banners, undo, or a review surface.
+- Manual proof confirmation opens an evidence submission surface before recording confirmation
+  (proof note, URL, local files, required-evidence checklist). Normal navigation must not silently
+  discard an open proof draft: block navigation with concise recovery copy until submit or cancel,
+  and retain the form + values on failure. Treat evidence confirmation and the follow-up progress
+  refresh as separate outcomes.
+- Motion is fast, direct, functional (~120–180ms). The only sanctioned loop is the gentle
+  running-status dot pulse; avoid decorative animation. Text must never overlap, clip without
+  intentional ellipsis, or occlude neighbors at supported sizes and Chinese/English lengths.
 
 ## Accessibility and Localization
 
-- Meet WCAG AA contrast: 4.5:1 for normal text and 3:1 for large text or icons conveying state.
-- Test high contrast, large text, keyboard-only navigation, and screen reader accessible names for any significant UI change.
-- Do not hard-code font sizes in ways that block OS text scaling when native platform support is available.
-- Preserve visible focus order that matches reading order: sidebar controls, stage navigation, workspace content, optional overlays.
-- Every icon-only control needs an accessible label and tooltip.
-- English repo prose is required. Chinese can appear only in `zh` i18n values. Design for both languages by allowing labels to wrap or truncate predictably.
-- Avoid abbreviations unless already introduced and useful. User-facing errors should state what happened, what Aimcub preserved, and the next action.
+- Meet WCAG AA contrast (4.5:1 normal text, 3:1 large text / state icons) — verify Glass text and
+  chips over the gradient and over translucent islands in both themes.
+- Test high contrast, large text, keyboard-only navigation, and screen-reader accessible names for
+  any significant UI change. Every icon-only control and status dot needs an accessible name and
+  tooltip. Preserve focus order matching reading order: sidebar → stage nav → workspace → overlays.
+- English repo prose is required; Chinese only in `zh` i18n values. Every user-facing string routes
+  through `t(...)` (no literals); keep en+zh parity (the `satisfies` guard + a parity test enforce
+  it). Dynamic i18n keys (e.g. `glass.journal.event.*`, `glass.station.line.*`, `glass.progress.*`)
+  must all exist — `translate()` throws on a missing key. Design labels to wrap or truncate
+  predictably in both languages.
 
 ## Electron Desktop Engineering Details
 
-- Renderer should stay isolated from Node. Use preload and typed IPC for allowed operations.
-- Desktop window appearance should stay native-system-first: main process sets `nativeTheme.themeSource = "system"`, applies a matching `BrowserWindow` background color, and emits the current `colorScheme` with window chrome state. Renderer dark tokens must respond to both `prefers-color-scheme: dark` and `data-system-appearance="dark"` so native theme changes are reflected without local UI preferences.
-- Do not load remote content with Node integration. Prefer local packaged UI and trusted HTTPS resources only when needed.
-- Validate IPC senders for privileged operations such as file access, agent execution, provider settings, and external opening.
-- Keep or add a restrictive Content Security Policy for renderer HTML.
-- Avoid blocking the Electron main process. Long-running CPU work should move to workers, child processes, or the existing local-agent runtime boundary.
-- Avoid blocking renderer interaction. Defer noncritical work with idle scheduling, workers, or staged loading.
-- Do not add dependencies for simple UI behavior without measuring size, startup cost, and maintenance risk.
-- Bundle static fonts/assets locally if the app depends on them. A desktop app should not wait on network resources for core UI.
+- Keep the renderer isolated from Node; use preload + typed IPC. New IPC lives in one place across
+  `shared/ipc.ts` (channel + `AimcubApi` type), `main/ipc.ts` (handler, validating sender input),
+  and `preload/index.ts` (passthrough). Validate privileged operations (file access, agent
+  execution, provider settings, external opening, `setThemeSource`).
+- Native-system-first appearance: the main process sets `nativeTheme.themeSource` (default
+  "system"), paints a matching `BrowserWindow` background, and emits the current `colorScheme` with
+  chrome state. The theme toggle overrides `themeSource` via IPC; the `nativeTheme` "updated"
+  listener repaints the background and re-emits chrome state.
+- `@core` purity is the hard boundary: business logic and pure derivations live in
+  `packages/core` / `packages/types` (pure TS, zero platform deps, unit-tested — enforced by
+  ESLint `no-restricted-imports` and `types: []`). App shells only render, bridge I/O, and call
+  IPC. Keep an incremental, cheap read path: batch list rollups (`listAimProgressSummaries`) over
+  N per-item calls; a separate `getAimJournal` rather than bloating the hot `getAimProgress`.
+- Keep a restrictive CSP; avoid remote content with Node integration; avoid blocking the main or
+  renderer process (defer noncritical work); do not add dependencies for simple UI behavior
+  without measuring size/startup/maintenance cost; bundle fonts/assets locally.
 
 ## Implementation Guardrails
 
-- Prefer shared CSS classes and tokens over new inline style islands. Current inline styles in renderer files are legacy debt; do not expand the pattern.
-- Before adding a component, check whether an existing `od-*` pattern can be reused or generalized.
-- If a layout needs repeated values, promote them to CSS custom properties or token exports instead of copying literal values.
-- Do not add new default rails, runtime strips, status stacks, or debug cards to the main Desktop shell.
-- Keep developer/debug surfaces opt-in, bounded, and separately scrollable.
-- For frontend changes, inspect the rendered UI at desktop and narrow widths before claiming completion. Check text fit, focus states, empty states, loading states, and Chinese/English strings when relevant.
-
-## Current Desktop Token Direction
-
-- The source of truth for Desktop today is `apps/desktop/src/renderer/cockpit.css`.
-- `apps/desktop/src/renderer/styles.ts` contains older shared inline-style helpers and should gradually converge toward the CSS token system.
-- The removed `packages/ui-tokens` package represented an older dark cross-platform palette. Do not recreate it unless it matches this document or is split into platform-specific token sets.
+- Prefer shared CSS classes and Glass tokens over new inline style islands. Current inline styles
+  in renderer files are legacy debt; do not expand the pattern.
+- Before adding a component, check whether an existing `od-*` pattern or shared primitive
+  (`renderer/ui/`) can be reused or generalized. Pure renderer transforms shared by App
+  orchestration live under `renderer/workflow/` (side-effect-free, directly unit-tested).
+- If a layout needs repeated values, promote them to CSS custom properties. Paste every Glass
+  token identically into both hand-duplicated dark blocks (the guard test catches drift).
+- Do not add new default rails, runtime strips, status stacks, or debug cards to the main shell.
+  Keep developer/debug surfaces opt-in, bounded, and separately scrollable.
+- For frontend changes, inspect the rendered UI at desktop and narrow widths, in **both light and
+  dark**, before claiming completion — check text fit over the gradient, focus states, empty
+  states, loading states, native traffic lights (drawn by macOS, not in DOM), and CN/EN strings.
 
 ## Review Checklist
 
-- Does the screen expose one primary next action?
-- Does the layout preserve the default two-column shell unless an opt-in surface is explicitly opened?
-- Are type sizes, weights, line heights, and spacing from this file?
-- Are labels concise, action-oriented, and sentence case?
-- Do hover, selected, focus, disabled, loading, error, and empty states exist?
-- Do controls meet target-size, contrast, keyboard, and accessible-name expectations?
-- Does the UI remain stable at narrow and wide window sizes?
-- Are debug/process details outside the default product view?
+- Does the screen expose one primary next action (on the Journey, the single "Your move")?
+- Does the layout preserve the default two-column glass shell unless an opt-in surface is opened?
+- Are type sizes, weights, line heights, and spacing from this file? Do new `font-size`s use ramp
+  tokens (or non-listed decimals)?
+- Do Glass tokens appear identically in all three theme blocks? Is text legible over the gradient
+  and translucent islands in both light and dark?
+- Are the 15 `data-od-id` anchors intact and the native macOS traffic lights native (no
+  React/CSS-drawn dots)?
+- Do hover, selected, focus, disabled, loading, error, and empty states exist? Do controls meet
+  target-size, contrast, keyboard, and accessible-name expectations (including status dots)?
+- Does the UI stay stable at 960×680 / 760×600 / 640×520 with no horizontal overflow?
+- Are debug/process details outside the default product view; are Journal/sheet rows real (not
+  fabricated)?
+- Is business logic in `@core` (pure, tested) with the app only rendering/bridging?
 - Did any new user design requirement get added back to this file?

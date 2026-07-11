@@ -72,6 +72,7 @@ import {
   type WebResearchConfig,
   type WebResearchStatus,
   type WebResearchTestResult,
+  type WindowThemeSource,
 } from "../shared/ipc";
 import { researchEvidenceForReview, runClarify, runDraft, runIntakeQuestions, runRefine, type PlanningModelRunLiveEvent } from "./planner";
 import { aimStore } from "./store";
@@ -391,6 +392,16 @@ export function registerIpc(): void {
       fullscreen: Boolean(win?.isFullScreen()),
       colorScheme: nativeTheme.shouldUseDarkColors ? "dark" : "light",
     };
+  });
+
+  // The in-app theme toggle drives the native window appearance. Setting themeSource fires
+  // nativeTheme's "updated" listener (main/index.ts), which repaints the window background
+  // and re-emits the chrome state — so the native titlebar/traffic-light context follows an
+  // in-app light/dark override instead of desyncing from the OS. Validate the untrusted value.
+  ipcMain.handle(IPC.setThemeSource, (_event, source: WindowThemeSource) => {
+    if (source === "system" || source === "light" || source === "dark") {
+      nativeTheme.themeSource = source;
+    }
   });
 
   ipcMain.handle(IPC.intake, async (event, req: IntakeRequest) => {
