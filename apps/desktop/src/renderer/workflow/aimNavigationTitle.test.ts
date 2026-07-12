@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { aimMatchesNavigationQuery, aimNavigationLabels, aimNavigationTitle } from "./aimNavigationTitle";
+import { aimNavigationLabels, aimNavigationTitle } from "./aimNavigationTitle";
 
 describe("aimNavigationTitle", () => {
   it("prefers the generated plan summary without changing the canonical title", () => {
@@ -59,14 +59,5 @@ describe("aimNavigationTitle", () => {
 
     expect(labels.fullLabel).toContain("coherent alignment system");
     expect(labels.label).toBe("Coordinate the entire desktop application…");
-  });
-
-  it("keeps canonical-only terms searchable when the generated label omits them", () => {
-    expect(aimMatchesNavigationQuery({
-      title: "Launch a finance app with current compliance research",
-      plan: { goal_summary: "Launch a finance app" },
-      description: "For independent workers",
-      status: "active",
-    }, "compliance")).toBe(true);
   });
 });

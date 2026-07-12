@@ -422,6 +422,13 @@ export interface WindowChromeState {
   colorScheme: SystemColorScheme;
 }
 
+/** Static app facts for Settings (About / General). Never includes a secret. */
+export interface AppInfo {
+  version: string;
+  /** Resolved local workspace root (~/.aimcub or $AIMCUB_HOME). */
+  workspacePath: string;
+}
+
 /** The typed surface exposed on `window.aimcub` by the preload bridge. */
 export interface AimcubApi {
   intake(req: IntakeRequest): Promise<AimIntakeReport>;
@@ -477,6 +484,10 @@ export interface AimcubApi {
   getWindowChromeState(): Promise<WindowChromeState>;
   /** Drive the native window appearance (titlebar/background/traffic-light context) from the in-app theme toggle. */
   setThemeSource(source: WindowThemeSource): Promise<void>;
+  /** Static app facts for Settings → General / About. */
+  getAppInfo(): Promise<AppInfo>;
+  /** Reveal the local workspace directory (~/.aimcub or $AIMCUB_HOME) in the OS file manager. */
+  revealWorkspace(): Promise<void>;
   onWindowChromeState(handler: (state: WindowChromeState) => void): () => void;
   onPlanningLiveEvent(handler: (event: PlanningLiveEvent) => void): () => void;
 }
@@ -530,6 +541,8 @@ export const IPC = {
   confirmMilestone: "aimcub:confirmMilestone",
   getWindowChromeState: "aimcub:getWindowChromeState",
   setThemeSource: "aimcub:setThemeSource",
+  getAppInfo: "aimcub:getAppInfo",
+  revealWorkspace: "aimcub:revealWorkspace",
   windowChromeState: "aimcub:windowChromeState",
   planningLiveEvent: "aimcub:planningLiveEvent",
 } as const;

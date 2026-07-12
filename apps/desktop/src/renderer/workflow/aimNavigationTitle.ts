@@ -11,11 +11,6 @@ export interface AimNavigationLabels {
   fullLabel: string;
 }
 
-interface AimNavigationSearchInput extends AimNavigationTitleInput {
-  description?: string | undefined | null;
-  status?: string | undefined | null;
-}
-
 function cleanText(value: string | undefined | null): string {
   return (value ?? "").replace(/\s+/g, " ").trim();
 }
@@ -104,16 +99,4 @@ export function aimNavigationLabels({ title, plan, fallback = "" }: AimNavigatio
  */
 export function aimNavigationTitle({ title, plan, fallback = "" }: AimNavigationTitleInput): string {
   return aimNavigationLabels({ title, plan, fallback }).label;
-}
-
-export function aimMatchesNavigationQuery(
-  input: AimNavigationSearchInput,
-  normalizedQuery: string,
-): boolean {
-  if (!normalizedQuery) return true;
-  const { label, fullLabel } = aimNavigationLabels(input);
-  return [label, fullLabel, cleanText(input.title), cleanText(input.description), cleanText(input.status)]
-    .join(" ")
-    .toLowerCase()
-    .includes(normalizedQuery);
 }

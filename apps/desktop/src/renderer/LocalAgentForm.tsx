@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { LocalAgentDetection, LocalAgentId, LocalAgentRunResult } from "../shared/ipc";
 
 import { useI18n } from "./i18n";
-import { Button, EmptyState, Panel, Row } from "./ui";
+import { Button, EmptyState, Panel } from "./ui";
 
 interface LocalAgentFormProps {
   agents: LocalAgentDetection[] | null;
@@ -64,56 +64,42 @@ export function LocalAgentForm({ agents, onRefresh }: LocalAgentFormProps) {
         <Button variant="ghost" size="sm" onClick={refresh}>{refreshing ? t("laf.scanning") : t("laf.rescan")}</Button>
       </div>
 
-      <div style={{ display: "grid", gap: 8, marginTop: 14 }}>
+      <div className="od-settings-card od-agent-rows">
         {(agents ?? []).map((agent) => {
           const test = tests[agent.id];
           const ready = agent.available && agent.authStatus !== "missing";
+          const meta = [
+            agent.version ?? (agent.available ? t("laf.installed") : t("laf.notInstalled")),
+            agent.authStatus !== "unknown" ? t(authLabelKey(agent.authStatus)) : null,
+            t("laf.models", { n: agent.models.length, source: agent.modelsSource }),
+          ].filter(Boolean).join(" · ");
           return (
-            <Panel
-              as="article"
-              key={agent.id}
-              tone={ready ? "neutral" : "warn"}
-              style={{ display: "grid", gap: 8 }}
-            >
-              <Row
-                trailing={(
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => runSmokeTest(agent)}
-                    disabled={!ready || test?.busy}
-                  >
-                    {test?.busy ? t("laf.testing") : t("laf.test")}
-                  </Button>
+            <div className="od-settings-card-row" key={agent.id} title={agent.path ?? agent.diagnostics[0] ?? t("laf.noPath")}>
+              <i className={`od-settings-ready-dot${ready ? "" : " is-warn"}`} aria-hidden="true" />
+              <div className="od-settings-card-copy">
+                <strong>{agent.name}</strong>
+                <span>{meta}</span>
+                {agent.authMessage && agent.authStatus !== "ok" && (
+                  <span className="od-ui-status-text" data-tone="danger">{agent.authMessage}</span>
                 )}
+                {test?.result && (
+                  <span className="od-ui-status-text" data-tone={test.result.ok ? "success" : "danger"}>
+                    {test.result.ok ? t("laf.testOk", { ms: test.result.durationMs }) : test.result.error ?? t("laf.testFailed")}
+                  </span>
+                )}
+                {test?.error && !test.result && (
+                  <span className="od-ui-status-text" data-tone="danger">{test.error}</span>
+                )}
+              </div>
+              <button
+                className="od-settings-mini-button"
+                type="button"
+                onClick={() => runSmokeTest(agent)}
+                disabled={!ready || test?.busy}
               >
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: "var(--od-font-weight-strong)" }}>{agent.name}</div>
-                  <div className="od-ui-status-text" style={{ marginTop: 2 }}>
-                    {agent.available ? t("laf.installed") : t("laf.notInstalled")}
-                    {agent.version ? ` · ${agent.version}` : ""}
-                    {agent.authStatus !== "unknown" ? ` · ${t(authLabelKey(agent.authStatus))}` : ""}
-                  </div>
-                </div>
-              </Row>
-              <div className="od-ui-status-text" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {agent.path ?? agent.diagnostics[0] ?? t("laf.noPath")}
-              </div>
-              <div className="od-ui-status-text">
-                {t("laf.models", { n: agent.models.length, source: agent.modelsSource })}
-              </div>
-              {agent.authMessage && agent.authStatus !== "ok" && (
-                <div className="od-ui-status-text" data-tone="danger">{agent.authMessage}</div>
-              )}
-              {test?.result && (
-                <div className="od-ui-status-text" data-tone={test.result.ok ? "success" : "danger"}>
-                  {test.result.ok ? t("laf.testOk", { ms: test.result.durationMs }) : test.result.error ?? t("laf.testFailed")}
-                </div>
-              )}
-              {test?.error && !test.result && (
-                <div className="od-ui-status-text" data-tone="danger">{test.error}</div>
-              )}
-            </Panel>
+                {test?.busy ? t("laf.testing") : t("laf.test")}
+              </button>
+            </div>
           );
         })}
         {agents && agents.length === 0 && <EmptyState style={{ minHeight: 96 }} title={t("laf.empty")} />}

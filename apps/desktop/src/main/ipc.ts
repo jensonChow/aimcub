@@ -4,10 +4,12 @@
  * aims). Clarifying answers are folded into dimension-aware `user_stated` memories — the
  * first concrete writes toward the memory pillar.
  */
-import { BrowserWindow, ipcMain, nativeTheme, type IpcMainInvokeEvent } from "electron";
+import { homedir } from "node:os";
+
+import { app, BrowserWindow, ipcMain, nativeTheme, shell, type IpcMainInvokeEvent } from "electron";
 
 import type { Goal, Milestone } from "@core/types";
-import type { NewMemory } from "@core/store";
+import { defaultDataDir, type NewMemory } from "@core/store";
 import {
   buildLocalHandoffManifest,
   critiquePlan,
@@ -529,6 +531,22 @@ export function registerIpc(): void {
     if (source === "system" || source === "light" || source === "dark") {
       nativeTheme.themeSource = source;
     }
+  });
+
+  ipcMain.handle(IPC.getAppInfo, () => {
+    const dir = defaultDataDir();
+    const home = homedir();
+    return {
+      version: app.getVersion(),
+      // Tilde-shortened for display; revealWorkspace resolves the real dir itself.
+      workspacePath: dir.startsWith(home) ? `~${dir.slice(home.length)}` : dir,
+    };
+  });
+
+  // Takes no renderer input — it only ever opens the fixed local workspace root, so a
+  // compromised renderer can't use it to open arbitrary paths.
+  ipcMain.handle(IPC.revealWorkspace, async () => {
+    await shell.openPath(defaultDataDir());
   });
 
   ipcMain.handle(IPC.intake, async (event, req: IntakeRequest) => {

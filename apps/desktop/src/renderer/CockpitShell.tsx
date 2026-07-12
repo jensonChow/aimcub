@@ -5,7 +5,8 @@ import type { AimDraft, AimProgressSummary, Goal } from "@core/types";
 import type { WindowChromeState } from "../shared/ipc";
 import { useI18n, type Lang } from "./i18n";
 import { AimDraftSidebarRows } from "./stages/aim/AimDraftRecovery";
-import { aimMatchesNavigationQuery, aimNavigationLabels } from "./workflow/aimNavigationTitle";
+import { setThemePref, useThemePref } from "./theme";
+import { aimNavigationLabels } from "./workflow/aimNavigationTitle";
 import { PROGRESS_STATUS_KEY } from "./workflow/progressSummary";
 import {
   availableWorkbenchStages,
@@ -24,7 +25,6 @@ type SidebarState = "pinned" | "collapsed" | "peek";
 const USER_MENU_ID = "od-sidebar-user-menu";
 const LANGUAGE_MENU_ID = "od-sidebar-language-menu";
 const SIDEBAR_WIDTH_STORAGE_KEY = "aimcub.sidebarWidth";
-const THEME_PREF_STORAGE_KEY = "aimcub.themePref";
 const SIDEBAR_REVEAL_DELAY_MS = 180;
 const SIDEBAR_CLOSE_DELAY_MS = 180;
 const SIDEBAR_AUTO_COLLAPSE_QUERY = "(max-width: 1040px)";
@@ -60,7 +60,6 @@ interface CockpitShellProps {
   onMemory?: () => void;
   memoryCount?: number;
   main: ReactNode;
-  settingsSidebar?: ReactNode;
   commands?: CockpitCommand[];
 }
 
@@ -95,20 +94,6 @@ function persistSidebarWidth(width: number) {
   window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(width));
 }
 
-type ThemePref = "system" | "light" | "dark";
-
-function readInitialThemePref(): ThemePref {
-  if (typeof window === "undefined") return "system";
-  const raw = window.localStorage.getItem(THEME_PREF_STORAGE_KEY);
-  return raw === "light" || raw === "dark" ? raw : "system";
-}
-
-function persistThemePref(pref: ThemePref) {
-  if (typeof window === "undefined") return;
-  if (pref === "system") window.localStorage.removeItem(THEME_PREF_STORAGE_KEY);
-  else window.localStorage.setItem(THEME_PREF_STORAGE_KEY, pref);
-}
-
 export function CockpitShell({
   goals,
   drafts = [],
@@ -124,19 +109,16 @@ export function CockpitShell({
   onMemory,
   memoryCount,
   main,
-  settingsSidebar,
   commands,
 }: CockpitShellProps) {
   const { t } = useI18n();
-  const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<"all" | "active" | "paused">("all");
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [sidebarPinned, setSidebarPinned] = useState(() => !prefersCollapsedSidebar());
   const [sidebarPeeking, setSidebarPeeking] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(readInitialSidebarWidth);
   const [sidebarResizing, setSidebarResizing] = useState(false);
   const [windowChrome, setWindowChrome] = useState<WindowChromeState>(DEFAULT_WINDOW_CHROME_STATE);
-  const [themePref, setThemePref] = useState<ThemePref>(readInitialThemePref);
+  const themePref = useThemePref();
   const effectiveAppearance = themePref === "system" ? windowChrome.colorScheme : themePref;
   const sidebarHoverZoneRef = useRef<HTMLDivElement | null>(null);
   const sidebarRef = useRef<HTMLElement | null>(null);
@@ -144,16 +126,17 @@ export function CockpitShell({
   const revealSidebarTimer = useRef<number | null>(null);
   const hideSidebarTimer = useRef<number | null>(null);
   const suppressSidebarPeekUntilExit = useRef(false);
-  const usingSettingsSidebar = activeStage === "settings" && Boolean(settingsSidebar);
+  // Memory and Settings are overlay detours: while one is open no sidebar nav row reads as current.
+  const overlayStage = activeStage === "memory" || activeStage === "settings";
   const hasGoals = goals.length > 0;
   const firstRunAim = activeStage === "aim"
     && workspaceTarget.kind !== "draft"
     && workspaceTarget.kind !== "goal"
     && !hasGoals;
-  const sidebarState: SidebarState = usingSettingsSidebar ? "pinned" : sidebarPinned ? "pinned" : sidebarPeeking ? "peek" : "collapsed";
+  const sidebarState: SidebarState = sidebarPinned ? "pinned" : sidebarPeeking ? "peek" : "collapsed";
   const sidebarVisible = sidebarState !== "collapsed";
   const sidebarToggleLabel = sidebarPinned ? t("sidebar.collapse") : t("sidebar.expand");
-  const sidebarId = usingSettingsSidebar ? "od-left-settings-sidebar" : "od-left-aim-sidebar";
+  const sidebarId = "od-left-aim-sidebar";
   const appStyle = { "--sidebar-width": `${sidebarWidth}px` } as CSSProperties;
 
   const stages = useMemo<StageItem[]>(() => [
@@ -166,20 +149,7 @@ export function CockpitShell({
   const availableStageIds = availableWorkbenchStages(workspaceTarget);
   const availableStages = stages.filter((item) => availableStageIds.includes(item.stage));
 
-  const normalizedQuery = query.trim().toLowerCase();
-  const visibleGoals = goals
-    .filter((goal) => {
-      if (filter === "paused" && goal.status !== "paused") return false;
-      if (filter === "active" && (goal.status === "achieved" || goal.status === "abandoned")) return false;
-      if (!normalizedQuery) return true;
-      return aimMatchesNavigationQuery({
-        title: goal.title,
-        plan: goal.plan_json,
-        description: goal.description,
-        status: goal.status,
-      }, normalizedQuery);
-    })
-    .slice(0, 12);
+  const visibleGoals = goals.slice(0, 12);
 
   const commandItems = useMemo<CockpitCommand[]>(() => {
     const stageCommandDetails = {
@@ -277,9 +247,7 @@ export function CockpitShell({
   }
 
   function toggleTheme() {
-    const next: ThemePref = effectiveAppearance === "dark" ? "light" : "dark";
-    persistThemePref(next);
-    setThemePref(next);
+    setThemePref(effectiveAppearance === "dark" ? "light" : "dark");
   }
 
   function updateSidebarWidth(nextWidth: number) {
@@ -504,119 +472,82 @@ export function CockpitShell({
         data-window-fullscreen={windowChrome.fullscreen ? "true" : "false"}
       >
         <div className="od-window-drag-strip" aria-hidden="true" data-od-id="window-drag-strip" />
-        {usingSettingsSidebar ? null : (
-          <div className="od-sidebar-hover-zone" data-od-id="sidebar-hover-zone" ref={sidebarHoverZoneRef}>
-            <div
-              className="od-sidebar-peek-trigger"
-              aria-hidden="true"
-              data-od-id="sidebar-peek-trigger"
-              onMouseDown={(event) => {
-                event.stopPropagation();
-                revealSidebarFromRailHover();
-              }}
-              onPointerDown={(event) => {
-                event.stopPropagation();
-                revealSidebarFromRailHover();
-              }}
-              onPointerEnter={revealSidebarFromRailHover}
-              onPointerMove={revealSidebarFromRailHover}
-              onPointerLeave={scheduleSidebarPeekClose}
-            />
-            <button
-              className="od-sidebar-toggle"
-              type="button"
-              aria-label={sidebarToggleLabel}
-              aria-expanded={sidebarVisible}
-              aria-pressed={sidebarPinned}
-              title={sidebarToggleLabel}
-              data-state={sidebarState}
-              data-od-id="sidebar-toggle"
-              onClick={onSidebarToggleClick}
-              onPointerDown={onSidebarTogglePointerDown}
-              onKeyDown={onSidebarToggleKeyDown}
-              onPointerEnter={revealSidebarAfterHover}
-              onPointerLeave={onSidebarTogglePointerLeave}
-              onFocus={keepSidebarPeekOpen}
-              onBlur={onSidebarToggleBlur}
-            >
-              <SidebarToggleIcon />
-            </button>
-          </div>
-        )}
+        <div className="od-sidebar-hover-zone" data-od-id="sidebar-hover-zone" ref={sidebarHoverZoneRef}>
+          <div
+            className="od-sidebar-peek-trigger"
+            aria-hidden="true"
+            data-od-id="sidebar-peek-trigger"
+            onMouseDown={(event) => {
+              event.stopPropagation();
+              revealSidebarFromRailHover();
+            }}
+            onPointerDown={(event) => {
+              event.stopPropagation();
+              revealSidebarFromRailHover();
+            }}
+            onPointerEnter={revealSidebarFromRailHover}
+            onPointerMove={revealSidebarFromRailHover}
+            onPointerLeave={scheduleSidebarPeekClose}
+          />
+          <button
+            className="od-sidebar-toggle"
+            type="button"
+            aria-label={sidebarToggleLabel}
+            aria-expanded={sidebarVisible}
+            aria-pressed={sidebarPinned}
+            title={sidebarToggleLabel}
+            data-state={sidebarState}
+            data-od-id="sidebar-toggle"
+            onClick={onSidebarToggleClick}
+            onPointerDown={onSidebarTogglePointerDown}
+            onKeyDown={onSidebarToggleKeyDown}
+            onPointerEnter={revealSidebarAfterHover}
+            onPointerLeave={onSidebarTogglePointerLeave}
+            onFocus={keepSidebarPeekOpen}
+            onBlur={onSidebarToggleBlur}
+          >
+            <SidebarToggleIcon />
+          </button>
+        </div>
         <aside
           id={sidebarId}
           ref={sidebarRef}
           className="od-sidebar"
-          data-mode={usingSettingsSidebar ? "settings" : "aims"}
-          data-od-id={usingSettingsSidebar ? "left-settings-sidebar" : "left-aim-sidebar"}
+          data-mode="aims"
+          data-od-id="left-aim-sidebar"
           aria-hidden={sidebarVisible ? undefined : true}
-          onPointerEnter={usingSettingsSidebar ? undefined : keepSidebarPeekOpen}
-          onPointerLeave={usingSettingsSidebar ? undefined : scheduleSidebarPeekClose}
-          onFocus={usingSettingsSidebar ? undefined : keepSidebarPeekOpen}
-          onBlur={usingSettingsSidebar ? undefined : scheduleSidebarPeekClose}
+          onPointerEnter={keepSidebarPeekOpen}
+          onPointerLeave={scheduleSidebarPeekClose}
+          onFocus={keepSidebarPeekOpen}
+          onBlur={scheduleSidebarPeekClose}
         >
-          {usingSettingsSidebar ? settingsSidebar : (
-            <>
-              <nav className="od-sidebar-global-actions" aria-label={t("shell.globalActions")} data-od-id="sidebar-global-actions">
+          <nav className="od-sidebar-brand" aria-label={t("shell.globalActions")} data-od-id="sidebar-global-actions">
                 <button
-                  className="od-sidebar-action od-home-panel"
+                  className="od-sidebar-brand-home"
                   type="button"
-                  aria-current={workspaceTarget.kind === "home" && activeStage !== "memory" ? "page" : undefined}
+                  aria-current={workspaceTarget.kind === "home" && !overlayStage ? "page" : undefined}
+                  aria-label={t("os.homePanel")}
+                  title={t("os.homePanel")}
                   data-od-id="sidebar-home-panel-action"
                   onClick={onHome}
                 >
-                  <span className="od-sidebar-action-icon" aria-hidden="true">
-                    <HomePanelIcon />
-                  </span>
-                  <span className="od-sidebar-action-label">{t("os.homePanel")}</span>
-                  <kbd aria-label="Command 0">
-                    <span aria-hidden="true">⌘</span>
-                    <span>0</span>
-                  </kbd>
+                  <span className="od-brand-mark" aria-hidden="true">A</span>
+                  <span className="od-brand-name">{t("glass.shell.brand")}</span>
                 </button>
                 <button
-                  className="od-sidebar-action od-new-aim"
+                  className="od-sidebar-plus"
                   type="button"
-                  aria-current={workspaceTarget.kind === "newAim" && activeStage !== "memory" ? "page" : undefined}
+                  aria-current={workspaceTarget.kind === "newAim" && !overlayStage ? "page" : undefined}
+                  aria-label={t("os.newAim")}
+                  title={t("os.newAim")}
                   data-od-id="sidebar-new-aim-action"
                   onClick={onNewAim}
                 >
-                  <span className="od-sidebar-action-icon od-new-aim-icon" aria-hidden="true">
-                    <NewAimIcon />
-                  </span>
-                  <span className="od-sidebar-action-label od-new-aim-label">{t("os.newAim")}</span>
-                  <kbd aria-label="Command N">
-                    <span aria-hidden="true">⌘</span>
-                    <span>N</span>
-                  </kbd>
+                  <PlusIcon />
                 </button>
               </nav>
 
               <section className="od-aim-browser" aria-label={t("shell.recentAims")}>
-                {hasGoals ? (
-                  <>
-                    <div className="od-sidebar-search">
-                      <label htmlFor="aim-search">{t("shell.searchAims")}</label>
-                      <input
-                        id="aim-search"
-                        value={query}
-                        onChange={(event) => setQuery(event.target.value)}
-                        placeholder={t("shell.searchAims")}
-                      />
-                    </div>
-                    <div className="od-filter-row" aria-label={t("shell.recentAims")}>
-                      <button className={filter === "all" ? "active" : ""} type="button" onClick={() => setFilter("all")}>
-                        {t("cockpit.filter.all")}
-                      </button>
-                      <button className={filter === "active" ? "active" : ""} type="button" onClick={() => setFilter("active")}>
-                        {t("cockpit.filter.active")}
-                      </button>
-                      <button className={filter === "paused" ? "active" : ""} type="button" onClick={() => setFilter("paused")}>
-                        {t("cockpit.filter.paused")}
-                      </button>
-                    </div>
-                  </>
-                ) : null}
                 {drafts.length > 0 && onOpenDraft && onDiscardDraft ? (
                   <AimDraftSidebarRows
                     drafts={drafts}
@@ -625,20 +556,17 @@ export function CockpitShell({
                     onDiscard={onDiscardDraft}
                   />
                 ) : null}
-                <div className="od-section-label" data-od-id="sidebar-recent-aims-label">
-                  <span>{t("shell.recentAims")}</span>
-                </div>
                 <div className="od-aim-list">
                   {visibleGoals.length === 0 ? (
-                    <div className="od-sidebar-empty">
-                      <strong>{t(hasGoals ? "shell.noSearchResults" : "shell.noAimsTitle")}</strong>
-                      <span>{t(hasGoals ? "shell.noSearchResultsBody" : "shell.noAimsBody")}</span>
-                    </div>
+                    <div className="od-sidebar-empty">{t("glass.shell.emptyNav")}</div>
                   ) : null}
                   {visibleGoals.map((goal) => {
-                    const selectedGoal = workspaceTarget.kind === "goal" && workspaceTarget.id === goal.id && activeStage !== "memory";
+                    const selectedGoal = workspaceTarget.kind === "goal" && workspaceTarget.id === goal.id && !overlayStage;
                     const navigationTitle = aimNavigationLabels({ title: goal.title, plan: goal.plan_json });
                     const summary = progressSummaries?.[goal.id];
+                    const markedStatus = summary && (summary.status === "needs_you" || summary.status === "blocked")
+                      ? summary.status
+                      : null;
                     return (
                       <button
                         key={goal.id}
@@ -652,12 +580,12 @@ export function CockpitShell({
                         <span className="od-aim-row-main">
                           <strong>{navigationTitle.label}</strong>
                         </span>
-                        {summary ? (
+                        {markedStatus ? (
                           <span
-                            className={`od-aim-progress-dot is-${summary.status}`}
+                            className={`od-aim-progress-dot is-${markedStatus}`}
                             role="img"
-                            aria-label={t(PROGRESS_STATUS_KEY[summary.status])}
-                            title={t(PROGRESS_STATUS_KEY[summary.status])}
+                            aria-label={t(PROGRESS_STATUS_KEY[markedStatus])}
+                            title={t(PROGRESS_STATUS_KEY[markedStatus])}
                           />
                         ) : null}
                       </button>
@@ -666,44 +594,15 @@ export function CockpitShell({
                 </div>
               </section>
 
-            </>
-          )}
-
-          {usingSettingsSidebar ? null : (
-            <div className="od-sidebar-footer" data-od-id="sidebar-footer">
-              <button
-                className="od-sidebar-action od-memory"
-                type="button"
-                aria-current={activeStage === "memory" ? "page" : undefined}
-                data-od-id="sidebar-memory-action"
-                onClick={onMemory}
-              >
-                <span className="od-sidebar-action-icon" aria-hidden="true">
-                  <MemoryIcon />
-                </span>
-                <span className="od-sidebar-action-label">{t("glass.shell.memory")}</span>
-                {typeof memoryCount === "number" && memoryCount > 0 ? (
-                  <span className="od-sidebar-memory-count" aria-label={t("glass.shell.memoryCount", { n: memoryCount })}>
-                    {memoryCount}
-                  </span>
-                ) : null}
-              </button>
-              <div className="od-sidebar-footer-meta">
-                <span className="od-sidebar-footer-path">{t("glass.shell.localFooter")}</span>
-                <button
-                  className="od-theme-toggle"
-                  type="button"
-                  aria-label={t("glass.shell.themeToggle")}
-                  title={t("glass.shell.themeToggle")}
-                  onClick={toggleTheme}
-                >
-                  {effectiveAppearance === "dark" ? <ThemeSunIcon /> : <ThemeMoonIcon />}
-                </button>
-              </div>
-            </div>
-          )}
-
-          <SidebarUserMenu onSettings={() => onStage("settings")} />
+          <SidebarUserMenu
+            appearance={effectiveAppearance}
+            themePref={themePref}
+            memoryCount={memoryCount}
+            memoryCurrent={activeStage === "memory"}
+            onMemory={onMemory}
+            onSettings={() => onStage("settings")}
+            onToggleTheme={toggleTheme}
+          />
         </aside>
 
         {sidebarState === "pinned" ? (
@@ -750,21 +649,10 @@ function SidebarToggleIcon() {
   );
 }
 
-function NewAimIcon() {
+function PlusIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
-      <circle cx="10" cy="10" r="5.25" />
-      <path d="M10 2.75v2.25M10 15v2.25M2.75 10h2.25M15 10h2.25M10 8.25v3.5M8.25 10h3.5" />
-    </svg>
-  );
-}
-
-function HomePanelIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
-      <path d="M4 8.5 10 3.75 16 8.5" />
-      <path d="M5.75 7.75v8h8.5v-8" />
-      <path d="M8.5 15.75v-4h3v4" />
+      <path d="M10 4.5v11M4.5 10h11" />
     </svg>
   );
 }
@@ -772,8 +660,27 @@ function HomePanelIcon() {
 function MemoryIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
-      <path d="M10 3.5c-2.9 0-4.75 1.9-4.75 4.35 0 1.25.5 2.2 1.2 2.95v2.45c0 .8.65 1.45 1.45 1.45h4.2c.8 0 1.45-.65 1.45-1.45v-2.45c.7-.75 1.2-1.7 1.2-2.95C14.75 5.4 12.9 3.5 10 3.5Z" />
-      <path d="M8 16.75h4" />
+      <path d="M10 3.5 3.5 6.5 10 9.5 16.5 6.5 10 3.5Z" />
+      <path d="M3.6 10 10 13l6.4-3" />
+      <path d="M3.6 13.4 10 16.4l6.4-3" />
+    </svg>
+  );
+}
+
+function PersonIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
+      <circle cx="10" cy="7" r="3" />
+      <path d="M4.5 16c.8-2.6 2.9-4 5.5-4s4.7 1.4 5.5 4" />
+    </svg>
+  );
+}
+
+function UpDownChevronIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
+      <path d="M6.5 8.5 10 5l3.5 3.5" />
+      <path d="M6.5 11.5 10 15l3.5-3.5" />
     </svg>
   );
 }
@@ -795,7 +702,17 @@ function ThemeSunIcon() {
   );
 }
 
-function SidebarUserMenu(props: { onSettings: () => void }) {
+interface SidebarUserMenuProps {
+  appearance: "light" | "dark";
+  themePref: "system" | "light" | "dark";
+  memoryCount?: number;
+  memoryCurrent: boolean;
+  onMemory?: () => void;
+  onSettings: () => void;
+  onToggleTheme: () => void;
+}
+
+function SidebarUserMenu(props: SidebarUserMenuProps) {
   const { lang, setLang, t } = useI18n();
   const [open, setOpen] = useState(false);
   const [languageOpen, setLanguageOpen] = useState(false);
@@ -960,17 +877,32 @@ function SidebarUserMenu(props: { onSettings: () => void }) {
             }
           }}
         >
-          <div className="od-user-menu-header" role="presentation">
-            <span className="od-user-avatar" aria-hidden="true">A</span>
-            <span>
-              <strong>{t("userMenu.accountName")}</strong>
-              <small>{t("userMenu.accountMeta")}</small>
-            </span>
-          </div>
+          {props.onMemory ? (
+            <button
+              className="od-user-menu-item"
+              ref={firstItemRef}
+              type="button"
+              role="menuitem"
+              aria-current={props.memoryCurrent ? "page" : undefined}
+              data-od-id="sidebar-memory-action"
+              onClick={() => {
+                closeMenu();
+                props.onMemory?.();
+              }}
+            >
+              <MemoryIcon />
+              <span>{t("glass.shell.memory")}</span>
+              {typeof props.memoryCount === "number" && props.memoryCount > 0 ? (
+                <small className="od-user-menu-value" aria-label={t("glass.shell.memoryCount", { n: props.memoryCount })}>
+                  {props.memoryCount}
+                </small>
+              ) : null}
+            </button>
+          ) : null}
 
           <button
             className="od-user-menu-item"
-            ref={firstItemRef}
+            ref={props.onMemory ? undefined : firstItemRef}
             type="button"
             role="menuitem"
             onClick={() => {
@@ -980,10 +912,7 @@ function SidebarUserMenu(props: { onSettings: () => void }) {
           >
             <SettingsIcon />
             <span>{t("userMenu.settings")}</span>
-            <kbd>Cmd ,</kbd>
           </button>
-
-          <div className="od-user-menu-separator" role="separator" />
 
           <div
             className="od-user-menu-submenu-anchor"
@@ -1032,6 +961,30 @@ function SidebarUserMenu(props: { onSettings: () => void }) {
               </div>
             ) : null}
           </div>
+
+          <div className="od-user-menu-separator" role="separator" />
+
+          <button
+            className="od-user-menu-item"
+            type="button"
+            role="menuitem"
+            onClick={props.onToggleTheme}
+          >
+            {props.appearance === "dark" ? <ThemeMoonIcon /> : <ThemeSunIcon />}
+            <span>{t("userMenu.appearance")}</span>
+            <small className="od-user-menu-value">
+              {t(props.themePref === "system"
+                ? "userMenu.appearanceSystem"
+                : props.appearance === "dark"
+                  ? "userMenu.appearanceDark"
+                  : "userMenu.appearanceLight")}
+            </small>
+          </button>
+
+          <div className="od-user-menu-device" role="presentation">
+            <span className="od-user-menu-device-dot" aria-hidden="true" />
+            <span>{t("glass.shell.onDevice")}</span>
+          </div>
         </div>
       ) : null}
 
@@ -1051,12 +1004,14 @@ function SidebarUserMenu(props: { onSettings: () => void }) {
           openMenu(true);
         }}
       >
-        <span className="od-user-avatar" aria-hidden="true">A</span>
+        <span className="od-user-avatar" aria-hidden="true">
+          <PersonIcon />
+        </span>
         <span className="od-user-trigger-copy">
           <strong>{t("userMenu.accountName")}</strong>
           <small>{t("userMenu.accountMeta")}</small>
         </span>
-        <ChevronDownIcon />
+        <UpDownChevronIcon />
       </button>
     </div>
   );
@@ -1084,14 +1039,6 @@ function ChevronRightIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
       <path d="m8 5 5 5-5 5" />
-    </svg>
-  );
-}
-
-function ChevronDownIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
-      <path d="m5 8 5 5 5-5" />
     </svg>
   );
 }

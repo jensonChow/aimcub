@@ -24,7 +24,7 @@ import {
   routeAfterPlanningFailure,
 } from "./planningErrors";
 import { formatRoutingValidation, routingAgentsFromDetections } from "./routingAgents";
-import { buildSettingsModel } from "./settingsModel";
+import { activeContextSourceCount, settingsSectionForFocus } from "./settingsModel";
 import { cockpitStageFor, planNodeForMilestone, progressRows } from "./stageRouting";
 
 const OWNER = "00000000-0000-4000-8000-000000000001";
@@ -134,10 +134,6 @@ const contextSources: ContextSourceStatus = {
   },
 };
 
-const testT = (key: string, vars?: Record<string, unknown>): string => {
-  if (!vars) return key;
-  return `${key} ${JSON.stringify(vars)}`;
-};
 const englishT: I18n["t"] = (key, vars) => translate("en", key, vars);
 
 describe("evidence submission helpers", () => {
@@ -284,21 +280,18 @@ describe("routing and settings helpers", () => {
         message: "Select a ready agent.",
       }],
     })).toBe("Missing agent: Select a ready agent.");
-    const settings = buildSettingsModel({
-      provider: null,
-      webResearch: {
-        configured: false,
-        provider: "brave",
-        enabled: true,
-        fetchPages: true,
-        hasApiKey: false,
-        keySource: null,
-      },
-      contextSources,
-      localAgents: agents,
-    }, testT);
-    expect(settings.planningReady).toBe(true);
-    expect(settings.webResearchHelper.status).toBe("intake.ready");
+  });
+
+  it("routes runtime-guidance focus into the matching settings tab", () => {
+    expect(settingsSectionForFocus("provider")).toBe("brain");
+    expect(settingsSectionForFocus("local")).toBe("workers");
+    expect(settingsSectionForFocus("web")).toBe("research");
+    expect(settingsSectionForFocus("context")).toBe("research");
+  });
+
+  it("counts active context sources for the Research summary row", () => {
+    expect(activeContextSourceCount(null)).toBe(0);
+    expect(activeContextSourceCount(contextSources)).toBeGreaterThan(0);
   });
 });
 

@@ -1,91 +1,78 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-12
-Branch: `main`. **Stage 7 (cleanup + convergence) is COMPLETE — the FINAL stage of the Journey-first
-epic. The epic is CLOSED, merged to `main`, and PUSHED.** Full-gate + live-QA green, including the
-dead-CSS sweep follow-up.
+Branch: `main`. **The Glass design re-sync is COMPLETE and merged** (branch
+`glass-design-resync`). Full gate + live packaged-app QA green; root `Aimcub.app` repacked.
 
-## Journey-first rebuild — DONE (Stages 1–7)
+## Glass design re-sync — DONE
 
-Epic plan: `~/.claude/plans/resilient-drifting-quail.md`. Stage 7 plan: `~/.claude/plans/hidden-singing-possum.md`.
-Stages 1–5 (bridge: reskin + fold funnel panels into Journey sheets) and Stage 6 (goal-first routing
-flip) shipped previously. Stage 7 removed the now-redundant/dead funnel and converged the two flows
-that still depended on it (edit + child-breakdown) onto the goal-first model.
+The founder re-imported `Aimcub Glass.dc.html` from his claude.ai/design project
+(`b99a9242-7164-4141-81e4-e6c363ecaf5f`, via the DesignSync MCP) and asked for it to be
+implemented. A precision diff against the shipped Journey-first app showed the Journey, New Aim
+composer, Memory page, and station sheets already matched the latest design; the real deltas were
+the sidebar, Home cards, Settings IA, and a station-glyph policy. Implemented as five focused
+commits, each independently full-gate green:
 
-**Founder decisions for Stage 7:** scope = **cleanup + convergence** (not pure cleanup); draft
-reconciliation = **discard-on-create** (keep the draft subsystem, discard the pre-goal draft on create).
+1. **Sidebar** — brand row ("A" mark + Aimcub → Home, compact "+" → New Aim) replaces the two
+   action rows; sidebar search + all/active/paused filters + "Recent aims" label deleted (Cmd+K
+   covers navigation; draft rows unchanged). The footer collapsed into the account trigger
+   ("Local workspace / ~/.aimcub") whose glass popover holds Memory(+count), Settings, Language,
+   an Appearance toggle, and the ok-dot on-device line. Sidebar dots now mark only needs-you
+   (accent) and blocked (danger). Theme pref moved to a shared store (`renderer/theme.ts`);
+   CockpitShell keeps the single native `setThemeSource` sync. Dead: `aimMatchesNavigationQuery`.
+2. **Home** — dynamic sub ("{n} aims in motion. One needs you."); cards carry a status phrase
+   sub-line + accent "your move" pill (needs_you) + 64×4 trailing bar; dot and `{done}/{total}`
+   text removed; first-run "connected" line gains "· {model}" when a provider model is set.
+3. **Settings re-IA** — aim sidebar stays; in-workspace "Settings" title + 196px rail with
+   General / Planning brain / Workers / Research / About + ~600px detail pane. New validated IPC:
+   `getAppInfo` (version + tilde-shortened workspace path) and `revealWorkspace` (no renderer
+   input; opens the fixed workspace root). Provider chooser became pills; local agents became
+   dot/name/meta/Test-run rows + an honest "You" row; Research holds the web form + a
+   "{n} of 6 active" context-sources row toggling the full panel; About states version + on-device
+   facts only (no fake updater). Deleted: SettingsPrimarySidebar/back/search/nav, the readiness
+   Overview + `buildSettingsModel`, the aim-context return card, `od-app-stage-settings` sidebar
+   locking, ~75 orphaned i18n keys. Section ids → `general|brain|workers|research|about`
+   (focus remap provider→brain, local→workers, web/context→research). The settings-return stage
+   is still recorded for draft persistence.
+4. **Journey polish** — only the active station shows a (pulsing accent) dot; header meta reads
+   as percent with the exact fraction on the accessible name (hidden on a plan-less shell).
+5. **Live-QA fixes** — `os.settings` legacy value ("Aim helpers") → "Settings"; long
+   `$AIMCUB_HOME` paths ellipsize in the Workspace row (tooltip keeps the full path); detail pane
+   clips horizontal overflow.
 
-## Stage 7 sub-steps (each independently full-gate green; committed on `glass-journey-stage7`)
+## Verification
 
-- **7.1** Removed the top `.od-stage-nav` strip (it duplicated the Journey's 6-station strip above
-  every open goal). `.od-main` base grid → single-row `minmax(0,1fr)` (the `auto` row only held the
-  strip; context/contracts/run/eval had no override → would have lost their scroll container). Deleted
-  the strip CSS + the orphaned `activeWorkbenchSurface` memo + `hasWorkbenchNavigation` import. Pruned
-  10 dead i18n keys. Stages stay reachable via Journey `onOpenStage`, Cmd/Ctrl+1..5, Cmd+K.
-- **7.2** Draft-linger fix (discard-on-create): `CreateAimRequest.draftId` → the `createAim` handler
-  discards it; `createAimAndOpenJourney` captures the pending draftId + `pauseAutosave()` (session left
-  intact so the in-flight timer honors the pause, not `beginSession`'s un-pause) + `resumeAutosave()`.
-- **7.3** Child-breakdown → goal-first: `breakDown` mints a linked child shell (`createAim` with
-  `parentGoalId`/`parentMilestoneId`) and opens its build-plan Journey (parity with top-level). +store test.
-- **7.4** In-Journey aim rename (edit-mode's replacement): new `renameGoal` store method + IPC +
-  preload + main handler (title/description only, works on a plan-less shell — `updateGoal` can't). New
-  `onRenameAim` inline header editor in `JourneyView` (both header sites) + `renameAim` App handler.
-  +6 i18n keys, +CSS, +store/JourneyView/App tests. **Additive** (edit machinery deleted in 7.5).
-- **7.5** Deleted the dead funnel intake surfaces: `AimIntakePanel`, `DraftAimOverviewPanel`
-  (+component+test), the edit machinery (`beginAimEdit`/`cancelAimEdit`/`changeAim*`/`aimEditBuffer`/
-  `restoreAimEditFocus`/all `aimSurfaceMode==="edit"/"summary"` branches), `checkpointSubmittedAim`,
-  the `startDraft` non-shell branch (now shell-only), `productErrorFromSaveBlock`, the composer icons,
-  `aimSurfaceAfterSubmit` import. `AimSurfaceMode` narrowed to `"idle" | "compose"`. **Gating prereq:**
-  `applyHydratedDraft` now lands every resume in the composer (drops legacy plan/clarify/parent/summary
-  hydration) so the retained draft-resume path can't re-enter the funnel. Pruned 53 orphaned i18n keys.
-  Rewrote the two funnel/edit source-guard test blocks to the compose-only model. **KEPT** (still
-  reachable via `onOpenStage` for saved goals): `ContextStage`/`PlanPanel`/`ExecutePanel`/`EvalStage`/
-  `LockedStagePanel`, `savePlan`/`saveGoal`/`createGoal`, and the `cockpit.*Locked*`/`context.stage.continue`/
-  `checkpointError*` i18n keys.
-- **7.6** Docs (`design-system.md` + this file + memory), full gate, live QA, repack, commit.
-
-## Verification (Stage 7)
-
-- **Full gate green** at every sub-step: `build` (+ `@core` no-leak) + tests (**281 desktop** + 72 store
-  + 88 cli) + `typecheck` + `lint` + `core:purity`.
-- **Live packaged-app QA via CDP** (isolated `AIMCUB_HOME` with the real DeepSeek provider config copied
-  in, empty store; real `~/.aimcub/store.json` mtime **unchanged**): (1) submit a new aim →
-  plan-less shell (1 goal, `plan_json` null, no fork) + Journey with **exactly one** nav strip (6 Journey
-  stations) + build-plan card + rename control; a title typed + paused >500ms autosaves a draft, and
-  submitting **discards it** (0 drafts) — the 7.2 fix. (2) Rename in the Journey header → persisted on the
-  same goal, no plan churn, no fork. (3) Resume a seeded legacy `summary`-surface draft → lands in the
-  **composer**, not the funnel (7.5). (4) Cmd+4 opens the Run stage (ExecutePanel) with no top strip;
-  `.od-main` is single-row + `.od-workspace` is the `overflow:auto` container (7.1). (5) Break down a
-  milestone → a linked **child shell** is created + opens its build-plan Journey (7.3).
+- **Full gate green per commit**: build (+ `@core` no-leak) + tests (**283 desktop** + store +
+  llm + local-agent + 88 cli) + typecheck + lint + core:purity. en/zh parity kept (~75 dead keys
+  pruned, ~40 added).
+- **Live packaged-app QA via CDP** (isolated `AIMCUB_HOME` with real settings.json copied in;
+  real `~/.aimcub/store.json` mtime verified unchanged): 35/35 scripted checks — brand row/menu
+  contents/appearance toggle flip, Settings rail + all five tabs (segmented appearance, Reveal
+  row, provider pills, You row, Manage expand, About version), composer sparks + circular submit,
+  goal-first submit → Journey with one strip + active-only dot + no % meta on a shell, Home
+  card state line/pill/bar, no horizontal overflow at 640px. Visual pass at 1180×780 in light +
+  dark (screenshots in the session scratchpad).
 - Repacked (`pnpm desktop:pack`) + refreshed root `Aimcub.app`.
 
-## Dead-CSS sweep (Stage 7.5 follow-up) — DONE
-
-The ~500 lines of dead AimIntakePanel/DraftAimOverviewPanel CSS were removed (branch
-`glass-journey-stage7-cssweep`, merged) via a brace-matched per-block sweep (a rule is dropped only
-when EVERY selector references a dead class; mixed comma-groups keep their live selectors) — −6897
-chars, all 14 dead classes gone, live classes (`.od-aim-intake`, `.od-aim-kicker`, `.od-aim-primary/
-secondary`, `.od-draft-recovery*`, `.od-initial-workspace*`, `.od-content-entry*`) intact. Trimmed the
-two stale App.test.tsx blocks (kept the live `.od-main-aim` grid guard + the secondary-control hover
-asserts). Full gate + live QA green (composer + Home draft-recovery render correctly). **No open
-threads remain — the Journey-first epic is fully landed.**
-
 ## Invariants (still enforced)
-- Journey sheet component-local + epoch-free; mutations via epoch-safe App handlers. The in-Journey
-  rename is a header editor behind a NEW `onRenameAim` prop — NOT a station `interaction`, so
-  `journey.test.ts:336` "only the Run station carries an interactive payload" holds.
-- `@core` pure (the new `renameGoal` is in `@core/store`, which is NOT in `core:purity` scope — that
-  scopes only `@core/domain`+`@core/types`; persistence belongs in the store). Evidence append-only +
-  idempotent; milestone completion derived by `evaluate()`. Native traffic lights; `data-od-id` anchors;
-  font ramp/weight; glass-token 3-block mirror; en/zh parity — all TS/test-enforced.
+
+- Native traffic lights; `data-od-id` anchors (memory action moved INTO the account menu but kept
+  `data-od-id="sidebar-memory-action"`); glass-token 3-block mirror; AA overrides (`--faint`,
+  light `--acc #0064cc`) untouched; type ramp guard (new 13.5/19px are non-guarded decimals);
+  `@core` pure — the re-sync is renderer + thin validated IPC only.
+- Honest UI: no flight-demo content, no fake updater, Journey secondary affordances
+  (hand-to-agent/schedule/later) still render only when a real handler exists.
 
 ## Ops gotchas (reusable)
+
 - Live packaged-app QA via CDP: repack + refresh root `Aimcub.app`, launch the binary with
-  `AIMCUB_HOME=<isolated>` + `--remote-debugging-port=NNNN` + `--user-data-dir=<isolated>`; copy real
-  `~/.aimcub/settings.json` (+ `context-sources.json`) in, empty store; connect a Node CDP driver (Node
-  22 has global `WebSocket`; drive `Runtime.evaluate` + `Page.captureScreenshot`). A planned goal can be
-  seeded fast via `updateGoalPlan` with the `store.test.ts` PLAN fixture values (domain `software`,
-  evaluators `commit_pattern`/`ci_status`, `completion_mode: auto_then_confirm`) — hand-crafted enums are
-  rejected by `validateExecutablePlan`. The sidebar labels a goal by its plan `goal_summary`, not
-  `goal.title` (aim-navigation title). Always verify real `~/.aimcub/store.json` mtime is unchanged.
+  `AIMCUB_HOME=<isolated>` + `--remote-debugging-port=NNNN` + `--user-data-dir=<isolated>`; copy
+  real `~/.aimcub/settings.json` (+ `context-sources.json`) in, empty store; drive
+  `Runtime.evaluate` + `Page.captureScreenshot` from Node 22 (global WebSocket). **The default
+  960×680 window auto-collapses the sidebar (`max-width: 1040px`)** — pin it via the toggle (or
+  emulate ≥1180px width) before menu/sidebar assertions; a popover inside the collapsed aside is
+  clickable in DOM but invisible. Always verify real `~/.aimcub/store.json` mtime unchanged.
+- Design re-sync flow: `DesignSync get_file` → serve the `.dc.html` + project `support.js`
+  locally (support.js pulls React/Babel from unpkg) → click through in a browser for the target
+  visuals before diffing code.
 - Pre-existing (carried): `com.aimcub.desktop` vs ASC `com.jensonchow.aimcub` bundle-id mismatch.
