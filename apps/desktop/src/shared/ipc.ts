@@ -94,6 +94,8 @@ export interface CreateAimRequest {
   description?: string;
   parentGoalId?: string;
   parentMilestoneId?: string;
+  /** A pre-goal composer draft to discard once the shell is created (parity with `saveGoal`). */
+  draftId?: string;
 }
 
 /**
@@ -124,6 +126,16 @@ export interface UpdateGoalPlanRequest {
   assumptions?: ClarifyAssumption[];
   /** A funnel draft to discard once the plan lands (parity with `saveGoal`'s draft cleanup). */
   draftId?: string;
+}
+
+/**
+ * Rename an existing aim's title/description in place — no plan change. Works on a plan-less shell
+ * or a planned goal (unlike {@link UpdateGoalPlanRequest}, which requires a plan).
+ */
+export interface RenameAimRequest {
+  goalId: string;
+  title?: string;
+  description?: string;
 }
 
 /**
@@ -421,6 +433,8 @@ export interface AimcubApi {
   createAim(req: CreateAimRequest): Promise<SavedGoal>;
   /** Land or re-plan the plan of an existing aim in place (no fork); null if the aim is gone. */
   updateGoalPlan(req: UpdateGoalPlanRequest): Promise<SavedGoal | null>;
+  /** Rename an aim's title/description in place (works on a plan-less shell); null if the aim is gone. */
+  renameGoal(req: RenameAimRequest): Promise<Goal | null>;
   listGoals(): Promise<Goal[]>;
   getGoal(id: string): Promise<GoalDetail | null>;
   getAimProgress(id: string): Promise<AimProgressReadModel | null>;
@@ -476,6 +490,7 @@ export const IPC = {
   saveGoal: "aimcub:saveGoal",
   createAim: "aimcub:createAim",
   updateGoalPlan: "aimcub:updateGoalPlan",
+  renameGoal: "aimcub:renameGoal",
   listGoals: "aimcub:listGoals",
   getGoal: "aimcub:getGoal",
   getAimProgress: "aimcub:getAimProgress",

@@ -786,74 +786,45 @@ describe("App planning state guards", () => {
     expect(openGoal).toContain('setAimSurfaceMode("idle")');
   });
 
-  it("separates new aim composition from committed draft summary and explicit editing", () => {
+  it("keeps a compose-only intake surface with no legacy funnel or edit machinery", () => {
     const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
     const startDraft = source.match(/async function startDraft[\s\S]*?\n {2}const builtAnswers/)?.[0] ?? "";
-    const checkpointSubmittedAim = source.match(/async function checkpointSubmittedAim[\s\S]*?\n {2}async function refreshAimDrafts/)?.[0] ?? "";
     const applyHydratedDraft = source.match(/function applyHydratedDraft[\s\S]*?async function openAimDraft/)?.[0] ?? "";
     const mainStage = source.match(/const mainStageContent = \(\(\) => \{[\s\S]*?\n {2}\}\)\(\);/)?.[0] ?? "";
     const draftAutosave = source.match(/useEffect\(\(\) => \{\n {4}if \(selected\) return;[\s\S]*?\n {2}\}\);/)?.[0] ?? "";
 
-    expect(source).toContain('type AimSurfaceMode = "idle" | "compose" | "summary" | "edit";');
-    expect(startDraft).toContain("if (options.aim) {");
-    expect(startDraft).toContain("resetPlanningForAimUpdate()");
-    expect(startDraft).toContain("aimSurfaceAfterSubmit");
-    expect(startDraft.indexOf("setAimSurfaceMode(nextAimSurface)")).toBeLessThan(
-      startDraft.indexOf('if (route === "show_helper_guidance")'),
-    );
-    expect(startDraft.indexOf("await checkpointSubmittedAim")).toBeLessThan(
-      startDraft.indexOf("setAimSurfaceMode(nextAimSurface)"),
-    );
-    expect(checkpointSubmittedAim).toContain('aimSurface: "summary"');
-    expect(checkpointSubmittedAim).toContain("{ navigation: true, throwOnError: true }");
-    expect(checkpointSubmittedAim).toContain("draftPersistence.pauseAutosave()");
-    expect(checkpointSubmittedAim).toContain("draftPersistence.resumeAutosave()");
-    expect(startDraft).toContain("setAimEditBuffer(null)");
-    expect(applyHydratedDraft).toContain("setAimSurfaceMode(hydrated.aimSurface)");
-    expect(source).toContain("aimSurface: overrides.aimSurface ?? persistedAimSurface(aimSurfaceMode)");
-    expect(draftAutosave).toContain("aimSurfaceMode");
-    expect(mainStage).toContain("if (showAimEditor)");
-    expect(mainStage).toContain('onTitle={aimSurfaceMode === "edit" ? changeAimTitle : setAimTitle}');
-    expect(mainStage).toContain('onDescription={aimSurfaceMode === "edit" ? changeAimDescription : setAimDescription}');
-    expect(mainStage).toContain("<DraftAimOverviewPanel");
-    expect(mainStage.indexOf("if (showAimEditor)")).toBeLessThan(mainStage.indexOf("<DraftAimOverviewPanel"));
-    expect(source).toContain('setAimSurfaceMode("edit")');
-    expect(source).not.toContain("aimComposerOpen || hasUnsavedAim");
+    // Goal-first: the surface mode is compose-only (no summary/edit funnel states).
+    expect(source).toContain('type AimSurfaceMode = "idle" | "compose";');
+    expect(source).toContain('const showAimEditor = aimSurfaceMode === "compose";');
     expect(source).toContain('activeDraftId: aimSurfaceMode === "compose" ? null : activeDraftId');
+    expect(draftAutosave).toContain("aimSurfaceMode");
+
+    // startDraft is shell-only — no unsaved-aim funnel (options.aim / aimSurfaceAfterSubmit / checkpoint).
+    expect(startDraft).toContain("options: { skipIntakeGate?: boolean; shell: {");
+    expect(startDraft).not.toContain("options.aim");
+    expect(startDraft).not.toContain("aimSurfaceAfterSubmit");
+    expect(startDraft).not.toContain("checkpointSubmittedAim");
+
+    // Resumes land in the composer (drop the legacy plan/summary/parent hydration).
+    expect(applyHydratedDraft).toContain('setAimSurfaceMode("compose")');
+    expect(applyHydratedDraft).not.toContain("hydrated.aimSurface");
+    expect(applyHydratedDraft).not.toContain("setParent(hydrated.parent)");
+
+    // The composer is the only intake surface; the funnel intake panels are gone.
+    expect(mainStage).toContain("if (showAimEditor)");
+    expect(mainStage).toContain("<NewAimComposer");
+    expect(mainStage).not.toContain("<AimIntakePanel");
+    expect(mainStage).not.toContain("<DraftAimOverviewPanel");
+
+    // The edit-mode machinery is fully removed.
+    expect(source).not.toContain("function beginAimEdit");
+    expect(source).not.toContain("aimEditBuffer");
+    expect(source).not.toContain('aimSurfaceMode === "edit"');
+    expect(source).not.toContain('setAimSurfaceMode("summary")');
+    expect(source).not.toContain("function checkpointSubmittedAim");
+
+    // continueContextToPlan is the saved-goal-only contracts hop (no unsaved-aim startDraft funnel).
     expect(source).toContain("const continueContextToPlan = () => {");
-    expect(source).not.toContain("const continueContextToPlan = parent ? undefined");
-  });
-
-  it("keeps an explicit aim edit aligned with downstream planning state", () => {
-    const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
-    const startDraft = source.match(/async function startDraft[\s\S]*?\n {2}const builtAnswers/)?.[0] ?? "";
-    const beginEdit = source.match(/function beginAimEdit[\s\S]*?function resetPlanningForAimUpdate/)?.[0] ?? "";
-    const resetPlanning = source.match(/function resetPlanningForAimUpdate[\s\S]*?function changeAimTitle/)?.[0] ?? "";
-    const changeTitle = source.match(/function changeAimTitle[\s\S]*?function changeAimDescription/)?.[0] ?? "";
-    const cancel = source.match(/function cancelAimEdit[\s\S]*?async function startNewAim/)?.[0] ?? "";
-    const navigationLock = source.match(/function navigationIsLocked[\s\S]*?function workflowMutationIsLocked/)?.[0] ?? "";
-
-    expect(beginEdit).toContain("setAimEditBuffer({ title: aimTitle, description: aimDescription })");
-    expect(beginEdit).toContain('if (pendingTargetNavigationRef.current || !openCockpitStage("aim")) return;');
-    expect(beginEdit).not.toContain("setDraft(null)");
-    expect(changeTitle).toContain("setAimEditBuffer");
-    expect(changeTitle).not.toContain("setAimTitle");
-    expect(resetPlanning).toContain("setDraft(null)");
-    expect(resetPlanning).toContain("setFinalPlan(null)");
-    expect(resetPlanning).toContain("setClarifyPhase(null)");
-    expect(resetPlanning).toContain('setContextNote("")');
-    expect(startDraft).toContain('contextNote: ""');
-    expect(startDraft.indexOf('route === "show_helper_guidance"')).toBeLessThan(startDraft.indexOf("resetPlanningForAimUpdate()"));
-    expect(cancel).toContain("setAimEditBuffer(null)");
-    expect(cancel).not.toContain("setAimTitle");
-    expect(cancel).toContain('setAimSurfaceMode("summary")');
-    expect(navigationLock).toContain('aimSurfaceMode === "edit"');
-    expect(navigationLock).toContain('t("aimDraft.edit.navigationRecovery")');
-    expect(source).toContain('if (aimSurfaceMode === "edit" && stage === "aim") return true;');
-    expect(source).toContain('const activeAimTitle = aimSurfaceMode === "edit" && aimEditBuffer');
-    expect(source).toContain('? aimEditBuffer.title.trim()');
-    expect(source).toContain('? aimEditBuffer.description');
-    expect(source).toContain("titleInputRef.current?.focus()");
   });
 
   it("keeps plan validation failures repairable instead of disabling contract edits", () => {
@@ -907,6 +878,38 @@ describe("App planning state guards", () => {
       saveFinally.indexOf("setBusy(null)"),
     );
     expect(mainIpcSource).toContain("if (req.draftId) await aimStore.discardAimDraft(req.draftId);");
+  });
+
+  it("discards a pre-goal draft when the goal-first shell is created", () => {
+    const appSource = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+    const createShell = appSource.match(/async function createAimAndOpenJourney[\s\S]*?\n {2}\/\*\* "Build the plan"/)?.[0]
+      ?? appSource.match(/async function createAimAndOpenJourney[\s\S]*?\n {2}async function/)?.[0]
+      ?? "";
+
+    // Capture + pause BEFORE createAim so the in-flight autosave timer can't re-mint the row.
+    expect(createShell).toContain(
+      "const pendingDraftId = draftPersistence.currentDraftId() ?? activeDraftIdRef.current ?? undefined;",
+    );
+    expect(createShell.indexOf("draftPersistence.pauseAutosave();")).toBeLessThan(
+      createShell.indexOf("window.aimcub.createAim"),
+    );
+    expect(createShell).toContain("window.aimcub.createAim({ title, description, draftId: pendingDraftId })");
+    expect(createShell).toContain("draftPersistence.resumeAutosave();");
+  });
+
+  it("renames the selected aim in place via renameGoal (no plan change)", () => {
+    const appSource = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+    const mainIpcSource = readFileSync(new URL("../main/ipc.ts", import.meta.url), "utf8");
+    const renameAim = appSource.match(/async function renameAim[\s\S]*?\n {2}async function runAgent/)?.[0] ?? "";
+
+    // Title/description-only patch through the epoch-safe App handler + the rename IPC.
+    expect(renameAim).toContain("window.aimcub.renameGoal({ goalId: goal.id, title, description: input.description })");
+    expect(renameAim).toContain("setSelected(updated)");
+    // Wired onto the Journey header, not a station interaction.
+    expect(appSource).toContain("onRenameAim={isPlanningShell ? undefined : (input) => void renameAim(input)}");
+    // The main handler renames without materializing a plan.
+    expect(mainIpcSource).toContain("ipcMain.handle(IPC.renameGoal");
+    expect(mainIpcSource).toContain("aimStore.renameGoal({ id: req.goalId, title: req.title, description: req.description })");
   });
 
   it("requires an explicit discard path for draft deletion", () => {
@@ -1454,12 +1457,6 @@ describe("CockpitShell", () => {
     expect(html).toContain("Recent aims");
     expect(html).toContain("Saved aims appear here.");
     expect(html).not.toContain('class="od-aim-card selected"');
-    expect(html).toContain('aria-label="Workbench navigation"');
-    expect(html).toContain('data-stage="aim"');
-    expect(html).toContain('data-stage="context"');
-    expect(html).toContain('data-stage="contracts"');
-    expect(html).not.toContain('data-stage="run"');
-    expect(html).not.toContain('data-stage="eval"');
   });
 
   it("keeps every recoverable draft reachable in the scrolling sidebar", () => {
@@ -1585,7 +1582,6 @@ describe("CockpitShell", () => {
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
 
     expect(css).toMatch(/\.od-main\s*{[^}]*--od-rail-operational:\s*940px;[^}]*--od-rail-reading:\s*760px;[^}]*--od-rail-compose:\s*560px;/s);
-    expect(css).toMatch(/\.od-stage-nav\s*{[^}]*width:\s*min\(100%, var\(--od-rail-operational\)\);[^}]*justify-content:\s*flex-start;/s);
     expect(css).toMatch(/\.od-workspace\s*{[^}]*width:\s*min\(100%, var\(--od-rail-operational\)\);/s);
     expect(css).toMatch(/\.od-workspace-aim:has\(> \.od-initial-workspace\[data-has-drafts="true"\]\)\s*{[^}]*align-content:\s*safe center;[^}]*justify-items:\s*stretch;/s);
     expect(css).toMatch(/\.od-initial-workspace\[data-has-drafts="true"\]\s*{[^}]*min-height:\s*0;[^}]*align-content:\s*start;[^}]*padding:\s*0;/s);
@@ -1593,11 +1589,10 @@ describe("CockpitShell", () => {
     expect(css).toMatch(/\.od-context-focus\s*{[^}]*width:\s*min\(100%, var\(--od-rail-reading\)\);[^}]*padding-top:\s*0;/s);
   });
 
-  it("reserves a stage-nav row for saved Aim overview at compact widths", () => {
+  it("keeps the saved Aim overview centered at compact widths", () => {
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
 
     expect(css).toMatch(/\.od-main-aim\s*{[^}]*grid-template-rows:\s*minmax\(0,\s*1fr\);[^}]*}/s);
-    expect(css).toMatch(/\.od-main-aim:has\(>\s*\.od-stage-nav\)\s*{[^}]*grid-template-rows:\s*auto minmax\(0,\s*1fr\);[^}]*}/s);
     expect(css).toMatch(/\.od-workspace-aim:has\(>\s*\.od-aim-overview\)\s*{[^}]*align-content:\s*safe center;[^}]*}/s);
     expect(css).toMatch(/\.od-draft-aim-overview \.od-aim-intake-head > div\s*{[^}]*min-width:\s*0;/s);
     expect(css).toMatch(/\.od-draft-aim-overview h1,\s*\.od-draft-aim-overview p\s*{[^}]*overflow-wrap:\s*anywhere;/s);
@@ -1727,41 +1722,6 @@ describe("CockpitShell", () => {
     expect(main).toContain("minHeight: MIN_WINDOW_HEIGHT");
   });
 
-  it("renders compact non-linear workbench navigation without numbered stage pills", () => {
-    const html = renderToStaticMarkup(
-      <I18nProvider>
-        <CockpitShell
-          goals={[savedGoal]}
-          activeStage="context"
-          workspaceTarget={{ kind: "goal", id: savedGoal.id }}
-          onHome={noop}
-          onNewAim={noop}
-          onOpenGoal={noop}
-          onStage={noop}
-          main={<div>Context stage</div>}
-        />
-      </I18nProvider>,
-    );
-
-    expect(html).toContain('aria-label="Workbench navigation"');
-    expect(html).toContain('class="od-stage-current"');
-    expect(html).toContain('<span class="od-stage-current-label">Surface</span>');
-    expect(html).toContain('<strong class="od-stage-current-title">Context</strong>');
-    expect(html).toContain('class="od-stage-switcher" role="group" aria-label="Workbench surfaces"');
-    expect(html).toContain('data-stage="aim"');
-    expect(html).toContain('data-stage="context"');
-    expect(html).toContain('data-stage="contracts"');
-    expect(html).toContain('data-stage="run"');
-    expect(html).toContain('data-stage="eval"');
-    expect(html).toContain('<span class="od-stage-title">Aim</span>');
-    expect(html).toContain('<span class="od-stage-title">Contracts</span>');
-    expect(html).toContain('<span class="od-stage-title">Work</span>');
-    expect(html).toContain('<span class="od-stage-title">Review</span>');
-    expect(html).toContain('<button class="active" type="button" aria-current="page" data-stage="context"');
-    expect(html).not.toContain("od-stage-index");
-    expect(html).not.toContain('aria-current="step"');
-  });
-
   it("keeps command palette and keyboard stage mappings on the same workbench stages", () => {
     const source = readFileSync(new URL("./CockpitShell.tsx", import.meta.url), "utf8");
 
@@ -1785,28 +1745,7 @@ describe("CockpitShell", () => {
     expect(stageSafeAreaRule).toContain("padding-top: max(24px, var(--stage-nav-titlebar-safe-top));");
     expect(css).not.toContain('.od-main:not(.od-main-aim):not(.od-main-settings)');
     expect(stageSafeAreaRule).not.toMatch(/\.od-sidebar|\.od-user-menu-|\.od-window-drag-strip/);
-    expect(css).toMatch(/\.od-stage-nav\s*{[^}]*justify-content:\s*flex-start;[^}]*gap:\s*12px;[^}]*min-height:\s*32px;/s);
-    expect(css).toMatch(/\.od-stage-switcher\s*{[^}]*gap:\s*4px;[^}]*padding:\s*2px;[^}]*border:\s*1px solid var\(--od-border-soft\);/s);
-    expect(css).toMatch(/\.od-stage-nav button\s*{[^}]*max-width:\s*112px;[^}]*min-height:\s*28px;[^}]*background:\s*transparent;/s);
     expect(css).not.toContain(".od-stage-index");
-  });
-
-  it("wraps and compresses workbench navigation without shell selector changes", () => {
-    const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
-    const compactStageNavRule = css.match(/@media \(max-width: 1040px\)\s*{[\s\S]*?\.od-stage-nav\s*{[^}]*}/)?.[0] ?? "";
-    const compactStageSwitcherRule = css.match(/@media \(max-width: 1040px\)\s*{[\s\S]*?\.od-stage-switcher\s*{[^}]*}/)?.[0] ?? "";
-    const narrowStageCurrentLabelRule = css.match(/\.od-stage-current-label\s*{[^}]*display:\s*none;[^}]*}/s)?.[0] ?? "";
-    const narrowStageSwitcherRule = css.match(/\.od-stage-switcher\s*{[^}]*flex:\s*1 1 320px;[^}]*}/s)?.[0] ?? "";
-    const narrowStageNavButtonRule = css.match(/\.od-stage-nav button\s*{[^}]*flex:\s*1 1 0;[^}]*}/s)?.[0] ?? "";
-
-    expect(compactStageNavRule).toMatch(/\.od-stage-nav\s*{[^}]*flex-wrap:\s*wrap;[^}]*row-gap:\s*8px;/s);
-    expect(compactStageSwitcherRule).toMatch(/\.od-stage-switcher\s*{[^}]*flex:\s*0 1 auto;/s);
-    expect(narrowStageCurrentLabelRule).toMatch(/\.od-stage-current-label\s*{[^}]*display:\s*none;/s);
-    expect(narrowStageSwitcherRule).toMatch(/\.od-stage-switcher\s*{[^}]*flex:\s*1 1 320px;/s);
-    expect(narrowStageNavButtonRule).toMatch(/\.od-stage-nav button\s*{[^}]*flex:\s*1 1 0;[^}]*max-width:\s*none;[^}]*padding:\s*0 8px;/s);
-    expect(narrowStageNavButtonRule).not.toMatch(/\.od-sidebar|\.od-user-menu-|\.od-window-drag-strip|data-sidebar-state/);
-    expect(narrowStageSwitcherRule).not.toMatch(/\.od-sidebar|\.od-user-menu-|\.od-window-drag-strip|data-sidebar-state/);
-    expect(narrowStageCurrentLabelRule).not.toMatch(/\.od-sidebar|\.od-user-menu-|\.od-window-drag-strip|data-sidebar-state/);
   });
 
   it("replaces the primary left sidebar with settings navigation on settings stage", () => {

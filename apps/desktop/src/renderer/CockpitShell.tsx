@@ -9,7 +9,6 @@ import { aimMatchesNavigationQuery, aimNavigationLabels } from "./workflow/aimNa
 import { PROGRESS_STATUS_KEY } from "./workflow/progressSummary";
 import {
   availableWorkbenchStages,
-  hasWorkbenchNavigation,
   isWorkbenchStageAvailable,
   WORKBENCH_STAGE_IDS,
   type CockpitStage,
@@ -166,11 +165,6 @@ export function CockpitShell({
   ], [t]);
   const availableStageIds = availableWorkbenchStages(workspaceTarget);
   const availableStages = stages.filter((item) => availableStageIds.includes(item.stage));
-  const activeWorkbenchSurface = stages.find((item) => item.stage === activeStage) ?? {
-    stage: "aim",
-    shortcut: "1",
-    title: t("cockpit.surface.aim"),
-  };
 
   const normalizedQuery = query.trim().toLowerCase();
   const visibleGoals = goals
@@ -732,29 +726,6 @@ export function CockpitShell({
         ) : null}
 
         <main className={`od-main od-main-${activeStage}`} data-od-id="main-delivery-workbench">
-          {activeStage !== "settings" && activeStage !== "memory" && hasWorkbenchNavigation(workspaceTarget) ? (
-            <nav className="od-stage-nav" aria-label={t("cockpit.workflow")}>
-              <div className="od-stage-current" aria-live="polite">
-                <span className="od-stage-current-label">{t("cockpit.surface.current")}</span>
-                <strong className="od-stage-current-title">{activeWorkbenchSurface.title}</strong>
-              </div>
-              <div className="od-stage-switcher" role="group" aria-label={t("cockpit.surface.switcher")}>
-                {availableStages.map((item) => (
-                  <button
-                    key={item.stage}
-                    className={activeStage === item.stage ? "active" : ""}
-                    type="button"
-                    aria-current={activeStage === item.stage ? "page" : undefined}
-                    data-stage={item.stage}
-                    onClick={() => onStage(item.stage)}
-                  >
-                    <span className="od-stage-title">{item.title}</span>
-                  </button>
-                ))}
-              </div>
-            </nav>
-          ) : null}
-
           <section className={`od-workspace od-workspace-${activeStage}`} data-od-id="workflow-panels">
             {main}
           </section>

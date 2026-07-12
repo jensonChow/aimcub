@@ -228,9 +228,24 @@ Reference links:
   sidebar without resizing the workspace. In fullscreen the product toggle moves left into
   traffic-light-safe space, but native traffic lights must remain in the revealed system titlebar.
 - Center workspace: a constrained-max-width workbench. For a saved aim the default surface is
-  the **Journey** work view (replacing the old `AimOverviewPanel`); compact non-linear workbench
-  navigation (Aim · Context · Contracts · Work · Review) sits above the heavier interactive stage
-  panels, which are unchanged and still reached through the epoch-safe `openCockpitStage(...)`.
+  the **Journey** work view (replacing the old `AimOverviewPanel`). **There is no top workbench
+  stage switcher** — the old `.od-stage-nav` strip was removed (Stage 7) because it duplicated the
+  Journey's own 6-station strip above every open goal. The heavier interactive stage panels
+  (Context/Plan/Run/Eval) are unchanged and still reached through the epoch-safe
+  `openCockpitStage(...)` — now via the Journey's own `onOpenStage`, the Cmd/Ctrl+1..5 shortcuts,
+  and the Cmd+K command palette. `.od-main` is a single-row grid (`minmax(0,1fr)`); the
+  `.od-workspace` child is the `overflow:auto` scroll container.
+- **Goal-first front door (shipped, Stage 6–7).** Submitting a New Aim mints a plan-less Goal
+  *shell* immediately (`createAim` → `createAimShell`) and mounts its Journey — it never routes
+  through an unsaved-aim intake funnel. The shell shows a "Turn this aim into a plan" card;
+  research / adaptive clarify Q&A / plan review all happen **in the Journey**, and the plan lands
+  on the SAME goal (`updateGoalPlan`, no fork). The Plan drill-in sheet edits in place (buffered
+  commit) and "Re-plan with AI" re-runs planning on the same goal. **Child breakdown** is
+  goal-first too: it mints a linked child shell (`createAim` with `parentGoalId`/`parentMilestoneId`)
+  that opens on its own build-plan Journey. **Aim rename** is an inline editor in the Journey
+  header (`onRenameAim` → `renameGoal`, title/description only, no plan change) — the old edit-mode
+  funnel is gone. A composer draft is autosaved while typing but discarded when the shell is
+  created; resuming any older draft lands back in the composer, never a funnel.
 - **The Journey work surface** renders from pure, unit-tested helpers under
   `renderer/workflow/journey/` off the existing `AimProgressReadModel` (+ the run-event journal
   and the aim's memories): a 6-station strip (Aim · Research · Context · Plan · Run · Eval) with
@@ -251,9 +266,9 @@ Reference links:
 - Optional inspector: process/context/quality/activity/debug detail may exist as an opt-in
   overlay/drawer/developer surface — independently scrollable, never displacing the primary task.
 - Stage model: Aim, Context, Plan/Contracts, Execute/Work, Eval/Review are iterative workbench
-  surfaces, not a strict wizard. Stage navigation reads as a compact non-linear mode switcher
-  with a current-surface label and quiet segmented controls, not large numbered step pills. Each
-  stage presents a single dominant action.
+  surfaces, not a strict wizard. The Journey's own 6-station strip is the navigation surface
+  (there is no separate top mode switcher); each full-page stage presents a single dominant action
+  and is opened from the Journey / palette / keyboard, not a persistent segmented control.
 - Existing aims open to the Journey (aim overview) first, not Run details; completed aims
   (`completion_recap.complete`) open Eval with the recap.
 - Settings use a split-view IA: the primary left sidebar becomes settings-category navigation and

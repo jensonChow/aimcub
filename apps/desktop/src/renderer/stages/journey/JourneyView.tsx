@@ -435,6 +435,13 @@ export interface JourneyViewProps {
   > & { onCommitPlan?: (plan: DecompositionOutput) => void };
   /** Re-plan the SAME aim with a fresh planning run (Stage 6B; merges, freezing completed work). */
   onReplan?: () => void;
+  /**
+   * Rename the aim's title/description in place (Stage 7; works on a shell or a planned goal — no
+   * plan change). When present, the Journey header shows an inline "Rename" editor. This is a plain
+   * header control, NOT a station interaction, so the journey.test "only Run carries an interactive
+   * payload" invariant is untouched.
+   */
+  onRenameAim?: (input: { title: string; description: string }) => void;
   disabled?: boolean;
   /** Count of OTHER aims with a turn waiting on the user, for the header jump chip. */
   elsewhereCount?: number;
@@ -509,7 +516,78 @@ export function JourneyView(props: JourneyViewProps) {
   const [pickingEvidence, setPickingEvidence] = useState(false);
   const sheetCloseRef = useRef<HTMLButtonElement | null>(null);
   const sheetTriggerRef = useRef<HTMLElement | null>(null);
+  // In-Journey aim rename (Stage 7): a component-local buffer seeded on open, committed via the
+  // epoch-safe App `onRenameAim` handler. JourneyView is keyed by goal.id in App, so switching aims
+  // remounts and resets this — no reset effect needed.
+  const [renaming, setRenaming] = useState(false);
+  const [renameTitle, setRenameTitle] = useState("");
+  const [renameDescription, setRenameDescription] = useState("");
   const { progress, goal } = props;
+
+  function openRename(): void {
+    setRenameTitle(goal.title);
+    setRenameDescription(goal.description ?? "");
+    setRenaming(true);
+  }
+
+  function saveRename(): void {
+    if (!renameTitle.trim()) return;
+    props.onRenameAim?.({ title: renameTitle, description: renameDescription });
+    setRenaming(false);
+  }
+
+  // The Journey header's aim block: the title + sub line, plus (when App supplies `onRenameAim`) an
+  // inline rename editor. Rendered at BOTH header sites (the plan-less shell branch + the main branch).
+  function renderAimHead(sub: string): ReactNode {
+    if (renaming && props.onRenameAim) {
+      return (
+        <div className="od-journey-head-main od-journey-aim-edit" data-od-id="journey-aim-edit">
+          <input
+            className="od-journey-aim-edit-title"
+            type="text"
+            value={renameTitle}
+            aria-label={t("glass.journey.rename.titleLabel")}
+            disabled={props.disabled}
+            onChange={(event) => setRenameTitle(event.target.value)}
+            autoFocus
+          />
+          <textarea
+            className="od-journey-aim-edit-desc"
+            value={renameDescription}
+            rows={2}
+            placeholder={t("glass.journey.rename.descPlaceholder")}
+            aria-label={t("glass.journey.rename.descLabel")}
+            disabled={props.disabled}
+            onChange={(event) => setRenameDescription(event.target.value)}
+          />
+          <div className="od-journey-aim-edit-actions">
+            <button
+              className="od-journey-primary"
+              type="button"
+              disabled={props.disabled || !renameTitle.trim()}
+              onClick={saveRename}
+            >
+              {t("glass.journey.rename.save")}
+            </button>
+            <button className="od-journey-secondary" type="button" onClick={() => setRenaming(false)}>
+              {t("glass.journey.rename.cancel")}
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="od-journey-head-main">
+        <h1 className="od-journey-title">{goal.title}</h1>
+        <p className="od-journey-sub">{sub}</p>
+        {props.onRenameAim ? (
+          <button className="od-journey-aim-rename" type="button" disabled={props.disabled} onClick={openRename}>
+            {t("glass.journey.rename")}
+          </button>
+        ) : null}
+      </div>
+    );
+  }
 
   // Modal-sheet focus management: move focus into the dialog on open, close on Escape, and
   // restore focus to the control that opened it on close. `aria-modal` alone does not do this.
@@ -540,10 +618,7 @@ export function JourneyView(props: JourneyViewProps) {
     return (
       <section className="od-journey" data-od-id="journey-view">
         <header className="od-journey-head">
-          <div className="od-journey-head-main">
-            <h1 className="od-journey-title">{goal.title}</h1>
-            <p className="od-journey-sub">{t("glass.journey.noPlan")}</p>
-          </div>
+          {renderAimHead(t("glass.journey.noPlan"))}
         </header>
         <button className="od-journey-primary" type="button" onClick={() => props.onOpenStage("context")}>
           {t("glass.journey.noPlanCta")}
@@ -647,10 +722,7 @@ export function JourneyView(props: JourneyViewProps) {
   return (
     <section className="od-journey" data-od-id="journey-view">
       <header className="od-journey-head">
-        <div className="od-journey-head-main">
-          <h1 className="od-journey-title">{goal.title}</h1>
-          <p className="od-journey-sub">{t("glass.journey.headerSub")}</p>
-        </div>
+        {renderAimHead(t("glass.journey.headerSub"))}
         <div className="od-journey-head-meta">
           {showElsewhere ? (
             <button

@@ -50,6 +50,7 @@ import {
   type ConfirmMilestoneRequest,
   type DraftRequest,
   type GoalDetail,
+  type RenameAimRequest,
   type UpdateGoalPlanRequest,
   type IntakeRequest,
   type ProviderConfig,
@@ -944,7 +945,15 @@ export function registerIpc(): void {
       parentGoalId: req.parentGoalId,
       parentMilestoneId: req.parentMilestoneId,
     });
+    // Discard the pre-goal composer draft now that the shell exists (parity with `saveGoal`).
+    if (req.draftId) await aimStore.discardAimDraft(req.draftId);
     return { ...saved };
+  });
+
+  ipcMain.handle(IPC.renameGoal, async (_e, req: RenameAimRequest): Promise<Goal | null> => {
+    // Title/description-only patch — no plan, no milestone re-materialization. Works on a shell.
+    const updated = await aimStore.renameGoal({ id: req.goalId, title: req.title, description: req.description });
+    return updated?.goal ?? null;
   });
 
   ipcMain.handle(IPC.updateGoalPlan, async (_e, req: UpdateGoalPlanRequest): Promise<SavedGoal | null> => {

@@ -428,6 +428,61 @@ describe("createJsonFileStore · createAimShell", () => {
     // Still exactly one goal — the shell was updated in place, not forked.
     expect((await store.listGoals()).length).toBe(1);
   });
+
+  it("links a sub-aim relation when a shell is created with a parent (goal-first breakdown)", async () => {
+    const store = freshStore();
+    const { goal: parent, milestones: parentMilestones } = await store.createGoal({
+      title: "Parent aim",
+      plan: PLAN,
+    });
+
+    const { goal: child } = await store.createAimShell({
+      title: "Child shell",
+      description: "Break this sub-aim down.",
+      parentGoalId: parent.id,
+      parentMilestoneId: parentMilestones[0]!.id,
+    });
+
+    // The child is a plan-less shell (planning happens in-Journey), yet the parent link is recorded.
+    expect(child.plan_json).toBeNull();
+    const relations = await store.listSubAimRelations(parent.id);
+    expect(relations).toHaveLength(1);
+    expect(relations[0]!.child_goal_id).toBe(child.id);
+    expect(relations[0]!.parent_goal_id).toBe(parent.id);
+    expect(relations[0]!.parent_milestone_id).toBe(parentMilestones[0]!.id);
+  });
+});
+
+describe("createJsonFileStore · renameGoal", () => {
+  it("renames a plan-less shell's title/description without materializing a plan", async () => {
+    const store = freshStore();
+    const { goal } = await store.createAimShell({ title: "Old title", description: "old" });
+
+    const updated = await store.renameGoal({ id: goal.id, title: "New title", description: "new" });
+    expect(updated).not.toBeNull();
+    expect(updated!.goal.title).toBe("New title");
+    expect(updated!.goal.description).toBe("new");
+
+    const reread = await store.getGoal(goal.id);
+    expect(reread!.goal.title).toBe("New title");
+    expect(reread!.goal.plan_json).toBeNull();
+    expect(reread!.milestones).toEqual([]);
+  });
+
+  it("keeps the current title when the new title is blank, and clears description with an empty string", async () => {
+    const store = freshStore();
+    const { goal } = await store.createGoal({ title: "Kept title", description: "keep me", plan: PLAN });
+
+    const updated = await store.renameGoal({ id: goal.id, title: "   ", description: "" });
+    expect(updated!.goal.title).toBe("Kept title");
+    expect(updated!.goal.description).toBe("");
+    // Plan/milestones are untouched by a rename.
+    expect((await store.getGoal(goal.id))!.milestones.length).toBe(PLAN.nodes.length);
+  });
+
+  it("returns null for an unknown aim", async () => {
+    expect(await freshStore().renameGoal({ id: "missing", title: "x" })).toBeNull();
+  });
 });
 
 describe("createJsonFileStore · round-trip", () => {

@@ -146,6 +146,15 @@ describe("JourneyView", () => {
     expect(html).toContain("Gather context");
   });
 
+  it("shows the in-Journey aim-rename control only when onRenameAim is provided (both header sites)", () => {
+    // Main (planned) header + the plan-less shell header both gate the control on the prop.
+    const planned = progressOf([row({ id: "m1", title: "Book flights", human: true })]);
+    expect(render(planned)).not.toContain("od-journey-aim-rename");
+    expect(render(planned, { onRenameAim: noop })).toContain("od-journey-aim-rename");
+    expect(render(null)).not.toContain("od-journey-aim-rename");
+    expect(render(null, { onRenameAim: noop })).toContain("od-journey-aim-rename");
+  });
+
   it("renders a You chip in the Your-move head", () => {
     const html = render(progressOf([row({ id: "m1", title: "Book flights", human: true })]));
     expect(html).toContain("od-journey-move-head");

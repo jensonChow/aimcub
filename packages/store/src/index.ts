@@ -152,6 +152,15 @@ export interface UpdateGoalInput {
   plan: DecompositionOutput;
 }
 
+/** Rename an existing aim's title/description in place — no plan change. */
+export interface RenameGoalInput {
+  id: string;
+  /** Omitted/blank keeps the current title. */
+  title?: string;
+  /** Omitted keeps the current description (`""` clears it). */
+  description?: string;
+}
+
 export interface UpsertAimDraftInput {
   id?: string;
   ownerId?: string;
@@ -355,6 +364,12 @@ export interface AimStore {
    * has that id. Throws if the new plan is structurally invalid (mirrors `materialize`).
    */
   updateGoal(input: UpdateGoalInput): Promise<{ goal: Goal; milestones: Milestone[] } | null>;
+  /**
+   * Rename an existing aim's title/description only — no plan, no milestones. Works on a plan-less
+   * shell (which {@link updateGoal} cannot, since it requires a plan). Returns the updated goal, or
+   * `null` if no aim has that id.
+   */
+  renameGoal(input: RenameGoalInput): Promise<{ goal: Goal } | null>;
   deleteGoal(id: string): Promise<void>;
   listEvidence(goalId: string): Promise<Evidence[]>;
   addEvidence(input: AddEvidenceInput): Promise<AddEvidenceResult>;
@@ -1461,6 +1476,17 @@ export function createJsonFileStore(dataDir: string = defaultDataDir(), options:
       store.assignments.push(...missingAssignments);
       save(store);
       return { goal, milestones };
+    },
+
+    async renameGoal(input: RenameGoalInput): Promise<{ goal: Goal } | null> {
+      const store = load();
+      const goal = store.goals.find((g) => g.id === input.id);
+      if (!goal) return null;
+      const title = input.title?.trim();
+      if (title) goal.title = title;
+      if (input.description !== undefined) goal.description = input.description;
+      save(store);
+      return { goal };
     },
 
     async deleteGoal(id: string): Promise<void> {
