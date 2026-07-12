@@ -18,7 +18,7 @@
  * can't dispatch a milestone that dropped out of the option set.
  */
 import type { AimProgressReadModel, Goal, Memory, Milestone, RunEvent } from "@core/domain";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import type { ConfirmMilestoneRequest } from "../../../shared/ipc";
 import { ContextInbox, type ContextInboxScope } from "../../ContextInbox";
@@ -423,6 +423,25 @@ export interface JourneyViewProps {
   onSchedule?: () => void;
   onLater?: () => void;
   onTakeBack?: () => void;
+  /**
+   * Goal-first (Stage 6). Whether a planning runtime is configured — gates the plan-less shell's
+   * "build the plan" action (a not-ready shell links to Settings instead of dead-ending).
+   */
+  planningRuntimeReady?: boolean;
+  /** Start the first-plan research run for a plan-less shell goal. */
+  onStartResearch?: () => void;
+  /**
+   * The in-Journey first-plan surface for a shell goal. When present, the Journey hosts the
+   * research/clarify/plan-review interaction in place of the Your-move card (never leaving the
+   * Journey): the clarify Q&A element while a clarify phase is active, then the generated plan
+   * review with an Accept action, else a working indicator.
+   */
+  planning?: {
+    busy: boolean;
+    clarifyPanel: ReactNode;
+    planReady: boolean;
+    onCommitPlan: () => void;
+  };
 }
 
 export function JourneyView(props: JourneyViewProps) {
@@ -628,7 +647,58 @@ export function JourneyView(props: JourneyViewProps) {
         ))}
       </div>
 
-      {move ? (
+      {props.planning ? (
+        <div className="od-journey-planning" data-od-id="journey-planning">
+          {props.planning.clarifyPanel ? (
+            props.planning.clarifyPanel
+          ) : props.planning.planReady && props.planReview ? (
+            <div className="od-journey-planning-review">
+              <div className="od-journey-eyebrow">{t("glass.journey.planReviewTitle")}</div>
+              <JourneyPlanSheetBody {...props.planReview} disabled={props.planning.busy} />
+              <div className="od-journey-move-actions">
+                <button
+                  className="od-journey-primary"
+                  type="button"
+                  disabled={props.planning.busy}
+                  onClick={props.planning.onCommitPlan}
+                >
+                  {t("glass.journey.savePlanCta")}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="od-journey-planning-working">
+              <i className="od-journey-dot od-journey-dot-active" aria-hidden="true" />
+              <div className="od-journey-ambient-title">{t("glass.journey.planningWorking")}</div>
+            </div>
+          )}
+        </div>
+      ) : progress.total_milestones === 0 ? (
+        <div className="od-journey-move" data-od-id="journey-build-plan">
+          <div className="od-journey-move-head">
+            <span className="od-journey-move-tag">{t("glass.journey.buildPlanTag")}</span>
+            <span className="od-journey-chip od-journey-chip-you">{t("glass.actor.you")}</span>
+          </div>
+          <div className="od-journey-move-title">{t("glass.journey.buildPlanTitle")}</div>
+          <p className="od-journey-move-body">{t("glass.journey.buildPlanBody")}</p>
+          <div className="od-journey-move-actions">
+            {props.planningRuntimeReady === false ? (
+              <button className="od-journey-secondary" type="button" onClick={() => props.onOpenStage("settings")}>
+                {t("glass.journey.buildPlanNoRuntime")}
+              </button>
+            ) : (
+              <button
+                className="od-journey-primary"
+                type="button"
+                disabled={props.disabled || !props.onStartResearch}
+                onClick={props.onStartResearch}
+              >
+                {t("glass.journey.buildPlanCta")}
+              </button>
+            )}
+          </div>
+        </div>
+      ) : move ? (
         <div className="od-journey-move" data-od-id="journey-move">
           <div className="od-journey-move-head">
             <span className="od-journey-move-tag">{tk(move.tagKey)}</span>

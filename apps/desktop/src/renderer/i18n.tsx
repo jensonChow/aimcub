@@ -1547,6 +1547,15 @@ export const STRINGS = {
   "glass.journey.sheetEmpty": { en: "Nothing here yet — this station fills in as the loop runs.", zh: "这里还是空的——随着循环推进，这个站点会逐步充实。" },
   "glass.journey.noPlan": { en: "This aim doesn't have a plan yet.", zh: "这个目标还没有计划。" },
   "glass.journey.noPlanCta": { en: "Gather context", zh: "收集背景" },
+  // ── Stage 6: goal-first in-Journey first-plan (build the plan / plan review / working) ──
+  "glass.journey.buildPlanTag": { en: "Your move — build the plan", zh: "该你了——制定计划" },
+  "glass.journey.buildPlanTitle": { en: "Turn this aim into a plan", zh: "把这个目标变成计划" },
+  "glass.journey.buildPlanBody": { en: "Aimcub researches the aim, asks anything it needs, then drafts the milestones and eval.", zh: "Aimcub 会研究目标、按需追问，然后草拟里程碑与评估。" },
+  "glass.journey.buildPlanCta": { en: "Build the plan", zh: "制定计划" },
+  "glass.journey.buildPlanNoRuntime": { en: "Connect a runtime in Settings", zh: "在设置中连接运行时" },
+  "glass.journey.planReviewTitle": { en: "Review the plan", zh: "检查计划" },
+  "glass.journey.savePlanCta": { en: "Save plan", zh: "保存计划" },
+  "glass.journey.planningWorking": { en: "Working on the plan…", zh: "正在制定计划……" },
   "glass.journey.later": { en: "Later", zh: "稍后" },
   // ── Stage 2: header jump chip, secondary move/ambient actions, interactive run sheet ──
   "glass.journey.turnsElsewhereOne": { en: "1 turn elsewhere", zh: "别处有 1 个轮次" },

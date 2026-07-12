@@ -45,10 +45,12 @@ import {
   IPC,
   type AcceptContextCandidateRequest,
   type ClarifyRequest,
+  type CreateAimRequest,
   type DeprioritizeContextMemoryRequest,
   type ConfirmMilestoneRequest,
   type DraftRequest,
   type GoalDetail,
+  type UpdateGoalPlanRequest,
   type IntakeRequest,
   type ProviderConfig,
   type ProviderStatus,
@@ -383,6 +385,130 @@ async function decompositionStrategy(
   learning?: DecompositionLearningReport | null,
 ) {
   return reviewDecompositionStrategyForStore(aimStore, title, description, learning);
+}
+
+/** The subset of a persist request the synthesis bundle is derived from (shared by save + update). */
+type SavedGoalSynthesisInput = Pick<
+  SaveRequest,
+  | "title"
+  | "description"
+  | "draft"
+  | "plan"
+  | "quality"
+  | "review"
+  | "qualityRetry"
+  | "debugTrace"
+  | "questions"
+  | "answers"
+  | "parentGoalId"
+  | "parentMilestoneId"
+>;
+
+/**
+ * Compute the synthesis bundle a persisted aim carries in `metadata` (plan quality, aim intake,
+ * context intake progress + sedimentation, local handoff manifest, planning context/tools, clarify
+ * answer impact, capture fulfillment) plus the `user_stated` memories folded from clarify answers.
+ * Shared by `saveGoal` (create) and `updateGoalPlan` (land/re-plan) so both persist the same context
+ * regardless of which path created the goal. Pure derivation over `@core` + the local store; no
+ * mutation (the caller persists).
+ */
+async function synthesizeSavedGoalMetadata(input: SavedGoalSynthesisInput) {
+  const selectedContext = await planningContext({ title: input.title, description: input.description });
+  const lineageLearning = await contextLineageLearning();
+  const memories: NewMemory[] = clarifyAnswersToMemories(input.questions, input.answers);
+  const researchEvidence = researchEvidenceForReview(selectedContext.research, selectedContext.researchRequired);
+  const answerImpact = input.answers.length > 0
+    ? traceClarifyAnswerImpact({
+        questions: input.questions,
+        answers: input.answers,
+        beforePlan: input.draft ?? null,
+        afterPlan: input.plan,
+        beforeQuality: input.draft ? critiquePlan({ plan: input.draft, context: selectedContext.memories, research: researchEvidence }) : null,
+        afterQuality: input.quality ?? null,
+      })
+    : null;
+  const captureFulfillment = reviewContextCaptureFulfillment({
+    questions: input.questions,
+    answers: input.answers,
+    memories,
+    impacts: answerImpact?.rows ?? [],
+  });
+  const intake = buildAimIntakeReport({
+    title: input.title,
+    description: input.description,
+    planning: selectedContext,
+    draftReview: input.review ?? null,
+    lineageLearning,
+  });
+  const intakeSignals = contextIntakeSignals({
+    planning: selectedContext,
+    questions: input.questions,
+    answers: input.answers,
+  });
+  const intakeProgress = reviewContextIntakeProgress({
+    loop: intake.loop,
+    signals: intakeSignals,
+  });
+  const contextSedimentation = reviewContextSedimentation({
+    loop: intake.loop,
+    progress: intakeProgress,
+    signals: intakeSignals,
+  });
+  const localHandoffManifest = buildLocalHandoffManifest({
+    plan: input.plan,
+    aimContext: contextSedimentation.aimContext,
+    durableMemoryCandidates: contextSedimentation.durableMemoryCandidates,
+    contextSedimentation,
+    selectedContext: selectedContext.memories,
+  });
+
+  const metadata: Record<string, unknown> = {
+    ...(input.quality !== undefined || input.qualityRetry || input.review
+      ? planQualityMetadata({
+          quality: input.quality ?? null,
+          retried: input.qualityRetry?.retried ?? false,
+          attempts: input.qualityRetry?.attempts ?? 1,
+          firstQuality: input.qualityRetry?.firstQuality ?? null,
+          output: input.plan,
+        }, input.review)
+      : {}),
+    aim_intake: intake,
+    context_intake_progress: intakeProgress,
+    context_sedimentation: contextSedimentation,
+    local_handoff_manifest: localHandoffManifest,
+    planning_context: selectedContext.report,
+    planning_tools: planningToolTrace(selectedContext),
+    ...(input.debugTrace ? { planning_debug_trace: input.debugTrace } : {}),
+    ...(input.parentGoalId && input.parentMilestoneId
+      ? {
+          parent_goal_id: input.parentGoalId,
+          parent_milestone_id: input.parentMilestoneId,
+        }
+      : {}),
+    ...(answerImpact ? { clarify_answer_impact: answerImpact } : {}),
+    ...(captureFulfillment.total > 0 ? { context_capture_fulfillment: captureFulfillment } : {}),
+  };
+
+  return { metadata, memories, answerImpact, contextSedimentation };
+}
+
+type SavedGoalSynthesis = Awaited<ReturnType<typeof synthesizeSavedGoalMetadata>>;
+
+/**
+ * Record the pending context candidates a persisted aim seeds (sedimented aim context + durable
+ * memory candidates, clarify assumptions, plan-review candidates). Shared by save + update; store
+ * candidate writes dedupe by normalized content, so re-running on a re-plan is idempotent-safe.
+ */
+async function recordSavedGoalContextCandidates(
+  goal: Goal,
+  input: { contextSedimentation: SavedGoalSynthesis["contextSedimentation"]; assumptions?: SaveRequest["assumptions"]; review?: SaveRequest["review"] },
+) {
+  return [
+    ...(await recordSedimentationAimContextForStore(aimStore, goal, input.contextSedimentation)),
+    ...(await recordSedimentationMemoryCandidatesForStore(aimStore, input.contextSedimentation)),
+    ...(await recordAssumptionContextCandidatesForStore(aimStore, goal, input.assumptions ?? [])),
+    ...(await recordReviewContextCandidatesForStore(aimStore, goal, input.review)),
+  ];
 }
 
 export function registerIpc(): void {
@@ -786,100 +912,102 @@ export function registerIpc(): void {
         ...routingValidation.issues.map((item) => `${item.title}: ${item.message}`),
       ].join("\n"));
     }
-    const selectedContext = await planningContext({ title: req.title, description: req.description });
-    const lineageLearning = await contextLineageLearning();
-    const memories: NewMemory[] = clarifyAnswersToMemories(req.questions, req.answers);
-    const researchEvidence = researchEvidenceForReview(selectedContext.research, selectedContext.researchRequired);
-    const answerImpact = req.answers.length > 0
-      ? traceClarifyAnswerImpact({
-          questions: req.questions,
-          answers: req.answers,
-          beforePlan: req.draft ?? null,
-          afterPlan: req.plan,
-          beforeQuality: req.draft ? critiquePlan({ plan: req.draft, context: selectedContext.memories, research: researchEvidence }) : null,
-          afterQuality: req.quality ?? null,
-      })
-      : null;
-    const captureFulfillment = reviewContextCaptureFulfillment({
-      questions: req.questions,
-      answers: req.answers,
-      memories,
-      impacts: answerImpact?.rows ?? [],
-    });
-    const intake = buildAimIntakeReport({
-      title: req.title,
-      description: req.description,
-      planning: selectedContext,
-      draftReview: req.review ?? null,
-      lineageLearning,
-    });
-    const intakeSignals = contextIntakeSignals({
-      planning: selectedContext,
-      questions: req.questions,
-      answers: req.answers,
-    });
-    const intakeProgress = reviewContextIntakeProgress({
-      loop: intake.loop,
-      signals: intakeSignals,
-    });
-    const contextSedimentation = reviewContextSedimentation({
-      loop: intake.loop,
-      progress: intakeProgress,
-      signals: intakeSignals,
-    });
-    const localHandoffManifest = buildLocalHandoffManifest({
-      plan: req.plan,
-      aimContext: contextSedimentation.aimContext,
-      durableMemoryCandidates: contextSedimentation.durableMemoryCandidates,
-      contextSedimentation,
-      selectedContext: selectedContext.memories,
-    });
-
+    const synthesis = await synthesizeSavedGoalMetadata(req);
     const saved = await aimStore.createGoal({
       title: req.title,
       description: req.description,
       parentGoalId: req.parentGoalId,
       parentMilestoneId: req.parentMilestoneId,
       plan: req.plan,
-      metadata: {
-        ...(req.quality !== undefined || req.qualityRetry || req.review
-          ? planQualityMetadata({
-              quality: req.quality ?? null,
-              retried: req.qualityRetry?.retried ?? false,
-              attempts: req.qualityRetry?.attempts ?? 1,
-              firstQuality: req.qualityRetry?.firstQuality ?? null,
-              output: req.plan,
-            }, req.review)
-          : {}),
-        aim_intake: intake,
-        context_intake_progress: intakeProgress,
-        context_sedimentation: contextSedimentation,
-        local_handoff_manifest: localHandoffManifest,
-        planning_context: selectedContext.report,
-        planning_tools: planningToolTrace(selectedContext),
-        ...(req.debugTrace ? { planning_debug_trace: req.debugTrace } : {}),
-        ...(req.parentGoalId && req.parentMilestoneId
-          ? {
-              parent_goal_id: req.parentGoalId,
-              parent_milestone_id: req.parentMilestoneId,
-            }
-          : {}),
-        ...(answerImpact ? { clarify_answer_impact: answerImpact } : {}),
-        ...(captureFulfillment.total > 0 ? { context_capture_fulfillment: captureFulfillment } : {}),
-      },
-      memories,
+      metadata: synthesis.metadata,
+      memories: synthesis.memories,
     });
-    const contextCandidates = [
-      ...(await recordSedimentationAimContextForStore(aimStore, saved.goal, contextSedimentation)),
-      ...(await recordSedimentationMemoryCandidatesForStore(aimStore, contextSedimentation)),
-      ...(await recordAssumptionContextCandidatesForStore(aimStore, saved.goal, req.assumptions ?? [])),
-      ...(await recordReviewContextCandidatesForStore(aimStore, saved.goal, req.review)),
-    ];
+    const contextCandidates = await recordSavedGoalContextCandidates(saved.goal, {
+      contextSedimentation: synthesis.contextSedimentation,
+      assumptions: req.assumptions,
+      review: req.review,
+    });
     if (req.draftId) await aimStore.discardAimDraft(req.draftId);
     return {
       ...saved,
-      answerImpact,
+      answerImpact: synthesis.answerImpact,
       contextCandidates,
     };
+  });
+
+  ipcMain.handle(IPC.createAim, async (_e, req: CreateAimRequest): Promise<SavedGoal> => {
+    // Goal-first: persist a plan-less shell so the Journey mounts immediately. No plan, no synthesis
+    // yet — the first plan (and its synthesis metadata) lands later via `updateGoalPlan`.
+    const saved = await aimStore.createAimShell({
+      title: req.title,
+      description: req.description,
+      parentGoalId: req.parentGoalId,
+      parentMilestoneId: req.parentMilestoneId,
+    });
+    return { ...saved };
+  });
+
+  ipcMain.handle(IPC.updateGoalPlan, async (_e, req: UpdateGoalPlanRequest): Promise<SavedGoal | null> => {
+    // Same routing gate as `saveGoal` (main trusts the renderer's validateExecutablePlan but re-checks
+    // routing before persisting).
+    const routingValidation = validatePlanRouting({
+      plan: req.plan,
+      agents: routingAgentOptions(await listLocalAgents()),
+      allowHuman: true,
+    });
+    if (!routingValidation.ok) {
+      throw new Error([
+        "Routing validation failed:",
+        ...routingValidation.issues.map((item) => `${item.title}: ${item.message}`),
+      ].join("\n"));
+    }
+
+    // Planning-run mode (the funnel context is supplied) recomputes the full synthesis bundle so a
+    // shell's first plan / a fresh re-plan carries the same metadata + memories + candidates a
+    // funnel `saveGoal` would. Manual-edit mode (no `questions`) is minimal: merge the plan only and
+    // leave existing metadata untouched (the live agent handoff reads per-milestone contracts, which
+    // `mergeMilestones` refreshes, so no goal-level manifest regeneration is needed).
+    const planningRunMode = req.questions !== undefined;
+    const synthesis = planningRunMode
+      ? await synthesizeSavedGoalMetadata({
+          title: req.title ?? "",
+          description: req.description,
+          draft: req.draft,
+          plan: req.plan,
+          quality: req.quality,
+          review: req.review,
+          qualityRetry: req.qualityRetry,
+          debugTrace: req.debugTrace,
+          questions: req.questions ?? [],
+          answers: req.answers ?? [],
+        })
+      : null;
+
+    const updated = await aimStore.updateGoal({
+      id: req.goalId,
+      title: req.title,
+      description: req.description,
+      plan: req.plan,
+      metadata: synthesis?.metadata,
+    });
+    if (!updated) return null;
+
+    let answerImpact: SavedGoalSynthesis["answerImpact"] = null;
+    let contextCandidates: Awaited<ReturnType<typeof recordSavedGoalContextCandidates>> | undefined;
+    if (synthesis) {
+      // Parity with `createGoal`, which inserts the clarify-answer memories inline. `addMemory`
+      // dedupes by content+goal, so re-plans do not accumulate duplicates.
+      for (const memory of synthesis.memories) {
+        await aimStore.addMemory({ ...memory, goalId: updated.goal.id });
+      }
+      contextCandidates = await recordSavedGoalContextCandidates(updated.goal, {
+        contextSedimentation: synthesis.contextSedimentation,
+        assumptions: req.assumptions,
+        review: req.review,
+      });
+      answerImpact = synthesis.answerImpact;
+    }
+    if (req.draftId) await aimStore.discardAimDraft(req.draftId);
+    return { ...updated, answerImpact, contextCandidates };
   });
 }

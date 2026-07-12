@@ -388,6 +388,48 @@ describe("createJsonFileStore · updateGoal", () => {
   });
 });
 
+describe("createJsonFileStore · createAimShell", () => {
+  it("persists a plan-less shell (plan_json null, zero milestones) the read model tolerates", async () => {
+    const store = freshStore();
+    const { goal, milestones } = await store.createAimShell({
+      title: "Plan a launch",
+      description: "goal-first shell",
+      metadata: { source: "test" },
+    });
+
+    expect(goal.plan_json).toBeNull();
+    expect(goal.status).toBe("active");
+    expect(milestones).toEqual([]);
+
+    // Read paths must not crash on a plan-less goal.
+    const reread = await store.getGoal(goal.id);
+    expect(reread!.goal.plan_json).toBeNull();
+    expect(reread!.milestones).toEqual([]);
+
+    const progress = await store.getAimProgress(goal.id);
+    expect(progress).not.toBeNull();
+    expect(progress!.total_milestones).toBe(0);
+    expect(progress!.completed_milestones).toBe(0);
+
+    const [summary] = await store.listAimProgressSummaries();
+    expect(summary.status).toBe("planning");
+  });
+
+  it("lands the first plan on the same shell via updateGoal (no fork)", async () => {
+    const store = freshStore();
+    const { goal } = await store.createAimShell({ title: "Plan a launch" });
+
+    const updated = await store.updateGoal({ id: goal.id, plan: PLAN });
+    expect(updated).not.toBeNull();
+    expect(updated!.goal.id).toBe(goal.id);
+    expect(updated!.goal.plan_json).toEqual(PLAN);
+    expect(updated!.milestones.length).toBe(PLAN.nodes.length);
+
+    // Still exactly one goal — the shell was updated in place, not forked.
+    expect((await store.listGoals()).length).toBe(1);
+  });
+});
+
 describe("createJsonFileStore · round-trip", () => {
   it("creates, lists, gets, and deletes a goal", async () => {
     const store = freshStore();

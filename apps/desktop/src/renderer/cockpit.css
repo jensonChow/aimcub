@@ -6635,6 +6635,28 @@ kbd {
   align-items: center;
 }
 
+/* Stage 6: goal-first in-Journey first-plan surface (clarify Q&A / plan review / working). */
+.od-journey-planning {
+  border-radius: 22px;
+  background: var(--island);
+  backdrop-filter: blur(36px);
+  -webkit-backdrop-filter: blur(36px);
+  box-shadow: var(--sh-lg), inset 0 0 0 1px var(--ring);
+  padding: 24px 28px;
+}
+
+.od-journey-planning-review {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.od-journey-planning-working {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 /* Secondary "Your move" actions (hand-to-agent / schedule / Later). Rendered only when a
    real handler is passed; Stage 2 wires none (routing/scheduling land in Stage 6), so this
    row stays hidden — the CSS ships as forward-ready infrastructure. */

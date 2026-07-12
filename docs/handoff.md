@@ -1,113 +1,106 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-12
-Branch: `main`. Journey-first **Stages 1–5** are committed, merged, and **pushed** (origin/main =
-`6e6f190d`). Stage 5 = fold Run/Evidence + Eval into the Journey sheets (5A read-only eval + inbox
-de-dup, 5B interactive in-sheet evidence submission).
+Branch: `glass-journey-stage6` (NOT yet merged to `main`). Journey-first **Stages 1–5** are on
+`origin/main` (`6e6f190d`). **Stage 6A** (goal-first create-shell + in-Journey first-plan +
+`updateGoalPlan` backbone) is committed on `glass-journey-stage6` and full-gate + live-QA green. This
+is a **checkpoint** — Stage 6B (editable plan sheet + re-plan) is next, on the same branch, before
+merging to `main`.
 
 ## Active epic — Journey-first rebuild (staged)
 
-Epic plan: `~/.claude/plans/resilient-drifting-quail.md`. The founder wants the WHOLE working flow to
-match the reference `Aimcub Glass.dc.html`: set aim → straight to the Journey; all work through the
-station strip + drill-in **sheets** + the single "Your move" card, absorbing the heavy stage panels.
-Delivered **in stages**, each green on the full gate.
+Epic plan: `~/.claude/plans/resilient-drifting-quail.md`. Stage 6 plan: `~/.claude/plans/fancy-skipping-kazoo.md`.
+Stage 6 is the **goal-first routing flip** (the first BACKEND stage): submit lands on the Journey
+immediately and plan updates live on the same goal. Founder decisions: **full in-Journey planning**
+(fold the research/clarify/plan interaction into the Journey — never leave it) and **6A first →
+checkpoint → 6B**.
 
-**Routing bridge (unchanged):** `saveGoal` needs a validated plan; the Goal is created only at the end
-of the intake→draft→clarify funnel, so true goal-first can't ship green in one step. Approach:
-**bridge** (Stages 1–5 keep the funnel; the Journey already mounts post-save; fold panels into sheets
-*behind* the existing `openCockpitStage` fallbacks) → **goal-first flip** at Stage 6.
+## Stage 6A — Goal-first create-shell + in-Journey first-plan + `updateGoalPlan` backbone (DONE)
 
-Roadmap: 1 New Aim composer (DONE) · 2 Journey parity + interactive-sheet infra (DONE) · 3 Fold
-Context (DONE) · 4 Fold Plan (DONE) · **5 Fold Run/Evidence + Eval (DONE this session)** ·
-6 goal-first routing flip · 7 cleanup. All the working stations are now folded into Journey sheets;
-Stage 6 flips routing so set-aim lands on the Journey immediately, Stage 7 removes the old stage nav.
+**Backbone (store → IPC → preload → main):**
+- `packages/store`: new `createAimShell(input)` — persists a plan-less Goal (`plan_json: null`,
+  `status "active"`, zero milestones/assignments). The in-place re-plan primitive `updateGoal` (already
+  CLI-proven + tested) is now the land/re-plan path. Extracted a shared `linkParentSubAim` helper
+  (used by both create paths). +2 store tests (shell persists null plan + 0 milestones; a later
+  `updateGoal` lands the first plan on the SAME goal, no fork).
+- `shared/ipc.ts`: `IPC.createAim` + `CreateAimRequest`; `IPC.updateGoalPlan` + `UpdateGoalPlanRequest`
+  (mirrors `SaveRequest`'s synthesis inputs + `draftId`). Preload bridges both.
+- `main/ipc.ts`: extracted the `saveGoal` synthesis bundle into a shared `synthesizeSavedGoalMetadata`
+  + `recordSavedGoalContextCandidates` (behavior-preserving for `saveGoal`). New `createAim` handler →
+  `createAimShell`. New `updateGoalPlan` handler → routing re-check (parity with `saveGoal`) → **two
+  honest modes**: planning-run mode (`questions` present) recomputes the full synthesis + inserts the
+  clarify-answer memories (via `addMemory`, dedup-safe) + records candidates; manual-edit mode (no
+  `questions`, for 6B) is minimal (merge the plan only). Discards `draftId` on success; null-safe.
+  **`local_handoff_manifest` staleness is a non-issue** — the live agent handoff reads per-milestone
+  `decomposition_contract` (refreshed by `mergeMilestones`), never the goal-level manifest, so a
+  manual edit needs no expensive manifest regeneration.
 
-## Stage 5 — Fold Run/Evidence + Eval into the Journey sheets (DONE this session)
+**Renderer — goal-first front door + in-Journey planning (`App.tsx` + `JourneyView.tsx`):**
+- `createAimAndOpenJourney()` (composer `onSubmit`): ports the `routeAfterAimSubmit` gate (no-op on
+  empty title; helper on no-runtime, creates nothing), then `createAim` → `openGoal(shell)`.
+- `planningShellId` state + derived `isPlanningShell`: the discriminator for the in-Journey flow
+  (replaces `Boolean(selected)` so a shell isn't locked read-only). Cleared on openGoal/resetComposer/
+  resetPlanningForAimUpdate.
+- `mainStageContent`: a shell-Journey branch **before** the funnel context/contracts interception →
+  the Journey stays mounted through the planning run. The Journey element is computed once (`journeyView`)
+  and reused normally (`!draft`) + during planning (`isPlanningShell`).
+- `startShellResearch()` → `startDraft({ shell })`: `startDraft` gained a `shell` branch that skips the
+  composer-surface + draft-checkpoint funnel logic (no orphan draft — the autosave effect is inert
+  while a goal is `selected`) and runs the same intake→draft→clarify orchestration. `continueFromContext`
+  + `refinePlan` are now shell-aware (read the shell's title/description; thread the shell flag).
+- The clarify Q&A (`ContextClarifyPanel`) is folded into a Journey **planning panel** (its `onSkip`
+  stays in-Journey for a shell); the generated plan review reuses the read-only `JourneyPlanSheetBody`
+  + a "Save plan" action; a working indicator covers the LLM gaps.
+- `commitShellPlan()` (Save plan): validate (`validateExecutablePlan` + `validatePlanRouting`) →
+  `updateGoalPlan(selected.id, …)` (NOT `saveGoal`) → null-safe → clear `planningShellId`, reset
+  planning state, `setSelected(updated.goal)`, route back to the Journey (`mode "cockpit"` /
+  `stageOverride "aim"` — else the leftover "contracts" would intercept), `refreshGoalState`.
+- JourneyView: `onStartResearch` + `planning` + `planningRuntimeReady` props. A **"build the plan"
+  card** renders when `total_milestones === 0` (before the move/ambient ternary), so a fresh shell
+  **never shows the false "Aim is complete." ambient** (a plan-less goal's `next_action` leak).
+  `yourMove.ts` stays pure/unchanged. New i18n `glass.journey.buildPlan*/planReviewTitle/savePlanCta/
+  planningWorking` (en/zh). New CSS `.od-journey-planning*` (token-only). +5 JourneyView tests.
 
-Two independently-green commits on `glass-journey-stage5`. No new backend/IPC; reuse existing App
-handlers; the `openCockpitStage("run"|"eval")` "Continue" fallbacks stay. Plan:
-`~/.claude/plans/mutable-percolating-pretzel.md`.
+## Verification (Stage 6A)
 
-**Stage 5A — read-only Eval fold + remove the Eval-duplicate ContextInbox** (`d64a4ae7`).
-- New stateless exported `JourneyEvalSheetBody` (`JourneyView.tsx`): the real `CompletionRecapPanel`
-  (now exported from `EvalStage.tsx`) when `progress.completion_recap.complete`; else a per-milestone
-  frame (met/open chip + title + next-action, mirroring flat `evalRows`) nesting the read-only
-  `EvidenceReviewList compact` under any milestone with evidence. **Framed on `progress.milestones`**
-  so no milestone is dropped. Gated purely on the open eval station (all data is already in
-  `progress`); flat `evalRows` + Continue fallback stay. Eval has no live milestone-mutation → honest
-  read-only.
-- **Finished the Stage-3 inbox move:** removed `EvalContextReviewSection` + both call sites + the
-  `ContextInbox` import from `EvalStage.tsx`, dropping the now-dead `disabled` / `goalTitle` /
-  `onAccept` / `onReject` props. Triage still lives in the Journey Context sheet; the "Context
-  candidates" eval metric stays. Updated 3 EvalStage tests (inbox now asserted OUT of Eval).
-- CSS `.od-journey-eval` + scoped recap reflow (1-col grid, `max-width:none`, hidden kicker). No new
-  i18n keys, no new Glass tokens.
+- **Full gate green**: `build` (+ `@core` no-leak) + **284 tests** (+2 store `createAimShell`, +5
+  JourneyView 6A) + `typecheck` + `lint` + `core:purity`. Behavior-preserving `saveGoal` refactor kept
+  all prior tests green; the brittle `continueFromContext` source-regex was relaxed for the shell option.
+- **Live packaged-app QA via CDP** (isolated `AIMCUB_HOME` with the real provider config copied in — a
+  DeepSeek key — but a fresh empty store; real `~/.aimcub/store.json` mtime **unchanged**): submit a new
+  aim → **plan-less shell persisted** (1 goal, `plan_json: null`, 0 milestones) → **Journey mounts
+  immediately with the "Turn this aim into a plan" card, no false-complete** → "Build the plan" →
+  "Working…" → **the clarify Q&A renders IN the Journey** (adaptive intake, 6 turns) → draft → refine
+  clarify → **real plan review in-Journey** → "Save plan" → **the plan landed on the SAME goal (goalId
+  unchanged, no fork): 7 nodes, 7 milestones, 7 assignments, 30 memories, all 13 metadata keys** (full
+  synthesis parity with `saveGoal`) → the Journey flipped to the planned goal (Your-move card, 0/7).
+- Repacked (`pnpm desktop:pack`) + refreshed root `Aimcub.app` (matches the committed source).
 
-**Stage 5B — interactive human evidence fold (Run station)** (`e0864cda`).
-- `runInteraction` now partitions pending work THREE ways with no overlap: agent-dispatchable →
-  `options`; human ready for proof (`isHumanExecuteRoute && !blocked && !executeRowNeedsEval`) →
-  `evidenceOptions`; else → `contextRows` (`stationSheet.ts` + a new `evidenceOptions` field on
-  `JourneyStationInteraction`). Picking an evidence option opens the **reused `EvidenceSubmissionForm`
-  in-sheet**; Submit → a new `onConfirmMilestone` JourneyView prop → App's live `confirmMilestone`
-  (real IPC, persists); Add-files → the App file picker via `onPickEvidenceFiles`.
-- Draft state is JourneyView-local (`activeEvidenceMilestoneId` + a per-milestone `evidenceDrafts`
-  map), **membership-checked** against the current interaction so a background refresh that drops a
-  milestone falls back to the list. **Modal-hide + persistent draft:** closing the sheet only clears
-  the active id; drafts persist until a real navigation unmounts the view. **Deliberately no
-  `onProofDraftActiveChange` nav-lock** — the sheet stays epoch-free (the nav-locked form remains via
-  Continue → Run stage). On submit failure the form + draft stay open (App surfaces the error).
-- `JourneySheetActionKind` stays `"run_agent"` (evidence uses a direct handler, not a new actionKind),
-  so the journey.test "only Run carries interaction" invariant is intact. Evidence options render
-  **read-only when no submit handler is wired** (honest-data). New i18n `glass.journey.evidenceGroup`
-  (en/zh); CSS `.od-journey-evidence*`. Updated `journey.test.ts` for the new partition.
+## Next — Stage 6B (after this checkpoint)
 
-## Verification (Stage 5)
+Editable in-place plan sheet + re-plan-same-goal. Make `JourneyPlanSheetBody` editable via a
+**buffered-local-plan + explicit "Save plan changes"** commit (do NOT wire `onChange` straight to
+`updateGoalPlan` — `planMerge` matches by title, so per-keystroke would churn milestone ids). Use a
+dedicated `editableWhenSaved`/`onCommit` seam on `PlanPanel` (keep `saved=true` copy/anchors), NOT
+`saved={false}`. Update `JourneyView.test.tsx:409-427` for the new affordances. A "Re-plan" action runs
+a planning run → `updateGoalPlan` (merge, completed frozen) — `breakDown` (child decompose) stays.
+The `updateGoalPlan` handler's manual-edit mode is already built for this.
 
-- Full gate green for each commit: `build` (+ `@core` no-leak) + **279 tests** (+3 `JourneyEvalSheetBody`
-  SSR + EvalStage inbox-removal updates in 5A; +1 journey partition null-case + 2 `JourneyRunSheetBody`
-  evidence-group tests in 5B) + `typecheck` + `lint` + `core:purity`. App.test PlanPanel snapshots,
-  `EvalStage` CSS snapshot, the font ramp/weight + glass-token + i18n-parity guards, and
-  `App.test.tsx:407` (`activeProofId` NOT in App.tsx — evidence state stays in JourneyView as
-  `activeEvidenceMilestoneId`) all still pass.
-- **Live packaged-app QA via CDP** (isolated `AIMCUB_HOME` seeded with `seedLocalAlphaDemo`; real
-  `~/.aimcub` untouched — `store.json` mtime unchanged): Eval station → `.od-journey-eval` frames all 4
-  seeded milestones, 2 with a nested read-only evidence review, **no context inbox**, no overflow,
-  Continue fallback. Run station → 2 agent options + 1 evidence option ("Review demo narrative…") under
-  the "Your move — submit proof" label. Opening the evidence option → the in-sheet form (proof note /
-  URL / files / required-evidence check, Submit disabled until valid). Filling the note + ticking the
-  required item enabled Submit; **submitting persisted** (form closed, no error, the milestone dropped
-  from `evidenceOptions`, the Eval sheet's evidence-review count went 2→3, the isolated store mtime
-  advanced). Agent dispatch still selects + enables "Run with agent". Real `~/.aimcub` untouched.
-- Repacked (`pnpm desktop:pack`) + refreshed root `Aimcub.app`.
+## Invariants (still enforced)
+- Journey sheet component-local + epoch-free; mutations via epoch-safe App handlers. `journey.test`
+  "only the Run station carries an interactive payload" — the build-plan card is App-driven and plan
+  editing rides the `planReview` prop channel; `buildJourneyStationSheet`/`interaction` untouched.
+- `@core` pure (no new op — the pure surface already existed); persistence in store + main. Evidence
+  append-only + idempotent; milestone completion derived by `evaluate()` (`mergeMilestones` freezes
+  completed). Native traffic lights; `data-od-id` anchors; font ramp/weight; glass-token 3-block mirror;
+  en/zh parity — all TS/test-enforced.
 
-## Commit / push
-
-- Stage 5: committed on `glass-journey-stage5` (`d64a4ae7` 5A + `e0864cda` 5B) + handoff, merged to
-  `main`, and **pushed** (origin/main = `6e6f190d`; merge `6e6f190d`).
-
-## Open risks / notes
-
-- **Modal-hide draft persistence** (5B) is verified by design (drafts not reset on station change) but
-  not live-tested end-to-end (the seeded demo had one human milestone, consumed by the submit test); a
-  re-seed would let a future pass confirm Escape-mid-draft → reopen restores the note.
-- **Post-completion routing** — completing the last milestone still auto-lands on the Eval stage recap
-  (`App.tsx:1241`), not the Journey. Unchanged; the Journey Eval sheet now ALSO shows the recap, so a
-  future stage could reconcile the two entry points.
-- New cross-stage import edges (`stages/journey` → `stages/eval/EvalStage` + `stages/execute/
-  EvidenceSubmissionForm`); no guard blocks them; typed props make breaking changes fail at compile.
+## Ops gotchas (reusable)
+- Live QA needs a provider in the isolated home: copy real `~/.aimcub/settings.json` (+ `context-sources.json`)
+  into `$AIMCUB_HOME` (read real, write isolated); start with an empty store to prove "one goal, no fork".
+  Drive via CDP (`--remote-debugging-port`). The adaptive intake is a multi-question wizard
+  (`.od-context-choice-list .od-ui-button-card` options; CTA priority Generate plan > Refine draft >
+  Next question, never "← Back"); refine can take 60s+ (poll, don't assume hang). Always verify real
+  `store.json` mtime is unchanged.
 - Pre-existing (carried): `com.aimcub.desktop` vs ASC `com.jensonchow.aimcub` bundle-id mismatch; dead
   i18n keys `glass.journey.receipt` / `glass.home.yourMove` (Stage 7 prune).
-
-## Next session prompt
-
-```text
-Journey-first rebuild: Stages 1–5 done (Stage 5 = Run/Evidence + Eval folded into the Journey sheets;
-5A read-only eval + inbox de-dup, 5B interactive in-sheet evidence submission → confirmMilestone).
-All on origin/main=6e6f190d. Read docs/handoff.md + the epic plan (~/.claude/plans/resilient-drifting-quail.md).
-Next is Stage 6 (goal-first routing flip — the first BACKEND stage): add a create-shell /
-updateGoalPlan IPC so submit lands on the Journey immediately with a "Start research" Your-move, and
-in-place plan-edit (the Stage-4 gap) + re-plan become live post-save. Needs a spike: today's re-plan
-creates a NEW goal, and saveGoal requires a validated plan. Files: shared/ipc.ts, main/ipc.ts, preload,
-@core/domain, App.tsx, JourneyView.tsx. Keep @core pure; persistence in apps/desktop/src/main. Detail
-Stage 6 in a plan before coding. Same gate + static harness + live-packaged-app QA discipline.
-```

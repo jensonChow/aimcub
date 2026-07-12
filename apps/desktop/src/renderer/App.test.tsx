@@ -741,7 +741,7 @@ describe("App planning state guards", () => {
     expect(continueFromContext).toContain("appendIntakeQuestions(intakeClarify, next)");
     expect(continueFromContext).toContain("MAX_ADAPTIVE_INTAKE_TURNS");
     expect(continueFromContext).toMatch(/next\.questions\.length > 0[\s\S]*?setClarifyPhase\("intake"\)/);
-    expect(continueFromContext).toMatch(/setClarifyPhase\(null\)[\s\S]*?startDraft\(\{ skipIntakeGate: true \}\)/);
+    expect(continueFromContext).toMatch(/setClarifyPhase\(null\)[\s\S]*?startDraft\(\{ skipIntakeGate: true[^}]*\}\)/);
   });
 
   it("keeps the Contracts context review compact above the plan", () => {

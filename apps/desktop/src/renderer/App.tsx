@@ -181,6 +181,11 @@ function AimOsApp() {
   const [draft, setDraft] = useState<DecompositionOutput | null>(null);
   const [finalPlan, setFinalPlan] = useState<DecompositionOutput | null>(null);
   const [planResult, setPlanResult] = useState<PlanResult | null>(null);
+  // Goal-first: when set, an in-Journey planning run is building the FIRST plan for this plan-less
+  // shell goal. It keeps the Journey mounted (the research/clarify/plan-review interaction renders
+  // in-Journey) and routes the commit to `updateGoalPlan` (land on the same goal) instead of
+  // `saveGoal` (which would fork). Derived `isPlanningShell` gates all of that.
+  const [planningShellId, setPlanningShellId] = useState<string | null>(null);
   const [planningDebugTraces, setPlanningDebugTraces] = useState<PlanningDebugTrace[]>([]);
   const [planningLiveEvents, setPlanningLiveEvents] = useState<PlanningLiveEvent[]>([]);
   const [intakeClarify, setIntakeClarify] = useState<ClarifyOutput | null>(null);
@@ -485,6 +490,7 @@ function AimOsApp() {
       setPlanningDebugTraces([]);
       setPlanningLiveEvents([]);
       clearPlanningRun();
+      setPlanningShellId(null);
       setIntakeClarify(null);
       setIntakeAnswers({});
       setClarifyPhase(null);
@@ -560,6 +566,7 @@ function AimOsApp() {
     setPlanningDebugTraces([]);
     setPlanningLiveEvents([]);
     clearPlanningRun();
+    setPlanningShellId(null);
     setIntakeClarify(null);
     setIntakeAnswers({});
     setClarifyPhase(null);
@@ -585,41 +592,53 @@ function AimOsApp() {
     });
   }
 
-  async function startDraft(options: { skipIntakeGate?: boolean; aim?: AimEditBuffer } = {}) {
+  async function startDraft(
+    options: { skipIntakeGate?: boolean; aim?: AimEditBuffer; shell?: { goalId: string; title: string; description: string } } = {},
+  ) {
     if (workflowMutationIsLocked()) return;
     const transition = navigationConcurrencyRef.current.workspace;
-    const requestedTitle = options.aim?.title ?? aimTitle;
-    const requestedDescription = options.aim?.description ?? aimDescription;
+    const requestedTitle = options.shell?.title ?? options.aim?.title ?? aimTitle;
+    const requestedDescription = options.shell?.description ?? options.aim?.description ?? aimDescription;
     const title = requestedTitle.trim();
-    const route = routeAfterAimSubmit({ title, provider, localAgents });
-    if (route === "missing_aim") return;
-    const nextAimSurface = aimSurfaceAfterSubmit({
-      action: route,
-      current: aimSurfaceMode === "edit" ? "edit" : "compose",
-    });
-    if (nextAimSurface === "summary" && !(await checkpointSubmittedAim({
-      title: requestedTitle,
-      description: requestedDescription,
-      resetPlanning: Boolean(options.aim),
-    }))) return;
-    setAimSurfaceMode(nextAimSurface);
-    if (nextAimSurface === "summary") setAimEditBuffer(null);
-    if (route === "show_helper_guidance") {
+    if (options.shell) {
+      // Goal-first: the shell aim already exists, so skip the composer-surface + draft-checkpoint
+      // funnel logic entirely (no draft is persisted — the autosave effect is inert while a goal is
+      // `selected`) and run the same planning orchestration in-Journey against the shell.
+      setRuntimeGuidanceVisible(false);
       setError(null);
-      setRuntimeGuidanceVisible(true);
-      setMode("cockpit");
-      setStageOverride("aim");
-      return;
+      setDraftSaveBlock(null);
+      setPlanningDebugTraces([]);
+    } else {
+      const route = routeAfterAimSubmit({ title, provider, localAgents });
+      if (route === "missing_aim") return;
+      const nextAimSurface = aimSurfaceAfterSubmit({
+        action: route,
+        current: aimSurfaceMode === "edit" ? "edit" : "compose",
+      });
+      if (nextAimSurface === "summary" && !(await checkpointSubmittedAim({
+        title: requestedTitle,
+        description: requestedDescription,
+        resetPlanning: Boolean(options.aim),
+      }))) return;
+      setAimSurfaceMode(nextAimSurface);
+      if (nextAimSurface === "summary") setAimEditBuffer(null);
+      if (route === "show_helper_guidance") {
+        setError(null);
+        setRuntimeGuidanceVisible(true);
+        setMode("cockpit");
+        setStageOverride("aim");
+        return;
+      }
+      if (options.aim) {
+        setAimTitle(options.aim.title);
+        setAimDescription(options.aim.description);
+        resetPlanningForAimUpdate();
+      }
+      setRuntimeGuidanceVisible(false);
+      setError(null);
+      setDraftSaveBlock(null);
+      setPlanningDebugTraces([]);
     }
-    if (options.aim) {
-      setAimTitle(options.aim.title);
-      setAimDescription(options.aim.description);
-      resetPlanningForAimUpdate();
-    }
-    setRuntimeGuidanceVisible(false);
-    setError(null);
-    setDraftSaveBlock(null);
-    setPlanningDebugTraces([]);
     const runId = startPlanningRun();
     try {
       if (!options.skipIntakeGate) {
@@ -977,10 +996,17 @@ function AimOsApp() {
 
   async function continueFromContext() {
     if (workflowMutationIsLocked()) return;
+    // Goal-first: while planning a shell, the aim's title/description live on the shell goal (the
+    // composer state is empty), and the draft-gen re-entry must stay on the shell branch.
+    const shellOpt = isPlanningShell && selected
+      ? { goalId: selected.id, title: selected.title, description: selected.description ?? "" }
+      : undefined;
+    const runTitle = shellOpt?.title ?? aimTitle;
+    const runDescription = shellOpt?.description ?? aimDescription;
     const priorQuestions = intakeClarify?.questions ?? [];
     if (priorQuestions.length === 0 || priorQuestions.length >= MAX_ADAPTIVE_INTAKE_TURNS) {
       setClarifyPhase(null);
-      await startDraft({ skipIntakeGate: true });
+      await startDraft({ skipIntakeGate: true, shell: shellOpt });
       return;
     }
 
@@ -990,8 +1016,8 @@ function AimOsApp() {
     setError(null);
     try {
       const intake = await window.aimcub.intake({
-        title: aimTitle.trim(),
-        description: aimDescription.trim() || undefined,
+        title: runTitle.trim(),
+        description: runDescription.trim() || undefined,
         clientRunId: runId,
         priorQuestions,
         answers: answersFor(intakeClarify, intakeAnswers),
@@ -999,7 +1025,7 @@ function AimOsApp() {
       });
       if (!isCurrentPlanningRun(runId, transition)) return;
       setPlanResult({ ok: false, output: null, errors: [], intake });
-      const next = intakeToClarifyOutput(intake, hasCjkText(`${aimTitle}\n${aimDescription}`));
+      const next = intakeToClarifyOutput(intake, hasCjkText(`${runTitle}\n${runDescription}`));
       const merged = appendIntakeQuestions(intakeClarify, next);
       if (next.questions.length > 0 && merged.questions.length > priorQuestions.length) {
         setIntakeClarify(merged);
@@ -1010,7 +1036,7 @@ function AimOsApp() {
 
       setClarifyPhase(null);
       setBusy(null);
-      await startDraft({ skipIntakeGate: true });
+      await startDraft({ skipIntakeGate: true, shell: shellOpt });
     } catch (err) {
       if (!isCurrentPlanningRun(runId, transition)) return;
       setError(formatPlanningFailure({
@@ -1034,10 +1060,12 @@ function AimOsApp() {
     setError(null);
     setDraftSaveBlock(null);
     const runId = startPlanningRun();
+    // Goal-first: while planning a shell, the aim's title/description live on the shell goal.
+    const shellGoal = isPlanningShell ? selected : null;
     try {
       const refined = await window.aimcub.refine({
-        title: aimTitle.trim(),
-        description: descriptionWithContext(),
+        title: (shellGoal?.title ?? aimTitle).trim(),
+        description: descriptionWithContext(shellGoal ? (shellGoal.description ?? "") : undefined),
         draft,
         questions: clarify?.questions ?? [],
         answers: builtAnswers,
@@ -1168,6 +1196,113 @@ function AimOsApp() {
     } finally {
       navigationConcurrencyRef.current = finishSaveInFlight(navigationConcurrencyRef.current);
       draftPersistence.resumeAutosave();
+      setBusy(null);
+    }
+  }
+
+  // ── Goal-first (Stage 6): submit → shell → Journey → in-Journey planning → land on the same goal ──
+
+  /** Submit from the New Aim composer: mint a plan-less shell and open its Journey immediately. */
+  async function createAimAndOpenJourney() {
+    if (workflowMutationIsLocked()) return;
+    const title = aimTitle.trim();
+    // Port the composer's submit gate: no aim → no-op; no planning runtime → show the helper and
+    // create nothing. Only a real, plannable aim mints a shell.
+    const route = routeAfterAimSubmit({ title, provider, localAgents });
+    if (route === "missing_aim") return;
+    if (route === "show_helper_guidance") {
+      setError(null);
+      setRuntimeGuidanceVisible(true);
+      setMode("cockpit");
+      setStageOverride("aim");
+      return;
+    }
+    const description = aimDescription.trim() || undefined;
+    setError(null);
+    setBusy(t("os.busy.save"));
+    try {
+      const created = await window.aimcub.createAim({ title, description });
+      resetComposer();
+      await refreshAll({ autoOpenFirstGoal: false });
+      await openGoal(created.goal, { checkpointDraft: false });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /** "Build the plan" on a plan-less shell: run the planning funnel in-Journey against the shell. */
+  async function startShellResearch() {
+    if (workflowMutationIsLocked() || !selected) return;
+    const goal = selected;
+    setPlanningShellId(goal.id);
+    await startDraft({ shell: { goalId: goal.id, title: goal.title, description: goal.description ?? "" } });
+  }
+
+  /** Commit the in-Journey generated plan onto the SAME shell goal (no fork) via `updateGoalPlan`. */
+  async function commitShellPlan() {
+    if (workflowMutationIsLocked() || !selected) return;
+    const goal = selected;
+    const plan = finalPlan ?? draft;
+    if (!plan) return;
+    const transition = navigationConcurrencyRef.current.workspace;
+    const validation = validateExecutablePlan(plan);
+    if (!validation.ok) {
+      setError(formatPlanningFailure({ stage: "save", errors: validation.errors, t, fallback: t("plan.validationFailed") }));
+      return;
+    }
+    const routingValidation = validatePlanRouting({ plan, agents: routingAgentsFromDetections(localAgents), allowHuman: true });
+    if (!routingValidation.ok) {
+      setError(formatRoutingValidation(routingValidation));
+      return;
+    }
+    setBusy(t("os.busy.save"));
+    setError(null);
+    try {
+      const updated = await window.aimcub.updateGoalPlan({
+        goalId: goal.id,
+        title: goal.title,
+        description: goal.description || undefined,
+        draft,
+        plan,
+        quality: planResult?.quality ?? null,
+        review: planResult?.review ?? null,
+        qualityRetry: planResult?.qualityRetry ?? undefined,
+        debugTrace: mergePlanningDebugTraces(planningDebugTraces.length ? planningDebugTraces : [planResult?.debugTrace]),
+        questions: [
+          ...(intakeClarify?.questions ?? []),
+          ...(clarifyPhase === "intake" ? [] : clarify?.questions ?? []),
+        ],
+        answers: [...builtIntakeAnswers, ...builtAnswers],
+        assumptions: clarify?.assumptions ?? [],
+      });
+      if (!isCurrentWorkspaceTransition(transition)) {
+        await refreshAll({ autoOpenFirstGoal: false });
+        return;
+      }
+      if (!updated) {
+        setError(t("planningError.save.message"));
+        return;
+      }
+      setPlanningShellId(null);
+      resetPlanningForAimUpdate();
+      setSelected(updated.goal);
+      // Route back to the Journey: clear the leftover "contracts"/"reviewing" the planning run set,
+      // else `mainStageContent`'s `activeStage === "contracts"` branch would intercept the render.
+      setMode("cockpit");
+      setStageOverride("aim");
+      setBusy(null);
+      await refreshGoalState(updated.goal, transition, navigationConcurrencyRef.current.surface, { route: false });
+      void refreshListSurfaces();
+    } catch (err) {
+      setError(formatPlanningFailure({
+        stage: "save",
+        errors: [err instanceof Error ? err.message : String(err)],
+        t,
+        fallback: t("planningError.save.message"),
+      }));
+    } finally {
       setBusy(null);
     }
   }
@@ -1313,6 +1448,9 @@ function AimOsApp() {
   const activePlan = (finalPlan ?? draft ?? detail?.goal.plan_json ?? null) as DecompositionOutput | null;
   const activePlanValidation = activePlan ? validateExecutablePlan(activePlan) : null;
   const planningRuntimeReady = hasPlanningRuntime(provider, localAgents);
+  // Goal-first: this selected goal is a plan-less shell mid first-plan (an in-Journey planning run is
+  // active), so the Journey stays mounted and hosts the research/clarify/plan-review interaction.
+  const isPlanningShell = planningShellId !== null && planningShellId === selected?.id;
   const draftAimOverviewState = draftSaveBlock
     ? "saveBlocked"
     : activePlanValidation?.ok === false
@@ -1461,6 +1599,7 @@ function AimOsApp() {
     setPlanningDebugTraces([]);
     setPlanningLiveEvents([]);
     clearPlanningRun();
+    setPlanningShellId(null);
     setIntakeClarify(null);
     setIntakeAnswers({});
     setClarifyPhase(null);
@@ -1600,7 +1739,9 @@ function AimOsApp() {
       onRefine={() => void (clarifyPhase === "intake" ? continueFromContext() : refinePlan())}
       onSkip={clarifyPhase === "intake" ? undefined : () => {
         setClarifyPhase(null);
-        openCockpitStage("contracts");
+        // In-Journey shell planning stays in the Journey (the plan review then shows in place);
+        // the funnel path still hops to the old contracts stage.
+        if (!isPlanningShell) openCockpitStage("contracts");
       }}
       onOpenSettings={openContextSettings}
       flowKey={activeDraftId ?? selected?.id ?? "new-aim"}
@@ -1685,6 +1826,58 @@ function AimOsApp() {
     void startDraft();
   };
 
+  // Aims (other than the selected one) with a turn waiting on the user → the header "N turns
+  // elsewhere" jump chip. `needs_you` is the faithful "your move waiting" signal; blocked aims are
+  // excluded (they may be waiting on an agent/dependency, not the user).
+  const journeyElsewhere = selected
+    ? goals.filter((candidate) => candidate.id !== selected.id && progressSummaries[candidate.id]?.status === "needs_you")
+    : [];
+  // The Journey element, computed once so it can render both normally (a planned goal) and, during a
+  // shell's first-plan run (`isPlanningShell`), in place of the funnel Context/Plan stages.
+  const journeyView = selected && !parent ? (
+    <JourneyView
+      key={selected.id}
+      goal={selected}
+      progress={progress}
+      runEvents={journalEvents}
+      researchMemories={memories.filter((memory) => memory.goal_id === selected.id || memory.goal_id === null)}
+      contextLoop={contextLoop}
+      contextReview={contextReview}
+      planReview={activePlan ? {
+        plan: activePlan,
+        quality: planResult?.quality ?? null,
+        review: planResult?.review ?? null,
+        validationErrors: activePlanValidationMessages,
+        routingAgents,
+        routingValidation: planRoutingValidation,
+      } : undefined}
+      disabled={Boolean(busy)}
+      elsewhereCount={journeyElsewhere.length}
+      planningRuntimeReady={planningRuntimeReady}
+      onStartResearch={() => void startShellResearch()}
+      planning={isPlanningShell ? {
+        busy: Boolean(busy),
+        clarifyPanel: clarifyPhase !== null && clarify ? clarifyPanel : null,
+        planReady: Boolean(finalPlan ?? draft) && clarifyPhase === null,
+        onCommitPlan: () => void commitShellPlan(),
+      } : undefined}
+      onOpenStage={openCockpitStage}
+      onRunAgent={(milestone) => void runAgent(milestone)}
+      onConfirmMilestone={confirmMilestone}
+      onPickEvidenceFiles={async () => {
+        const result = await window.aimcub.pickLocalContextFiles();
+        return result.canceled ? [] : result.paths;
+      }}
+      onNewAim={startNewAim}
+      onAcceptContextCandidate={acceptContextCandidate}
+      onRejectContextCandidate={rejectContextCandidate}
+      onJumpElsewhere={() => {
+        const next = journeyElsewhere[0];
+        if (next) void openGoal(next);
+      }}
+    />
+  ) : null;
+
   const mainStageContent = (() => {
     if (activeStage === "settings") return settingsPanel;
     if (activeStage === "memory") {
@@ -1697,6 +1890,9 @@ function AimOsApp() {
         />
       );
     }
+    // Goal-first: a shell mid first-plan keeps the Journey mounted (the research/clarify/plan-review
+    // interaction renders in-Journey) instead of falling through to the funnel Context/Plan stages.
+    if (isPlanningShell && journeyView) return journeyView;
     if (activeStage === "context") {
       if (!selected && !parent && !hasUnsavedAim) {
         return (
@@ -1767,49 +1963,7 @@ function AimOsApp() {
         />
       );
     }
-    if (selected && !draft && !parent) {
-      // Aims (other than this one) with a turn waiting on the user → the header "N turns
-      // elsewhere" jump chip. `needs_you` is the faithful "your move waiting" signal; blocked
-      // aims are excluded (they may be waiting on an agent/dependency, not the user).
-      const elsewhere = goals.filter(
-        (candidate) => candidate.id !== selected.id && progressSummaries[candidate.id]?.status === "needs_you",
-      );
-      return (
-        <JourneyView
-          key={selected.id}
-          goal={selected}
-          progress={progress}
-          runEvents={journalEvents}
-          researchMemories={memories.filter((memory) => memory.goal_id === selected.id || memory.goal_id === null)}
-          contextLoop={contextLoop}
-          contextReview={contextReview}
-          planReview={activePlan ? {
-            plan: activePlan,
-            quality: planResult?.quality ?? null,
-            review: planResult?.review ?? null,
-            validationErrors: activePlanValidationMessages,
-            routingAgents,
-            routingValidation: planRoutingValidation,
-          } : undefined}
-          disabled={Boolean(busy)}
-          elsewhereCount={elsewhere.length}
-          onOpenStage={openCockpitStage}
-          onRunAgent={(milestone) => void runAgent(milestone)}
-          onConfirmMilestone={confirmMilestone}
-          onPickEvidenceFiles={async () => {
-            const result = await window.aimcub.pickLocalContextFiles();
-            return result.canceled ? [] : result.paths;
-          }}
-          onNewAim={startNewAim}
-          onAcceptContextCandidate={acceptContextCandidate}
-          onRejectContextCandidate={rejectContextCandidate}
-          onJumpElsewhere={() => {
-            const next = elsewhere[0];
-            if (next) void openGoal(next);
-          }}
-        />
-      );
-    }
+    if (journeyView && !draft) return journeyView;
     if (showAimEditor) {
       // Top-level new aim (not editing, not a child breakdown) → the Glass NEW AIM composer.
       // Edit mode and child/parent breakdown keep the AimIntakePanel surface unchanged.
@@ -1831,7 +1985,7 @@ function AimOsApp() {
             guidance={composerGuidance}
             onTitle={setAimTitle}
             onDescription={setAimDescription}
-            onSubmit={() => void startDraft({})}
+            onSubmit={() => void createAimAndOpenJourney()}
           />
         );
       }
