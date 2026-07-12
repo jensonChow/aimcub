@@ -132,7 +132,7 @@ export const STRINGS = {
   "os.newAim": { en: "New aim", zh: "新目标" },
   "os.savedAims": { en: "Saved aims", zh: "已保存目标" },
   "os.noAims": { en: "No saved aims yet.", zh: "还没有保存的目标。" },
-  "os.settings": { en: "Aim helpers", zh: "Aim 助手" },
+  "os.settings": { en: "Settings", zh: "设置" },
   "os.setupProvider": { en: "Set up planning model", zh: "设置规划模型" },
   "os.flow": { en: "Aim flow", zh: "目标流程" },
   "os.heroTitle": { en: "What should Aimcub move forward?", zh: "Aimcub 要推进什么？" },

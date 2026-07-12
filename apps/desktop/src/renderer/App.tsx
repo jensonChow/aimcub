@@ -2221,7 +2221,9 @@ function SettingsGeneralPane(props: { workspacePath: string | null }) {
             <strong>{t("settings.general.workspace")}</strong>
             <span>{t("settings.general.workspaceBody")}</span>
           </div>
-          <code className="od-settings-path">{props.workspacePath ?? "~/.aimcub"}</code>
+          <code className="od-settings-path" title={props.workspacePath ?? undefined}>
+            {props.workspacePath ?? "~/.aimcub"}
+          </code>
           <button
             className="od-settings-mini-button"
             type="button"
