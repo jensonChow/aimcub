@@ -1,9 +1,8 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-11
-Branch: `main`. Journey-first **Stages 1–4** are committed and merged. Stages 1–3 are on origin/main
-(`fdfb238f`); **Stage 4** (fold Plan into the Journey sheet) is committed + merged to `main` locally,
-**push pending user authorization**.
+Branch: `main`. Journey-first **Stages 1–4** are committed, merged, and **pushed** (origin/main =
+`b14c07a3`). Stage 4 = fold the read-only Plan interior into the Journey sheet.
 
 ## Active epic — Journey-first rebuild (staged)
 
@@ -79,9 +78,8 @@ prop-driven `PlanPanel` verbatim. No new backend/IPC. Plan: `~/.claude/plans/mut
 
 ## Commit / push
 
-- Journey-first Stage 4: committed on `glass-journey-stage4` + merged to `main`. **Not yet pushed**
-  (awaiting user authorization). Once pushed, add an "Update handoff: Stage 4 pushed" commit with the
-  origin hash (mirrors the Stage-3 `a3d3a84f` pattern).
+- Journey-first Stage 4: committed on `glass-journey-stage4`, merged to `main`, and **pushed**
+  (origin/main = `b14c07a3`; commits `f3afa7f5` feature + `b14c07a3` merge).
 
 ## Open risks / notes
 
@@ -101,8 +99,7 @@ prop-driven `PlanPanel` verbatim. No new backend/IPC. Plan: `~/.claude/plans/mut
 
 ```text
 Journey-first rebuild: Stages 1–4 done (Stage 4 = read-only Plan interior folded into the Journey
-sheet via JourneyPlanSheetBody; edit deferred to Stage 6). Stages 1–3 on origin/main=fdfb238f; Stage 4
-committed+merged locally (push may be pending — check `git log origin/main`). Read docs/handoff.md +
+sheet via JourneyPlanSheetBody; edit deferred to Stage 6). All on origin/main=b14c07a3. Read docs/handoff.md +
 the epic plan (~/.claude/plans/resilient-drifting-quail.md). Next is Stage 5 (Fold Run/Evidence + Eval
 into Journey sheets): the Run sheet hosts EvidenceSubmissionForm + proof-draft state (respect
 onProofDraftActiveChange nav-lock) + LocalAgentExecutionSummary; the Eval sheet hosts EvalStage's
