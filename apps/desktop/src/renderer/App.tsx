@@ -1931,6 +1931,7 @@ function AimOsApp() {
         drafts={aimDrafts}
         progressSummaries={progressSummaries}
         planningRuntimeReady={planningRuntimeReady}
+        planningModelLabel={provider?.configured ? provider.model ?? undefined : undefined}
         onOpenGoal={(goal) => void openGoal(goal)}
         onNewAim={() => void startNewAim()}
         onResumeDraft={(draftRow) => void openAimDraft(draftRow)}

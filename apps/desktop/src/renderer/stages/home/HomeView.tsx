@@ -10,18 +10,29 @@
  * The empty/first-run state must never auto-render the aim composer — the primary
  * action is a "Set your first aim" button that opens New Aim explicitly.
  */
-import type { AimDraft, AimProgressSummary, Goal } from "@core/types";
+import type { AimDraft, AimProgressSummary, AimProgressSummaryStatus, Goal } from "@core/types";
 
-import { useI18n } from "../../i18n";
+import { useI18n, type StringKey } from "../../i18n";
 import { aimNavigationLabels } from "../../workflow/aimNavigationTitle";
 import { PROGRESS_STATUS_KEY, progressRatio } from "../../workflow/progressSummary";
 import { AimDraftHomeSection } from "../aim/AimDraftRecovery";
+
+/** Card sub-line phrases, in the design's voice ("Run · waiting on you" → status only, honestly derived). */
+const HOME_STATE_KEY: Record<AimProgressSummaryStatus, StringKey> = {
+  planning: "glass.home.state.planning",
+  needs_you: "glass.home.state.needs_you",
+  running: "glass.home.state.running",
+  blocked: "glass.home.state.blocked",
+  complete: "glass.home.state.complete",
+};
 
 export interface HomeViewProps {
   goals?: Goal[];
   drafts?: AimDraft[];
   progressSummaries?: Record<string, AimProgressSummary>;
   planningRuntimeReady?: boolean;
+  /** Configured planning-model label for the first-run "connected" line, when known. */
+  planningModelLabel?: string;
   onOpenGoal?: (goal: Goal) => void;
   onNewAim?: () => void;
   onResumeDraft?: (draft: AimDraft) => void;
@@ -45,6 +56,17 @@ export function HomeView(props: HomeViewProps) {
 
   if (goals.length > 0 && props.onOpenGoal) {
     const onOpenGoal = props.onOpenGoal;
+    const needsCount = goals.filter(
+      (goal) => props.progressSummaries?.[goal.id]?.status === "needs_you",
+    ).length;
+    const countLine = goals.length === 1
+      ? t("glass.home.countOne")
+      : t("glass.home.countMany", { n: goals.length });
+    const needsLine = needsCount === 0
+      ? t("glass.home.needsNone")
+      : needsCount === 1
+        ? t("glass.home.needsOne")
+        : t("glass.home.needsMany", { n: needsCount });
     return (
       <section
         className="od-initial-workspace od-home-aims-wrap"
@@ -53,7 +75,7 @@ export function HomeView(props: HomeViewProps) {
       >
         <div className="od-home-aims">
           <h1 className="od-home-heading">{t("glass.home.welcome")}</h1>
-          <p className="od-home-sub">{t("glass.home.sub")}</p>
+          <p className="od-home-sub">{countLine} {needsLine}</p>
           <div className="od-home-card-list">
             {goals.map((goal) => {
               const nav = aimNavigationLabels({ title: goal.title, plan: goal.plan_json });
@@ -64,30 +86,23 @@ export function HomeView(props: HomeViewProps) {
                   className="od-home-card"
                   key={goal.id}
                   type="button"
-                  aria-label={nav.fullLabel}
+                  aria-label={summary ? `${nav.fullLabel} · ${statusLabel}` : nav.fullLabel}
                   title={nav.fullLabel}
                   onClick={() => onOpenGoal(goal)}
                 >
                   <span className="od-home-card-main">
                     <strong className="od-home-card-title">{nav.label}</strong>
-                    {summary && summary.total > 0 ? (
-                      <span className="od-home-card-progress">
-                        <span className="od-home-card-bar">
-                          <span className="od-home-card-bar-fill" style={{ width: `${progressRatio(summary) * 100}%` }} />
-                        </span>
-                        <span className="od-home-card-progress-text">{summary.completed}/{summary.total}</span>
-                      </span>
-                    ) : summary ? (
-                      <span className="od-home-card-progress-text">{statusLabel}</span>
+                    {summary ? (
+                      <span className="od-home-card-state">{t(HOME_STATE_KEY[summary.status])}</span>
                     ) : null}
                   </span>
+                  {summary?.status === "needs_you" ? (
+                    <span className="od-home-card-pill">{t("glass.home.yourMove")}</span>
+                  ) : null}
                   {summary ? (
-                    <span
-                      className={`od-home-card-dot is-${summary.status}`}
-                      role="img"
-                      aria-label={statusLabel}
-                      title={statusLabel}
-                    />
+                    <span className="od-home-card-bar" role="img" aria-label={t("shell.progressValue", { done: summary.completed, total: summary.total })}>
+                      <span className="od-home-card-bar-fill" style={{ width: `${progressRatio(summary) * 100}%` }} />
+                    </span>
                   ) : null}
                 </button>
               );
@@ -126,7 +141,11 @@ export function HomeView(props: HomeViewProps) {
             ) : null}
           </div>
         ) : props.planningRuntimeReady === true ? (
-          <div className="od-home-setup-done">{t("glass.home.setupDone")}</div>
+          <div className="od-home-setup-done">
+            {props.planningModelLabel
+              ? t("glass.home.setupDoneModel", { model: props.planningModelLabel })
+              : t("glass.home.setupDone")}
+          </div>
         ) : null}
       </div>
     </section>
