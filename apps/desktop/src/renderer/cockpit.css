@@ -7041,6 +7041,41 @@ kbd {
   color: var(--faint);
 }
 
+/* Run sheet evidence group: human milestones ready for proof render as actionable buttons that open
+   the in-sheet evidence form (or as plain rows when no submit handler is wired). Shares the option
+   idiom; the label distinguishes it from the agent radiogroup above. */
+.od-journey-evidence {
+  margin-top: 8px;
+  display: grid;
+  gap: 9px;
+}
+
+.od-journey-evidence-label {
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-semibold);
+  color: var(--mut);
+}
+
+.od-journey-evidence-option {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  padding: 13px 16px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--island2);
+  cursor: pointer;
+  text-align: left;
+  box-shadow: inset 0 0 0 1px var(--ring);
+  transition: box-shadow 150ms ease;
+}
+
+.od-journey-evidence-option:hover { box-shadow: var(--sh-md), inset 0 0 0 1px var(--ring); }
+.od-journey-evidence-option:focus-visible { outline: 0; box-shadow: var(--od-focus); }
+.od-journey-evidence-option:disabled { cursor: default; opacity: 0.6; }
+
 .od-journey-sheet-hint {
   display: flex;
   align-items: center;
@@ -7080,6 +7115,55 @@ kbd {
 }
 
 .od-journey-plan .od-stage-kicker {
+  display: none;
+}
+
+/* Eval station sheet interior: hosts the reused read-only recap (CompletionRecapPanel) or a
+   per-milestone frame nesting the read-only EvidenceReviewList. The recap is built for the wide Eval
+   stage, so descendant-only overrides reflow it for the 560px sheet — collapse its 2-col grid to one
+   column, drop its max-width, wrap its metrics, and hide its own kicker (the sheet head carries the
+   EVAL label). Layout-only; never edit the pinned .od-eval-*/.od-recap-* base rules. */
+.od-journey-eval {
+  display: grid;
+  gap: 14px;
+}
+
+.od-journey-eval-item {
+  display: grid;
+  gap: 8px;
+}
+
+.od-journey-eval-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.od-journey-eval-title {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--od-type-body);
+  color: var(--ink);
+}
+
+.od-journey-eval-meta {
+  font-size: var(--od-type-meta);
+  color: var(--mut);
+}
+
+.od-journey-eval .od-completion-recap {
+  max-width: none;
+}
+
+.od-journey-eval .od-recap-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.od-journey-eval .od-stage-metrics {
+  flex-wrap: wrap;
+}
+
+.od-journey-eval .od-completion-recap > .od-stage-panel-head .od-stage-kicker {
   display: none;
 }
 

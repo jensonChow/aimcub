@@ -1642,12 +1642,8 @@ function AimOsApp() {
 
   const evalPanel = selected && detail ? (
     <EvalStage
-      goalTitle={detail.goal.title}
       rows={progressRows(detail, progress)}
       progress={progress}
-      disabled={Boolean(busy)}
-      onAcceptContextCandidate={(candidate, content, scope) => void acceptContextCandidate(candidate, content, scope)}
-      onRejectContextCandidate={(candidate) => void rejectContextCandidate(candidate)}
     />
   ) : null;
 
@@ -1799,6 +1795,11 @@ function AimOsApp() {
           elsewhereCount={elsewhere.length}
           onOpenStage={openCockpitStage}
           onRunAgent={(milestone) => void runAgent(milestone)}
+          onConfirmMilestone={confirmMilestone}
+          onPickEvidenceFiles={async () => {
+            const result = await window.aimcub.pickLocalContextFiles();
+            return result.canceled ? [] : result.paths;
+          }}
           onNewAim={startNewAim}
           onAcceptContextCandidate={acceptContextCandidate}
           onRejectContextCandidate={rejectContextCandidate}

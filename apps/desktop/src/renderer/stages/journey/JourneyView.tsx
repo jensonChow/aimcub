@@ -20,10 +20,17 @@
 import type { AimProgressReadModel, Goal, Memory, Milestone, RunEvent } from "@core/domain";
 import { useEffect, useRef, useState } from "react";
 
+import type { ConfirmMilestoneRequest } from "../../../shared/ipc";
 import { ContextInbox, type ContextInboxScope } from "../../ContextInbox";
 import type { ContextBundleReview } from "../../contextReview";
 import { useI18n, type StringKey } from "../../i18n";
 import { pendingContextCandidates } from "../../labels";
+import {
+  emptyEvidenceDraft,
+  evidenceDraftIsSubmittable,
+  evidenceSubmissionPayload,
+  type EvidenceSubmissionDraft,
+} from "../../workflow/evidenceSubmission";
 import type { CockpitStage } from "../../workflow/workspaceNavigation";
 import {
   buildJourneyAmbient,
@@ -44,6 +51,8 @@ import {
 import { ContextActivityPanel } from "../context/ContextActivityPanel";
 import type { ContextLoopModel } from "../context/contextLoop";
 import { ContextReviewPanel } from "../context/ContextReviewPanel";
+import { CompletionRecapPanel, EvidenceReviewList } from "../eval/EvalStage";
+import { EvidenceSubmissionForm } from "../execute/EvidenceSubmissionForm";
 import { PlanPanel, type PlanPanelProps } from "../plan/PlanPanel";
 
 const STATION_NAME_KEY: Record<JourneyStationId, StringKey> = {
@@ -138,10 +147,13 @@ function formatClock(iso: string): string {
 }
 
 /**
- * The interactive body of the Run station sheet: dispatchable milestones as a single-select
- * radiogroup, the non-dispatchable remainder read-only below, and an enable-gated confirm.
- * Stateless and prop-driven so it renders (and is asserted) in both the un-selected and
- * selected states under `renderToStaticMarkup` — the parent owns the selection state.
+ * The interactive body of the Run station sheet: agent-dispatchable milestones as a single-select
+ * radiogroup with an enable-gated confirm; human milestones ready for proof as a second, actionable
+ * group (each opens the in-sheet evidence form via `onPickEvidence`); and the non-dispatchable
+ * remainder read-only below. Stateless and prop-driven so it renders (and is asserted) under
+ * `renderToStaticMarkup` — the parent owns the selection/draft state. The evidence group renders as
+ * plain read-only rows when `onPickEvidence` is absent (honest: no actionable affordance without a
+ * handler).
  */
 export interface JourneyRunSheetBodyProps {
   interaction: JourneyStationInteraction;
@@ -149,35 +161,62 @@ export interface JourneyRunSheetBodyProps {
   disabled: boolean;
   onSelect: (milestoneId: string) => void;
   onConfirm: () => void;
+  onPickEvidence?: (milestoneId: string) => void;
 }
 
 export function JourneyRunSheetBody(props: JourneyRunSheetBodyProps) {
-  const { interaction, selectedOptionId, disabled, onSelect, onConfirm } = props;
+  const { interaction, selectedOptionId, disabled, onSelect, onConfirm, onPickEvidence } = props;
   const { t } = useI18n();
   const tk = (key: string, vars?: Record<string, string | number>) => t(key as StringKey, vars);
   const hasSelection = resolveSelectedOption(interaction.options, selectedOptionId) !== null;
   const canConfirm = canConfirmInteraction(selectedOptionId, interaction.options, disabled);
+  const hasAgentWork = interaction.options.length > 0;
 
   return (
     <div className="od-journey-interactive">
-      <div className="od-journey-options" role="radiogroup" aria-label={t("glass.station.run")}>
-        {interaction.options.map((option) => {
-          const selected = option.milestoneId === selectedOptionId;
-          return (
+      {hasAgentWork ? (
+        <div className="od-journey-options" role="radiogroup" aria-label={t("glass.station.run")}>
+          {interaction.options.map((option) => {
+            const selected = option.milestoneId === selectedOptionId;
+            return (
+              <button
+                key={option.milestoneId}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                className={`od-journey-option${selected ? " od-journey-option-open" : ""}`}
+                onClick={() => onSelect(option.milestoneId)}
+              >
+                <span className="od-journey-option-title">{option.text}</span>
+                {option.note ? <span className="od-journey-option-note">{statusMetaLabel(option.note, tk)}</span> : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
+      {interaction.evidenceOptions.length > 0 ? (
+        <div className="od-journey-evidence">
+          <span className="od-journey-evidence-label">{t("glass.journey.evidenceGroup")}</span>
+          {interaction.evidenceOptions.map((option) => (onPickEvidence ? (
             <button
               key={option.milestoneId}
               type="button"
-              role="radio"
-              aria-checked={selected}
-              className={`od-journey-option${selected ? " od-journey-option-open" : ""}`}
-              onClick={() => onSelect(option.milestoneId)}
+              className="od-journey-evidence-option"
+              disabled={disabled}
+              onClick={() => onPickEvidence(option.milestoneId)}
             >
               <span className="od-journey-option-title">{option.text}</span>
               {option.note ? <span className="od-journey-option-note">{statusMetaLabel(option.note, tk)}</span> : null}
             </button>
-          );
-        })}
-      </div>
+          ) : (
+            <div className="od-journey-sheet-row" key={option.milestoneId}>
+              <span className={chipClass(option.chip)}>{tk(CHIP_KEY[option.chip])}</span>
+              <span className="od-journey-sheet-text">{option.text}</span>
+            </div>
+          )))}
+        </div>
+      ) : null}
 
       {interaction.contextRows.length > 0 ? (
         <div className="od-journey-sheet-rows">
@@ -191,12 +230,14 @@ export function JourneyRunSheetBody(props: JourneyRunSheetBodyProps) {
         </div>
       ) : null}
 
-      <div className="od-journey-sheet-hint">
-        <span className="od-journey-sheet-hint-text">{t("glass.journey.interactiveHint")}</span>
-        <button className="od-journey-primary" type="button" disabled={!canConfirm} onClick={onConfirm}>
-          {hasSelection ? t("glass.journey.confirmRun") : t("glass.journey.confirmPick")}
-        </button>
-      </div>
+      {hasAgentWork ? (
+        <div className="od-journey-sheet-hint">
+          <span className="od-journey-sheet-hint-text">{t("glass.journey.interactiveHint")}</span>
+          <button className="od-journey-primary" type="button" disabled={!canConfirm} onClick={onConfirm}>
+            {hasSelection ? t("glass.journey.confirmRun") : t("glass.journey.confirmPick")}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -284,6 +325,51 @@ export function JourneyPlanSheetBody(props: JourneyPlanSheetBodyProps) {
   );
 }
 
+/**
+ * The Eval station sheet's interior: the saved-goal read-only eval review. When the aim is complete
+ * it shows the real `CompletionRecapPanel` (the same recap the old Eval stage renders); otherwise it
+ * frames every milestone (met/open chip + title + next-action meta, mirroring the flat `evalRows`)
+ * and nests the read-only `EvidenceReviewList` under any milestone that already has evidence. Eval
+ * has no live milestone-mutation (evidence review is read-only; context-candidate triage lives in the
+ * Context sheet), so this body is honest read-only. Stateless; rendered under `renderToStaticMarkup`.
+ */
+export interface JourneyEvalSheetBodyProps {
+  progress: AimProgressReadModel;
+}
+
+export function JourneyEvalSheetBody(props: JourneyEvalSheetBodyProps) {
+  const { t } = useI18n();
+  const tk = (key: string) => t(key as StringKey);
+  const { progress } = props;
+
+  if (progress.completion_recap?.complete) {
+    return (
+      <div className="od-journey-eval">
+        <CompletionRecapPanel progress={progress} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="od-journey-eval">
+      {progress.milestones.map((row) => {
+        const chip: JourneyChip = row.eval_review.passed ? "eval.met" : "eval.open";
+        const meta = row.eval_review.passed ? tk("glass.station.meta.met") : row.next_action;
+        return (
+          <div className="od-journey-eval-item" key={row.milestone.id}>
+            <div className="od-journey-eval-head">
+              <span className={chipClass(chip)}>{tk(CHIP_KEY[chip])}</span>
+              <span className="od-journey-eval-title">{row.milestone.title}</span>
+              {meta ? <span className="od-journey-eval-meta">{meta}</span> : null}
+            </div>
+            {row.evidence.length > 0 ? <EvidenceReviewList row={row} compact /> : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export interface JourneyViewProps {
   goal: Goal;
   progress: AimProgressReadModel | null;
@@ -314,6 +400,17 @@ export interface JourneyViewProps {
   elsewhereCount?: number;
   onOpenStage: (stage: CockpitStage) => void;
   onRunAgent: (milestone: Milestone) => void;
+  /**
+   * Submit human evidence for a milestone from the Run sheet's in-place evidence form (the live
+   * `confirmMilestone` App handler). Returns whether the confirm persisted. When present, human
+   * milestones ready for proof become actionable evidence options; otherwise they stay read-only.
+   */
+  onConfirmMilestone?: (
+    milestone: Milestone,
+    submission: Omit<ConfirmMilestoneRequest, "goalId" | "milestoneId">,
+  ) => Promise<boolean>;
+  /** Pick local files to attach to the in-sheet evidence draft (the App file picker). */
+  onPickEvidenceFiles?: () => Promise<string[]>;
   onNewAim: () => void;
   /** Jump to the next aim with a turn waiting elsewhere (header chip). */
   onJumpElsewhere?: () => void;
@@ -343,6 +440,14 @@ export function JourneyView(props: JourneyViewProps) {
   };
   const [openStation, setOpenStation] = useState<JourneyStationId | null>(null);
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
+  // Evidence-form state for the Run sheet. `activeEvidenceMilestoneId` = which human milestone's
+  // form is open (null → the option list); `evidenceDrafts` is a per-milestone draft map that
+  // PERSISTS across sheet open/close (modal-hide, not discard) and is only dropped when a real
+  // navigation unmounts this view (keyed by goal.id). The sheet never touches App nav epochs, so
+  // there is no `onProofDraftActiveChange` nav-lock here — closing the sheet keeps the draft parked.
+  const [activeEvidenceMilestoneId, setActiveEvidenceMilestoneId] = useState<string | null>(null);
+  const [evidenceDrafts, setEvidenceDrafts] = useState<Record<string, EvidenceSubmissionDraft>>({});
+  const [pickingEvidence, setPickingEvidence] = useState(false);
   const sheetCloseRef = useRef<HTMLButtonElement | null>(null);
   const sheetTriggerRef = useRef<HTMLElement | null>(null);
   const { progress, goal } = props;
@@ -352,6 +457,8 @@ export function JourneyView(props: JourneyViewProps) {
   // Also resets any interactive selection whenever the open station changes.
   useEffect(() => {
     setSelectedOptionId(null);
+    // Return to the option list on any station change; drafts persist in `evidenceDrafts`.
+    setActiveEvidenceMilestoneId(null);
     if (!openStation) return;
     sheetTriggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const focusFrame = requestAnimationFrame(() => sheetCloseRef.current?.focus());
@@ -409,6 +516,17 @@ export function JourneyView(props: JourneyViewProps) {
   // The Plan station sheet hosts the saved-goal read-only plan review (the real contract interior)
   // when App supplies the pure plan view-model; otherwise it falls back to flat plan rows.
   const planBody = sheet?.station === "plan" && props.planReview ? props.planReview : null;
+  // The Eval station sheet hosts the saved-goal read-only eval review (recap or per-milestone
+  // evidence). All the data is already in `progress`, so this is gated purely on the open station.
+  const evalBody = sheet?.station === "eval" ? progress : null;
+  // The Run sheet's in-place evidence form: the human milestone whose form is open, membership-checked
+  // against the CURRENT interaction so a background refresh that drops it falls back to the option list.
+  const activeEvidenceOption = sheet?.interaction && activeEvidenceMilestoneId
+    ? sheet.interaction.evidenceOptions.find((option) => option.milestoneId === activeEvidenceMilestoneId) ?? null
+    : null;
+  const activeEvidenceMilestone = activeEvidenceOption
+    ? progress.milestones.find((row) => row.milestone.id === activeEvidenceOption.milestoneId)?.milestone ?? null
+    : null;
   const elsewhereCount = props.elsewhereCount ?? 0;
   const showElsewhere = elsewhereCount > 0 && Boolean(props.onJumpElsewhere);
   const hasMoveSecondary = Boolean(props.onHandToAgent || props.onSchedule || props.onLater);
@@ -435,6 +553,36 @@ export function JourneyView(props: JourneyViewProps) {
     if (!milestone) return;
     props.onRunAgent(milestone);
     setOpenStation(null);
+  }
+
+  async function pickEvidenceFiles(milestone: Milestone): Promise<void> {
+    if (!props.onPickEvidenceFiles) return;
+    setPickingEvidence(true);
+    try {
+      const paths = await props.onPickEvidenceFiles();
+      if (paths.length === 0) return;
+      setEvidenceDrafts((current) => {
+        const base = current[milestone.id] ?? emptyEvidenceDraft(milestone);
+        return { ...current, [milestone.id]: { ...base, filePaths: [...new Set([...base.filePaths, ...paths])] } };
+      });
+    } finally {
+      setPickingEvidence(false);
+    }
+  }
+
+  async function submitEvidence(milestone: Milestone): Promise<void> {
+    if (!props.onConfirmMilestone) return;
+    const draft = evidenceDrafts[milestone.id] ?? emptyEvidenceDraft(milestone);
+    if (!evidenceDraftIsSubmittable(draft)) return;
+    const ok = await props.onConfirmMilestone(milestone, evidenceSubmissionPayload(draft));
+    // On failure keep the form + draft open — App surfaces the error banner. On success drop the draft.
+    if (!ok) return;
+    setActiveEvidenceMilestoneId(null);
+    setEvidenceDrafts((current) => {
+      const next = { ...current };
+      delete next[milestone.id];
+      return next;
+    });
   }
 
   return (
@@ -598,13 +746,27 @@ export function JourneyView(props: JourneyViewProps) {
               </button>
             </div>
             {sheet.interaction ? (
-              <JourneyRunSheetBody
-                interaction={sheet.interaction}
-                selectedOptionId={selectedOptionId}
-                disabled={Boolean(props.disabled)}
-                onSelect={setSelectedOptionId}
-                onConfirm={confirmInteraction}
-              />
+              activeEvidenceMilestone ? (
+                <EvidenceSubmissionForm
+                  milestone={activeEvidenceMilestone}
+                  draft={evidenceDrafts[activeEvidenceMilestone.id] ?? emptyEvidenceDraft(activeEvidenceMilestone)}
+                  disabled={Boolean(props.disabled)}
+                  pickingFiles={pickingEvidence}
+                  onChange={(draft) => setEvidenceDrafts((current) => ({ ...current, [activeEvidenceMilestone.id]: draft }))}
+                  onPickFiles={() => void pickEvidenceFiles(activeEvidenceMilestone)}
+                  onCancel={() => setActiveEvidenceMilestoneId(null)}
+                  onSubmit={() => void submitEvidence(activeEvidenceMilestone)}
+                />
+              ) : (
+                <JourneyRunSheetBody
+                  interaction={sheet.interaction}
+                  selectedOptionId={selectedOptionId}
+                  disabled={Boolean(props.disabled)}
+                  onSelect={setSelectedOptionId}
+                  onConfirm={confirmInteraction}
+                  onPickEvidence={props.onConfirmMilestone ? setActiveEvidenceMilestoneId : undefined}
+                />
+              )
             ) : contextBody ? (
               <JourneyContextSheetBody
                 loop={contextBody.loop}
@@ -625,6 +787,8 @@ export function JourneyView(props: JourneyViewProps) {
                 routingValidation={planBody.routingValidation}
                 disabled={Boolean(props.disabled)}
               />
+            ) : evalBody ? (
+              <JourneyEvalSheetBody progress={evalBody} />
             ) : sheet.rows.length === 0 ? (
               <p className="od-journey-sheet-empty">{t("glass.journey.sheetEmpty")}</p>
             ) : (

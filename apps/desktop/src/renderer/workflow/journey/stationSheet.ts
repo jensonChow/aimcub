@@ -7,7 +7,7 @@
  */
 import type { AimProgressReadModel, Memory } from "@core/domain";
 
-import { isHumanExecuteRoute, type ExecuteMilestoneRow } from "../../stages/execute/executePrimaryAction";
+import { executeRowNeedsEval, isHumanExecuteRoute, type ExecuteMilestoneRow } from "../../stages/execute/executePrimaryAction";
 import type { CockpitStage } from "../workspaceNavigation";
 import type {
   JourneyStationId,
@@ -64,14 +64,22 @@ function runRows(progress: AimProgressReadModel): JourneyStationSheetRow[] {
   return pendingRunMilestones(progress).map(runRowOf);
 }
 
+/** A pending human milestone whose next move is submitting evidence: human-routed, unblocked, not awaiting eval. */
+function isEvidenceReady(row: ExecuteMilestoneRow): boolean {
+  return isHumanExecuteRoute(row) && !row.blocked && !executeRowNeedsEval(row);
+}
+
 /**
- * The Run station's interactive payload: dispatchable milestones become selectable `options`,
- * everything else pending (blocked / human / in-flight) stays visible as read-only `contextRows`
- * so the sheet never hides part of the picture. `null` when nothing is dispatchable — the sheet
- * then falls back to its plain read-only rows.
+ * The Run station's interactive payload, partitioning the pending set three ways with no overlap:
+ * agent-dispatchable milestones become selectable `options`; human milestones ready for proof become
+ * `evidenceOptions` (selecting one opens the in-sheet evidence form); everything else pending
+ * (blocked / in-flight / needs-eval) stays visible as read-only `contextRows` so the sheet never
+ * hides part of the picture. `null` only when there is neither a dispatchable option nor an evidence
+ * option — the sheet then falls back to its plain read-only rows.
  */
 function runInteraction(progress: AimProgressReadModel): JourneyStationInteraction | null {
   const options: JourneyStationOption[] = [];
+  const evidenceOptions: JourneyStationOption[] = [];
   const contextRows: JourneyStationSheetRow[] = [];
   for (const row of pendingRunMilestones(progress)) {
     if (isDispatchable(row)) {
@@ -81,12 +89,19 @@ function runInteraction(progress: AimProgressReadModel): JourneyStationInteracti
         note: row.latest_run?.status ?? row.milestone.status,
         chip: "owner.agent",
       });
+    } else if (isEvidenceReady(row)) {
+      evidenceOptions.push({
+        milestoneId: row.milestone.id,
+        text: row.milestone.title,
+        note: row.milestone.status,
+        chip: "owner.you",
+      });
     } else {
       contextRows.push(runRowOf(row));
     }
   }
-  if (options.length === 0) return null;
-  return { actionKind: "run_agent", options, contextRows };
+  if (options.length === 0 && evidenceOptions.length === 0) return null;
+  return { actionKind: "run_agent", options, evidenceOptions, contextRows };
 }
 
 function evalRows(progress: AimProgressReadModel): JourneyStationSheetRow[] {

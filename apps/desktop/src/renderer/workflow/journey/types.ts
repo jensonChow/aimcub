@@ -87,10 +87,10 @@ export interface JourneyStationSheetRow {
 }
 
 /**
- * Which existing App handler a station sheet's interactive confirm invokes. Only
- * `run_agent` (→ the existing `runAgent` handler) exists in Stage 2; `confirm_milestone`
- * arrives with the evidence form in Stage 5. Kept as a union so the component can switch
- * without a boolean explosion later.
+ * Which existing App handler the interactive radiogroup's confirm invokes. Only `run_agent`
+ * (→ the existing `runAgent` handler) exists. Human evidence submission (Stage 5) does NOT go
+ * through this actionKind — selecting an `evidenceOptions` entry opens the in-sheet evidence form,
+ * which calls a direct `onConfirmMilestone` handler — so the union stays single-kind.
  */
 export type JourneySheetActionKind = "run_agent";
 
@@ -107,14 +107,17 @@ export interface JourneyStationOption {
 }
 
 /**
- * The interactive payload for a station sheet: a set of dispatchable `options` the user
- * selects among, plus the non-dispatchable `contextRows` (blocked / human / in-flight work)
- * kept read-only so the sheet never hides part of the picture. `options ∪ contextRows`
- * covers the station's full pending set. Pure — the component owns selection state and i18n.
+ * The interactive payload for a station sheet: agent-dispatchable `options` (the confirm radiogroup),
+ * human-routed `evidenceOptions` whose next move is submitting evidence (selecting one opens the
+ * in-sheet evidence form), and the remaining non-dispatchable `contextRows` (blocked / in-flight /
+ * needs-eval work) kept read-only so the sheet never hides part of the picture.
+ * `options ∪ evidenceOptions ∪ contextRows` covers the station's full pending set (no overlap).
+ * Pure — the component owns selection/draft state and i18n.
  */
 export interface JourneyStationInteraction {
   actionKind: JourneySheetActionKind;
   options: JourneyStationOption[];
+  evidenceOptions: JourneyStationOption[];
   contextRows: JourneyStationSheetRow[];
 }
 

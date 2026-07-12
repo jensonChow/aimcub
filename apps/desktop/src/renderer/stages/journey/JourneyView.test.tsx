@@ -6,7 +6,7 @@ import type { ContextBundleReview } from "../../contextReview";
 import { I18nProvider } from "../../i18n";
 import type { JourneyStationInteraction } from "../../workflow/journey";
 import { buildContextLoopModel } from "../context/contextLoop";
-import { JourneyContextSheetBody, JourneyPlanSheetBody, JourneyRunSheetBody, JourneyView, type JourneyViewProps } from "./JourneyView";
+import { JourneyContextSheetBody, JourneyEvalSheetBody, JourneyPlanSheetBody, JourneyRunSheetBody, JourneyView, type JourneyViewProps } from "./JourneyView";
 
 const OWNER = "owner-1";
 const noop = () => {};
@@ -163,6 +163,7 @@ describe("JourneyRunSheetBody", () => {
       { milestoneId: "m1", text: "Draft the copy", note: "pending", chip: "owner.agent" },
       { milestoneId: "m2", text: "Book the venue", note: "pending", chip: "owner.agent" },
     ],
+    evidenceOptions: [],
     contextRows: [{ chip: "status.blocked", text: "Blocked bit", meta: "blocked" }],
   };
 
@@ -204,6 +205,49 @@ describe("JourneyRunSheetBody", () => {
     const html = renderBody("m2", true);
     expect(html).toContain("Run with agent"); // label reflects the live selection
     expect(html).toContain("disabled"); // but busy → not confirmable
+  });
+
+  const evidenceInteraction: JourneyStationInteraction = {
+    actionKind: "run_agent",
+    options: [],
+    evidenceOptions: [{ milestoneId: "h1", text: "Submit launch approval", note: "pending", chip: "owner.you" }],
+    contextRows: [],
+  };
+
+  it("renders ready human milestones as actionable evidence options when a submit handler is wired", () => {
+    const html = renderToStaticMarkup(
+      <I18nProvider>
+        <JourneyRunSheetBody
+          interaction={evidenceInteraction}
+          selectedOptionId={null}
+          disabled={false}
+          onSelect={noop}
+          onConfirm={noop}
+          onPickEvidence={noop}
+        />
+      </I18nProvider>,
+    );
+    expect(html).toContain("od-journey-evidence-option");
+    expect(html).toContain("Submit launch approval");
+    expect(html).toContain("Your move — submit proof");
+    expect(html).not.toContain('role="radiogroup"'); // no agent work → no radiogroup or confirm hint
+    expect(html).not.toContain("Pick one to continue");
+  });
+
+  it("renders evidence options as read-only rows when no submit handler is wired (honest)", () => {
+    const html = renderToStaticMarkup(
+      <I18nProvider>
+        <JourneyRunSheetBody
+          interaction={evidenceInteraction}
+          selectedOptionId={null}
+          disabled={false}
+          onSelect={noop}
+          onConfirm={noop}
+        />
+      </I18nProvider>,
+    );
+    expect(html).toContain("Submit launch approval");
+    expect(html).not.toContain("od-journey-evidence-option"); // not actionable without a handler
   });
 });
 
@@ -380,5 +424,79 @@ describe("JourneyPlanSheetBody", () => {
     expect(html).not.toContain("od-plan-routing-details"); // routing controls are editable-gated
     expect(html).not.toContain("od-plan-structure-details"); // reorder/merge/split are editable-gated
     expect(html).not.toContain("od-aim-primary"); // the Save button is hidden when saved
+  });
+});
+
+describe("JourneyEvalSheetBody", () => {
+  function renderBody(progress: AimProgressReadModel): string {
+    return renderToStaticMarkup(
+      <I18nProvider>
+        <JourneyEvalSheetBody progress={progress} />
+      </I18nProvider>,
+    );
+  }
+
+  function evidenceRow(): AimProgressMilestoneRead {
+    return {
+      ...row({ id: "m1", title: "Ship the fix" }),
+      evidence: [
+        {
+          evidence: {
+            id: "ev-1", owner_id: OWNER, goal_id: "g1", milestone_id: "m1", emitter_id: null,
+            kind: "git_commit", source_event_id: "commit:xyz", occurred_at: "2026-07-07T08:00:00.000Z",
+            summary: "Journey eval evidence row rendered", payload: { message: "Fix" }, trust_score: 0.9,
+            created_at: "2026-07-07T08:00:00.000Z",
+          },
+          rule_matches: [],
+          status: "matched",
+          review_note: "Matches the acceptance rule.",
+        },
+      ],
+      evidence_count: 1,
+    } as AimProgressMilestoneRead;
+  }
+
+  it("frames every milestone with a met/open chip and no evidence list when there is no evidence", () => {
+    const html = renderBody(progressOf([
+      row({ id: "m1", title: "Book flights", human: true }),
+      row({ id: "m2", title: "Draft the copy" }),
+    ]));
+    expect(html).toContain("od-journey-eval");
+    expect(html).toContain("od-journey-eval-title");
+    expect(html).toContain("Book flights");
+    expect(html).toContain("Draft the copy"); // no milestone dropped
+    expect(html).toContain("od-journey-chip-eval");
+    expect(html).not.toContain("od-evidence-review"); // nothing to review yet
+  });
+
+  it("nests the read-only evidence review under a milestone that has evidence", () => {
+    const html = renderBody(progressOf([evidenceRow()]));
+    expect(html).toContain("od-journey-eval");
+    expect(html).toContain("od-evidence-review");
+    expect(html).toContain("Journey eval evidence row rendered");
+  });
+
+  it("shows the completion recap when the aim is complete", () => {
+    const recap = {
+      complete: true,
+      final_outcome: "Completed 1/1 sub-aims.",
+      completed_sub_aims: [{
+        milestone_id: "m1", title: "Ship the fix", outcome: "Shipped.",
+        completed_at: "2026-07-07T08:20:00.000Z", decided_by: "rule_auto",
+        evidence_ids: [], eval_status: "passed",
+      }],
+      passing_evidence: [],
+      eval_results: [],
+      learned_context: [],
+      evidence_empty_reason: "",
+      context_empty_reason: "",
+    };
+    const html = renderBody(progressOf(
+      [row({ id: "m1", title: "Ship the fix", completed: true })],
+      { completion_recap: recap as AimProgressReadModel["completion_recap"] },
+    ));
+    expect(html).toContain("Completion recap");
+    expect(html).toContain("Completed 1/1 sub-aims.");
+    expect(html).not.toContain("od-journey-eval-title"); // recap branch, not the per-milestone frame
   });
 });

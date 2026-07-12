@@ -343,12 +343,12 @@ describe("buildJourneyStationSheet", () => {
 });
 
 describe("Run station interaction", () => {
-  it("partitions pending work into dispatchable options and read-only context, leaving rows intact", () => {
+  it("partitions pending work into agent options, evidence options, and read-only context, leaving rows intact", () => {
     const queued = mkRow({ id: "m5", title: "Queued agent" });
     queued.latest_run = mkRun({ id: "r5", milestoneId: "m5", status: "queued" });
     const rows = [
-      mkRow({ id: "m1", title: "Agent work" }),               // dispatchable → option
-      mkRow({ id: "m2", title: "Human work", human: true }),  // human → context
+      mkRow({ id: "m1", title: "Agent work" }),               // dispatchable → agent option
+      mkRow({ id: "m2", title: "Human work", human: true }),  // human, ready → evidence option
       mkRow({ id: "m3", title: "Blocked work", blocked: true }), // blocked → context
       mkRow({ id: "m4", title: "Running agent", running: true }), // in flight → context
       queued,                                                  // queued → context (not re-dispatchable)
@@ -361,20 +361,21 @@ describe("Run station interaction", () => {
     // Only the unblocked, agent-routed, not-in-flight milestone is dispatchable.
     expect(interaction?.options.map((o) => o.milestoneId)).toEqual(["m1"]);
     expect(interaction?.options[0]).toMatchObject({ chip: "owner.agent", text: "Agent work" });
-    // The rest of the pending set stays visible as read-only context (m6 is completed → dropped).
+    // The ready human milestone becomes a selectable evidence option (opens the in-sheet form).
+    expect(interaction?.evidenceOptions.map((o) => o.milestoneId)).toEqual(["m2"]);
+    expect(interaction?.evidenceOptions[0]).toMatchObject({ chip: "owner.you", text: "Human work" });
+    // The rest of the pending set stays read-only context (m6 is completed → dropped).
     expect(interaction?.contextRows.map((r) => r.text)).toEqual([
-      "Human work",
       "Blocked work",
       "Running agent",
       "Queued agent",
     ]);
     expect(interaction?.contextRows.map((r) => r.chip)).toEqual([
-      "owner.you",
       "status.blocked",
       "owner.agent",
       "owner.agent",
     ]);
-    // options ∪ contextRows == the plain read-only rows (no duplication, nothing hidden).
+    // options ∪ evidenceOptions ∪ contextRows == the plain read-only rows (no duplication, nothing hidden).
     expect(sheet.rows.map((r) => r.text)).toEqual([
       "Agent work",
       "Human work",
@@ -384,15 +385,27 @@ describe("Run station interaction", () => {
     ]);
   });
 
-  it("is null when nothing is dispatchable (falls back to plain read-only rows)", () => {
+  it("surfaces a ready human milestone as an evidence option even when no agent work is dispatchable", () => {
     const rows = [
-      mkRow({ id: "m1", title: "Human", human: true }),
-      mkRow({ id: "m2", title: "Blocked", blocked: true }),
-      mkRow({ id: "m3", title: "Running", running: true }),
+      mkRow({ id: "m1", title: "Human", human: true }),      // ready → evidence option
+      mkRow({ id: "m2", title: "Blocked", blocked: true }),  // blocked → context
+      mkRow({ id: "m3", title: "Running", running: true }),  // in flight → context
+    ];
+    const sheet = buildJourneyStationSheet("run", mkProgress(rows));
+    expect(sheet.interaction).not.toBeNull();
+    expect(sheet.interaction?.options).toEqual([]);
+    expect(sheet.interaction?.evidenceOptions.map((o) => o.milestoneId)).toEqual(["m1"]);
+    expect(sheet.rows).toHaveLength(3);
+  });
+
+  it("is null when nothing is dispatchable or evidence-ready (falls back to plain read-only rows)", () => {
+    const rows = [
+      mkRow({ id: "m1", title: "Blocked human", human: true, blocked: true }), // blocked → context
+      mkRow({ id: "m2", title: "Blocked agent", blocked: true }),              // blocked → context
     ];
     const sheet = buildJourneyStationSheet("run", mkProgress(rows));
     expect(sheet.interaction).toBeNull();
-    expect(sheet.rows).toHaveLength(3);
+    expect(sheet.rows).toHaveLength(2);
   });
 });
 

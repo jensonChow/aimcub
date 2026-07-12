@@ -17,8 +17,6 @@ const LOW_TRUST_EVIDENCE = "00000000-0000-4000-8000-000000000031";
 const MEMORY = "00000000-0000-4000-8000-000000000040";
 const ACCEPTED_MEMORY = "00000000-0000-4000-8000-000000000041";
 
-const noop = () => {};
-
 const goal: Goal = {
   id: GOAL,
   owner_id: OWNER,
@@ -223,12 +221,8 @@ function renderEval(progressModel: AimProgressReadModel): string {
   return renderToStaticMarkup(
     <I18nProvider>
       <EvalStage
-        goalTitle={progressModel.goal.title}
         rows={progressModel.milestones}
         progress={progressModel}
-        disabled={false}
-        onAcceptContextCandidate={noop}
-        onRejectContextCandidate={noop}
       />
     </I18nProvider>,
   );
@@ -254,8 +248,8 @@ describe("EvalStage", () => {
     expect(html).toContain("trust 45%");
     expect(html).toContain("No acceptance rule match yet.");
     expect(html).toContain("Trust is below the 80% floor");
-    expect(html).toContain("Context inbox");
-    expect(html).toContain("Accepted global context is reused when Aimcub plans future aims.");
+    // The Context inbox is no longer duplicated in Eval — triage lives in the Journey Context sheet.
+    expect(html).not.toContain("Context inbox");
   });
 
   it("does not render a large empty Context Inbox block when no candidates are pending", () => {
@@ -269,15 +263,16 @@ describe("EvalStage", () => {
     expect(html).not.toContain('class="od-eval-context"');
   });
 
-  it("renders ContextInbox when pending candidates exist", () => {
+  it("keeps the Context Inbox out of Eval even when candidates are pending (it moved to the Journey Context sheet)", () => {
     const html = renderEval(progress({ contextCandidates: [pendingMemory] }));
 
-    expect(html).toContain("Context inbox");
-    expect(html).toContain("Eval signal: Evidence review should show rule matches and trust before completion.");
-    expect(html).toContain("Accepted global context is reused when Aimcub plans future aims.");
+    // The inbox no longer renders in Eval, but the pending candidate still counts in the metric.
+    expect(html).not.toContain("Context inbox");
+    expect(html).toContain("Context candidates");
+    expect(html).toContain("<strong>1</strong>");
   });
 
-  it("keeps the completion recap factual and leaves Context Inbox in Eval flow", () => {
+  it("keeps the completion recap factual and leaves the Context Inbox out of Eval flow", () => {
     const html = renderEval(progress(true));
 
     expect(html).toContain("Completion recap");
@@ -287,7 +282,7 @@ describe("EvalStage", () => {
     expect(html).toContain("Eval result");
     expect(html).toContain("Context learned");
     expect(html).toContain("Future reuse");
-    expect(html).toContain("Context inbox");
+    expect(html).not.toContain("Context inbox");
   });
 
   it("does not duplicate an empty Context Inbox in the completion recap", () => {
