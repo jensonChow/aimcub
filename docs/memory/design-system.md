@@ -1,6 +1,6 @@
 # Design System Memory
 
-Last updated: 2026-07-11
+Last updated: 2026-07-12
 
 ## Scope
 
@@ -34,10 +34,13 @@ Glass is two things at once:
 **Shipped** (stages 0/A/B/C/D on `main`): the additive Glass token set in `cockpit.css`
 (present identically in all three theme blocks), the gradient-desktop + translucent-island
 shell, the `JourneyView` work surface, Glass Home / New / Memory / Settings pages, row/card
-glassification, the sidebar Memory nav row + `~/.aimcub · local` footer + theme toggle, the
-`listMemories` / `getAimJournal` / `listAimProgressSummaries` IPC, the real (`@core`) Research
-station and run-lifecycle journal, and the batch per-aim progress dots. Before making desktop
-visual changes, read `docs/handoff.md` and the loading order in `docs/memory/desktop.md`.
+glassification, the `listMemories` / `getAimJournal` / `listAimProgressSummaries` IPC, the
+real (`@core`) Research station and run-lifecycle journal, and the batch per-aim progress
+dots. A **2026-07-12 design re-sync** (branch `glass-design-resync`, from the updated
+`Aimcub Glass.dc.html`) then rebuilt the sidebar (brand row + account-menu popover), Home
+cards, and the Settings IA to the latest reference — the sections below describe the
+re-synced state. Before making desktop visual changes, read `docs/handoff.md` and the
+loading order in `docs/memory/desktop.md`.
 
 ## Design Tokens
 
@@ -198,30 +201,36 @@ Reference links:
   `--traffic-light-*`. **Do not draw red/yellow/green or inactive substitute dots in React/CSS.**
   Custom titlebar controls (sidebar toggle) sit beside the native controls, outside
   transform/zoom/filter containers, with `no-drag` hit targets and a separate drag region.
-- **Theme toggle.** Desktop follows macOS system appearance by default. The Glass sidebar footer
-  has an explicit light/dark toggle: a renderer-owned `themePref` ("system" default,
-  `localStorage`-persisted) drives Glass tokens off `data-system-appearance`, and it is synced to
-  the **native** window chrome through an IPC → `nativeTheme.themeSource` handler (which triggers
-  the main process to repaint `win.setBackgroundColor` and re-emit chrome state), so an in-app
-  override does not desync the native titlebar/traffic-light context from the visible content.
-  "system" hands appearance back to the OS. Renderer dark tokens respond to both
+- **Theme preference.** Desktop follows macOS system appearance by default. The preference is a
+  shared renderer store (`renderer/theme.ts`, `localStorage`-persisted, "system" default) with two
+  writers: the account-menu **Appearance** row (toggles light/dark; the value label shows
+  Light / Dark / System) and **Settings → General**'s segmented Light / Dark / System control.
+  CockpitShell reads it, drives Glass tokens off `data-system-appearance`, and keeps the single
+  IPC → `nativeTheme.themeSource` sync (main repaints `win.setBackgroundColor` and re-emits chrome
+  state), so an in-app override never desyncs the native titlebar/traffic-light context. "system"
+  hands appearance back to the OS. Renderer dark tokens respond to both
   `prefers-color-scheme: dark` and `data-system-appearance="dark"`.
-- Sidebar: the top-left area is app-level navigation (Home Panel, New Aim) as normal action
-  rows — transparent rest, compact 32–36px height, substantial icons aligned to the list inset,
-  normal-weight labels, Command-symbol hints revealed on hover/focus, and a stable selected
-  state. Glass hover/selected states use translucent `--island2` / `--field` washes (not flat
-  gray fills); selected rows show a quiet fill with no border/outline/selected-shadow. Below the
-  recent-aims list, a Glass footer block holds a **Memory nav row**, a `~/.aimcub · local` line,
-  and the theme toggle. Recent-aim rows carry a small trailing **status dot marker** (see
+- Sidebar (re-synced): the top-left is a **brand row** — an accent "A" mark + "Aimcub" button that
+  goes Home, and a compact trailing "+" icon button for New Aim (26px, quiet `--field` hover) —
+  followed by a plain aim list (no search field, no all/active/paused filter pills, no "Recent
+  aims" section label; Cmd+K covers navigation, drafts keep their labelled rows). Empty list shows
+  one quiet line: "Your aims will live here." Glass hover/selected states use translucent
+  `--island2` / `--field` washes (not flat gray fills); selected rows show a quiet fill with no
+  border/outline/selected-shadow. Aim rows carry a small trailing **status dot marker** (see
   Status markers) — a marker, never a status subtitle.
 - Sidebar aim and draft rows are compact one-line navigation rows: prefer a concise generated
   `goal_summary`, else conservative intent-prefix cleanup with a grapheme-safe bound; keep the
   canonical title for editing/planning/search/CLI/agents. One 36px line with CSS ellipsis; the
   full cleaned summary is exposed from the focusable row tooltip. Do not show workflow status
   subtitles ("Context needed", "Plan ready", "active", …) under titles.
-- Sidebar footer user menu: the lower-left account trigger opens an account-style popover with
-  Settings and Language (Language as a Claude-like hover side submenu). Compact menu-like
-  interior, no auto first-item focus ring on pointer open.
+- Sidebar footer account menu (re-synced): the lower-left trigger is the workspace identity —
+  a person-icon avatar tile + "Local workspace / ~/.aimcub" + up-down chevron. Its glass popover
+  (island fill, blur, `--ring` inset, 14px radius) holds **Memory** (with a trailing count and
+  `aria-current` while the Memory page is open), **Settings**, **Language** (Claude-like hover
+  side submenu), a separator, an **Appearance** row (icon + current value; click toggles
+  light/dark), and a non-interactive ok-dot `~/.aimcub · on device` line. There is no separate
+  footer Memory row / path line / theme-toggle button. No auto first-item focus ring on pointer
+  open.
 - Sidebar toggle: a top-left titlebar-cluster icon button (pinned / collapsed / peek). Clicking
   toggles pinned/collapsed; pinned reserves layout space and never covers the workspace; while
   collapsed, hovering the button or the 32px left-edge rail reveals a transient overlay peek
@@ -249,20 +258,27 @@ Reference links:
 - **The Journey work surface** renders from pure, unit-tested helpers under
   `renderer/workflow/journey/` off the existing `AimProgressReadModel` (+ the run-event journal
   and the aim's memories): a 6-station strip (Aim · Research · Context · Plan · Run · Eval) with
-  per-station status glyphs and one-line summaries; a single "Your move" card (reusing the
-  Execute stage's `executePrimaryAction` mapping) or an "Ambient" card when an agent is running
-  or the aim is idle/complete; a "Turns" roster of who is doing what now; and a "Journal" ledger
-  merging appended evidence with run-lifecycle events, newest-first. Clicking a station opens a
+  one-line summaries — only the **active** station carries a visible (pulsing accent) dot;
+  done/living/partial/up stations stay dot-free with the summary line and muted "up" name
+  carrying state (never color-only). The header meta reads as the completion **percent** (exact
+  fraction on the accessible name/tooltip; hidden for a plan-less shell). Below: a single
+  "Your move" card (reusing the Execute stage's `executePrimaryAction` mapping) or an "Ambient"
+  card when an agent is running or the aim is idle/complete; a "Turns" roster of who is doing
+  what now; and a "Journal" ledger merging appended evidence with run-lifecycle events,
+  newest-first. Clicking a station opens a
   read-only **sheet** (local component state — it never touches the workspace/surface navigation
   epochs and clears on any real navigation); the sheet footer CTA routes into the interactive
   stage via `openCockpitStage`. Research is a real `@core`-derived station (gathered-context
   signal) shown as a read-only receipt; do not fabricate demo content.
-- Status markers: per-aim rollup state on list surfaces (sidebar rows, Home cards) is a small
-  colored **dot** with an accessible name — never a text subtitle. Dot semantics: complete
-  (`--okdot`), running (`--acc`, gentle pulse), needs-you (`--warndot`), blocked (`--danger`),
-  planning (hollow ring). Home cards additionally show a thin 6px progress bar + `{done}/{total}`.
-  These read from the cheap batch `listAimProgressSummaries` endpoint, not N per-aim progress
-  calls.
+- Status markers (re-synced): sidebar aim rows mark only the states that ask for the user's
+  attention — needs-you (`--acc` accent dot) and blocked (`--danger`) — with accessible names;
+  running/planning/complete rows stay unmarked so the strip reads calm. Home cards carry the
+  full state instead: an honest status phrase under the title ("waiting on you" / "quietly in
+  motion" / "shaping the plan" / "blocked — needs a look" / "complete"), an accent **"your move"
+  pill** for needs-you, and a fixed 64×4px trailing progress bar (ink-mix fill on `--island2`,
+  fraction on the accessible name) — no dot, no `{done}/{total}` counter text. The Home subtitle
+  is the live rollup ("{n} aims in motion. One needs you."). All of it reads from the cheap batch
+  `listAimProgressSummaries` endpoint, not N per-aim progress calls.
 - Optional inspector: process/context/quality/activity/debug detail may exist as an opt-in
   overlay/drawer/developer surface — independently scrollable, never displacing the primary task.
 - Stage model: Aim, Context, Plan/Contracts, Execute/Work, Eval/Review are iterative workbench
@@ -271,15 +287,21 @@ Reference links:
   and is opened from the Journey / palette / keyboard, not a persistent segmented control.
 - Existing aims open to the Journey (aim overview) first, not Run details; completed aims
   (`completion_recap.complete`) open Eval with the recap.
-- Settings use a split-view IA: the primary left sidebar becomes settings-category navigation and
-  the workspace becomes the selected detail pane. Do not add a second in-workspace settings nav
-  or stack provider / local-agent / web-research / context-source forms into one long page.
-  Settings mode locks its category sidebar (no Aim workspace toggle / peek rail / brand header);
-  it uses quiet gray selected rows (no blue rail), thin bordered control groups with internal
-  dividers, muted status text plus tiny readiness dots, and a wider ~1080px control panel with
-  narrower readable header copy. Keep "next setup" guidance in Overview only. Command palette
-  (Cmd/Ctrl+K) provides keyboard-first navigation; add entries when a workflow becomes top-level
-  (Memory is a candidate follow-up).
+- Settings (re-synced IA): the aim sidebar **stays in place**; Settings renders in the workspace
+  as a "Settings" title + 196px category rail (**General / Planning brain / Workers / Research /
+  About**) beside one ~600px detail pane. The selected rail item uses an `--acc-soft` wash with
+  accent text. One glass island per control group (18px radius, `--island` + blur + `--ring`
+  inset), rows divided by `--edge` hairlines. General = Appearance segmented (Light/Dark/System)
+  + Workspace row (real tilde-shortened path via `getAppInfo`, Reveal via the no-input
+  `revealWorkspace` IPC). Planning brain = provider **pills** (selected = accent, description
+  shown only for the selected provider) + model select + key + Test/Save. Workers = an honest
+  "You" row ("judgment, approvals, anything with your card") + local-agent rows (ok/warn dot ·
+  name · version/auth/models meta · Test run). Research = web-research form + a Context-sources
+  summary row ("{n} of 6 active") whose Manage toggles the full sources panel inline. About =
+  version + on-device data row only — no fabricated updater. There is no readiness Overview; each
+  form carries its own status copy. Compact windows stack the rail above the pane (wrapping
+  pills). Command palette (Cmd/Ctrl+K) provides keyboard-first navigation; add entries when a
+  workflow becomes top-level (Memory is a candidate follow-up).
 
 ## Layout Rules
 
