@@ -1795,6 +1795,11 @@ function AimOsApp() {
           elsewhereCount={elsewhere.length}
           onOpenStage={openCockpitStage}
           onRunAgent={(milestone) => void runAgent(milestone)}
+          onConfirmMilestone={confirmMilestone}
+          onPickEvidenceFiles={async () => {
+            const result = await window.aimcub.pickLocalContextFiles();
+            return result.canceled ? [] : result.paths;
+          }}
           onNewAim={startNewAim}
           onAcceptContextCandidate={acceptContextCandidate}
           onRejectContextCandidate={rejectContextCandidate}

@@ -163,6 +163,7 @@ describe("JourneyRunSheetBody", () => {
       { milestoneId: "m1", text: "Draft the copy", note: "pending", chip: "owner.agent" },
       { milestoneId: "m2", text: "Book the venue", note: "pending", chip: "owner.agent" },
     ],
+    evidenceOptions: [],
     contextRows: [{ chip: "status.blocked", text: "Blocked bit", meta: "blocked" }],
   };
 
@@ -204,6 +205,49 @@ describe("JourneyRunSheetBody", () => {
     const html = renderBody("m2", true);
     expect(html).toContain("Run with agent"); // label reflects the live selection
     expect(html).toContain("disabled"); // but busy → not confirmable
+  });
+
+  const evidenceInteraction: JourneyStationInteraction = {
+    actionKind: "run_agent",
+    options: [],
+    evidenceOptions: [{ milestoneId: "h1", text: "Submit launch approval", note: "pending", chip: "owner.you" }],
+    contextRows: [],
+  };
+
+  it("renders ready human milestones as actionable evidence options when a submit handler is wired", () => {
+    const html = renderToStaticMarkup(
+      <I18nProvider>
+        <JourneyRunSheetBody
+          interaction={evidenceInteraction}
+          selectedOptionId={null}
+          disabled={false}
+          onSelect={noop}
+          onConfirm={noop}
+          onPickEvidence={noop}
+        />
+      </I18nProvider>,
+    );
+    expect(html).toContain("od-journey-evidence-option");
+    expect(html).toContain("Submit launch approval");
+    expect(html).toContain("Your move — submit proof");
+    expect(html).not.toContain('role="radiogroup"'); // no agent work → no radiogroup or confirm hint
+    expect(html).not.toContain("Pick one to continue");
+  });
+
+  it("renders evidence options as read-only rows when no submit handler is wired (honest)", () => {
+    const html = renderToStaticMarkup(
+      <I18nProvider>
+        <JourneyRunSheetBody
+          interaction={evidenceInteraction}
+          selectedOptionId={null}
+          disabled={false}
+          onSelect={noop}
+          onConfirm={noop}
+        />
+      </I18nProvider>,
+    );
+    expect(html).toContain("Submit launch approval");
+    expect(html).not.toContain("od-journey-evidence-option"); // not actionable without a handler
   });
 });
 

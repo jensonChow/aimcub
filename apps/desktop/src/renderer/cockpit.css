@@ -7041,6 +7041,41 @@ kbd {
   color: var(--faint);
 }
 
+/* Run sheet evidence group: human milestones ready for proof render as actionable buttons that open
+   the in-sheet evidence form (or as plain rows when no submit handler is wired). Shares the option
+   idiom; the label distinguishes it from the agent radiogroup above. */
+.od-journey-evidence {
+  margin-top: 8px;
+  display: grid;
+  gap: 9px;
+}
+
+.od-journey-evidence-label {
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-semibold);
+  color: var(--mut);
+}
+
+.od-journey-evidence-option {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  padding: 13px 16px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--island2);
+  cursor: pointer;
+  text-align: left;
+  box-shadow: inset 0 0 0 1px var(--ring);
+  transition: box-shadow 150ms ease;
+}
+
+.od-journey-evidence-option:hover { box-shadow: var(--sh-md), inset 0 0 0 1px var(--ring); }
+.od-journey-evidence-option:focus-visible { outline: 0; box-shadow: var(--od-focus); }
+.od-journey-evidence-option:disabled { cursor: default; opacity: 0.6; }
+
 .od-journey-sheet-hint {
   display: flex;
   align-items: center;

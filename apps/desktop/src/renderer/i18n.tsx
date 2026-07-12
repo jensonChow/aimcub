@@ -1560,6 +1560,7 @@ export const STRINGS = {
     en: "The agent takes this turn — its result shows up in Turns and the Journal.",
     zh: "由 agent 接手这一轮——结果会出现在「轮次」和「记录」中。",
   },
+  "glass.journey.evidenceGroup": { en: "Your move — submit proof", zh: "该你了——提交证明" },
   "glass.journey.contextEmpty": {
     en: "Context is folded into the plan — nothing is waiting on you here.",
     zh: "背景已并入计划——这里没有待你处理的事项。",
