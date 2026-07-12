@@ -1,9 +1,9 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-12
-Branch: `glass-journey-stage7` (off `main`, origin/main=`d58cc6e1`). **Stage 7 (cleanup + convergence)
-is COMPLETE and full-gate + live-QA green — the FINAL stage of the Journey-first epic. The epic is
-closed.** Not yet merged to `main`; do not push without the founder's OK.
+Branch: `main`. **Stage 7 (cleanup + convergence) is COMPLETE — the FINAL stage of the Journey-first
+epic. The epic is CLOSED, merged to `main`, and PUSHED.** Full-gate + live-QA green, including the
+dead-CSS sweep follow-up.
 
 ## Journey-first rebuild — DONE (Stages 1–7)
 
@@ -59,13 +59,16 @@ reconciliation = **discard-on-create** (keep the draft subsystem, discard the pr
   milestone → a linked **child shell** is created + opens its build-plan Journey (7.3).
 - Repacked (`pnpm desktop:pack`) + refreshed root `Aimcub.app`.
 
-## Follow-up spun off (not blocking)
+## Dead-CSS sweep (Stage 7.5 follow-up) — DONE
 
-- **Dead AimIntakePanel/DraftAimOverviewPanel CSS** (~500 lines in `cockpit.css`, gate-harmless) is
-  intertwined with live shared classes (`.od-aim-intake`, `.od-aim-kicker`, `.od-aim-primary`,
-  `.od-draft-recovery*`, …) so it needs a careful per-block sweep + removing the two stale App.test.tsx
-  blocks that assert only dead classes (`"uses the New Aim quiet hover treatment…"`, `"keeps the saved
-  Aim overview centered…"`). Spun off as a separate task.
+The ~500 lines of dead AimIntakePanel/DraftAimOverviewPanel CSS were removed (branch
+`glass-journey-stage7-cssweep`, merged) via a brace-matched per-block sweep (a rule is dropped only
+when EVERY selector references a dead class; mixed comma-groups keep their live selectors) — −6897
+chars, all 14 dead classes gone, live classes (`.od-aim-intake`, `.od-aim-kicker`, `.od-aim-primary/
+secondary`, `.od-draft-recovery*`, `.od-initial-workspace*`, `.od-content-entry*`) intact. Trimmed the
+two stale App.test.tsx blocks (kept the live `.od-main-aim` grid guard + the secondary-control hover
+asserts). Full gate + live QA green (composer + Home draft-recovery render correctly). **No open
+threads remain — the Journey-first epic is fully landed.**
 
 ## Invariants (still enforced)
 - Journey sheet component-local + epoch-free; mutations via epoch-safe App handlers. The in-Journey
