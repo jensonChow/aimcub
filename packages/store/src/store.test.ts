@@ -453,6 +453,38 @@ describe("createJsonFileStore · createAimShell", () => {
   });
 });
 
+describe("createJsonFileStore · renameGoal", () => {
+  it("renames a plan-less shell's title/description without materializing a plan", async () => {
+    const store = freshStore();
+    const { goal } = await store.createAimShell({ title: "Old title", description: "old" });
+
+    const updated = await store.renameGoal({ id: goal.id, title: "New title", description: "new" });
+    expect(updated).not.toBeNull();
+    expect(updated!.goal.title).toBe("New title");
+    expect(updated!.goal.description).toBe("new");
+
+    const reread = await store.getGoal(goal.id);
+    expect(reread!.goal.title).toBe("New title");
+    expect(reread!.goal.plan_json).toBeNull();
+    expect(reread!.milestones).toEqual([]);
+  });
+
+  it("keeps the current title when the new title is blank, and clears description with an empty string", async () => {
+    const store = freshStore();
+    const { goal } = await store.createGoal({ title: "Kept title", description: "keep me", plan: PLAN });
+
+    const updated = await store.renameGoal({ id: goal.id, title: "   ", description: "" });
+    expect(updated!.goal.title).toBe("Kept title");
+    expect(updated!.goal.description).toBe("");
+    // Plan/milestones are untouched by a rename.
+    expect((await store.getGoal(goal.id))!.milestones.length).toBe(PLAN.nodes.length);
+  });
+
+  it("returns null for an unknown aim", async () => {
+    expect(await freshStore().renameGoal({ id: "missing", title: "x" })).toBeNull();
+  });
+});
+
 describe("createJsonFileStore · round-trip", () => {
   it("creates, lists, gets, and deletes a goal", async () => {
     const store = freshStore();

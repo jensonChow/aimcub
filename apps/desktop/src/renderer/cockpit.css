@@ -6335,6 +6335,60 @@ kbd {
   color: var(--faint);
 }
 
+.od-journey-aim-rename {
+  margin: 6px 0 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--acc);
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-medium);
+  cursor: pointer;
+}
+
+.od-journey-aim-rename:hover,
+.od-journey-aim-rename:focus-visible {
+  text-decoration: underline;
+}
+
+.od-journey-aim-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.od-journey-aim-edit-title,
+.od-journey-aim-edit-desc {
+  width: 100%;
+  border: 1px solid var(--ring);
+  border-radius: var(--od-radius-sm);
+  background: var(--field);
+  color: var(--ink);
+  padding: 8px 10px;
+  font-family: inherit;
+}
+
+.od-journey-aim-edit-title {
+  font-size: var(--od-type-title);
+  font-weight: var(--od-font-weight-strong);
+}
+
+.od-journey-aim-edit-desc {
+  font-size: var(--od-type-meta);
+  resize: vertical;
+}
+
+.od-journey-aim-edit-title:focus-visible,
+.od-journey-aim-edit-desc:focus-visible {
+  outline: none;
+  border-color: var(--acc);
+}
+
+.od-journey-aim-edit-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .od-journey-head-meta {
   flex: none;
   display: flex;

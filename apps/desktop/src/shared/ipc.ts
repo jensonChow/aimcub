@@ -129,6 +129,16 @@ export interface UpdateGoalPlanRequest {
 }
 
 /**
+ * Rename an existing aim's title/description in place — no plan change. Works on a plan-less shell
+ * or a planned goal (unlike {@link UpdateGoalPlanRequest}, which requires a plan).
+ */
+export interface RenameAimRequest {
+  goalId: string;
+  title?: string;
+  description?: string;
+}
+
+/**
  * A decomposition result over IPC. There is no offline/template fallback: when no
  * provider is configured or the LLM call fails, `ok` is false and `errors` carries the
  * reason for the UI to surface honestly.
@@ -423,6 +433,8 @@ export interface AimcubApi {
   createAim(req: CreateAimRequest): Promise<SavedGoal>;
   /** Land or re-plan the plan of an existing aim in place (no fork); null if the aim is gone. */
   updateGoalPlan(req: UpdateGoalPlanRequest): Promise<SavedGoal | null>;
+  /** Rename an aim's title/description in place (works on a plan-less shell); null if the aim is gone. */
+  renameGoal(req: RenameAimRequest): Promise<Goal | null>;
   listGoals(): Promise<Goal[]>;
   getGoal(id: string): Promise<GoalDetail | null>;
   getAimProgress(id: string): Promise<AimProgressReadModel | null>;
@@ -478,6 +490,7 @@ export const IPC = {
   saveGoal: "aimcub:saveGoal",
   createAim: "aimcub:createAim",
   updateGoalPlan: "aimcub:updateGoalPlan",
+  renameGoal: "aimcub:renameGoal",
   listGoals: "aimcub:listGoals",
   getGoal: "aimcub:getGoal",
   getAimProgress: "aimcub:getAimProgress",

@@ -1358,6 +1358,36 @@ function AimOsApp() {
     }
   }
 
+  /** Rename the selected aim's title/description in place (shell or planned) — no plan change. */
+  async function renameAim(input: { title: string; description: string }) {
+    if (workflowMutationIsLocked() || !selected) return;
+    const goal = selected;
+    const transition = navigationConcurrencyRef.current.workspace;
+    const title = input.title.trim();
+    if (!title) return;
+    setBusy(t("os.busy.save"));
+    setError(null);
+    try {
+      const updated = await window.aimcub.renameGoal({ goalId: goal.id, title, description: input.description });
+      if (!isCurrentWorkspaceTransition(transition)) {
+        await refreshAll({ autoOpenFirstGoal: false });
+        return;
+      }
+      if (!updated) {
+        setError(t("planningError.save.message"));
+        return;
+      }
+      setSelected(updated);
+      setBusy(null);
+      await refreshGoalState(updated, transition, navigationConcurrencyRef.current.surface, { route: false });
+      void refreshListSurfaces();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function runAgent(milestone: Milestone) {
     if (workflowMutationIsLocked()) return;
     if (!selected) return;
@@ -1921,6 +1951,7 @@ function AimOsApp() {
         onCommitPlan: isPlanningShell ? undefined : (plan) => void commitPlanEdit(plan),
       } : undefined}
       onReplan={!isPlanningShell && (progress?.total_milestones ?? 0) > 0 ? () => void startShellResearch() : undefined}
+      onRenameAim={isPlanningShell ? undefined : (input) => void renameAim(input)}
       disabled={Boolean(busy)}
       elsewhereCount={journeyElsewhere.length}
       planningRuntimeReady={planningRuntimeReady}

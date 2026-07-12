@@ -926,6 +926,21 @@ describe("App planning state guards", () => {
     expect(createShell).toContain("draftPersistence.resumeAutosave();");
   });
 
+  it("renames the selected aim in place via renameGoal (no plan change)", () => {
+    const appSource = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+    const mainIpcSource = readFileSync(new URL("../main/ipc.ts", import.meta.url), "utf8");
+    const renameAim = appSource.match(/async function renameAim[\s\S]*?\n {2}async function runAgent/)?.[0] ?? "";
+
+    // Title/description-only patch through the epoch-safe App handler + the rename IPC.
+    expect(renameAim).toContain("window.aimcub.renameGoal({ goalId: goal.id, title, description: input.description })");
+    expect(renameAim).toContain("setSelected(updated)");
+    // Wired onto the Journey header, not a station interaction.
+    expect(appSource).toContain("onRenameAim={isPlanningShell ? undefined : (input) => void renameAim(input)}");
+    // The main handler renames without materializing a plan.
+    expect(mainIpcSource).toContain("ipcMain.handle(IPC.renameGoal");
+    expect(mainIpcSource).toContain("aimStore.renameGoal({ id: req.goalId, title: req.title, description: req.description })");
+  });
+
   it("requires an explicit discard path for draft deletion", () => {
     const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
     const openDraft = source.match(/async function openAimDraft[\s\S]*?\n {2}async function discardAimDraft/)?.[0] ?? "";

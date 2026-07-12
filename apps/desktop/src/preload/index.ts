@@ -10,6 +10,7 @@ const api: AimcubApi = {
   saveGoal: (req) => ipcRenderer.invoke(IPC.saveGoal, req),
   createAim: (req) => ipcRenderer.invoke(IPC.createAim, req),
   updateGoalPlan: (req) => ipcRenderer.invoke(IPC.updateGoalPlan, req),
+  renameGoal: (req) => ipcRenderer.invoke(IPC.renameGoal, req),
   listGoals: () => ipcRenderer.invoke(IPC.listGoals),
   getGoal: (id) => ipcRenderer.invoke(IPC.getGoal, id),
   getAimProgress: (id) => ipcRenderer.invoke(IPC.getAimProgress, id),
