@@ -1,10 +1,10 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-12
-Branch: `glass-journey-stage6`. Journey-first **Stages 1–5** are on `origin/main` (`6e6f190d`).
-**Stage 6 (goal-first routing flip) is COMPLETE** — 6A (create-shell + in-Journey first-plan +
-`updateGoalPlan` backbone) `970d21f0` + 6B (editable plan sheet + re-plan) — both full-gate + live-QA
-green. Ready to merge `glass-journey-stage6` → `main` (ask before push).
+Branch: `main`. **Stage 6 (goal-first routing flip) is COMPLETE, merged, and PUSHED** —
+`origin/main` = `d58cc6e1` (merge of `glass-journey-stage6`: 6A create-shell + in-Journey first-plan +
+`updateGoalPlan` backbone `970d21f0`, 6B editable plan sheet + re-plan `3e865100`). Both sub-stages
+full-gate + live-QA green. **Next: Stage 7 (cleanup).**
 
 ## Active epic — Journey-first rebuild (staged)
 
