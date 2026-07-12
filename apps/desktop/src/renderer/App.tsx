@@ -1472,15 +1472,16 @@ function AimOsApp() {
     }
   }
 
-  function breakDown(milestone: Milestone) {
+  async function breakDown(milestone: Milestone) {
     if (workflowMutationIsLocked()) return;
     const plan = detail?.goal.plan_json as DecompositionOutput | null | undefined;
     const node = planNodeForMilestone(plan, milestone);
-    beginWorkspaceTransition();
-    resetComposer({ openComposer: true });
-    setParent({ goalId: milestone.goal_id, milestoneId: milestone.id });
-    setAimTitle(milestone.title);
-    setAimDescription([
+    // Goal-first: mint a linked CHILD shell (parent link carried on the create request) and open its
+    // Journey, exactly like a top-level aim — the child lands on the "build the plan" card. The rich
+    // decomposition-contract context becomes the child's persisted description so in-Journey planning
+    // has it. Captured before `resetComposer` clears `selected`.
+    const title = milestone.title;
+    const description = [
       selected ? `Parent aim: ${selected.title}` : "",
       milestone.description ? `Sub-aim context: ${milestone.description}` : "",
       node?.decomposition_contract?.definition_of_done
@@ -1491,9 +1492,24 @@ function AimOsApp() {
         : "",
       node?.decomposition_contract?.eval_signal ? `Eval signal: ${node.decomposition_contract.eval_signal}` : "",
       "Break this sub-aim into smaller sub-aims with concrete eval rules.",
-    ].filter(Boolean).join("\n"));
-    setMode("cockpit");
-    setStageOverride("aim");
+    ].filter(Boolean).join("\n");
+    setError(null);
+    setBusy(t("os.busy.save"));
+    try {
+      resetComposer();
+      const created = await window.aimcub.createAim({
+        title,
+        description,
+        parentGoalId: milestone.goal_id,
+        parentMilestoneId: milestone.id,
+      });
+      await refreshAll({ autoOpenFirstGoal: false });
+      await openGoal(created.goal, { checkpointDraft: false });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(null);
+    }
   }
 
   const activePlan = (finalPlan ?? draft ?? detail?.goal.plan_json ?? null) as DecompositionOutput | null;
@@ -1826,7 +1842,7 @@ function AimOsApp() {
         const result = await window.aimcub.pickLocalContextFiles();
         return result.canceled ? [] : result.paths;
       }}
-      onBreakDown={breakDown}
+      onBreakDown={(milestone) => void breakDown(milestone)}
       onReviewEval={() => openCockpitStage("eval")}
       onProofDraftActiveChange={handleProofDraftActiveChange}
     />

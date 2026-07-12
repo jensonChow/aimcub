@@ -428,6 +428,29 @@ describe("createJsonFileStore · createAimShell", () => {
     // Still exactly one goal — the shell was updated in place, not forked.
     expect((await store.listGoals()).length).toBe(1);
   });
+
+  it("links a sub-aim relation when a shell is created with a parent (goal-first breakdown)", async () => {
+    const store = freshStore();
+    const { goal: parent, milestones: parentMilestones } = await store.createGoal({
+      title: "Parent aim",
+      plan: PLAN,
+    });
+
+    const { goal: child } = await store.createAimShell({
+      title: "Child shell",
+      description: "Break this sub-aim down.",
+      parentGoalId: parent.id,
+      parentMilestoneId: parentMilestones[0]!.id,
+    });
+
+    // The child is a plan-less shell (planning happens in-Journey), yet the parent link is recorded.
+    expect(child.plan_json).toBeNull();
+    const relations = await store.listSubAimRelations(parent.id);
+    expect(relations).toHaveLength(1);
+    expect(relations[0]!.child_goal_id).toBe(child.id);
+    expect(relations[0]!.parent_goal_id).toBe(parent.id);
+    expect(relations[0]!.parent_milestone_id).toBe(parentMilestones[0]!.id);
+  });
 });
 
 describe("createJsonFileStore · round-trip", () => {
