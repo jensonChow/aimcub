@@ -1454,12 +1454,6 @@ describe("CockpitShell", () => {
     expect(html).toContain("Recent aims");
     expect(html).toContain("Saved aims appear here.");
     expect(html).not.toContain('class="od-aim-card selected"');
-    expect(html).toContain('aria-label="Workbench navigation"');
-    expect(html).toContain('data-stage="aim"');
-    expect(html).toContain('data-stage="context"');
-    expect(html).toContain('data-stage="contracts"');
-    expect(html).not.toContain('data-stage="run"');
-    expect(html).not.toContain('data-stage="eval"');
   });
 
   it("keeps every recoverable draft reachable in the scrolling sidebar", () => {
@@ -1585,7 +1579,6 @@ describe("CockpitShell", () => {
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
 
     expect(css).toMatch(/\.od-main\s*{[^}]*--od-rail-operational:\s*940px;[^}]*--od-rail-reading:\s*760px;[^}]*--od-rail-compose:\s*560px;/s);
-    expect(css).toMatch(/\.od-stage-nav\s*{[^}]*width:\s*min\(100%, var\(--od-rail-operational\)\);[^}]*justify-content:\s*flex-start;/s);
     expect(css).toMatch(/\.od-workspace\s*{[^}]*width:\s*min\(100%, var\(--od-rail-operational\)\);/s);
     expect(css).toMatch(/\.od-workspace-aim:has\(> \.od-initial-workspace\[data-has-drafts="true"\]\)\s*{[^}]*align-content:\s*safe center;[^}]*justify-items:\s*stretch;/s);
     expect(css).toMatch(/\.od-initial-workspace\[data-has-drafts="true"\]\s*{[^}]*min-height:\s*0;[^}]*align-content:\s*start;[^}]*padding:\s*0;/s);
@@ -1593,11 +1586,10 @@ describe("CockpitShell", () => {
     expect(css).toMatch(/\.od-context-focus\s*{[^}]*width:\s*min\(100%, var\(--od-rail-reading\)\);[^}]*padding-top:\s*0;/s);
   });
 
-  it("reserves a stage-nav row for saved Aim overview at compact widths", () => {
+  it("keeps the saved Aim overview centered at compact widths", () => {
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
 
     expect(css).toMatch(/\.od-main-aim\s*{[^}]*grid-template-rows:\s*minmax\(0,\s*1fr\);[^}]*}/s);
-    expect(css).toMatch(/\.od-main-aim:has\(>\s*\.od-stage-nav\)\s*{[^}]*grid-template-rows:\s*auto minmax\(0,\s*1fr\);[^}]*}/s);
     expect(css).toMatch(/\.od-workspace-aim:has\(>\s*\.od-aim-overview\)\s*{[^}]*align-content:\s*safe center;[^}]*}/s);
     expect(css).toMatch(/\.od-draft-aim-overview \.od-aim-intake-head > div\s*{[^}]*min-width:\s*0;/s);
     expect(css).toMatch(/\.od-draft-aim-overview h1,\s*\.od-draft-aim-overview p\s*{[^}]*overflow-wrap:\s*anywhere;/s);
@@ -1727,41 +1719,6 @@ describe("CockpitShell", () => {
     expect(main).toContain("minHeight: MIN_WINDOW_HEIGHT");
   });
 
-  it("renders compact non-linear workbench navigation without numbered stage pills", () => {
-    const html = renderToStaticMarkup(
-      <I18nProvider>
-        <CockpitShell
-          goals={[savedGoal]}
-          activeStage="context"
-          workspaceTarget={{ kind: "goal", id: savedGoal.id }}
-          onHome={noop}
-          onNewAim={noop}
-          onOpenGoal={noop}
-          onStage={noop}
-          main={<div>Context stage</div>}
-        />
-      </I18nProvider>,
-    );
-
-    expect(html).toContain('aria-label="Workbench navigation"');
-    expect(html).toContain('class="od-stage-current"');
-    expect(html).toContain('<span class="od-stage-current-label">Surface</span>');
-    expect(html).toContain('<strong class="od-stage-current-title">Context</strong>');
-    expect(html).toContain('class="od-stage-switcher" role="group" aria-label="Workbench surfaces"');
-    expect(html).toContain('data-stage="aim"');
-    expect(html).toContain('data-stage="context"');
-    expect(html).toContain('data-stage="contracts"');
-    expect(html).toContain('data-stage="run"');
-    expect(html).toContain('data-stage="eval"');
-    expect(html).toContain('<span class="od-stage-title">Aim</span>');
-    expect(html).toContain('<span class="od-stage-title">Contracts</span>');
-    expect(html).toContain('<span class="od-stage-title">Work</span>');
-    expect(html).toContain('<span class="od-stage-title">Review</span>');
-    expect(html).toContain('<button class="active" type="button" aria-current="page" data-stage="context"');
-    expect(html).not.toContain("od-stage-index");
-    expect(html).not.toContain('aria-current="step"');
-  });
-
   it("keeps command palette and keyboard stage mappings on the same workbench stages", () => {
     const source = readFileSync(new URL("./CockpitShell.tsx", import.meta.url), "utf8");
 
@@ -1785,28 +1742,7 @@ describe("CockpitShell", () => {
     expect(stageSafeAreaRule).toContain("padding-top: max(24px, var(--stage-nav-titlebar-safe-top));");
     expect(css).not.toContain('.od-main:not(.od-main-aim):not(.od-main-settings)');
     expect(stageSafeAreaRule).not.toMatch(/\.od-sidebar|\.od-user-menu-|\.od-window-drag-strip/);
-    expect(css).toMatch(/\.od-stage-nav\s*{[^}]*justify-content:\s*flex-start;[^}]*gap:\s*12px;[^}]*min-height:\s*32px;/s);
-    expect(css).toMatch(/\.od-stage-switcher\s*{[^}]*gap:\s*4px;[^}]*padding:\s*2px;[^}]*border:\s*1px solid var\(--od-border-soft\);/s);
-    expect(css).toMatch(/\.od-stage-nav button\s*{[^}]*max-width:\s*112px;[^}]*min-height:\s*28px;[^}]*background:\s*transparent;/s);
     expect(css).not.toContain(".od-stage-index");
-  });
-
-  it("wraps and compresses workbench navigation without shell selector changes", () => {
-    const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
-    const compactStageNavRule = css.match(/@media \(max-width: 1040px\)\s*{[\s\S]*?\.od-stage-nav\s*{[^}]*}/)?.[0] ?? "";
-    const compactStageSwitcherRule = css.match(/@media \(max-width: 1040px\)\s*{[\s\S]*?\.od-stage-switcher\s*{[^}]*}/)?.[0] ?? "";
-    const narrowStageCurrentLabelRule = css.match(/\.od-stage-current-label\s*{[^}]*display:\s*none;[^}]*}/s)?.[0] ?? "";
-    const narrowStageSwitcherRule = css.match(/\.od-stage-switcher\s*{[^}]*flex:\s*1 1 320px;[^}]*}/s)?.[0] ?? "";
-    const narrowStageNavButtonRule = css.match(/\.od-stage-nav button\s*{[^}]*flex:\s*1 1 0;[^}]*}/s)?.[0] ?? "";
-
-    expect(compactStageNavRule).toMatch(/\.od-stage-nav\s*{[^}]*flex-wrap:\s*wrap;[^}]*row-gap:\s*8px;/s);
-    expect(compactStageSwitcherRule).toMatch(/\.od-stage-switcher\s*{[^}]*flex:\s*0 1 auto;/s);
-    expect(narrowStageCurrentLabelRule).toMatch(/\.od-stage-current-label\s*{[^}]*display:\s*none;/s);
-    expect(narrowStageSwitcherRule).toMatch(/\.od-stage-switcher\s*{[^}]*flex:\s*1 1 320px;/s);
-    expect(narrowStageNavButtonRule).toMatch(/\.od-stage-nav button\s*{[^}]*flex:\s*1 1 0;[^}]*max-width:\s*none;[^}]*padding:\s*0 8px;/s);
-    expect(narrowStageNavButtonRule).not.toMatch(/\.od-sidebar|\.od-user-menu-|\.od-window-drag-strip|data-sidebar-state/);
-    expect(narrowStageSwitcherRule).not.toMatch(/\.od-sidebar|\.od-user-menu-|\.od-window-drag-strip|data-sidebar-state/);
-    expect(narrowStageCurrentLabelRule).not.toMatch(/\.od-sidebar|\.od-user-menu-|\.od-window-drag-strip|data-sidebar-state/);
   });
 
   it("replaces the primary left sidebar with settings navigation on settings stage", () => {

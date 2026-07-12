@@ -542,7 +542,6 @@ kbd {
 .od-chip,
 .od-sidebar-toggle,
 .od-filter-row button,
-.od-stage-nav button,
 .od-aim-card,
 .od-content-entry,
 .od-content-entry-main,
@@ -559,7 +558,6 @@ kbd {
 .od-chip:active,
 .od-sidebar-toggle:active,
 .od-filter-row button:active,
-.od-stage-nav button:active,
 .od-aim-card:active,
 .od-content-entry-main:active,
 .od-action-menu-trigger:active,
@@ -1529,7 +1527,7 @@ kbd {
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: 16px;
   padding: 24px clamp(24px, 4vw, 32px);
   /* Transparent so the desktop gradient reads as the work area behind stage cards. */
@@ -1538,10 +1536,6 @@ kbd {
 
 .od-main-aim {
   grid-template-rows: minmax(0, 1fr);
-}
-
-.od-main-aim:has(> .od-stage-nav) {
-  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .od-main-settings {
@@ -1555,99 +1549,6 @@ kbd {
 .od-app[data-sidebar-state="collapsed"] .od-main:not(.od-main-settings),
 .od-app[data-sidebar-state="peek"] .od-main:not(.od-main-settings) {
   padding-top: max(24px, var(--stage-nav-titlebar-safe-top));
-}
-
-.od-stage-nav {
-  width: min(100%, var(--od-rail-operational));
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 12px;
-  min-height: 32px;
-}
-
-.od-stage-current {
-  flex: 0 1 144px;
-  min-width: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--od-muted);
-  font-size: var(--od-type-meta);
-  line-height: var(--od-line-meta);
-  white-space: nowrap;
-}
-
-.od-stage-current-label {
-  color: var(--od-meta);
-  font-weight: var(--od-font-weight-medium);
-}
-
-.od-stage-current-title {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--od-fg);
-  font-weight: var(--od-font-weight-semibold);
-  text-overflow: ellipsis;
-}
-
-.od-stage-switcher {
-  min-width: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px;
-  border: 1px solid var(--od-border-soft);
-  border-radius: var(--od-radius-sm);
-  background: var(--od-surface-warm);
-}
-
-.od-stage-nav button {
-  min-width: 0;
-  max-width: 112px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 28px;
-  border: 1px solid transparent;
-  border-radius: calc(var(--od-radius-sm) - 2px);
-  background: transparent;
-  color: var(--od-muted);
-  padding: 0 10px;
-  cursor: pointer;
-}
-
-.od-stage-nav button:hover,
-.od-stage-nav button:focus-visible {
-  border-color: transparent;
-  background: var(--od-interaction-hover-bg);
-  box-shadow: var(--od-interaction-hover-shadow);
-  color: var(--od-fg);
-}
-
-.od-stage-nav button:focus-visible {
-  box-shadow: var(--od-interaction-focus-shadow);
-}
-
-.od-stage-nav button.active {
-  border-color: var(--od-border-soft);
-  background: var(--od-bg);
-  box-shadow: none;
-  color: var(--od-fg);
-}
-
-.od-stage-title {
-  display: block;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.od-stage-title {
-  font-size: var(--od-type-meta);
-  font-weight: var(--od-font-weight-semibold);
 }
 
 .od-workspace {
@@ -6169,15 +6070,6 @@ kbd {
     opacity: 1;
     box-shadow: var(--od-shadow-peek);
   }
-
-  .od-stage-nav {
-    flex-wrap: wrap;
-    row-gap: 8px;
-  }
-
-  .od-stage-switcher {
-    flex: 0 1 auto;
-  }
 }
 
 @media (max-width: 760px) {
@@ -6210,33 +6102,6 @@ kbd {
     inset: auto;
     height: auto;
     z-index: 10;
-  }
-
-  .od-stage-nav {
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .od-stage-current {
-    flex: 0 1 120px;
-  }
-
-  .od-stage-current-label {
-    display: none;
-  }
-
-  .od-stage-switcher {
-    flex: 1 1 320px;
-  }
-
-  .od-stage-nav button {
-    flex: 1 1 0;
-    max-width: none;
-    padding: 0 8px;
-  }
-
-  .od-stage-title {
-    max-width: 100%;
   }
 
   .od-context-source-status-list,
