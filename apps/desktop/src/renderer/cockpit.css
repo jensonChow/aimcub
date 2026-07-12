@@ -7070,6 +7070,19 @@ kbd {
   line-height: 1.55;
 }
 
+/* Plan station sheet interior: hosts the reused read-only PlanPanel (saved=true). `.od-stage-panel`
+   is a bare grid and `.od-plan-editor` has no own rule, so there is no nested card chrome to strip —
+   the only redundancy is the panel's own "Sub-aims" kicker (the sheet head already carries the PLAN
+   label), which is hidden in-sheet. Descendant-only scoping — never edit the pinned .od-plan-contract-*
+   base rules (guarded by the PlanPanel cockpit.css snapshot in App.test.tsx). */
+.od-journey-plan {
+  display: grid;
+}
+
+.od-journey-plan .od-stage-kicker {
+  display: none;
+}
+
 .od-journey-sheet-foot {
   margin-top: 16px;
   display: flex;

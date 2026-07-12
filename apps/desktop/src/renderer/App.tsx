@@ -1787,6 +1787,14 @@ function AimOsApp() {
           researchMemories={memories.filter((memory) => memory.goal_id === selected.id || memory.goal_id === null)}
           contextLoop={contextLoop}
           contextReview={contextReview}
+          planReview={activePlan ? {
+            plan: activePlan,
+            quality: planResult?.quality ?? null,
+            review: planResult?.review ?? null,
+            validationErrors: activePlanValidationMessages,
+            routingAgents,
+            routingValidation: planRoutingValidation,
+          } : undefined}
           disabled={Boolean(busy)}
           elsewhereCount={elsewhere.length}
           onOpenStage={openCockpitStage}
