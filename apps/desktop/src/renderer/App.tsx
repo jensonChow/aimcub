@@ -35,7 +35,6 @@ import { buildContextCandidateAcceptRequest, type ContextInboxScope } from "./Co
 import { ContextSourcesPanel } from "./ContextSourcesPanel";
 import { buildContextBundleReview } from "./contextReview";
 import {
-  aimSurfaceAfterSubmit,
   deriveAimHelperProfile,
   hasPlanningRuntime,
   routeAfterAimSubmit,
@@ -58,7 +57,6 @@ import { buildContextLoopModel } from "./stages/context/contextLoop";
 import { ContextReviewPanel } from "./stages/context/ContextReviewPanel";
 import { ContextStage } from "./stages/context/ContextStage";
 import type { ClarifyPhase, ContextAnswerMap } from "./stages/context/types";
-import { DraftAimOverviewPanel } from "./stages/aim/DraftAimOverviewPanel";
 import { EvalStage } from "./stages/eval/EvalStage";
 import { ExecutePanel } from "./stages/execute/ExecutePanel";
 import { NewAimComposer } from "./stages/aim/NewAimComposer";
@@ -133,13 +131,8 @@ import { shortText } from "./workflow/text";
 
 export { buildSettingsModel };
 
-type AimSurfaceMode = "idle" | "compose" | "summary" | "edit";
+type AimSurfaceMode = "idle" | "compose";
 const MAX_ADAPTIVE_INTAKE_TURNS = 6;
-
-interface AimEditBuffer {
-  title: string;
-  description: string;
-}
 
 interface AimDraftPersistenceOverrides {
   title?: string;
@@ -175,8 +168,6 @@ function AimOsApp() {
   const [aimSurfaceMode, setAimSurfaceMode] = useState<AimSurfaceMode>("idle");
   const [aimTitle, setAimTitle] = useState("");
   const [aimDescription, setAimDescription] = useState("");
-  const [aimEditBuffer, setAimEditBuffer] = useState<AimEditBuffer | null>(null);
-  const [restoreAimEditFocus, setRestoreAimEditFocus] = useState(false);
   const [parent, setParent] = useState<{ goalId: string; milestoneId: string } | null>(null);
   const [draft, setDraft] = useState<DecompositionOutput | null>(null);
   const [finalPlan, setFinalPlan] = useState<DecompositionOutput | null>(null);
@@ -291,15 +282,6 @@ function AimOsApp() {
       const message = t("os.proofNavigationBlocked");
       proofNavigationErrorRef.current = message;
       setError(message);
-      return true;
-    }
-    if (aimSurfaceMode === "edit") {
-      setError({
-        title: t("aimDraft.edit.navigationTitle"),
-        message: t("aimDraft.edit.navigationMessage"),
-        recovery: t("aimDraft.edit.navigationRecovery"),
-        details: [],
-      });
       return true;
     }
     return navigationConcurrencyRef.current.saveInFlight || Boolean(discardInFlightDraftIdRef.current);
@@ -475,8 +457,6 @@ function AimOsApp() {
       setBusy(null);
       setMode("cockpit");
       setAimSurfaceMode("idle");
-      setAimEditBuffer(null);
-      setRestoreAimEditFocus(false);
       setActiveDraftId(null);
       setDetail(null);
       setProgress(null);
@@ -555,8 +535,6 @@ function AimOsApp() {
     setStageOverride("aim");
     setActiveDraftId(null);
     setAimSurfaceMode(options.openComposer ? "compose" : "idle");
-    setAimEditBuffer(null);
-    setRestoreAimEditFocus(false);
     setAimTitle("");
     setAimDescription("");
     setParent(null);
@@ -593,52 +571,19 @@ function AimOsApp() {
   }
 
   async function startDraft(
-    options: { skipIntakeGate?: boolean; aim?: AimEditBuffer; shell?: { goalId: string; title: string; description: string } } = {},
+    options: { skipIntakeGate?: boolean; shell: { goalId: string; title: string; description: string } },
   ) {
     if (workflowMutationIsLocked()) return;
     const transition = navigationConcurrencyRef.current.workspace;
-    const requestedTitle = options.shell?.title ?? options.aim?.title ?? aimTitle;
-    const requestedDescription = options.shell?.description ?? options.aim?.description ?? aimDescription;
-    const title = requestedTitle.trim();
-    if (options.shell) {
-      // Goal-first: the shell aim already exists, so skip the composer-surface + draft-checkpoint
-      // funnel logic entirely (no draft is persisted — the autosave effect is inert while a goal is
-      // `selected`) and run the same planning orchestration in-Journey against the shell.
-      setRuntimeGuidanceVisible(false);
-      setError(null);
-      setDraftSaveBlock(null);
-      setPlanningDebugTraces([]);
-    } else {
-      const route = routeAfterAimSubmit({ title, provider, localAgents });
-      if (route === "missing_aim") return;
-      const nextAimSurface = aimSurfaceAfterSubmit({
-        action: route,
-        current: aimSurfaceMode === "edit" ? "edit" : "compose",
-      });
-      if (nextAimSurface === "summary" && !(await checkpointSubmittedAim({
-        title: requestedTitle,
-        description: requestedDescription,
-        resetPlanning: Boolean(options.aim),
-      }))) return;
-      setAimSurfaceMode(nextAimSurface);
-      if (nextAimSurface === "summary") setAimEditBuffer(null);
-      if (route === "show_helper_guidance") {
-        setError(null);
-        setRuntimeGuidanceVisible(true);
-        setMode("cockpit");
-        setStageOverride("aim");
-        return;
-      }
-      if (options.aim) {
-        setAimTitle(options.aim.title);
-        setAimDescription(options.aim.description);
-        resetPlanningForAimUpdate();
-      }
-      setRuntimeGuidanceVisible(false);
-      setError(null);
-      setDraftSaveBlock(null);
-      setPlanningDebugTraces([]);
-    }
+    const requestedDescription = options.shell.description;
+    const title = options.shell.title.trim();
+    // Goal-first: the shell aim already exists — run the planning orchestration in-Journey against it.
+    // The composer-surface + draft-checkpoint funnel is gone (no draft is persisted here; the autosave
+    // effect is inert while a goal is `selected`).
+    setRuntimeGuidanceVisible(false);
+    setError(null);
+    setDraftSaveBlock(null);
+    setPlanningDebugTraces([]);
     const runId = startPlanningRun();
     try {
       if (!options.skipIntakeGate) {
@@ -666,14 +611,7 @@ function AimOsApp() {
       setBusy(t("os.busy.draft"));
       setMode("drafting");
       setStageOverride("contracts");
-      const planningDescription = options.aim
-        ? buildDescriptionWithContext({
-          baseDescription: requestedDescription,
-          intakeClarify: null,
-          intakeAnswers: {},
-          contextNote: "",
-        })
-        : descriptionWithContext(requestedDescription);
+      const planningDescription = descriptionWithContext(requestedDescription);
       const req = { title, description: planningDescription, clientRunId: runId };
       const nextDraft = await window.aimcub.draft(req);
       if (!isCurrentPlanningRun(runId, transition)) return;
@@ -809,50 +747,8 @@ function AimOsApp() {
     }
   }
 
-  async function checkpointSubmittedAim(input: {
-    title: string;
-    description: string;
-    resetPlanning: boolean;
-  }): Promise<boolean> {
-    const transition = navigationConcurrencyRef.current.workspace;
-    draftPersistence.pauseAutosave();
-    setBusy(t("os.busy.captureAim"));
-    try {
-      const saved = await persistCurrentDraftNow({
-        title: input.title,
-        description: input.description,
-        aimSurface: "summary",
-        resetPlanning: input.resetPlanning,
-      }, { navigation: true, throwOnError: true });
-      if (!isCurrentWorkspaceTransition(transition)) return false;
-      if (saved) return true;
-      throw new Error("Submitted Aim checkpoint did not persist.");
-    } catch (err) {
-      if (!isCurrentWorkspaceTransition(transition)) return false;
-      setError({
-        title: t("aimDraft.checkpointErrorTitle"),
-        message: t("aimDraft.checkpointErrorMessage"),
-        recovery: t("aimDraft.checkpointErrorRecovery"),
-        details: [err instanceof Error ? err.message : String(err)],
-      });
-      return false;
-    } finally {
-      draftPersistence.resumeAutosave();
-      if (isCurrentWorkspaceTransition(transition)) setBusy(null);
-    }
-  }
-
   async function refreshAimDrafts() {
     setAimDrafts(await window.aimcub.listAimDrafts().catch(() => []));
-  }
-
-  function productErrorFromSaveBlock(saveBlock: AimDraftSaveBlock): ProductError {
-    return {
-      title: saveBlock.title,
-      message: saveBlock.message,
-      recovery: saveBlock.recovery,
-      details: [],
-    };
   }
 
   function applyHydratedDraft(hydrated: HydratedAimDraft) {
@@ -864,41 +760,30 @@ function AimOsApp() {
     setProgress(null);
     setJournalEvents([]);
     setActiveDraftId(hydrated.id);
-    setAimSurfaceMode(hydrated.aimSurface);
-    setAimEditBuffer(null);
-    setRestoreAimEditFocus(false);
+    // Goal-first: every resume lands back in the composer with the aim's title/description. The
+    // legacy plan/clarify/parent/summary hydration fed the removed intake funnel and is dropped;
+    // submitting from the composer mints a shell and planning happens in-Journey.
+    setAimSurfaceMode("compose");
     setAimTitle(hydrated.title);
     setAimDescription(hydrated.description);
-    setParent(hydrated.parent);
-    setDraft(hydrated.draft);
-    setFinalPlan(hydrated.finalPlan);
-    setPlanResult(hydrated.finalPlan || hydrated.draft ? {
-      ok: true,
-      output: hydrated.finalPlan ?? hydrated.draft,
-      errors: [],
-    } : null);
+    setParent(null);
+    setDraft(null);
+    setFinalPlan(null);
+    setPlanResult(null);
     setPlanningDebugTraces([]);
     setPlanningLiveEvents([]);
     clearPlanningRun();
-    setIntakeClarify(hydrated.intakeClarify);
-    setIntakeAnswers(hydrated.intakeAnswers);
-    setClarifyPhase(hydrated.phase);
-    setClarify(hydrated.phase === "intake"
-      ? hydrated.intakeClarify
-      : hydrated.phase === "postDraft"
-        ? hydrated.clarify ?? { questions: [], assumptions: [] }
-        : hydrated.clarify);
-    setAnswers(hydrated.clarifyAnswers);
-    setContextNote(hydrated.contextNote);
-    setDraftSaveBlock(hydrated.saveBlock);
-    setError(hydrated.saveBlock ? productErrorFromSaveBlock(hydrated.saveBlock) : null);
+    setIntakeClarify(null);
+    setIntakeAnswers({});
+    setClarifyPhase(null);
+    setClarify(null);
+    setAnswers({});
+    setContextNote("");
+    setDraftSaveBlock(null);
+    setError(null);
     setRuntimeGuidanceVisible(false);
-    setMode(hydrated.stage === "contracts"
-      ? "reviewing"
-      : hydrated.stage === "context"
-        ? hydrated.phase === "postDraft" ? "answering" : "contexting"
-        : "cockpit");
-    setStageOverride(hydrated.stage);
+    setMode("cockpit");
+    setStageOverride("aim");
   }
 
   async function openAimDraft(draftRow: AimDraft) {
@@ -996,13 +881,14 @@ function AimOsApp() {
 
   async function continueFromContext() {
     if (workflowMutationIsLocked()) return;
-    // Goal-first: while planning a shell, the aim's title/description live on the shell goal (the
-    // composer state is empty), and the draft-gen re-entry must stay on the shell branch.
+    // Goal-first: planning only ever runs against a shell now (the unsaved-aim funnel is gone), so the
+    // aim's title/description live on the shell goal.
     const shellOpt = isPlanningShell && selected
       ? { goalId: selected.id, title: selected.title, description: selected.description ?? "" }
       : undefined;
-    const runTitle = shellOpt?.title ?? aimTitle;
-    const runDescription = shellOpt?.description ?? aimDescription;
+    if (!shellOpt) return;
+    const runTitle = shellOpt.title;
+    const runDescription = shellOpt.description;
     const priorQuestions = intakeClarify?.questions ?? [];
     if (priorQuestions.length === 0 || priorQuestions.length >= MAX_ADAPTIVE_INTAKE_TURNS) {
       setClarifyPhase(null);
@@ -1548,16 +1434,6 @@ function AimOsApp() {
   // Goal-first: this selected goal is a plan-less shell mid first-plan (an in-Journey planning run is
   // active), so the Journey stays mounted and hosts the research/clarify/plan-review interaction.
   const isPlanningShell = planningShellId !== null && planningShellId === selected?.id;
-  const draftAimOverviewState = draftSaveBlock
-    ? "saveBlocked"
-    : activePlanValidation?.ok === false
-      ? "needsRepair"
-      : activePlan && clarifyPhase === null
-        ? "planReady"
-        : !activePlan && clarifyPhase === null && !planningRuntimeReady
-          ? "helperSetup"
-          : "context";
-  const draftAimNextSurface = draftAimOverviewState === "context" ? "context" : "contracts";
   const activePlanValidationMessages = activePlanValidation?.ok === false
     ? formatPlanValidationIssues(activePlanValidation.errors, t)
     : [];
@@ -1572,19 +1448,15 @@ function AimOsApp() {
     || Boolean(parent)
     || Boolean(draft)
     || Boolean(activeDraftId);
-  const showAimEditor = aimSurfaceMode === "compose" || aimSurfaceMode === "edit";
+  const showAimEditor = aimSurfaceMode === "compose";
   const activeStage = stageOverride ?? cockpitStageFor(mode, selected, activePlan);
   const workspaceTarget = deriveWorkspaceTarget({
     selectedGoalId: selected?.id ?? null,
     activeDraftId: aimSurfaceMode === "compose" ? null : activeDraftId,
     showAimComposer: hasTransientAimWork,
   });
-  const activeAimTitle = aimSurfaceMode === "edit" && aimEditBuffer
-    ? aimEditBuffer.title.trim()
-    : selected?.title ?? aimTitle.trim();
-  const activeAimDescription = aimSurfaceMode === "edit" && aimEditBuffer
-    ? aimEditBuffer.description
-    : selected?.description ?? aimDescription;
+  const activeAimTitle = selected?.title ?? aimTitle.trim();
+  const activeAimDescription = selected?.description ?? aimDescription;
   const activeAimHelper = useMemo(
     () => deriveAimHelperProfile({ title: activeAimTitle, description: activeAimDescription }),
     [activeAimDescription, activeAimTitle],
@@ -1645,7 +1517,6 @@ function AimOsApp() {
   }
 
   function openCockpitStage(stage: CockpitStage): boolean {
-    if (aimSurfaceMode === "edit" && stage === "aim") return true;
     if (navigationIsLocked() || pendingTargetNavigationRef.current) return false;
     if (stage !== "settings" && !isWorkbenchStageAvailable(workspaceTarget, stage)) return false;
     if (stage !== activeStage) {
@@ -1680,15 +1551,6 @@ function AimOsApp() {
     return true;
   }
 
-  function beginAimEdit() {
-    if (pendingTargetNavigationRef.current || !openCockpitStage("aim")) return;
-    setAimEditBuffer({ title: aimTitle, description: aimDescription });
-    setRestoreAimEditFocus(false);
-    setAimSurfaceMode("edit");
-    setRuntimeGuidanceVisible(false);
-    setError(null);
-  }
-
   function resetPlanningForAimUpdate() {
     setDraft(null);
     setFinalPlan(null);
@@ -1707,23 +1569,6 @@ function AimOsApp() {
     setError(null);
   }
 
-  function changeAimTitle(value: string) {
-    setAimEditBuffer((current) => current ? { ...current, title: value } : current);
-  }
-
-  function changeAimDescription(value: string) {
-    setAimEditBuffer((current) => current ? { ...current, description: value } : current);
-  }
-
-  function cancelAimEdit() {
-    if (!aimEditBuffer) return;
-    setAimEditBuffer(null);
-    setRestoreAimEditFocus(true);
-    setAimSurfaceMode("summary");
-    setMode("cockpit");
-    setRuntimeGuidanceVisible(false);
-    setError(draftSaveBlock ? productErrorFromSaveBlock(draftSaveBlock) : null);
-  }
 
   async function startNewAim() {
     if (navigationIsLocked()) return;
@@ -1760,7 +1605,7 @@ function AimOsApp() {
   }
 
   function openSettingsForAim() {
-    if ((aimSurfaceMode !== "edit" && navigationIsLocked()) || pendingTargetNavigationRef.current) return;
+    if (navigationIsLocked() || pendingTargetNavigationRef.current) return;
     beginSurfaceTransition();
     interruptPlanningForNavigation();
     settingsReturnStageRef.current = settingsReturnStage(
@@ -1785,12 +1630,6 @@ function AimOsApp() {
 
   function returnFromSettings() {
     if (planningRuntimeReady) setRuntimeGuidanceVisible(false);
-    if (aimSurfaceMode === "edit") {
-      beginSurfaceTransition();
-      setStageOverride("aim");
-      setMode("cockpit");
-      return;
-    }
     openCockpitStage(settingsReturnStageRef.current);
   }
 
@@ -1916,11 +1755,9 @@ function AimOsApp() {
     />
   );
   const continueContextToPlan = () => {
-    if (activePlan || selected) {
-      openCockpitStage("contracts");
-      return;
-    }
-    void startDraft();
+    // Goal-first: the Context stage is only reachable for a saved goal now, so continuing always
+    // opens the Plan (contracts) stage — the old unsaved-aim `startDraft` funnel is gone.
+    openCockpitStage("contracts");
   };
 
   // Aims (other than the selected one) with a turn waiting on the user → the header "N turns
@@ -2019,7 +1856,6 @@ function AimOsApp() {
           loop={contextLoop}
           showReview={shouldShowContextReviewInContext}
           reviewRunning={mode === "contexting" && Boolean(busy)}
-          onEditAim={selected || busy ? undefined : beginAimEdit}
           onOpenSettings={openContextSettings}
           onContextSources={setContextSources}
           onContinueToPlan={continueContextToPlan}
@@ -2066,63 +1902,26 @@ function AimOsApp() {
     }
     if (journeyView && !draft) return journeyView;
     if (showAimEditor) {
-      // Top-level new aim (not editing, not a child breakdown) → the Glass NEW AIM composer.
-      // Edit mode and child/parent breakdown keep the AimIntakePanel surface unchanged.
-      if (aimSurfaceMode === "compose" && !parent) {
-        const composerGuidance = runtimeGuidanceVisible && !planningRuntimeReady && activeAimHelper ? (
-          <AimHelperGuidancePanel
-            title={aimTitle}
-            profile={activeAimHelper}
-            onOpenSettings={openSettingsForAim}
-            onKeepEditing={() => setRuntimeGuidanceVisible(false)}
-          />
-        ) : null;
-        return (
-          <NewAimComposer
-            title={aimTitle}
-            description={aimDescription}
-            disabled={Boolean(busy)}
-            memoryCount={memories.length}
-            guidance={composerGuidance}
-            onTitle={setAimTitle}
-            onDescription={setAimDescription}
-            onSubmit={() => void createAimAndOpenJourney()}
-          />
-        );
-      }
-      return (
-        <AimIntakePanel
-          title={aimEditBuffer?.title ?? aimTitle}
-          description={aimEditBuffer?.description ?? aimDescription}
-          parent={parent}
-          mode={mode}
-          disabled={Boolean(busy)}
-          editing={aimSurfaceMode === "edit"}
-          restartsPlanning={Boolean(activePlan || clarifyPhase || draftSaveBlock)}
-          onTitle={aimSurfaceMode === "edit" ? changeAimTitle : setAimTitle}
-          onDescription={aimSurfaceMode === "edit" ? changeAimDescription : setAimDescription}
-          onDraft={() => void startDraft(aimSurfaceMode === "edit" && aimEditBuffer ? { aim: aimEditBuffer } : {})}
-          onCancelEdit={cancelAimEdit}
-          runtimeGuidance={runtimeGuidanceVisible && !planningRuntimeReady ? activeAimHelper : null}
+      // Goal-first: the composer is the only intake surface. Editing a saved aim happens in the
+      // Journey (rename); child breakdown mints a linked shell — both skip this funnel.
+      const composerGuidance = runtimeGuidanceVisible && !planningRuntimeReady && activeAimHelper ? (
+        <AimHelperGuidancePanel
+          title={aimTitle}
+          profile={activeAimHelper}
           onOpenSettings={openSettingsForAim}
           onKeepEditing={() => setRuntimeGuidanceVisible(false)}
         />
-      );
-    }
-    if (hasTransientAimWork) {
+      ) : null;
       return (
-        <DraftAimOverviewPanel
+        <NewAimComposer
           title={aimTitle}
           description={aimDescription}
-          child={Boolean(parent)}
-          state={draftAimOverviewState}
           disabled={Boolean(busy)}
-          focusEditAction={restoreAimEditFocus}
-          onEditFocusRestored={() => setRestoreAimEditFocus(false)}
-          onEdit={beginAimEdit}
-          onContinue={draftAimOverviewState === "helperSetup"
-            ? openSettingsForAim
-            : () => openCockpitStage(draftAimNextSurface)}
+          memoryCount={memories.length}
+          guidance={composerGuidance}
+          onTitle={setAimTitle}
+          onDescription={setAimDescription}
+          onSubmit={() => void createAimAndOpenJourney()}
         />
       );
     }
@@ -2187,150 +1986,6 @@ function ProductErrorNotice(props: { error: string | ProductError }) {
         </details>
       ) : null}
     </Notice>
-  );
-}
-
-function AimIntakePanel(props: {
-  title: string;
-  description: string;
-  parent: { goalId: string; milestoneId: string } | null;
-  mode: AppMode;
-  disabled: boolean;
-  editing: boolean;
-  restartsPlanning: boolean;
-  runtimeGuidance: AimHelperProfile | null;
-  onTitle: (value: string) => void;
-  onDescription: (value: string) => void;
-  onDraft: () => void;
-  onCancelEdit: () => void;
-  onOpenSettings: () => void;
-  onKeepEditing: () => void;
-}) {
-  const { t } = useI18n();
-  const titleInputRef = useRef<HTMLTextAreaElement | null>(null);
-  const contextInputRef = useRef<HTMLTextAreaElement | null>(null);
-  const [contextOpen, setContextOpen] = useState(() => props.description.trim().length > 0);
-  const hasAim = props.title.trim().length > 0;
-  const submitting = props.mode === "contexting" || props.mode === "drafting";
-  const disabled = props.disabled || !hasAim;
-  const intakeTitle = props.parent ? t("os.breakdownTitle") : t("aimIntake.workbenchTitle");
-  const intakeBody = props.parent ? t("aimIntake.subAimBody") : t("aimIntake.workbenchBody");
-  const composerPlaceholder = props.parent ? t("aimIntake.composerPlaceholder") : t("aimIntake.workbenchTitle");
-  const submitLabel = props.editing
-    ? t(props.restartsPlanning ? "aimDraft.edit.regenerate" : "aimDraft.edit.update")
-    : t("aimIntake.cta");
-
-  useEffect(() => {
-    if (props.description.trim().length > 0) setContextOpen(true);
-  }, [props.description]);
-
-  useEffect(() => {
-    if (!props.editing) return;
-    const timer = window.setTimeout(() => titleInputRef.current?.focus(), 0);
-    return () => window.clearTimeout(timer);
-  }, [props.editing]);
-
-  function openContextInput() {
-    setContextOpen(true);
-    window.setTimeout(() => contextInputRef.current?.focus(), 0);
-  }
-
-  return (
-    <section className={props.parent ? "od-aim-intake od-aim-intake-child" : "od-aim-intake"}>
-      {props.editing ? (
-        <div className="od-aim-edit-mode" data-od-id="aim-edit-mode">
-          <div>
-            <div className="od-aim-kicker">{t("aimDraft.edit.kicker")}</div>
-            <p>{t(props.restartsPlanning ? "aimDraft.edit.regenerateBody" : "aimDraft.edit.updateBody")}</p>
-          </div>
-          <button className="od-aim-secondary" type="button" disabled={props.disabled} onClick={props.onCancelEdit}>
-            {t("aimDraft.edit.cancel")}
-          </button>
-        </div>
-      ) : props.parent ? (
-        <div className="od-aim-intake-head">
-          <div>
-            <div className="od-aim-kicker">{t("os.subAimMode")}</div>
-            <h1>{intakeTitle}</h1>
-            <p>{intakeBody}</p>
-          </div>
-        </div>
-      ) : null}
-
-      <div className="od-aim-composer">
-        <textarea
-          id="aim-title"
-          ref={titleInputRef}
-          className="od-aim-title-input"
-          value={props.title}
-          onChange={(event) => props.onTitle(event.target.value)}
-          placeholder={composerPlaceholder}
-          aria-label={t("aimIntake.titleLabel")}
-          rows={2}
-        />
-        {contextOpen ? (
-          <textarea
-            id="aim-context"
-            ref={contextInputRef}
-            className="od-aim-context-input"
-            value={props.description}
-            onChange={(event) => props.onDescription(event.target.value)}
-            placeholder={t("aimIntake.contextPlaceholder")}
-            aria-label={t("aimIntake.contextLabel")}
-            rows={2}
-          />
-        ) : null}
-        <div className="od-aim-composer-toolbar">
-          <button
-            className="od-aim-composer-icon-button"
-            type="button"
-            onClick={openContextInput}
-            aria-label={t("aimIntake.addContext")}
-            title={t("aimIntake.addContext")}
-          >
-            <ComposerPlusIcon />
-          </button>
-          <span aria-hidden={!hasAim}>
-            {hasAim ? t(props.editing && props.restartsPlanning ? "aimDraft.edit.regenerateHint" : "aimIntake.readyHint") : null}
-          </span>
-          <button
-            className="od-aim-primary od-aim-send-button"
-            type="button"
-            onClick={props.onDraft}
-            disabled={disabled}
-            aria-label={submitting ? t("os.drafting") : submitLabel}
-            title={submitting ? t("os.drafting") : submitLabel}
-          >
-            <ComposerArrowUpIcon />
-          </button>
-        </div>
-      </div>
-
-      {props.runtimeGuidance ? (
-        <AimHelperGuidancePanel
-          title={props.title}
-          profile={props.runtimeGuidance}
-          onOpenSettings={props.onOpenSettings}
-          onKeepEditing={props.onKeepEditing}
-        />
-      ) : null}
-    </section>
-  );
-}
-
-function ComposerPlusIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
-      <path d="M10 4.2v11.6M4.2 10h11.6" />
-    </svg>
-  );
-}
-
-function ComposerArrowUpIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
-      <path d="M10 15.8V4.8M5.8 9l4.2-4.2L14.2 9" />
-    </svg>
   );
 }
 

@@ -786,74 +786,45 @@ describe("App planning state guards", () => {
     expect(openGoal).toContain('setAimSurfaceMode("idle")');
   });
 
-  it("separates new aim composition from committed draft summary and explicit editing", () => {
+  it("keeps a compose-only intake surface with no legacy funnel or edit machinery", () => {
     const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
     const startDraft = source.match(/async function startDraft[\s\S]*?\n {2}const builtAnswers/)?.[0] ?? "";
-    const checkpointSubmittedAim = source.match(/async function checkpointSubmittedAim[\s\S]*?\n {2}async function refreshAimDrafts/)?.[0] ?? "";
     const applyHydratedDraft = source.match(/function applyHydratedDraft[\s\S]*?async function openAimDraft/)?.[0] ?? "";
     const mainStage = source.match(/const mainStageContent = \(\(\) => \{[\s\S]*?\n {2}\}\)\(\);/)?.[0] ?? "";
     const draftAutosave = source.match(/useEffect\(\(\) => \{\n {4}if \(selected\) return;[\s\S]*?\n {2}\}\);/)?.[0] ?? "";
 
-    expect(source).toContain('type AimSurfaceMode = "idle" | "compose" | "summary" | "edit";');
-    expect(startDraft).toContain("if (options.aim) {");
-    expect(startDraft).toContain("resetPlanningForAimUpdate()");
-    expect(startDraft).toContain("aimSurfaceAfterSubmit");
-    expect(startDraft.indexOf("setAimSurfaceMode(nextAimSurface)")).toBeLessThan(
-      startDraft.indexOf('if (route === "show_helper_guidance")'),
-    );
-    expect(startDraft.indexOf("await checkpointSubmittedAim")).toBeLessThan(
-      startDraft.indexOf("setAimSurfaceMode(nextAimSurface)"),
-    );
-    expect(checkpointSubmittedAim).toContain('aimSurface: "summary"');
-    expect(checkpointSubmittedAim).toContain("{ navigation: true, throwOnError: true }");
-    expect(checkpointSubmittedAim).toContain("draftPersistence.pauseAutosave()");
-    expect(checkpointSubmittedAim).toContain("draftPersistence.resumeAutosave()");
-    expect(startDraft).toContain("setAimEditBuffer(null)");
-    expect(applyHydratedDraft).toContain("setAimSurfaceMode(hydrated.aimSurface)");
-    expect(source).toContain("aimSurface: overrides.aimSurface ?? persistedAimSurface(aimSurfaceMode)");
-    expect(draftAutosave).toContain("aimSurfaceMode");
-    expect(mainStage).toContain("if (showAimEditor)");
-    expect(mainStage).toContain('onTitle={aimSurfaceMode === "edit" ? changeAimTitle : setAimTitle}');
-    expect(mainStage).toContain('onDescription={aimSurfaceMode === "edit" ? changeAimDescription : setAimDescription}');
-    expect(mainStage).toContain("<DraftAimOverviewPanel");
-    expect(mainStage.indexOf("if (showAimEditor)")).toBeLessThan(mainStage.indexOf("<DraftAimOverviewPanel"));
-    expect(source).toContain('setAimSurfaceMode("edit")');
-    expect(source).not.toContain("aimComposerOpen || hasUnsavedAim");
+    // Goal-first: the surface mode is compose-only (no summary/edit funnel states).
+    expect(source).toContain('type AimSurfaceMode = "idle" | "compose";');
+    expect(source).toContain('const showAimEditor = aimSurfaceMode === "compose";');
     expect(source).toContain('activeDraftId: aimSurfaceMode === "compose" ? null : activeDraftId');
+    expect(draftAutosave).toContain("aimSurfaceMode");
+
+    // startDraft is shell-only — no unsaved-aim funnel (options.aim / aimSurfaceAfterSubmit / checkpoint).
+    expect(startDraft).toContain("options: { skipIntakeGate?: boolean; shell: {");
+    expect(startDraft).not.toContain("options.aim");
+    expect(startDraft).not.toContain("aimSurfaceAfterSubmit");
+    expect(startDraft).not.toContain("checkpointSubmittedAim");
+
+    // Resumes land in the composer (drop the legacy plan/summary/parent hydration).
+    expect(applyHydratedDraft).toContain('setAimSurfaceMode("compose")');
+    expect(applyHydratedDraft).not.toContain("hydrated.aimSurface");
+    expect(applyHydratedDraft).not.toContain("setParent(hydrated.parent)");
+
+    // The composer is the only intake surface; the funnel intake panels are gone.
+    expect(mainStage).toContain("if (showAimEditor)");
+    expect(mainStage).toContain("<NewAimComposer");
+    expect(mainStage).not.toContain("<AimIntakePanel");
+    expect(mainStage).not.toContain("<DraftAimOverviewPanel");
+
+    // The edit-mode machinery is fully removed.
+    expect(source).not.toContain("function beginAimEdit");
+    expect(source).not.toContain("aimEditBuffer");
+    expect(source).not.toContain('aimSurfaceMode === "edit"');
+    expect(source).not.toContain('setAimSurfaceMode("summary")');
+    expect(source).not.toContain("function checkpointSubmittedAim");
+
+    // continueContextToPlan is the saved-goal-only contracts hop (no unsaved-aim startDraft funnel).
     expect(source).toContain("const continueContextToPlan = () => {");
-    expect(source).not.toContain("const continueContextToPlan = parent ? undefined");
-  });
-
-  it("keeps an explicit aim edit aligned with downstream planning state", () => {
-    const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
-    const startDraft = source.match(/async function startDraft[\s\S]*?\n {2}const builtAnswers/)?.[0] ?? "";
-    const beginEdit = source.match(/function beginAimEdit[\s\S]*?function resetPlanningForAimUpdate/)?.[0] ?? "";
-    const resetPlanning = source.match(/function resetPlanningForAimUpdate[\s\S]*?function changeAimTitle/)?.[0] ?? "";
-    const changeTitle = source.match(/function changeAimTitle[\s\S]*?function changeAimDescription/)?.[0] ?? "";
-    const cancel = source.match(/function cancelAimEdit[\s\S]*?async function startNewAim/)?.[0] ?? "";
-    const navigationLock = source.match(/function navigationIsLocked[\s\S]*?function workflowMutationIsLocked/)?.[0] ?? "";
-
-    expect(beginEdit).toContain("setAimEditBuffer({ title: aimTitle, description: aimDescription })");
-    expect(beginEdit).toContain('if (pendingTargetNavigationRef.current || !openCockpitStage("aim")) return;');
-    expect(beginEdit).not.toContain("setDraft(null)");
-    expect(changeTitle).toContain("setAimEditBuffer");
-    expect(changeTitle).not.toContain("setAimTitle");
-    expect(resetPlanning).toContain("setDraft(null)");
-    expect(resetPlanning).toContain("setFinalPlan(null)");
-    expect(resetPlanning).toContain("setClarifyPhase(null)");
-    expect(resetPlanning).toContain('setContextNote("")');
-    expect(startDraft).toContain('contextNote: ""');
-    expect(startDraft.indexOf('route === "show_helper_guidance"')).toBeLessThan(startDraft.indexOf("resetPlanningForAimUpdate()"));
-    expect(cancel).toContain("setAimEditBuffer(null)");
-    expect(cancel).not.toContain("setAimTitle");
-    expect(cancel).toContain('setAimSurfaceMode("summary")');
-    expect(navigationLock).toContain('aimSurfaceMode === "edit"');
-    expect(navigationLock).toContain('t("aimDraft.edit.navigationRecovery")');
-    expect(source).toContain('if (aimSurfaceMode === "edit" && stage === "aim") return true;');
-    expect(source).toContain('const activeAimTitle = aimSurfaceMode === "edit" && aimEditBuffer');
-    expect(source).toContain('? aimEditBuffer.title.trim()');
-    expect(source).toContain('? aimEditBuffer.description');
-    expect(source).toContain("titleInputRef.current?.focus()");
   });
 
   it("keeps plan validation failures repairable instead of disabling contract edits", () => {
