@@ -50,6 +50,8 @@ const api: AimcubApi = {
   confirmMilestone: (req) => ipcRenderer.invoke(IPC.confirmMilestone, req),
   getWindowChromeState: () => ipcRenderer.invoke(IPC.getWindowChromeState),
   setThemeSource: (source) => ipcRenderer.invoke(IPC.setThemeSource, source),
+  getAppInfo: () => ipcRenderer.invoke(IPC.getAppInfo),
+  revealWorkspace: () => ipcRenderer.invoke(IPC.revealWorkspace),
   onWindowChromeState: (handler) => {
     const listener = (_event: IpcRendererEvent, payload: unknown) => {
       handler(payload as Parameters<typeof handler>[0]);

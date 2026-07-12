@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import {
   validateExecutablePlan,
@@ -17,6 +17,7 @@ import type {
   RunEvent,
 } from "@core/types";
 import type {
+  AppInfo,
   ClarifyIpcResult,
   ConfirmMilestoneRequest,
   ContextSourceStatus,
@@ -41,7 +42,7 @@ import {
   routeAfterRefresh,
   type AimHelperProfile,
 } from "./firstRunFlow";
-import { I18nProvider, useI18n, type I18n } from "./i18n";
+import { I18nProvider, useI18n, type StringKey } from "./i18n";
 import {
   aimIntakeOf,
   planningContextOf,
@@ -65,8 +66,8 @@ import { JourneyView } from "./stages/journey/JourneyView";
 import { MemoryView } from "./stages/memory/MemoryView";
 import { WebResearchForm } from "./WebResearchForm";
 import { PlanPanel } from "./stages/plan/PlanPanel";
+import { setThemePref, useThemePref } from "./theme";
 import { Button, Panel } from "./ui";
-import { C } from "./styles";
 import {
   appendIntakeQuestions,
   answersFor,
@@ -98,11 +99,9 @@ import {
   type ProductError,
 } from "./workflow/planningErrors";
 import {
-  buildSettingsModel,
+  activeContextSourceCount,
+  CONTEXT_SOURCE_TOTAL,
   settingsSectionForFocus,
-  type SettingsHelper,
-  type SettingsHelperTone,
-  type SettingsModel,
   type SettingsSectionId,
 } from "./workflow/settingsModel";
 import {
@@ -128,8 +127,6 @@ import {
   settingsReturnStage,
 } from "./workflow/workspaceNavigation";
 import { shortText } from "./workflow/text";
-
-export { buildSettingsModel };
 
 type AimSurfaceMode = "idle" | "compose";
 const MAX_ADAPTIVE_INTAKE_TURNS = 6;
@@ -190,7 +187,7 @@ function AimOsApp() {
   const [busy, setBusyState] = useState<string | null>(null);
   const [stageOverride, setStageOverride] = useState<CockpitStage | null>(null);
   const [runtimeGuidanceVisible, setRuntimeGuidanceVisible] = useState(false);
-  const [settingsSection, setSettingsSection] = useState<SettingsSectionId>("overview");
+  const [settingsSection, setSettingsSection] = useState<SettingsSectionId>("general");
   const [manualProofDraftActive, setManualProofDraftActive] = useState(false);
   const proofNavigationErrorRef = useRef<string | null>(null);
   const [workspaceRevision, setWorkspaceRevision] = useState(0);
@@ -1530,7 +1527,7 @@ function AimOsApp() {
         settingsReturnStageRef.current,
       );
       setStageOverride(stage);
-      setSettingsSection("overview");
+      setSettingsSection("general");
       setMode("settings");
       return true;
     }
@@ -1623,14 +1620,9 @@ function AimOsApp() {
     beginSurfaceTransition();
     interruptPlanningForNavigation();
     settingsReturnStageRef.current = "context";
-    setSettingsSection("context");
+    setSettingsSection("research");
     setMode("settings");
     setStageOverride("settings");
-  }
-
-  function returnFromSettings() {
-    if (planningRuntimeReady) setRuntimeGuidanceVisible(false);
-    openCockpitStage(settingsReturnStageRef.current);
   }
 
   async function refreshMemories() {
@@ -1724,34 +1716,18 @@ function AimOsApp() {
     />
   ) : null;
 
-  const settingsModel = buildSettingsModel({ provider, webResearch, contextSources, localAgents }, t);
   const settingsPanel = (
     <SettingsPanel
       provider={provider}
       webResearch={webResearch}
       contextSources={contextSources}
       localAgents={localAgents}
-      model={settingsModel}
       activeSection={settingsSection}
       onSection={setSettingsSection}
       onProvider={setProvider}
       onWeb={setWebResearch}
       onContextSources={setContextSources}
       onRefreshAgents={async () => setLocalAgents(await window.aimcub.listLocalAgents())}
-      aimContext={activeAimTitle ? {
-        title: activeAimTitle,
-        profile: activeAimHelper,
-        runtimeReady: planningRuntimeReady,
-      } : null}
-      onReturnToAim={activeAimTitle ? returnFromSettings : undefined}
-    />
-  );
-  const settingsSidebar = (
-    <SettingsPrimarySidebar
-      model={settingsModel}
-      activeSection={settingsSection}
-      onSection={setSettingsSection}
-      onBack={returnFromSettings}
     />
   );
   const continueContextToPlan = () => {
@@ -1956,7 +1932,6 @@ function AimOsApp() {
       onStage={openCockpitStage}
       onMemory={openMemory}
       memoryCount={memories.length}
-      settingsSidebar={settingsSidebar}
       main={(
         <>
           {error ? <ProductErrorNotice error={error} /> : null}
@@ -2095,357 +2070,280 @@ function LockedStagePanel(props: {
   );
 }
 
+/**
+ * Settings — the re-synced Glass IA: the aim sidebar stays put; the workspace hosts a
+ * "Settings" title + category rail (General / Planning brain / Workers / Research / About)
+ * beside one detail pane. Forms keep their full capability; this component only arranges
+ * them and owns the two General controls (appearance pref + workspace reveal).
+ */
+const SETTINGS_TABS: Array<{ id: SettingsSectionId; labelKey: StringKey }> = [
+  { id: "general", labelKey: "settings.tab.general" },
+  { id: "brain", labelKey: "settings.tab.brain" },
+  { id: "workers", labelKey: "settings.tab.workers" },
+  { id: "research", labelKey: "settings.tab.research" },
+  { id: "about", labelKey: "settings.tab.about" },
+];
+
 export function SettingsPanel(props: {
   provider: ProviderStatus | null;
   webResearch: WebResearchStatus | null;
   contextSources: ContextSourceStatus | null;
   localAgents: LocalAgentDetection[];
-  model: SettingsModel;
   activeSection: SettingsSectionId;
   onSection: (section: SettingsSectionId) => void;
-  aimContext: {
-    title: string;
-    profile: AimHelperProfile;
-    runtimeReady: boolean;
-  } | null;
   onProvider: (status: ProviderStatus) => void;
   onWeb: (status: WebResearchStatus) => void;
   onContextSources: (status: ContextSourceStatus) => void;
   onRefreshAgents: () => Promise<void>;
-  onReturnToAim?: () => void;
 }) {
-  const { activeSection, model } = props;
-  const activeHelper = model.navItems.find((item) => item.id === activeSection) ?? model.overviewHelper;
+  const { t } = useI18n();
+  const { activeSection } = props;
+  const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    window.aimcub?.getAppInfo?.().then((info) => {
+      if (active) setAppInfo(info);
+    }).catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   let detailPane: ReactNode;
-  if (activeSection === "overview") {
+  if (activeSection === "general") {
+    detailPane = <SettingsGeneralPane workspacePath={appInfo?.workspacePath ?? null} />;
+  } else if (activeSection === "brain") {
     detailPane = (
-      <SettingsOverviewPane
-        helper={model.overviewHelper}
-        helpers={model.helpers}
-        planningReady={model.planningReady}
-        overallNext={model.overallNext}
-        aimContext={props.aimContext}
-        onReturnToAim={props.onReturnToAim}
-        onSection={props.onSection}
+      <SettingsTabPane title={t("settings.tab.brain")} sub={t("settings.brain.sub")}>
+        <div className="od-settings-card od-settings-card-form">
+          <ProviderForm status={props.provider} onSaved={props.onProvider} />
+        </div>
+      </SettingsTabPane>
+    );
+  } else if (activeSection === "workers") {
+    detailPane = (
+      <SettingsTabPane title={t("settings.tab.workers")} sub={t("settings.workers.sub")}>
+        <div className="od-settings-you-row">
+          <i className="od-settings-ready-dot" aria-hidden="true" />
+          <span className="od-settings-you-name">{t("glass.actor.you")}</span>
+          <span className="od-settings-you-meta">{t("settings.workers.youMeta")}</span>
+        </div>
+        <LocalAgentForm agents={props.localAgents} onRefresh={props.onRefreshAgents} />
+      </SettingsTabPane>
+    );
+  } else if (activeSection === "research") {
+    detailPane = (
+      <SettingsResearchPane
+        webResearch={props.webResearch}
+        contextSources={props.contextSources}
+        localAgents={props.localAgents}
+        onWeb={props.onWeb}
+        onContextSources={props.onContextSources}
       />
     );
-  } else if (activeSection === "provider") {
-    detailPane = (
-      <SettingsDetailPane helper={model.providerHelper}>
-        <ProviderForm status={props.provider} onSaved={props.onProvider} />
-      </SettingsDetailPane>
-    );
-  } else if (activeSection === "local") {
-    detailPane = (
-      <SettingsDetailPane helper={model.localAgentHelper}>
-        <LocalAgentForm agents={props.localAgents} onRefresh={props.onRefreshAgents} />
-      </SettingsDetailPane>
-    );
-  } else if (activeSection === "web") {
-    detailPane = (
-      <SettingsDetailPane helper={model.webResearchHelper}>
+  } else {
+    detailPane = <SettingsAboutPane version={appInfo?.version ?? null} />;
+  }
+
+  return (
+    <section className="od-settings" data-od-id="settings-view">
+      <div className="od-settings-rail">
+        <h1 className="od-settings-title">{t("os.settings")}</h1>
+        <nav className="od-settings-rail-nav" aria-label={t("os.settings")}>
+          {SETTINGS_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className="od-settings-rail-item"
+              aria-current={tab.id === activeSection ? "page" : undefined}
+              onClick={() => props.onSection(tab.id)}
+            >
+              <SettingsTabIcon section={tab.id} />
+              <span>{t(tab.labelKey)}</span>
+            </button>
+          ))}
+        </nav>
+      </div>
+      <div className="od-settings-detail" aria-live="polite">
+        {detailPane}
+      </div>
+    </section>
+  );
+}
+
+function SettingsTabPane(props: { title: string; sub: string; children: ReactNode }) {
+  return (
+    <section className="od-settings-pane">
+      <header className="od-settings-pane-head">
+        <h3>{props.title}</h3>
+        <p>{props.sub}</p>
+      </header>
+      <div className="od-settings-pane-body">{props.children}</div>
+    </section>
+  );
+}
+
+function SettingsGeneralPane(props: { workspacePath: string | null }) {
+  const { t } = useI18n();
+  const themePref = useThemePref();
+  const options: Array<{ pref: "light" | "dark" | "system"; label: string }> = [
+    { pref: "light", label: t("userMenu.appearanceLight") },
+    { pref: "dark", label: t("userMenu.appearanceDark") },
+    { pref: "system", label: t("userMenu.appearanceSystem") },
+  ];
+
+  return (
+    <SettingsTabPane title={t("settings.tab.general")} sub={t("settings.general.sub")}>
+      <div className="od-settings-card">
+        <div className="od-settings-card-row">
+          <div className="od-settings-card-copy">
+            <strong>{t("userMenu.appearance")}</strong>
+            <span>{t("settings.general.appearanceBody")}</span>
+          </div>
+          <div className="od-settings-seg" role="radiogroup" aria-label={t("userMenu.appearance")}>
+            {options.map((option) => (
+              <button
+                key={option.pref}
+                type="button"
+                role="radio"
+                aria-checked={themePref === option.pref}
+                data-active={themePref === option.pref ? "true" : "false"}
+                onClick={() => setThemePref(option.pref)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="od-settings-card-row">
+          <div className="od-settings-card-copy">
+            <strong>{t("settings.general.workspace")}</strong>
+            <span>{t("settings.general.workspaceBody")}</span>
+          </div>
+          <code className="od-settings-path">{props.workspacePath ?? "~/.aimcub"}</code>
+          <button
+            className="od-settings-mini-button"
+            type="button"
+            onClick={() => void window.aimcub?.revealWorkspace?.()}
+          >
+            {t("settings.general.reveal")}
+          </button>
+        </div>
+      </div>
+    </SettingsTabPane>
+  );
+}
+
+function SettingsResearchPane(props: {
+  webResearch: WebResearchStatus | null;
+  contextSources: ContextSourceStatus | null;
+  localAgents: LocalAgentDetection[];
+  onWeb: (status: WebResearchStatus) => void;
+  onContextSources: (status: ContextSourceStatus) => void;
+}) {
+  const { t } = useI18n();
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+  const activeSources = activeContextSourceCount(props.contextSources);
+
+  return (
+    <SettingsTabPane title={t("settings.tab.research")} sub={t("settings.research.sub")}>
+      <div className="od-settings-card od-settings-card-form">
         <WebResearchForm
           status={props.webResearch}
           localAgentReady={props.localAgents.some((agent) => agent.available && agent.authStatus !== "missing")}
           onSaved={props.onWeb}
         />
-      </SettingsDetailPane>
-    );
-  } else {
-    detailPane = (
-      <SettingsDetailPane helper={model.contextHelper}>
-        <ContextSourcesPanel status={props.contextSources} compact onSaved={props.onContextSources} />
-      </SettingsDetailPane>
-    );
-  }
-
-  return (
-    <Panel variant="plain" style={panelStyle()}>
-      <div className="od-settings-detail" aria-live="polite" aria-label={activeHelper.title}>
-        {detailPane}
       </div>
-    </Panel>
-  );
-}
-
-function SettingsPrimarySidebar(props: {
-  model: SettingsModel;
-  activeSection: SettingsSectionId;
-  onSection: (section: SettingsSectionId) => void;
-  onBack: () => void;
-}) {
-  const { t } = useI18n();
-  const [query, setQuery] = useState("");
-  const normalizedQuery = query.trim().toLowerCase();
-  const visibleItems = props.model.navItems.filter((item) => {
-    if (!normalizedQuery) return true;
-    return `${item.title} ${item.body}`.toLowerCase().includes(normalizedQuery);
-  });
-
-  return (
-    <div className="od-settings-sidebar-content">
-      <button className="od-settings-back" type="button" onClick={props.onBack}>
-        <SettingsBackIcon />
-        <span>{t("settings.backToAims")}</span>
-      </button>
-
-      <label className="od-settings-search">
-        <SettingsSearchIcon />
-        <span>{t("settings.searchLabel")}</span>
-        <input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder={t("settings.searchPlaceholder")}
-        />
-      </label>
-
-      <nav className="od-settings-nav" aria-label={t("settings.navigationLabel")}>
-        <div className="od-settings-nav-section">{t("settings.group.aim")}</div>
-        {visibleItems.length === 0 ? <div className="od-settings-nav-empty">{t("settings.searchEmpty")}</div> : null}
-        {visibleItems.map((item) => (
+      <div className="od-settings-card">
+        <div className="od-settings-card-row">
+          <div className="od-settings-card-copy">
+            <strong>{t("settings.research.sources")}</strong>
+            <span>{t("settings.research.sourcesMeta", { n: activeSources, total: CONTEXT_SOURCE_TOTAL })}</span>
+          </div>
           <button
-            key={item.id}
+            className="od-settings-mini-button"
             type="button"
-            className="od-settings-nav-item"
-            data-active={item.id === props.activeSection ? "true" : "false"}
-            data-tone={item.tone || "neutral"}
-            aria-current={item.id === props.activeSection ? "page" : undefined}
-            onClick={() => props.onSection(item.id)}
+            aria-expanded={sourcesOpen}
+            onClick={() => setSourcesOpen((open) => !open)}
           >
-            <SettingsNavIcon section={item.id} />
-            <span className="od-settings-nav-label">{item.title}</span>
-            <span className={`od-settings-nav-dot ${item.tone}`} title={item.status} aria-label={item.status} />
+            {t(sourcesOpen ? "settings.research.manageClose" : "settings.research.manage")}
           </button>
-        ))}
-      </nav>
-    </div>
+        </div>
+      </div>
+      {sourcesOpen ? (
+        <ContextSourcesPanel status={props.contextSources} compact onSaved={props.onContextSources} />
+      ) : null}
+    </SettingsTabPane>
   );
 }
 
-function SettingsBackIcon() {
+function SettingsAboutPane(props: { version: string | null }) {
+  const { t } = useI18n();
   return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
-      <path d="M12.5 5.5 8 10l4.5 4.5" />
-      <path d="M8.5 10H16" />
-    </svg>
+    <SettingsTabPane title={t("settings.tab.about")} sub={t("settings.about.sub")}>
+      <div className="od-settings-card">
+        <div className="od-settings-card-row">
+          <div className="od-settings-card-copy">
+            <strong>{t("glass.shell.brand")}</strong>
+            <span>{t("settings.about.appBody")}</span>
+          </div>
+          {props.version ? (
+            <code className="od-settings-path">{t("settings.about.version", { version: props.version })}</code>
+          ) : null}
+        </div>
+        <div className="od-settings-card-row">
+          <div className="od-settings-card-copy">
+            <strong>{t("settings.about.data")}</strong>
+            <span>{t("settings.about.dataBody")}</span>
+          </div>
+          <i className="od-settings-ready-dot" aria-hidden="true" />
+        </div>
+      </div>
+    </SettingsTabPane>
   );
 }
 
-function SettingsSearchIcon() {
-  return (
-    <svg className="od-settings-search-icon" aria-hidden="true" viewBox="0 0 20 20" focusable="false">
-      <circle cx="8.5" cy="8.5" r="4.75" />
-      <path d="m12.25 12.25 3.25 3.25" />
-    </svg>
-  );
-}
-
-function SettingsNavIcon(props: { section: SettingsSectionId }) {
+function SettingsTabIcon(props: { section: SettingsSectionId }) {
   const pathBySection: Record<SettingsSectionId, ReactNode> = {
-    overview: (
+    general: (
       <>
-        <circle cx="7" cy="7" r="2.5" />
-        <circle cx="13" cy="7" r="2.5" />
-        <path d="M4.5 13.5h11" />
+        <circle cx="10" cy="10" r="3.2" />
+        <path d="M10 2.5v2M10 15.5v2M17.5 10h-2M4.5 10h-2M14.9 5.1l-1.4 1.4M6.5 13.5 5.1 14.9M14.9 14.9l-1.4-1.4M6.5 6.5 5.1 5.1" />
       </>
     ),
-    provider: (
+    brain: (
       <>
-        <path d="M4.5 5.5h11v9h-11z" />
-        <path d="M7.5 8.5h5" />
-        <path d="M7.5 11.5h3" />
+        <rect x="6" y="6" width="8" height="8" rx="1.6" />
+        <path d="M8.4 6V4M11.6 6V4M8.4 16v-2M11.6 16v-2M6 8.4H4M6 11.6H4M16 8.4h-2M16 11.6h-2" />
       </>
     ),
-    local: (
+    workers: (
       <>
-        <path d="M4 6.5h12v7H4z" />
-        <path d="M7 16h6" />
-        <path d="M10 13.5V16" />
+        <circle cx="7.4" cy="8" r="2.2" />
+        <path d="M3.4 15.4c.4-2 1.9-3.1 4-3.1s3.6 1.1 4 3.1" />
+        <path d="M12.6 6.2A1.9 1.9 0 1 1 13.6 10" />
+        <path d="M13 12.4c1.7-.1 3.2.9 3.6 3" />
       </>
     ),
-    web: (
+    research: (
       <>
-        <circle cx="10" cy="10" r="5.5" />
-        <path d="M4.5 10h11" />
-        <path d="M10 4.5c1.5 1.6 2.2 3.4 2.2 5.5s-.7 3.9-2.2 5.5" />
-        <path d="M10 4.5C8.5 6.1 7.8 7.9 7.8 10s.7 3.9 2.2 5.5" />
+        <circle cx="10" cy="10" r="6.5" />
+        <path d="M3.5 10h13M10 3.5c2 2.2 2 10.8 0 13M10 3.5c-2 2.2-2 10.8 0 13" />
       </>
     ),
-    context: (
+    about: (
       <>
-        <path d="M5 5.5h10v9H5z" />
-        <path d="M7.5 8h5" />
-        <path d="M7.5 11h4" />
+        <circle cx="10" cy="10" r="6.8" />
+        <path d="M10 9.2v3.6" />
+        <path d="M10 6.7h.01" />
       </>
     ),
   };
 
   return (
-    <svg className="od-settings-nav-icon" aria-hidden="true" viewBox="0 0 20 20" focusable="false">
+    <svg className="od-settings-rail-icon" aria-hidden="true" viewBox="0 0 20 20" focusable="false">
       {pathBySection[props.section]}
     </svg>
   );
-}
-
-function SettingsOverviewPane(props: {
-  helper: SettingsHelper;
-  helpers: SettingsHelper[];
-  planningReady: boolean;
-  overallNext: string;
-  aimContext: {
-    title: string;
-    profile: AimHelperProfile;
-    runtimeReady: boolean;
-  } | null;
-  onReturnToAim?: () => void;
-  onSection: (section: SettingsSectionId) => void;
-}) {
-  const { t } = useI18n();
-  const planningStatus = props.planningReady ? t("settings.status.readyToPlan") : t("os.blocked");
-  return (
-    <section className="od-settings-pane">
-      <SettingsPaneHeader title={props.helper.title} body={props.helper.body} />
-
-      {props.aimContext ? (
-        <SettingsAimContextPanel
-          title={props.aimContext.title}
-          profile={props.aimContext.profile}
-          runtimeReady={props.aimContext.runtimeReady}
-          onReturnToAim={props.onReturnToAim}
-        />
-      ) : null}
-
-      <SettingsRowSection title={t("settings.section.aim")} body={t("settings.section.aimBody")}>
-        <SettingsRow
-          title={t("settings.row.planningStatus")}
-          body={t("settings.intakeNote")}
-          detail={props.overallNext}
-          status={planningStatus}
-          tone={props.planningReady ? "success" : "warn"}
-          actionLabel={props.onReturnToAim ? t("settings.action.openAim") : undefined}
-          onAction={props.onReturnToAim}
-        />
-        {props.helpers.map((helper) => (
-          <SettingsRow
-            key={helper.id}
-            title={helper.title}
-            body={helper.body}
-            detail={helper.next}
-            status={helper.status}
-            tone={helper.tone}
-            actionLabel={settingsActionLabel(helper.id, t)}
-            onAction={() => props.onSection(helper.id)}
-          />
-        ))}
-      </SettingsRowSection>
-    </section>
-  );
-}
-
-function SettingsDetailPane(props: { helper: SettingsHelper; children: ReactNode }) {
-  return (
-    <section className="od-settings-pane">
-      <SettingsPaneHeader title={props.helper.title} body={props.helper.body} />
-      <div className="od-settings-pane-body">
-        {props.children}
-      </div>
-    </section>
-  );
-}
-
-function SettingsPaneHeader(props: { title: string; body: string }) {
-  return (
-    <header className="od-settings-pane-head">
-      <div>
-        <h3>{props.title}</h3>
-        <p>{props.body}</p>
-      </div>
-    </header>
-  );
-}
-
-function SettingsRowSection(props: { title: string; body?: string; children: ReactNode }) {
-  return (
-    <section className="od-settings-row-section">
-      <div className="od-settings-row-section-head">
-        <h4>{props.title}</h4>
-        {props.body ? <p>{props.body}</p> : null}
-      </div>
-      <div className="od-settings-row-list">
-        {props.children}
-      </div>
-    </section>
-  );
-}
-
-function SettingsRow(props: {
-  title: string;
-  body: string;
-  detail?: string;
-  status?: string;
-  tone?: SettingsHelperTone;
-  actionLabel?: string;
-  onAction?: () => void;
-}) {
-  return (
-    <div className="od-settings-row">
-      <div className="od-settings-row-copy">
-        <strong>{props.title}</strong>
-        <span>{props.body}</span>
-        {props.detail ? <small>{props.detail}</small> : null}
-      </div>
-      <div className="od-settings-row-control">
-        {props.status ? <span className={`od-settings-status-pill ${props.tone || ""}`}>{props.status}</span> : null}
-        {props.actionLabel && props.onAction ? (
-          <button className="od-settings-row-button" type="button" onClick={props.onAction}>
-            {props.actionLabel}
-          </button>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function settingsActionLabel(section: SettingsSectionId, t: I18n["t"]): string {
-  if (section === "local") return t("settings.action.manage");
-  return t("settings.action.configure");
-}
-
-function SettingsAimContextPanel(props: {
-  title: string;
-  profile: AimHelperProfile;
-  runtimeReady: boolean;
-  onReturnToAim?: () => void;
-}) {
-  const { t } = useI18n();
-  return (
-    <section className="od-settings-current-aim" data-state={props.runtimeReady ? "ready" : "blocked"}>
-      <div className="od-settings-current-aim-copy">
-        <span>{t("firstRun.settingsEyebrow")}</span>
-        <strong>{shortText(props.title, 140)}</strong>
-        <small>{helperReason(props.profile, t)}</small>
-      </div>
-      <div className="od-settings-current-aim-control">
-        <span className="od-settings-status-pill">{helperPreferenceLabel(props.profile, t)}</span>
-        <span className={`od-settings-status-pill ${props.runtimeReady ? "success" : "warn"}`}>
-          {props.runtimeReady ? t("settings.status.readyToPlan") : t("os.blocked")}
-        </span>
-        {props.onReturnToAim ? (
-          <button className="od-settings-row-button" type="button" onClick={props.onReturnToAim}>
-            {t("firstRun.returnToAim")}
-          </button>
-        ) : null}
-      </div>
-    </section>
-  );
-}
-
-function panelStyle(): CSSProperties {
-  return {
-    background: C.surface,
-    border: "none",
-    borderRadius: 0,
-    padding: 0,
-  };
 }

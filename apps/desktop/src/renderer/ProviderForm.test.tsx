@@ -38,13 +38,17 @@ function status(provider: LlmProvider, model: string | null = null, baseURL: str
 }
 
 describe("ProviderForm", () => {
-  it("renders every catalog provider in the desktop picker", () => {
+  it("renders every catalog provider as a pill, describing only the selected one", () => {
     const html = renderProviderForm();
 
     for (const provider of LLM_PROVIDER_CATALOG) {
       expect(html).toContain(provider.label);
-      expect(html).toContain(htmlText(provider.description));
     }
+    const selected = LLM_PROVIDER_CATALOG[0]!;
+    expect(html).toContain('class="od-provider-pill" aria-checked="true"');
+    expect(html).toContain(htmlText(selected.description));
+    const unselected = LLM_PROVIDER_CATALOG.find((provider) => provider.id !== selected.id)!;
+    expect(html).not.toContain(htmlText(unselected.description));
   });
 
   it.each([

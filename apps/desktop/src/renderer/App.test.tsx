@@ -7,10 +7,10 @@ import { routingRecommendationForPlanNode, type RoutingRuntimeAgentOption } from
 import type { AimDraft, AimProgressReadModel, DecompositionOutput, Goal, Milestone } from "@core/types";
 import type { ContextSourceStatus, GoalDetail, ProviderStatus, WebResearchStatus } from "../shared/ipc";
 
-import { App, buildSettingsModel, SettingsPanel } from "./App";
+import { App, SettingsPanel } from "./App";
 import { HomeView } from "./stages/home/HomeView";
 import { CockpitShell, WORKBENCH_STAGE_IDS } from "./CockpitShell";
-import { I18nProvider, STRINGS, translate, type I18n } from "./i18n";
+import { I18nProvider, STRINGS } from "./i18n";
 import { EvidenceSubmissionForm } from "./stages/execute/EvidenceSubmissionForm";
 import { ExecutePanel } from "./stages/execute/ExecutePanel";
 import { LocalAgentExecutionSummary } from "./stages/execute/LocalAgentExecutionSummary";
@@ -67,7 +67,6 @@ const savedGoal: Goal = {
 const noop = () => {};
 const asyncNoop = async () => {};
 const asyncTrue = async () => true;
-const testT: I18n["t"] = (key, vars) => translate("en", key, vars);
 
 const providerStatus: ProviderStatus = {
   configured: false,
@@ -946,14 +945,15 @@ describe("App planning state guards", () => {
     );
   });
 
-  it("keeps navigation scoped to the active work target and restores the Settings return surface", () => {
+  it("keeps navigation scoped to the active work target and records the Settings return surface", () => {
     const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
     const openCockpitStage = source.match(/function openCockpitStage[\s\S]*?\n {2}async function startNewAim/)?.[0] ?? "";
     const currentAimDraftInput = source.match(/function currentAimDraftInput[\s\S]*?\n {2}async function persistCurrentDraftNow/)?.[0] ?? "";
 
     expect(openCockpitStage).toContain("isWorkbenchStageAvailable(workspaceTarget, stage)");
+    // Settings still records the pre-settings stage so a draft persisted while Settings is
+    // open resumes on the real workbench surface, not on "settings".
     expect(openCockpitStage).toContain("settingsReturnStage(");
-    expect(source).toContain("openCockpitStage(settingsReturnStageRef.current)");
     expect(currentAimDraftInput).toContain('stageOverride === "settings"');
     expect(currentAimDraftInput).toContain("settingsReturnStageRef.current");
     expect(source).not.toContain("executePanel ?? planPanel");
@@ -1264,24 +1264,16 @@ describe("PlanPanel", () => {
 });
 
 describe("SettingsPanel", () => {
-  it("renders only the selected settings detail pane", () => {
-    const model = buildSettingsModel({
-      provider: providerStatus,
-      webResearch: webResearchStatus,
-      contextSources: contextSourceStatus,
-      localAgents: [],
-    }, testT);
-    const html = renderToStaticMarkup(
+  function renderSettings(section: "general" | "brain" | "workers" | "research" | "about") {
+    return renderToStaticMarkup(
       <I18nProvider>
         <SettingsPanel
           provider={providerStatus}
           webResearch={webResearchStatus}
           contextSources={contextSourceStatus}
           localAgents={[]}
-          model={model}
-          activeSection="overview"
+          activeSection={section}
           onSection={noop}
-          aimContext={null}
           onProvider={noop}
           onWeb={noop}
           onContextSources={noop}
@@ -1289,21 +1281,53 @@ describe("SettingsPanel", () => {
         />
       </I18nProvider>,
     );
+  }
+
+  it("keeps the aim sidebar and renders the in-workspace category rail", () => {
+    const html = renderSettings("general");
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
 
-    expect(html).toContain("Overview");
-    expect(html).toContain("Planning status");
-    expect(html).toContain("Configure");
-    expect(html).not.toContain("Settings sections");
-    expect(html).not.toContain("API key");
-    expect(html).not.toContain("Rescan");
-    expect(css).toMatch(/\.od-settings-row-list\s*{[^}]*border:\s*1px solid var\(--od-border-soft\);[^}]*border-radius:\s*var\(--od-radius-md\);[^}]*background:\s*var\(--od-surface-warm\);/s);
-    expect(css).toMatch(/\.od-settings-row,\s*\.od-settings-current-aim\s*{[^}]*padding:\s*14px 16px;/s);
-    expect(css).toMatch(/\.od-settings-row:last-child\s*{[^}]*border-bottom:\s*0;/s);
-    expect(css).toMatch(/\.od-settings-status-pill\s*{[^}]*gap:\s*6px;[^}]*background:\s*transparent;[^}]*color:\s*var\(--od-muted\);/s);
-    expect(css).toMatch(/\.od-settings-status-pill::before\s*{[^}]*width:\s*6px;[^}]*height:\s*6px;[^}]*background:\s*var\(--od-meta\);/s);
-    expect(css).toMatch(/\.od-settings-status-pill\.warn\s*{[^}]*color:\s*var\(--od-muted\);/s);
-    expect(css).toMatch(/\.od-settings-row-button\s*{[^}]*min-height:\s*28px;[^}]*border:\s*1px solid transparent;[^}]*background:\s*var\(--od-surface\);/s);
+    // The rail lives in the workspace (the shell no longer swaps in a settings sidebar).
+    expect(html).toContain('data-od-id="settings-view"');
+    for (const label of ["General", "Planning brain", "Workers", "Research", "About"]) {
+      expect(html).toContain(`<span>${label}</span>`);
+    }
+    expect(html).toContain('aria-current="page"');
+    expect(html).not.toContain("Back to aims");
+    expect(html).not.toContain("Overview");
+    expect(css).toMatch(/\.od-settings\s*{[^}]*display:\s*flex;[^}]*gap:\s*28px;/s);
+    expect(css).toMatch(/\.od-settings-rail\s*{[^}]*width:\s*196px;[^}]*flex:\s*none;/s);
+    expect(css).toMatch(/\.od-settings-rail-item\[aria-current="page"\]\s*{[^}]*background:\s*var\(--acc-soft\);[^}]*color:\s*var\(--acc\);/s);
+    expect(css).toMatch(/\.od-settings-card\s*{[^}]*border-radius:\s*18px;[^}]*background:\s*var\(--island\);[^}]*backdrop-filter:\s*blur\(28px\);/s);
+    expect(css).toMatch(/\.od-settings-card-row \+ \.od-settings-card-row\s*{[^}]*border-top:\s*1px solid var\(--edge\);/s);
+  });
+
+  it("renders only the selected settings pane", () => {
+    const generalHtml = renderSettings("general");
+    expect(generalHtml).toContain("Appearance");
+    expect(generalHtml).toContain("Workspace");
+    expect(generalHtml).toContain("Reveal");
+    expect(generalHtml).not.toContain("API key");
+    expect(generalHtml).not.toContain("Rescan");
+
+    const brainHtml = renderSettings("brain");
+    expect(brainHtml).toContain("Planning brain");
+    expect(brainHtml).toContain("An API key, or a signed-in local agent — either can plan.");
+
+    const workersHtml = renderSettings("workers");
+    expect(workersHtml).toContain("You and your agents — same rules, same receipts.");
+    expect(workersHtml).toContain("judgment, approvals, anything with your card");
+
+    const researchHtml = renderSettings("research");
+    expect(researchHtml).toContain("Context sources");
+    expect(researchHtml).toContain("Manage");
+
+    const aboutHtml = renderSettings("about");
+    expect(aboutHtml).toContain("Aimcub runs on your machine.");
+    expect(aboutHtml).toContain("Everything stays on device. Nothing leaves ~/.aimcub without your approval.");
+    // No fabricated updater — About only states real facts.
+    expect(aboutHtml).not.toContain("Check");
+    expect(aboutHtml).not.toContain("latest");
   });
 });
 
@@ -1581,7 +1605,6 @@ describe("CockpitShell", () => {
     expect(css).toMatch(/\.od-sidebar-toggle:focus-visible\s*{[^}]*background:\s*var\(--od-interaction-hover-bg\);[^}]*border-color:\s*transparent;[^}]*box-shadow:\s*var\(--od-interaction-focus-shadow\);/s);
     expect(css).toMatch(/\.od-user-menu-trigger:hover,\s*\.od-user-menu-trigger\[aria-expanded="true"\]\s*{[^}]*border-color:\s*transparent;[^}]*background:\s*var\(--island2\);[^}]*box-shadow:\s*none;/s);
     expect(css).toMatch(/\.od-user-menu-trigger:focus-visible\s*{[^}]*border-color:\s*transparent;[^}]*background:\s*var\(--island2\);[^}]*box-shadow:\s*var\(--od-focus\);/s);
-    expect(css).toMatch(/\.od-settings-button:hover\s*{[^}]*border-color:\s*transparent;[^}]*background:\s*var\(--od-interaction-hover-bg\);[^}]*box-shadow:\s*var\(--od-interaction-hover-shadow\);/s);
     expect(css).toMatch(/\.od-aim-secondary:hover\s*{[^}]*border-color:\s*transparent;[^}]*background:\s*var\(--od-interaction-hover-bg\);[^}]*box-shadow:\s*var\(--od-interaction-hover-shadow\);/s);
     expect(css).toMatch(/\.od-command-row:hover,\s*\.od-command-row\[data-active="true"\]\s*{[^}]*border-color:\s*transparent;[^}]*background:\s*var\(--od-interaction-hover-bg\);[^}]*box-shadow:\s*var\(--od-interaction-hover-shadow\);/s);
     expect(css).toMatch(/\.od-routing-owner button:hover:not\(:disabled\)\s*{[^}]*background:\s*var\(--od-interaction-hover-bg\);[^}]*box-shadow:\s*var\(--od-interaction-hover-shadow\);/s);
@@ -1727,52 +1750,36 @@ describe("CockpitShell", () => {
     expect(css).not.toContain(".od-stage-index");
   });
 
-  it("replaces the primary left sidebar with settings navigation on settings stage", () => {
+  it("keeps the aim sidebar in place on the settings stage", () => {
     const html = renderToStaticMarkup(
       <I18nProvider>
         <CockpitShell
-          goals={[]}
+          goals={[savedGoal]}
           activeStage="settings"
-          workspaceTarget={{ kind: "home" }}
+          workspaceTarget={{ kind: "goal", id: savedGoal.id }}
           onHome={noop}
           onNewAim={noop}
           onOpenGoal={noop}
           onStage={noop}
-          settingsSidebar={<nav aria-label="Settings sections"><button type="button">Planning model</button></nav>}
           main={<div>Settings detail pane</div>}
         />
       </I18nProvider>,
     );
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
 
-    expect(html).toContain('data-od-id="left-settings-sidebar"');
-    expect(html).not.toContain('data-od-id="sidebar-toggle"');
-    expect(html).not.toContain('data-od-id="sidebar-peek-trigger"');
-    expect(html).toContain('data-sidebar-state="pinned"');
-    expect(html).not.toContain('data-od-id="mac-titlebar"');
-    expect(html).not.toContain("<h1>Aimcub</h1>");
-    expect(html).not.toContain("<p>Workbench</p>");
-    expect(html).toContain("Settings sections");
-    expect(html).toContain("Planning model");
+    // Settings renders inside the workspace; the shell keeps the normal aim sidebar + toggle.
+    expect(html).not.toContain('data-od-id="left-settings-sidebar"');
+    expect(html).toContain('data-od-id="left-aim-sidebar"');
+    expect(html).toContain('data-od-id="sidebar-toggle"');
     expect(html).toContain("Settings detail pane");
     expect(html).toContain('data-od-id="sidebar-user-menu-trigger"');
-    expect(html).not.toContain("Search aims");
-    expect(html).not.toContain("Workbench navigation");
-    expect(html).not.toContain("Workbench surfaces");
+    // While Settings is open no sidebar nav row reads as current.
+    expect(html).not.toContain('class="od-aim-card selected"');
     expect(css).toMatch(/\.od-workspace-settings\s*{[^}]*width:\s*min\(100%, 1080px\);/s);
-    expect(css).toMatch(/\.od-settings-sidebar-content\s*{[^}]*width:\s*var\(--sidebar-content-width\);[^}]*justify-self:\s*center;/s);
-    expect(css).toMatch(/\.od-settings-back\s*{[^}]*width:\s*100%;[^}]*grid-template-columns:\s*var\(--sidebar-action-icon-slot\) minmax\(0, 1fr\);[^}]*padding:\s*0 var\(--sidebar-row-padding-x\);/s);
-    expect(css).toMatch(/\.od-settings-search\s*{[^}]*width:\s*100%;/s);
-    expect(css).toMatch(/\.od-settings-search input\s*{[^}]*min-height:\s*36px;[^}]*border-radius:\s*var\(--od-radius-md\);[^}]*padding:\s*0 11px 0 calc\(var\(--sidebar-row-padding-x\) \+ var\(--sidebar-action-icon-slot\) \+ var\(--sidebar-action-label-gap\)\);/s);
-    expect(css).toMatch(/\.od-settings-search-icon\s*{[^}]*left:\s*var\(--sidebar-row-padding-x\);[^}]*width:\s*18px;[^}]*transform:\s*translate\(var\(--sidebar-action-icon-offset-x\), -50%\);/s);
-    expect(css).toMatch(/\.od-settings-nav\s*{[^}]*padding-right:\s*0;[^}]*scrollbar-gutter:\s*auto;/s);
-    expect(css).toMatch(/\.od-settings-nav-section\s*{[^}]*padding:\s*8px var\(--sidebar-row-padding-x\) 4px;/s);
-    expect(css).toMatch(/\.od-settings-nav-empty\s*{[^}]*padding:\s*8px var\(--sidebar-row-padding-x\);/s);
-    expect(css).toMatch(/\.od-settings-nav-item\s*{[^}]*grid-template-columns:\s*var\(--sidebar-action-icon-slot\) minmax\(0, 1fr\) auto;[^}]*column-gap:\s*var\(--sidebar-action-label-gap\);[^}]*padding:\s*0 var\(--sidebar-row-padding-x\);/s);
-    expect(css).toMatch(/\.od-settings-nav-item\[data-active="true"\]\s*{[^}]*background:\s*var\(--od-selection-bg\);[^}]*border-color:\s*transparent;/s);
-    expect(css).not.toContain(".od-settings-nav-item[data-active=\"true\"]::before");
-    expect(css).toMatch(/\.od-settings-nav-icon\s*{[^}]*justify-self:\s*start;[^}]*transform:\s*translateX\(var\(--sidebar-action-icon-offset-x\)\);/s);
-    expect(css).toMatch(/\.od-settings-nav-item\[data-active="true"\] \.od-settings-nav-icon\s*{[^}]*color:\s*currentColor;/s);
+    expect(css).not.toContain(".od-settings-sidebar-content");
+    expect(css).not.toContain(".od-settings-back");
+    expect(css).not.toContain(".od-settings-nav");
+    expect(css).not.toContain(".od-settings-search");
   });
 
   it("keeps a stable top drag strip outside the dynamic sidebar layers", () => {
@@ -1892,11 +1899,11 @@ describe("CockpitShell", () => {
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
 
     expect(css).toContain("@media (max-width: 1040px)");
-    expect(css).toContain(".od-app:not(.od-app-stage-settings)[data-sidebar-state=\"collapsed\"]");
-    expect(css).toContain(".od-app:not(.od-app-stage-settings)[data-sidebar-state=\"peek\"]");
+    // Settings no longer special-cases the sidebar — one collapse/peek behavior everywhere.
+    expect(css).not.toContain("od-app-stage-settings");
+    expect(css).toContain(".od-app[data-sidebar-state=\"collapsed\"],\n  .od-app[data-sidebar-state=\"peek\"] {");
     expect(css).toContain("grid-template-columns: 0 minmax(0, 1fr);");
-    expect(css).toContain(".od-app:not(.od-app-stage-settings)[data-sidebar-state=\"peek\"] .od-sidebar");
-    expect(css).not.toContain(".od-app:not(.od-app-stage-settings)[data-sidebar-state=\"pinned\"] .od-sidebar");
+    expect(css).toContain(".od-app[data-sidebar-state=\"peek\"] .od-sidebar");
     expect(css).toContain("flex-wrap: wrap;");
   });
 

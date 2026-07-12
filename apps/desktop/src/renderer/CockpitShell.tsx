@@ -60,7 +60,6 @@ interface CockpitShellProps {
   onMemory?: () => void;
   memoryCount?: number;
   main: ReactNode;
-  settingsSidebar?: ReactNode;
   commands?: CockpitCommand[];
 }
 
@@ -110,7 +109,6 @@ export function CockpitShell({
   onMemory,
   memoryCount,
   main,
-  settingsSidebar,
   commands,
 }: CockpitShellProps) {
   const { t } = useI18n();
@@ -128,7 +126,6 @@ export function CockpitShell({
   const revealSidebarTimer = useRef<number | null>(null);
   const hideSidebarTimer = useRef<number | null>(null);
   const suppressSidebarPeekUntilExit = useRef(false);
-  const usingSettingsSidebar = activeStage === "settings" && Boolean(settingsSidebar);
   // Memory and Settings are overlay detours: while one is open no sidebar nav row reads as current.
   const overlayStage = activeStage === "memory" || activeStage === "settings";
   const hasGoals = goals.length > 0;
@@ -136,10 +133,10 @@ export function CockpitShell({
     && workspaceTarget.kind !== "draft"
     && workspaceTarget.kind !== "goal"
     && !hasGoals;
-  const sidebarState: SidebarState = usingSettingsSidebar ? "pinned" : sidebarPinned ? "pinned" : sidebarPeeking ? "peek" : "collapsed";
+  const sidebarState: SidebarState = sidebarPinned ? "pinned" : sidebarPeeking ? "peek" : "collapsed";
   const sidebarVisible = sidebarState !== "collapsed";
   const sidebarToggleLabel = sidebarPinned ? t("sidebar.collapse") : t("sidebar.expand");
-  const sidebarId = usingSettingsSidebar ? "od-left-settings-sidebar" : "od-left-aim-sidebar";
+  const sidebarId = "od-left-aim-sidebar";
   const appStyle = { "--sidebar-width": `${sidebarWidth}px` } as CSSProperties;
 
   const stages = useMemo<StageItem[]>(() => [
@@ -475,60 +472,56 @@ export function CockpitShell({
         data-window-fullscreen={windowChrome.fullscreen ? "true" : "false"}
       >
         <div className="od-window-drag-strip" aria-hidden="true" data-od-id="window-drag-strip" />
-        {usingSettingsSidebar ? null : (
-          <div className="od-sidebar-hover-zone" data-od-id="sidebar-hover-zone" ref={sidebarHoverZoneRef}>
-            <div
-              className="od-sidebar-peek-trigger"
-              aria-hidden="true"
-              data-od-id="sidebar-peek-trigger"
-              onMouseDown={(event) => {
-                event.stopPropagation();
-                revealSidebarFromRailHover();
-              }}
-              onPointerDown={(event) => {
-                event.stopPropagation();
-                revealSidebarFromRailHover();
-              }}
-              onPointerEnter={revealSidebarFromRailHover}
-              onPointerMove={revealSidebarFromRailHover}
-              onPointerLeave={scheduleSidebarPeekClose}
-            />
-            <button
-              className="od-sidebar-toggle"
-              type="button"
-              aria-label={sidebarToggleLabel}
-              aria-expanded={sidebarVisible}
-              aria-pressed={sidebarPinned}
-              title={sidebarToggleLabel}
-              data-state={sidebarState}
-              data-od-id="sidebar-toggle"
-              onClick={onSidebarToggleClick}
-              onPointerDown={onSidebarTogglePointerDown}
-              onKeyDown={onSidebarToggleKeyDown}
-              onPointerEnter={revealSidebarAfterHover}
-              onPointerLeave={onSidebarTogglePointerLeave}
-              onFocus={keepSidebarPeekOpen}
-              onBlur={onSidebarToggleBlur}
-            >
-              <SidebarToggleIcon />
-            </button>
-          </div>
-        )}
+        <div className="od-sidebar-hover-zone" data-od-id="sidebar-hover-zone" ref={sidebarHoverZoneRef}>
+          <div
+            className="od-sidebar-peek-trigger"
+            aria-hidden="true"
+            data-od-id="sidebar-peek-trigger"
+            onMouseDown={(event) => {
+              event.stopPropagation();
+              revealSidebarFromRailHover();
+            }}
+            onPointerDown={(event) => {
+              event.stopPropagation();
+              revealSidebarFromRailHover();
+            }}
+            onPointerEnter={revealSidebarFromRailHover}
+            onPointerMove={revealSidebarFromRailHover}
+            onPointerLeave={scheduleSidebarPeekClose}
+          />
+          <button
+            className="od-sidebar-toggle"
+            type="button"
+            aria-label={sidebarToggleLabel}
+            aria-expanded={sidebarVisible}
+            aria-pressed={sidebarPinned}
+            title={sidebarToggleLabel}
+            data-state={sidebarState}
+            data-od-id="sidebar-toggle"
+            onClick={onSidebarToggleClick}
+            onPointerDown={onSidebarTogglePointerDown}
+            onKeyDown={onSidebarToggleKeyDown}
+            onPointerEnter={revealSidebarAfterHover}
+            onPointerLeave={onSidebarTogglePointerLeave}
+            onFocus={keepSidebarPeekOpen}
+            onBlur={onSidebarToggleBlur}
+          >
+            <SidebarToggleIcon />
+          </button>
+        </div>
         <aside
           id={sidebarId}
           ref={sidebarRef}
           className="od-sidebar"
-          data-mode={usingSettingsSidebar ? "settings" : "aims"}
-          data-od-id={usingSettingsSidebar ? "left-settings-sidebar" : "left-aim-sidebar"}
+          data-mode="aims"
+          data-od-id="left-aim-sidebar"
           aria-hidden={sidebarVisible ? undefined : true}
-          onPointerEnter={usingSettingsSidebar ? undefined : keepSidebarPeekOpen}
-          onPointerLeave={usingSettingsSidebar ? undefined : scheduleSidebarPeekClose}
-          onFocus={usingSettingsSidebar ? undefined : keepSidebarPeekOpen}
-          onBlur={usingSettingsSidebar ? undefined : scheduleSidebarPeekClose}
+          onPointerEnter={keepSidebarPeekOpen}
+          onPointerLeave={scheduleSidebarPeekClose}
+          onFocus={keepSidebarPeekOpen}
+          onBlur={scheduleSidebarPeekClose}
         >
-          {usingSettingsSidebar ? settingsSidebar : (
-            <>
-              <nav className="od-sidebar-brand" aria-label={t("shell.globalActions")} data-od-id="sidebar-global-actions">
+          <nav className="od-sidebar-brand" aria-label={t("shell.globalActions")} data-od-id="sidebar-global-actions">
                 <button
                   className="od-sidebar-brand-home"
                   type="button"
@@ -600,9 +593,6 @@ export function CockpitShell({
                   })}
                 </div>
               </section>
-
-            </>
-          )}
 
           <SidebarUserMenu
             appearance={effectiveAppearance}

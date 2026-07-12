@@ -123,20 +123,23 @@ export function ProviderForm({ status, onSaved, onClose }: ProviderFormProps) {
 
       <div className="od-ui-field">
         <span className="od-ui-field-label">{t("pf.providerLabel")}</span>
-        <div className="od-option-grid">
+        <div className="od-provider-pills" role="radiogroup" aria-label={t("pf.providerLabel")}>
           {PROVIDER_OPTIONS.map((provider) => (
-            <Button
+            <button
               key={provider.id}
-              className="od-ui-button-card"
-              selected={providerKind === provider.id}
+              type="button"
+              role="radio"
+              className="od-provider-pill"
+              aria-checked={providerKind === provider.id}
               onClick={() => selectProvider(provider.id)}
-              aria-pressed={providerKind === provider.id}
             >
-              <strong>{provider.label}</strong>
-              <span>{provider.description}</span>
-            </Button>
+              {provider.label}
+            </button>
           ))}
         </div>
+        {providerDef.description ? (
+          <div className="od-ui-status-text">{providerDef.description}</div>
+        ) : null}
       </div>
 
       {providerDef.models.length > 0 && (
