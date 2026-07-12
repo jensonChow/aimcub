@@ -260,8 +260,8 @@ select:focus-visible {
 .od-sidebar-peek-trigger,
 .od-sidebar-toggle,
 .od-sidebar-resizer,
-.od-sidebar-global-actions,
-.od-sidebar-global-actions *,
+.od-sidebar-brand,
+.od-sidebar-brand *,
 .od-user-menu-anchor,
 .od-user-menu-anchor *,
 .od-action-menu-anchor,
@@ -488,10 +488,7 @@ kbd {
   box-shadow: var(--od-shadow-peek);
 }
 
-.od-sidebar-head,
-.od-sidebar-head-actions,
 .od-section-label,
-.od-filter-row,
 .od-inspector-head,
 .od-context-source-summary-head,
 .od-context-control-head,
@@ -501,39 +498,6 @@ kbd {
   align-items: center;
 }
 
-.od-sidebar-head {
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 10px;
-  app-region: drag;
-  -webkit-app-region: drag;
-}
-
-.od-sidebar-head-actions,
-.od-sidebar-head-actions * {
-  app-region: no-drag;
-  -webkit-app-region: no-drag;
-}
-
-.od-sidebar-head h1 {
-  margin: 0;
-  font-family: "SF Pro Display", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: var(--od-type-body);
-  line-height: 1.1;
-  letter-spacing: 0;
-}
-
-.od-sidebar-head p {
-  margin: 3px 0 0;
-  color: var(--od-muted);
-  font-size: var(--od-type-meta);
-}
-
-.od-sidebar-head-actions {
-  align-items: flex-start;
-  gap: 8px;
-}
-
 .od-subtle-button,
 .od-settings-back,
 .od-settings-button,
@@ -541,7 +505,6 @@ kbd {
 .od-user-menu-item,
 .od-chip,
 .od-sidebar-toggle,
-.od-filter-row button,
 .od-aim-card,
 .od-content-entry,
 .od-content-entry-main,
@@ -557,7 +520,6 @@ kbd {
 .od-user-menu-item:active,
 .od-chip:active,
 .od-sidebar-toggle:active,
-.od-filter-row button:active,
 .od-aim-card:active,
 .od-content-entry-main:active,
 .od-action-menu-trigger:active,
@@ -565,8 +527,7 @@ kbd {
   transform: scale(0.99);
 }
 
-.od-subtle-button,
-.od-filter-row button {
+.od-subtle-button {
   min-height: 32px;
   border: 1px solid var(--od-border-soft);
   border-radius: var(--od-radius-pill);
@@ -579,148 +540,113 @@ kbd {
   cursor: pointer;
 }
 
-.od-subtle-button:hover,
-.od-filter-row button:hover {
+.od-subtle-button:hover {
   border-color: transparent;
   background: var(--od-interaction-hover-bg);
   box-shadow: var(--od-interaction-hover-shadow);
   color: var(--od-fg);
 }
 
-.od-subtle-button:focus-visible,
-.od-filter-row button:focus-visible {
+.od-subtle-button:focus-visible {
   border-color: transparent;
   background: var(--od-interaction-hover-bg);
   box-shadow: var(--od-interaction-focus-shadow);
   color: var(--od-fg);
 }
 
-.od-filter-row button.active {
-  box-shadow: none;
-  color: var(--od-fg);
-  background: var(--od-bg);
-  border-color: var(--od-border);
-}
-
-.od-sidebar-global-actions {
+/* The sidebar brand row: an app-identity Home button plus a compact New-aim "+" action. */
+.od-sidebar-brand {
   width: var(--sidebar-content-width);
   min-width: 0;
-  display: grid;
+  display: flex;
   justify-self: center;
-  gap: 3px;
+  align-items: center;
+  gap: 6px;
 }
 
-.od-sidebar-action {
-  position: relative;
-  width: 100%;
-  min-height: 34px;
-  display: grid;
-  grid-template-columns: var(--sidebar-action-icon-slot) minmax(0, 1fr) auto;
+.od-sidebar-brand-home {
+  flex: 1;
+  min-width: 0;
+  display: flex;
   align-items: center;
-  column-gap: var(--sidebar-action-label-gap);
-  border: 1px solid transparent;
+  gap: 9px;
+  min-height: 34px;
+  border: 0;
   border-radius: var(--od-radius-sm);
   background: transparent;
-  box-shadow: none;
-  color: var(--od-fg-2);
+  color: var(--od-fg);
   padding: 0 var(--sidebar-row-padding-x);
   text-align: left;
   cursor: pointer;
-  transition: background 140ms ease, color 140ms ease, box-shadow 140ms ease;
+  transition: background 140ms ease;
 }
 
-.od-sidebar-action:hover,
-.od-sidebar-action:focus-visible {
+.od-sidebar-brand-home:hover,
+.od-sidebar-brand-home[aria-current="page"]:hover {
   background: var(--island2);
-  box-shadow: none;
-  color: var(--od-fg);
 }
 
-.od-sidebar-action[aria-current="page"] {
-  background: var(--field);
-  border-color: transparent;
-  box-shadow: none;
-  color: var(--od-fg);
-}
-
-.od-sidebar-action[aria-current="page"]:hover {
-  background: var(--field);
-  border-color: transparent;
-  box-shadow: none;
-}
-
-.od-sidebar-action:focus-visible {
+.od-sidebar-brand-home:focus-visible {
+  background: var(--island2);
   box-shadow: var(--od-focus);
 }
 
-.od-sidebar-action[aria-current="page"]:focus-visible {
-  background: var(--field);
-  border-color: transparent;
-  box-shadow: var(--od-focus);
-}
-
-.od-sidebar-action-icon {
-  width: var(--sidebar-action-icon-slot);
-  height: 20px;
+.od-brand-mark {
+  width: 26px;
+  height: 26px;
+  flex: none;
   display: grid;
-  align-items: center;
-  justify-items: start;
-  color: currentColor;
-  transform: translateX(var(--sidebar-action-icon-offset-x));
+  place-items: center;
+  border-radius: 8px;
+  background: var(--acc);
+  color: var(--acc-on);
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-strong);
 }
 
-.od-sidebar-action:hover .od-sidebar-action-icon,
-.od-sidebar-action:focus-visible .od-sidebar-action-icon {
-  color: currentColor;
-}
-
-.od-sidebar-action-icon svg {
-  width: 18px;
-  height: 18px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: var(--od-icon-stroke);
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.od-sidebar-action-label {
+.od-brand-name {
   min-width: 0;
   overflow: hidden;
-  font-size: var(--od-type-body);
-  font-weight: var(--od-font-weight-medium);
-  line-height: 16px;
+  font-size: 13.5px;
+  font-weight: var(--od-font-weight-strong);
+  line-height: 18px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.od-sidebar-action kbd {
-  display: inline-flex;
-  justify-self: end;
-  align-items: center;
-  gap: 2px;
-  min-height: 16px;
-  border-color: color-mix(in oklab, var(--od-fg), transparent 90%);
-  background: color-mix(in oklab, var(--od-fg), transparent 96%);
-  color: var(--od-meta);
-  padding: 0 5px;
-  font-size: var(--od-type-meta);
-  font-weight: var(--od-font-weight-medium);
-  opacity: 0;
-  transform: translateX(2px);
-  transition: opacity 140ms ease, transform 140ms ease;
+.od-sidebar-plus {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--od-muted);
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
 }
 
-.od-sidebar-action kbd span[aria-hidden="true"] {
-  font-size: var(--od-type-meta);
-  font-weight: var(--od-font-weight-semibold);
-  line-height: 1;
+.od-sidebar-plus:hover,
+.od-sidebar-plus[aria-current="page"] {
+  background: var(--field);
+  color: var(--od-fg);
 }
 
-.od-sidebar-action:hover kbd,
-.od-sidebar-action:focus-visible kbd {
-  opacity: 1;
-  transform: translateX(0);
+.od-sidebar-plus:focus-visible {
+  background: var(--field);
+  color: var(--od-fg);
+  box-shadow: var(--od-focus);
+}
+
+.od-sidebar-plus svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
 }
 
 .od-section-label {
@@ -820,20 +746,21 @@ kbd {
   white-space: nowrap;
 }
 
-/* Per-aim status marker — a quiet trailing dot, not a status subtitle. */
+/*
+ * Per-aim status marker — a quiet trailing dot, not a status subtitle. Sidebar rows mark
+ * only the states that ask for the user's attention (needs-you → accent, blocked → danger);
+ * running/planning/complete aims stay unmarked so the strip reads calm.
+ */
 .od-aim-progress-dot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   flex: none;
   border-radius: 50%;
   background: var(--faint);
 }
 
-.od-aim-progress-dot.is-complete { background: var(--okdot); }
-.od-aim-progress-dot.is-running { background: var(--acc); animation: od-journey-pulse 1.4s ease-in-out infinite; }
-.od-aim-progress-dot.is-needs_you { background: var(--warndot); }
+.od-aim-progress-dot.is-needs_you { background: var(--acc); }
 .od-aim-progress-dot.is-blocked { background: var(--danger); }
-.od-aim-progress-dot.is-planning { background: transparent; box-shadow: inset 0 0 0 1.5px var(--faint); }
 
 .od-aim-card .od-aim-row-main > span,
 .od-content-entry-copy > span,
@@ -1035,40 +962,6 @@ kbd {
   background: var(--od-accent);
 }
 
-.od-sidebar-search {
-  display: grid;
-  gap: 5px;
-  padding: 0 var(--sidebar-row-padding-x);
-}
-
-.od-sidebar-search label {
-  color: var(--od-muted);
-  font-size: var(--od-type-meta);
-  font-weight: var(--od-font-weight-semibold);
-}
-
-.od-sidebar-search input {
-  width: 100%;
-  min-height: 36px;
-  border: 1px solid var(--od-border-soft);
-  border-radius: var(--od-radius-pill);
-  padding: 0 13px;
-  background: var(--od-surface-warm);
-  color: var(--od-fg);
-  font-size: var(--od-type-body);
-}
-
-.od-filter-row {
-  gap: 8px;
-  overflow-x: auto;
-  padding: 0 var(--sidebar-row-padding-x) 2px;
-  scrollbar-width: none;
-}
-
-.od-filter-row::-webkit-scrollbar {
-  display: none;
-}
-
 .od-aim-list {
   display: grid;
   align-content: start;
@@ -1084,23 +977,10 @@ kbd {
 }
 
 .od-sidebar-empty {
-  display: grid;
-  gap: 3px;
-  padding: 7px var(--sidebar-row-padding-x);
-  color: var(--od-muted);
-}
-
-.od-sidebar-empty strong {
-  color: var(--od-fg-2);
-  font-size: var(--od-type-body);
-  line-height: 1.3;
-  font-weight: var(--od-font-weight-semibold);
-}
-
-.od-sidebar-empty span {
+  padding: 8px var(--sidebar-row-padding-x);
   color: var(--od-meta);
   font-size: var(--od-type-meta);
-  line-height: 1.35;
+  line-height: var(--od-line-meta);
 }
 
 .od-app[data-empty-aim="true"] .od-aim-browser {
@@ -1253,14 +1133,14 @@ kbd {
 .od-user-menu-trigger:hover,
 .od-user-menu-trigger[aria-expanded="true"] {
   border-color: transparent;
-  background: var(--od-interaction-hover-bg);
-  box-shadow: var(--od-interaction-hover-shadow);
+  background: var(--island2);
+  box-shadow: none;
 }
 
 .od-user-menu-trigger:focus-visible {
   border-color: transparent;
-  background: var(--od-interaction-hover-bg);
-  box-shadow: var(--od-interaction-focus-shadow);
+  background: var(--island2);
+  box-shadow: var(--od-focus);
 }
 
 .od-user-avatar {
@@ -1268,13 +1148,21 @@ kbd {
   height: 28px;
   display: inline-grid;
   place-items: center;
-  border: 1px solid var(--od-border-soft);
-  border-radius: 50%;
-  background: color-mix(in oklab, var(--od-accent), var(--od-bg) 88%);
-  color: var(--od-accent);
-  font-size: var(--od-type-meta);
-  font-weight: var(--od-font-weight-strong);
-  line-height: 1;
+  border: 0;
+  border-radius: 9px;
+  background: var(--island2);
+  box-shadow: inset 0 0 0 1px var(--ring);
+  color: var(--mut);
+}
+
+.od-user-avatar svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: var(--od-icon-stroke);
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .od-user-trigger-copy {
@@ -1283,23 +1171,21 @@ kbd {
   gap: 1px;
 }
 
-.od-user-trigger-copy strong,
-.od-user-menu-header strong {
+.od-user-trigger-copy strong {
   min-width: 0;
   overflow: hidden;
   color: var(--od-fg);
-  font-size: var(--od-type-body);
-  line-height: 1.25;
+  font-size: var(--od-type-meta);
+  line-height: 1.3;
   font-weight: var(--od-font-weight-semibold);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.od-user-trigger-copy small,
-.od-user-menu-header small {
+.od-user-trigger-copy small {
   min-width: 0;
   overflow: hidden;
-  color: var(--od-meta);
+  color: var(--faint);
   font-size: var(--od-type-meta);
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -1317,54 +1203,55 @@ kbd {
   gap: 2px;
   overflow: visible;
   padding: 6px;
-  border: 1px solid var(--od-border);
-  border-radius: var(--od-radius-md);
-  background: color-mix(in oklab, var(--od-bg), var(--od-surface-warm) 18%);
-  box-shadow: var(--od-shadow-popover);
+  border: 0;
+  border-radius: 14px;
+  background: var(--island);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  box-shadow: var(--sh-lg), inset 0 0 0 1px var(--ring);
+  animation: od-menu-rise 160ms ease;
 }
 
-.od-user-menu-header {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: 26px minmax(0, 1fr);
-  align-items: center;
-  gap: 8px;
-  padding: 4px 6px 6px;
-}
+@keyframes od-menu-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.99);
+  }
 
-.od-user-menu-header span:last-child {
-  min-width: 0;
-  display: grid;
-  gap: 1px;
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .od-user-menu-item {
   width: 100%;
   min-width: 0;
-  min-height: 32px;
+  min-height: 34px;
   display: grid;
   grid-template-columns: 18px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   border: 1px solid transparent;
-  border-radius: var(--od-radius-sm);
+  border-radius: 9px;
   background: transparent;
   color: var(--od-fg);
-  padding: 0 6px;
+  padding: 0 8px;
   text-align: left;
   cursor: pointer;
 }
 
 .od-user-menu-item:hover,
 .od-user-menu-item[data-submenu-open="true"],
-.od-user-menu-item:focus-visible {
+.od-user-menu-item[aria-current="page"] {
   border-color: transparent;
-  background: var(--od-interaction-hover-bg);
-  box-shadow: var(--od-interaction-hover-shadow);
+  background: var(--island2);
+  box-shadow: none;
 }
 
 .od-user-menu-item:focus-visible {
-  box-shadow: var(--od-interaction-focus-shadow);
+  background: var(--island2);
+  box-shadow: var(--od-focus);
 }
 
 .od-user-menu-item span {
@@ -1377,12 +1264,12 @@ kbd {
   white-space: nowrap;
 }
 
-.od-user-menu-item kbd {
-  min-height: 18px;
-  border-radius: 6px;
-  padding: 0 5px;
+.od-user-menu-value {
+  justify-self: end;
+  color: var(--faint);
   font-size: var(--od-type-meta);
-  font-weight: var(--od-font-weight-medium);
+  line-height: var(--od-line-meta);
+  font-variant-numeric: tabular-nums;
 }
 
 .od-user-menu-item svg {
@@ -1393,45 +1280,50 @@ kbd {
   stroke-width: var(--od-icon-stroke);
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-
-.od-user-menu-item svg {
-  color: var(--od-fg-2);
+  color: var(--mut);
 }
 
 .od-user-menu-trigger > svg {
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
   fill: none;
   stroke: currentColor;
-  stroke-width: var(--od-icon-stroke);
+  stroke-width: 1.6;
   stroke-linecap: round;
   stroke-linejoin: round;
+  color: var(--faint);
 }
 
-.od-user-menu-header .od-user-avatar {
-  width: 26px;
-  height: 26px;
-}
-
-.od-user-menu-header strong {
+.od-user-menu-device {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 8px 10px 3px;
+  color: var(--faint);
   font-size: var(--od-type-meta);
   line-height: var(--od-line-meta);
 }
 
-.od-user-menu-header small {
-  font-size: var(--od-type-meta);
-  line-height: 14px;
+.od-user-menu-device span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.od-user-menu-trigger > svg {
-  color: var(--od-meta);
+.od-user-menu-device-dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--ok);
 }
 
 .od-user-menu-separator {
   height: 1px;
-  margin: 3px 6px;
-  background: var(--od-border-soft);
+  margin: 4px 8px;
+  background: var(--ring);
 }
 
 .od-user-menu-submenu-anchor {
@@ -1460,10 +1352,12 @@ kbd {
   gap: 1px;
   overflow: auto;
   padding: 6px;
-  border: 1px solid var(--od-border);
-  border-radius: var(--od-radius-md);
-  background: color-mix(in oklab, var(--od-bg), var(--od-surface-warm) 18%);
-  box-shadow: var(--od-shadow-popover);
+  border: 0;
+  border-radius: 14px;
+  background: var(--island);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  box-shadow: var(--sh-lg), inset 0 0 0 1px var(--ring);
 }
 
 .od-user-language-option {
@@ -6808,73 +6702,6 @@ kbd {
    Idiom: translucent --island/--island2 fills + backdrop blur + inset --ring
    hairlines + --sh-* elevation; text ramp --ink/--ink2/--mut/--faint.
    ========================================================================== */
-
-/* ── Sidebar footer (Memory row lives in the shared .od-sidebar-action; here
-      we add the ~/.aimcub · local line, theme toggle, and memory count) ── */
-.od-sidebar-footer {
-  width: var(--sidebar-content-width);
-  justify-self: center;
-  display: grid;
-  gap: 3px;
-}
-
-.od-sidebar-memory-count {
-  justify-self: end;
-  font-size: var(--od-type-meta);
-  color: var(--faint);
-  font-variant-numeric: tabular-nums;
-}
-
-.od-sidebar-footer-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px var(--sidebar-row-padding-x) 2px;
-}
-
-.od-sidebar-footer-path {
-  flex: 1;
-  min-width: 0;
-  font-size: var(--od-type-meta);
-  color: var(--faint);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.od-theme-toggle {
-  flex: none;
-  width: 26px;
-  height: 26px;
-  display: grid;
-  place-items: center;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--mut);
-  cursor: pointer;
-  transition: background 140ms ease, color 140ms ease;
-}
-
-.od-theme-toggle:hover {
-  background: var(--field);
-  color: var(--ink);
-}
-
-.od-theme-toggle:focus-visible {
-  outline: 0;
-  box-shadow: var(--od-focus);
-}
-
-.od-theme-toggle svg {
-  width: 15px;
-  height: 15px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: var(--od-icon-stroke);
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
 
 /* ── Home — saved-aims list ── */
 .od-home-aims {
