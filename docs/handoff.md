@@ -1,9 +1,9 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-12
-Branch: `main`. Journey-first **Stages 1–5** are committed and merged. Stages 1–4 are on origin/main
-(`b14c07a3`); **Stage 5** (fold Run/Evidence + Eval into the Journey sheets) is committed + merged to
-`main` locally, **push pending user authorization**.
+Branch: `main`. Journey-first **Stages 1–5** are committed, merged, and **pushed** (origin/main =
+`6e6f190d`). Stage 5 = fold Run/Evidence + Eval into the Journey sheets (5A read-only eval + inbox
+de-dup, 5B interactive in-sheet evidence submission).
 
 ## Active epic — Journey-first rebuild (staged)
 
@@ -82,9 +82,8 @@ handlers; the `openCockpitStage("run"|"eval")` "Continue" fallbacks stay. Plan:
 
 ## Commit / push
 
-- Stage 5: committed on `glass-journey-stage5` (`d64a4ae7` 5A + `e0864cda` 5B) + this handoff update,
-  merged to `main`. **Not yet pushed** (awaiting user authorization). Once pushed, add an "Update
-  handoff: Stage 5 pushed" commit with the origin hash (mirrors the Stage-3/4 pattern).
+- Stage 5: committed on `glass-journey-stage5` (`d64a4ae7` 5A + `e0864cda` 5B) + handoff, merged to
+  `main`, and **pushed** (origin/main = `6e6f190d`; merge `6e6f190d`).
 
 ## Open risks / notes
 
@@ -104,8 +103,7 @@ handlers; the `openCockpitStage("run"|"eval")` "Continue" fallbacks stay. Plan:
 ```text
 Journey-first rebuild: Stages 1–5 done (Stage 5 = Run/Evidence + Eval folded into the Journey sheets;
 5A read-only eval + inbox de-dup, 5B interactive in-sheet evidence submission → confirmMilestone).
-Stages 1–4 on origin/main=b14c07a3; Stage 5 committed+merged locally (push may be pending — check
-`git log origin/main`). Read docs/handoff.md + the epic plan (~/.claude/plans/resilient-drifting-quail.md).
+All on origin/main=6e6f190d. Read docs/handoff.md + the epic plan (~/.claude/plans/resilient-drifting-quail.md).
 Next is Stage 6 (goal-first routing flip — the first BACKEND stage): add a create-shell /
 updateGoalPlan IPC so submit lands on the Journey immediately with a "Start research" Your-move, and
 in-place plan-edit (the Stage-4 gap) + re-plan become live post-save. Needs a spike: today's re-plan
