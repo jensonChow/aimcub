@@ -5881,19 +5881,24 @@ kbd {
   white-space: nowrap;
 }
 
+/*
+ * Station glyph policy (re-synced design): only the ACTIVE station carries a visible
+ * (pulsing accent) dot. Done/living/partial/up stations stay dot-free — the station's
+ * one-line summary text and the muted "up" name carry state, so it is never color-only.
+ */
 .od-journey-dot {
-  width: 8px;
-  height: 8px;
+  display: none;
+  width: 7px;
+  height: 7px;
   flex: none;
   border-radius: 50%;
-  background: var(--faint);
 }
 
-.od-journey-dot-done { background: var(--acc); }
-.od-journey-dot-living { background: var(--okdot); }
-.od-journey-dot-partial { background: var(--warndot); }
-.od-journey-dot-up { background: transparent; box-shadow: inset 0 0 0 1.5px var(--faint); }
-.od-journey-dot-active { background: var(--acc); animation: od-journey-pulse 1.4s ease-in-out infinite; }
+.od-journey-dot-active {
+  display: block;
+  background: var(--acc);
+  animation: od-journey-pulse 1.4s ease-in-out infinite;
+}
 
 @keyframes od-journey-pulse {
   0%, 100% { opacity: 1; }

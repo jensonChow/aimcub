@@ -634,7 +634,11 @@ export function JourneyView(props: JourneyViewProps) {
   const turns = buildJourneyTurns(progress, t, Date.now());
   const journal = buildJourneyJournal(progress, props.runEvents ?? []);
   const sheet = openStation ? buildJourneyStationSheet(openStation, progress, researchMemories) : null;
-  const headMeta = `${progress.completed_milestones}/${progress.total_milestones}`;
+  // The header meta reads as the design's completion percent; the exact fraction stays
+  // on the accessible name/tooltip.
+  const headMeta = progress.total_milestones > 0
+    ? `${Math.round((progress.completed_milestones / progress.total_milestones) * 100)}%`
+    : "";
   // The Context station sheet hosts the live saved-goal Context interior when App supplies the
   // pure view-models + candidate handlers; otherwise it falls back to read-only rows.
   const contextBody =
@@ -736,7 +740,15 @@ export function JourneyView(props: JourneyViewProps) {
                 : tk("glass.journey.turnsElsewhereMany", { n: elsewhereCount })}
             </button>
           ) : null}
-          <span className="od-journey-meta" aria-label={t("shell.progress")}>{headMeta}</span>
+          {headMeta ? (
+            <span
+              className="od-journey-meta"
+              aria-label={tk("shell.progressValue", { done: progress.completed_milestones, total: progress.total_milestones })}
+              title={tk("shell.progressValue", { done: progress.completed_milestones, total: progress.total_milestones })}
+            >
+              {headMeta}
+            </span>
+          ) : null}
         </div>
       </header>
 
