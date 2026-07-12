@@ -1578,10 +1578,6 @@ kbd {
   width: min(100%, 820px);
 }
 
-.od-workspace-aim:has(> .od-aim-overview) {
-  align-content: safe center;
-}
-
 .od-workspace-aim:has(> .od-notice) {
   align-content: start;
 }
@@ -2229,8 +2225,7 @@ kbd {
   max-width: 700px;
 }
 
-.od-aim-intake,
-.od-aim-overview {
+.od-aim-intake {
   display: grid;
   gap: 24px;
 }
@@ -2243,55 +2238,13 @@ kbd {
   gap: 16px;
 }
 
-.od-aim-intake-child {
-  min-height: 0;
-  align-content: start;
-}
-
-.od-aim-intake-head {
-  display: flex;
-  justify-content: center;
-  gap: 24px;
-  align-items: flex-start;
-  text-align: center;
-}
-
-.od-aim-intake-child .od-aim-intake-head,
-.od-aim-overview .od-aim-intake-head {
-  justify-content: space-between;
-  text-align: left;
-}
-
-.od-aim-edit-mode {
-  width: min(100%, var(--od-rail-compose));
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 16px;
-}
-
-.od-aim-edit-mode p {
-  margin: 4px 0 0;
-  text-align: left;
-}
-
-.od-draft-aim-overview .od-aim-intake-head > div {
-  min-width: 0;
-}
-
-.od-draft-aim-overview h1,
-.od-draft-aim-overview p {
-  overflow-wrap: anywhere;
-}
-
 .od-aim-kicker {
   color: var(--od-muted);
   font-size: var(--od-type-body);
   font-weight: var(--od-font-weight-semibold);
 }
 
-.od-aim-intake h1,
-.od-aim-overview h1 {
+.od-aim-intake h1 {
   margin: 0;
   color: var(--od-fg);
   font-family: "SF Pro Display", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif;
@@ -2301,19 +2254,12 @@ kbd {
   letter-spacing: 0;
 }
 
-.od-aim-intake p,
-.od-aim-overview p {
+.od-aim-intake p {
   max-width: 520px;
   margin: 8px auto 0;
   color: var(--od-muted);
   font-size: var(--od-type-body);
   line-height: 1.45;
-}
-
-.od-aim-intake-child p,
-.od-aim-overview p {
-  margin-left: 0;
-  margin-right: 0;
 }
 
 .od-initial-workspace {
@@ -2413,110 +2359,6 @@ kbd {
   white-space: nowrap;
 }
 
-.od-aim-composer {
-  width: min(100%, var(--od-rail-compose));
-  margin-inline: auto;
-  justify-self: center;
-  display: grid;
-  gap: 0;
-  border: 1px solid transparent;
-  border-radius: 20px;
-  background: var(--island2);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  padding: 12px 14px;
-  box-shadow: var(--od-shadow-composer);
-  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
-}
-
-.od-aim-composer:focus-within {
-  background: color-mix(in oklab, var(--od-surface), var(--od-bg) 28%);
-  box-shadow: var(--od-shadow-composer-focus);
-}
-
-.od-aim-composer:hover {
-  border-color: color-mix(in oklab, var(--od-fg), transparent 86%);
-}
-
-.od-aim-composer:has(.od-aim-title-input:focus-visible, .od-aim-context-input:focus-visible) {
-  border-color: color-mix(in oklab, var(--od-fg), transparent 86%);
-  box-shadow: var(--od-shadow-composer-focus);
-}
-
-.od-aim-composer-toolbar {
-  min-height: 36px;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 8px;
-  padding-top: 4px;
-}
-
-.od-aim-composer-toolbar span {
-  min-width: 0;
-  justify-self: end;
-  color: var(--od-meta);
-  font-size: var(--od-type-meta);
-  line-height: 1.35;
-  font-weight: var(--od-font-weight-medium);
-}
-
-.od-aim-composer .od-aim-composer-icon-button,
-.od-aim-composer .od-aim-send-button {
-  width: 36px;
-  height: 36px;
-  min-height: 36px;
-  display: inline-grid;
-  place-items: center;
-  border-radius: var(--od-radius-pill);
-  padding: 0;
-  line-height: 1;
-  flex: 0 0 auto;
-}
-
-.od-aim-composer-icon-button {
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--od-fg);
-  cursor: pointer;
-  transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
-}
-
-.od-aim-composer-icon-button:hover {
-  background: var(--od-interaction-hover-bg);
-  border-color: transparent;
-  box-shadow: var(--od-interaction-hover-shadow);
-}
-
-.od-aim-composer-icon-button:focus-visible {
-  background: var(--od-interaction-hover-bg);
-  border-color: transparent;
-  box-shadow: var(--od-interaction-focus-shadow);
-}
-
-.od-aim-composer-icon-button:active,
-.od-aim-send-button:active:not(:disabled) {
-  transform: scale(0.98);
-}
-
-.od-aim-composer-icon-button svg,
-.od-aim-send-button svg {
-  width: 18px;
-  height: 18px;
-  display: block;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: var(--od-icon-stroke-strong);
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.od-aim-intake-form {
-  display: grid;
-  gap: 10px;
-  margin-top: 2px;
-}
-
 .od-field-head {
   display: flex;
   align-items: center;
@@ -2529,116 +2371,6 @@ kbd {
 
 .od-field-head span {
   color: var(--od-meta);
-}
-
-.od-aim-title-input,
-.od-aim-context-input {
-  width: 100%;
-  min-width: 0;
-  border: 1px solid var(--od-border-soft);
-  border-radius: var(--od-radius-md);
-  background: var(--od-surface-warm);
-  color: var(--od-fg);
-  font-family: inherit;
-  outline: 0;
-}
-
-.od-aim-title-input {
-  min-height: 56px;
-  padding: 0 16px;
-  font-size: var(--od-type-title);
-  font-weight: var(--od-font-weight-strong);
-}
-
-.od-aim-context-input {
-  min-height: 150px;
-  margin-top: 4px;
-  padding: 15px 16px;
-  resize: vertical;
-  font-size: var(--od-type-body);
-  line-height: 1.5;
-}
-
-.od-aim-title-input::placeholder,
-.od-aim-context-input::placeholder {
-  color: var(--od-meta);
-}
-
-.od-aim-title-input:focus,
-.od-aim-context-input:focus {
-  border-color: color-mix(in oklab, var(--od-accent), var(--od-bg) 48%);
-  background: var(--od-bg);
-}
-
-.od-aim-composer .od-aim-title-input,
-.od-aim-composer .od-aim-context-input {
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-}
-
-.od-aim-composer .od-aim-title-input {
-  height: 44px;
-  min-height: 44px;
-  padding: 8px 18px 0;
-  resize: none;
-  font-size: var(--od-type-body);
-  line-height: var(--od-line-body);
-  font-weight: var(--od-font-weight-regular);
-}
-
-.od-aim-composer .od-aim-context-input {
-  height: 40px;
-  min-height: 40px;
-  margin-top: 0;
-  padding: 0 18px 6px;
-  resize: none;
-  font-size: var(--od-type-body);
-  line-height: var(--od-line-body);
-}
-
-.od-aim-composer .od-aim-context-input {
-  color: var(--od-fg-2);
-}
-
-.od-aim-composer .od-aim-send-button {
-  background: #d96842;
-  color: #ffffff;
-}
-
-.od-aim-composer .od-aim-send-button:hover:not(:disabled) {
-  background: #e0714a;
-}
-
-.od-aim-composer .od-aim-send-button:disabled {
-  background: color-mix(in oklab, var(--od-fg), transparent 82%);
-  color: var(--od-muted);
-  opacity: 1;
-}
-
-.od-aim-composer .od-aim-title-input:focus,
-.od-aim-composer .od-aim-context-input:focus {
-  background: transparent;
-}
-
-.od-aim-composer .od-aim-title-input:focus-visible,
-.od-aim-composer .od-aim-context-input:focus-visible {
-  box-shadow: none;
-}
-
-.od-aim-intake-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  min-height: 44px;
-}
-
-.od-aim-intake-footer p {
-  margin: 0;
-  color: var(--od-muted);
-  font-size: var(--od-type-body);
-  line-height: 1.45;
 }
 
 .od-aim-intake-actions {
@@ -2697,39 +2429,6 @@ kbd {
 .od-aim-primary:active:not(:disabled),
 .od-aim-secondary:active {
   transform: scale(0.99);
-}
-
-.od-aim-overview-strip {
-  display: grid;
-  grid-template-columns: 180px minmax(0, 1fr);
-  gap: 12px;
-}
-
-.od-aim-overview-strip div {
-  min-width: 0;
-  display: grid;
-  gap: 5px;
-  border: 1px solid var(--od-border-soft);
-  border-radius: var(--od-radius-md);
-  background: var(--od-surface-warm);
-  padding: 13px 14px;
-}
-
-.od-aim-overview-strip span,
-.od-aim-overview-strip small {
-  color: var(--od-muted);
-  font-size: var(--od-type-meta);
-  line-height: 1.35;
-}
-
-.od-aim-overview-strip strong {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--od-fg);
-  font-size: var(--od-type-title);
-  line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .od-aim-context-summary {
@@ -6222,27 +5921,11 @@ kbd {
     padding-top: 24px;
   }
 
-  .od-aim-intake-head,
-  .od-aim-intake-footer,
-  .od-aim-edit-mode {
-    display: grid;
-  }
-
-  .od-aim-composer {
-    padding: 12px;
-  }
-
-  .od-aim-composer-toolbar {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-  }
-
-  .od-aim-intake h1,
-  .od-aim-overview h1 {
+  .od-aim-intake h1 {
     font-size: var(--od-type-title);
   }
 
-  .od-aim-intake p,
-  .od-aim-overview p {
+  .od-aim-intake p {
     font-size: var(--od-type-body);
   }
 
@@ -6250,14 +5933,6 @@ kbd {
   .od-aim-primary,
   .od-aim-secondary {
     width: 100%;
-  }
-
-  .od-aim-composer-toolbar .od-aim-primary {
-    width: 36px;
-  }
-
-  .od-aim-overview-strip {
-    grid-template-columns: minmax(0, 1fr);
   }
 
   .od-aim-context-summary {

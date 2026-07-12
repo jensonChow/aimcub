@@ -1589,22 +1589,16 @@ describe("CockpitShell", () => {
     expect(css).toMatch(/\.od-context-focus\s*{[^}]*width:\s*min\(100%, var\(--od-rail-reading\)\);[^}]*padding-top:\s*0;/s);
   });
 
-  it("keeps the saved Aim overview centered at compact widths", () => {
+  it("keeps the saved-goal workbench on a single-row grid", () => {
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
 
+    // The top stage-nav is gone (Stage 7), so .od-main is single-row and .od-main-aim matches it.
     expect(css).toMatch(/\.od-main-aim\s*{[^}]*grid-template-rows:\s*minmax\(0,\s*1fr\);[^}]*}/s);
-    expect(css).toMatch(/\.od-workspace-aim:has\(>\s*\.od-aim-overview\)\s*{[^}]*align-content:\s*safe center;[^}]*}/s);
-    expect(css).toMatch(/\.od-draft-aim-overview \.od-aim-intake-head > div\s*{[^}]*min-width:\s*0;/s);
-    expect(css).toMatch(/\.od-draft-aim-overview h1,\s*\.od-draft-aim-overview p\s*{[^}]*overflow-wrap:\s*anywhere;/s);
   });
 
-  it("uses the New Aim quiet hover treatment for secondary desktop controls", () => {
+  it("uses the quiet hover treatment for secondary desktop controls", () => {
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
 
-    expect(css).toMatch(/\.od-aim-composer\s*{[^}]*border:\s*1px solid transparent;[^}]*transition:\s*border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;/s);
-    expect(css).toMatch(/\.od-aim-composer:hover\s*{[^}]*border-color:\s*color-mix\(in oklab, var\(--od-fg\), transparent 86%\);/s);
-    expect(css).toMatch(/\.od-aim-composer:has\(\.od-aim-title-input:focus-visible,\s*\.od-aim-context-input:focus-visible\)\s*{[^}]*border-color:\s*color-mix\(in oklab, var\(--od-fg\), transparent 86%\);[^}]*box-shadow:\s*var\(--od-shadow-composer-focus\);/s);
-    expect(css).toMatch(/\.od-aim-composer \.od-aim-title-input\s*{[^}]*padding:\s*8px 18px 0;/s);
     expect(css).toMatch(/\.od-sidebar-toggle:hover,\s*\.od-sidebar-toggle\[data-state="peek"\]\s*{[^}]*background:\s*var\(--od-interaction-hover-bg\);[^}]*border-color:\s*transparent;[^}]*box-shadow:\s*var\(--od-interaction-hover-shadow\);/s);
     expect(css).toMatch(/\.od-sidebar-toggle:focus-visible\s*{[^}]*background:\s*var\(--od-interaction-hover-bg\);[^}]*border-color:\s*transparent;[^}]*box-shadow:\s*var\(--od-interaction-focus-shadow\);/s);
     expect(css).toMatch(/\.od-user-menu-trigger:hover,\s*\.od-user-menu-trigger\[aria-expanded="true"\]\s*{[^}]*border-color:\s*transparent;[^}]*background:\s*var\(--od-interaction-hover-bg\);[^}]*box-shadow:\s*var\(--od-interaction-hover-shadow\);/s);
