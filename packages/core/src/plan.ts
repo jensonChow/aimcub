@@ -284,6 +284,13 @@ export interface ExistingMilestone {
   id: string;
   title: string;
   status: MilestoneStatus;
+  /**
+   * The plan-node key this milestone was materialized from, when known. Preferred over title for
+   * matching so an in-place edit that RENAMES a milestone (same node key, new title) updates the
+   * milestone in place instead of skip+add. An LLM re-plan generates fresh keys that don't match,
+   * so it falls back to title matching exactly as before.
+   */
+  key?: string | null;
 }
 
 export interface MergedItem {
@@ -298,18 +305,31 @@ const norm = (s: string): string => s.trim().toLowerCase().replace(/\s+/g, " ");
 /**
  * Merge a new decomposition result into the existing milestones. Hard invariants:
  *  - Completed nodes → always freeze (kept even if the LLM drops them; finished effort is never lost).
- *  - Unfinished nodes matched by title → update (reuse the stable id).
+ *  - Unfinished nodes matched by key (preferred) or title → update (reuse the stable id), so an
+ *    in-place rename keeps the same milestone instead of skip+add.
  *  - New nodes → add. Unfinished nodes that disappeared → skip (soft delete, not a physical delete).
  */
 export function planMerge(existing: ExistingMilestone[], next: DecompositionOutput): MergedItem[] {
+  const byKey = new Map<string, ExistingMilestone>();
   const byTitle = new Map<string, ExistingMilestone>();
-  for (const m of existing) byTitle.set(norm(m.title), m);
+  for (const m of existing) {
+    if (m.key) byKey.set(m.key, m);
+    byTitle.set(norm(m.title), m);
+  }
 
   const usedExisting = new Set<string>();
   const result: MergedItem[] = [];
 
   for (const node of next.nodes) {
-    const match = byTitle.get(norm(node.title));
+    // Match by stable node key first (survives a rename), then by title. Never re-match an existing
+    // milestone already claimed by an earlier node.
+    const keyed = node.key ? byKey.get(node.key) : undefined;
+    const titled = byTitle.get(norm(node.title));
+    const match = keyed && !usedExisting.has(keyed.id)
+      ? keyed
+      : titled && !usedExisting.has(titled.id)
+        ? titled
+        : undefined;
     if (match) {
       usedExisting.add(match.id);
       if (match.status === "completed") {

@@ -166,4 +166,31 @@ describe("planMerge · re-plan preserves completed nodes", () => {
     const merged = planMerge(existing, next);
     expect(merged.find((m) => m.existingId === "1")).toMatchObject({ action: "freeze" });
   });
+
+  it("matches by node key so an in-place rename updates the same milestone (no skip+add)", () => {
+    // Same node key "k2", new title → an in-place edit rename. Without key matching this would
+    // skip the old milestone and add a fresh one (churning the id + orphaning evidence).
+    const keyed: ExistingMilestone[] = [
+      { id: "1", title: "Design schema", status: "completed", key: "k1" },
+      { id: "2", title: "Write API", status: "pending", key: "k2" },
+    ];
+    const next = plan([mkNode("k1", "Design schema"), mkNode("k2", "Write the API (renamed)")]);
+    const merged = planMerge(keyed, next);
+
+    const renamed = merged.find((m) => m.nodeKey === "k2");
+    expect(renamed).toMatchObject({ action: "update", existingId: "2", title: "Write the API (renamed)" });
+    // No skip/add churn for the rename — only the two keyed rows survive.
+    expect(merged.filter((m) => m.action === "skip")).toHaveLength(0);
+    expect(merged.filter((m) => m.action === "add")).toHaveLength(0);
+    expect(merged).toHaveLength(2);
+  });
+
+  it("falls back to title matching when node keys don't correspond (LLM re-plan)", () => {
+    // Existing rows carry keys, but the LLM's fresh nodes use different keys → title fallback,
+    // exactly the pre-existing behavior.
+    const keyed: ExistingMilestone[] = [{ id: "2", title: "Write API", status: "pending", key: "old-key" }];
+    const next = plan([mkNode("fresh-key", "write api")]);
+    const merged = planMerge(keyed, next);
+    expect(merged.find((m) => m.existingId === "2")).toMatchObject({ action: "update" });
+  });
 });

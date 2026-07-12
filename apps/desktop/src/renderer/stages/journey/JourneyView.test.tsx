@@ -466,7 +466,7 @@ describe("JourneyPlanSheetBody", () => {
     edges: [],
   };
 
-  function renderBody(disabled = false): string {
+  function renderBody(opts: { editable?: boolean; disabled?: boolean } = {}): string {
     return renderToStaticMarkup(
       <I18nProvider>
         <JourneyPlanSheetBody
@@ -476,7 +476,8 @@ describe("JourneyPlanSheetBody", () => {
           validationErrors={[]}
           routingAgents={[]}
           routingValidation={null}
-          disabled={disabled}
+          disabled={opts.disabled ?? false}
+          onCommitPlan={opts.editable ? noop : undefined}
         />
       </I18nProvider>,
     );
@@ -494,12 +495,26 @@ describe("JourneyPlanSheetBody", () => {
     expect(html).not.toContain("Deliver the final signed-off contract to the owner.");
   });
 
-  it("renders no edit affordances for a saved goal (honest read-only, edit deferred to Stage 6)", () => {
+  it("renders read-only (no edit affordances) when no commit handler is wired", () => {
     const html = renderBody();
     expect(html).not.toContain("<textarea"); // no editable contract/rule fields
     expect(html).not.toContain("od-plan-routing-details"); // routing controls are editable-gated
     expect(html).not.toContain("od-plan-structure-details"); // reorder/merge/split are editable-gated
-    expect(html).not.toContain("od-aim-primary"); // the Save button is hidden when saved
+    expect(html).not.toContain("od-journey-plan-actions"); // no commit row without onCommitPlan
+    expect(html).not.toContain("Save plan changes");
+  });
+
+  it("becomes editable in place with a buffered Save plan changes commit (Stage 6B)", () => {
+    const html = renderBody({ editable: true });
+    // The editable contract interior appears (the affordances the read-only case denies).
+    expect(html).toContain("od-plan-structure-details");
+    expect(html).not.toContain("od-plan-readonly-title");
+    // The sheet's own commit row (distinct from the funnel's "Save aim" button).
+    expect(html).toContain("od-journey-plan-actions");
+    expect(html).toContain("Save plan changes");
+    // Disabled until the buffer is dirty (nothing edited yet at initial render).
+    expect(html).toMatch(/Save plan changes[\s\S]*?<\/button>/);
+    expect(html).not.toContain("Save aim"); // not the funnel save button
   });
 });
 

@@ -1,11 +1,10 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-12
-Branch: `glass-journey-stage6` (NOT yet merged to `main`). Journey-first **Stages 1–5** are on
-`origin/main` (`6e6f190d`). **Stage 6A** (goal-first create-shell + in-Journey first-plan +
-`updateGoalPlan` backbone) is committed on `glass-journey-stage6` and full-gate + live-QA green. This
-is a **checkpoint** — Stage 6B (editable plan sheet + re-plan) is next, on the same branch, before
-merging to `main`.
+Branch: `glass-journey-stage6`. Journey-first **Stages 1–5** are on `origin/main` (`6e6f190d`).
+**Stage 6 (goal-first routing flip) is COMPLETE** — 6A (create-shell + in-Journey first-plan +
+`updateGoalPlan` backbone) `970d21f0` + 6B (editable plan sheet + re-plan) — both full-gate + live-QA
+green. Ready to merge `glass-journey-stage6` → `main` (ask before push).
 
 ## Active epic — Journey-first rebuild (staged)
 
@@ -76,15 +75,44 @@ checkpoint → 6B**.
   synthesis parity with `saveGoal`) → the Journey flipped to the planned goal (Your-move card, 0/7).
 - Repacked (`pnpm desktop:pack`) + refreshed root `Aimcub.app` (matches the committed source).
 
-## Next — Stage 6B (after this checkpoint)
+## Stage 6B — In-place editable plan sheet + re-plan-same-goal (DONE)
 
-Editable in-place plan sheet + re-plan-same-goal. Make `JourneyPlanSheetBody` editable via a
-**buffered-local-plan + explicit "Save plan changes"** commit (do NOT wire `onChange` straight to
-`updateGoalPlan` — `planMerge` matches by title, so per-keystroke would churn milestone ids). Use a
-dedicated `editableWhenSaved`/`onCommit` seam on `PlanPanel` (keep `saved=true` copy/anchors), NOT
-`saved={false}`. Update `JourneyView.test.tsx:409-427` for the new affordances. A "Re-plan" action runs
-a planning run → `updateGoalPlan` (merge, completed frozen) — `breakDown` (child decompose) stays.
-The `updateGoalPlan` handler's manual-edit mode is already built for this.
+- **`PlanPanel` seam**: `editableWhenSaved` prop; `editable = onChange && (!saved || editableWhenSaved)`.
+  The funnel keeps its `!saved` "Save aim" button; a saved-editable host renders its own commit. No
+  `saved={false}` lie — copy/anchors stay correct.
+- **Editable `JourneyPlanSheetBody`**: read-only by default (no `onCommitPlan`); when `onCommitPlan` is
+  supplied it edits in place — a component-local `editedPlan` buffer (dropped whenever the underlying
+  saved plan changes, via a `[props.plan]` effect) + an explicit **"Save plan changes"** (enabled only
+  when dirty) + Discard. NOT wired per-keystroke. Threaded `onCommitPlan` through
+  `JourneyViewProps.planReview` → the Plan drill-in sheet (the 6A first-plan review stays read-only via
+  `onCommitPlan={undefined}`).
+- **`commitPlanEdit`** (App): manual-edit `updateGoalPlan` (no `questions` → minimal metadata patch,
+  no fabricated critique) → `refreshGoalState`. **Re-plan**: a "Re-plan with AI" button in the Plan
+  sheet footer closes the sheet + calls `startShellResearch(selected)` (reuses the 6A planning loop;
+  commit merges, completed frozen). `breakDown` (child decompose) stays.
+- **`planMerge` key-preferring match** (the one `@core` change): `ExistingMilestone.key` (the
+  `plan_key`); `planMerge` matches by node key first, then title, and never re-matches a claimed row.
+  This makes an in-place **rename** update the SAME milestone (stable id, evidence preserved) instead
+  of skip+add; an LLM re-plan (fresh keys) still falls back to title exactly as before.
+  `mergeMilestones` passes `metadata.plan_key`. +3 `plan.test` cases.
+
+## Verification (Stage 6B)
+
+- **Full gate green** (build + tests + typecheck + lint + core:purity); +1 editable/buffered-commit
+  `JourneyView.test`, +3 `plan.test` key-match, read-only-interior tests kept (no-`onCommitPlan` case).
+- **Live packaged-app QA** (isolated home, real `~/.aimcub` untouched): opening a planned goal's Plan
+  station → the sheet is **editable** (structure controls + "Save plan changes" + "Re-plan with AI").
+  Editing a node's title + Save → **persisted on the same goal**; on clean data a rename keeps the
+  **milestone id stable** (`88bc4992…` before == after) and the count unchanged (the key-match fix —
+  a title-only `planMerge` churned id+count, now fixed). "Re-plan with AI" → closes the sheet, opens
+  the in-Journey planning panel, goal id preserved (no fork).
+
+## Next — Stage 7 (cleanup)
+
+Remove the top `.od-stage-nav` switcher (its highlight can lag after an in-Journey commit — cosmetic,
+gone with the strip); retire dead `LockedStagePanel`/`DraftAimOverviewPanel`/funnel branches now that
+the goal-first front door is the default; converge edit + child-breakdown onto Glass; prune dead i18n
+keys (`glass.journey.receipt` / `glass.home.yourMove`); update `docs/memory/design-system.md`.
 
 ## Invariants (still enforced)
 - Journey sheet component-local + epoch-free; mutations via epoch-safe App handlers. `journey.test`

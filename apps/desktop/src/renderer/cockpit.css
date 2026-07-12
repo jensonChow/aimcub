@@ -6657,6 +6657,14 @@ kbd {
   gap: 12px;
 }
 
+/* Stage 6B: the editable Plan sheet's commit actions row. */
+.od-journey-plan-actions {
+  margin-top: 18px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
 /* Secondary "Your move" actions (hand-to-agent / schedule / Later). Rendered only when a
    real handler is passed; Stage 2 wires none (routing/scheduling land in Stage 6), so this
    row stays hidden — the CSS ships as forward-ready infrastructure. */

@@ -860,7 +860,12 @@ export function mergeMilestones(
   const plan = parseDecomposition(next);
 
   const merged = planMerge(
-    existing.map((m) => ({ id: m.id, title: m.title, status: m.status })),
+    existing.map((m) => ({
+      id: m.id,
+      title: m.title,
+      status: m.status,
+      key: typeof m.metadata?.plan_key === "string" ? m.metadata.plan_key : null,
+    })),
     plan,
   );
   const existingById = new Map(existing.map((m) => [m.id, m]));

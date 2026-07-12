@@ -1307,6 +1307,51 @@ function AimOsApp() {
     }
   }
 
+  /** Persist an in-place manual plan edit onto the current saved goal (Stage 6B, manual-edit mode). */
+  async function commitPlanEdit(plan: DecompositionOutput) {
+    if (workflowMutationIsLocked() || !selected) return;
+    const goal = selected;
+    const transition = navigationConcurrencyRef.current.workspace;
+    const validation = validateExecutablePlan(plan);
+    if (!validation.ok) {
+      setError(formatPlanningFailure({ stage: "save", errors: validation.errors, t, fallback: t("plan.validationFailed") }));
+      return;
+    }
+    const routingValidation = validatePlanRouting({ plan, agents: routingAgentsFromDetections(localAgents), allowHuman: true });
+    if (!routingValidation.ok) {
+      setError(formatRoutingValidation(routingValidation));
+      return;
+    }
+    setBusy(t("os.busy.save"));
+    setError(null);
+    try {
+      // No `questions` → manual-edit mode: merge the plan (completed milestones frozen), keep the
+      // existing intake/synthesis metadata (no fabricated critique for a hand edit).
+      const updated = await window.aimcub.updateGoalPlan({ goalId: goal.id, plan });
+      if (!isCurrentWorkspaceTransition(transition)) {
+        await refreshAll({ autoOpenFirstGoal: false });
+        return;
+      }
+      if (!updated) {
+        setError(t("planningError.save.message"));
+        return;
+      }
+      setSelected(updated.goal);
+      setBusy(null);
+      await refreshGoalState(updated.goal, transition, navigationConcurrencyRef.current.surface, { route: false });
+      void refreshListSurfaces();
+    } catch (err) {
+      setError(formatPlanningFailure({
+        stage: "save",
+        errors: [err instanceof Error ? err.message : String(err)],
+        t,
+        fallback: t("planningError.save.message"),
+      }));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function runAgent(milestone: Milestone) {
     if (workflowMutationIsLocked()) return;
     if (!selected) return;
@@ -1850,7 +1895,10 @@ function AimOsApp() {
         validationErrors: activePlanValidationMessages,
         routingAgents,
         routingValidation: planRoutingValidation,
+        // Editable in place only for a saved planned goal (not a shell being planned, Stage 6B).
+        onCommitPlan: isPlanningShell ? undefined : (plan) => void commitPlanEdit(plan),
       } : undefined}
+      onReplan={!isPlanningShell && (progress?.total_milestones ?? 0) > 0 ? () => void startShellResearch() : undefined}
       disabled={Boolean(busy)}
       elsewhereCount={journeyElsewhere.length}
       planningRuntimeReady={planningRuntimeReady}

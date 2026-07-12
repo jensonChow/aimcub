@@ -1556,6 +1556,10 @@ export const STRINGS = {
   "glass.journey.planReviewTitle": { en: "Review the plan", zh: "检查计划" },
   "glass.journey.savePlanCta": { en: "Save plan", zh: "保存计划" },
   "glass.journey.planningWorking": { en: "Working on the plan…", zh: "正在制定计划……" },
+  // ── Stage 6B: in-place plan edit + re-plan ──
+  "glass.journey.savePlanChanges": { en: "Save plan changes", zh: "保存计划修改" },
+  "glass.journey.discardPlanChanges": { en: "Discard changes", zh: "放弃修改" },
+  "glass.journey.replan": { en: "Re-plan with AI", zh: "用 AI 重新规划" },
   "glass.journey.later": { en: "Later", zh: "稍后" },
   // ── Stage 2: header jump chip, secondary move/ambient actions, interactive run sheet ──
   "glass.journey.turnsElsewhereOne": { en: "1 turn elsewhere", zh: "别处有 1 个轮次" },
