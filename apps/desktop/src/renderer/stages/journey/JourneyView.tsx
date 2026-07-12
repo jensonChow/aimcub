@@ -44,6 +44,7 @@ import {
 import { ContextActivityPanel } from "../context/ContextActivityPanel";
 import type { ContextLoopModel } from "../context/contextLoop";
 import { ContextReviewPanel } from "../context/ContextReviewPanel";
+import { CompletionRecapPanel, EvidenceReviewList } from "../eval/EvalStage";
 import { PlanPanel, type PlanPanelProps } from "../plan/PlanPanel";
 
 const STATION_NAME_KEY: Record<JourneyStationId, StringKey> = {
@@ -284,6 +285,51 @@ export function JourneyPlanSheetBody(props: JourneyPlanSheetBodyProps) {
   );
 }
 
+/**
+ * The Eval station sheet's interior: the saved-goal read-only eval review. When the aim is complete
+ * it shows the real `CompletionRecapPanel` (the same recap the old Eval stage renders); otherwise it
+ * frames every milestone (met/open chip + title + next-action meta, mirroring the flat `evalRows`)
+ * and nests the read-only `EvidenceReviewList` under any milestone that already has evidence. Eval
+ * has no live milestone-mutation (evidence review is read-only; context-candidate triage lives in the
+ * Context sheet), so this body is honest read-only. Stateless; rendered under `renderToStaticMarkup`.
+ */
+export interface JourneyEvalSheetBodyProps {
+  progress: AimProgressReadModel;
+}
+
+export function JourneyEvalSheetBody(props: JourneyEvalSheetBodyProps) {
+  const { t } = useI18n();
+  const tk = (key: string) => t(key as StringKey);
+  const { progress } = props;
+
+  if (progress.completion_recap?.complete) {
+    return (
+      <div className="od-journey-eval">
+        <CompletionRecapPanel progress={progress} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="od-journey-eval">
+      {progress.milestones.map((row) => {
+        const chip: JourneyChip = row.eval_review.passed ? "eval.met" : "eval.open";
+        const meta = row.eval_review.passed ? tk("glass.station.meta.met") : row.next_action;
+        return (
+          <div className="od-journey-eval-item" key={row.milestone.id}>
+            <div className="od-journey-eval-head">
+              <span className={chipClass(chip)}>{tk(CHIP_KEY[chip])}</span>
+              <span className="od-journey-eval-title">{row.milestone.title}</span>
+              {meta ? <span className="od-journey-eval-meta">{meta}</span> : null}
+            </div>
+            {row.evidence.length > 0 ? <EvidenceReviewList row={row} compact /> : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export interface JourneyViewProps {
   goal: Goal;
   progress: AimProgressReadModel | null;
@@ -409,6 +455,9 @@ export function JourneyView(props: JourneyViewProps) {
   // The Plan station sheet hosts the saved-goal read-only plan review (the real contract interior)
   // when App supplies the pure plan view-model; otherwise it falls back to flat plan rows.
   const planBody = sheet?.station === "plan" && props.planReview ? props.planReview : null;
+  // The Eval station sheet hosts the saved-goal read-only eval review (recap or per-milestone
+  // evidence). All the data is already in `progress`, so this is gated purely on the open station.
+  const evalBody = sheet?.station === "eval" ? progress : null;
   const elsewhereCount = props.elsewhereCount ?? 0;
   const showElsewhere = elsewhereCount > 0 && Boolean(props.onJumpElsewhere);
   const hasMoveSecondary = Boolean(props.onHandToAgent || props.onSchedule || props.onLater);
@@ -625,6 +674,8 @@ export function JourneyView(props: JourneyViewProps) {
                 routingValidation={planBody.routingValidation}
                 disabled={Boolean(props.disabled)}
               />
+            ) : evalBody ? (
+              <JourneyEvalSheetBody progress={evalBody} />
             ) : sheet.rows.length === 0 ? (
               <p className="od-journey-sheet-empty">{t("glass.journey.sheetEmpty")}</p>
             ) : (

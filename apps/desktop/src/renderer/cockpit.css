@@ -7083,6 +7083,55 @@ kbd {
   display: none;
 }
 
+/* Eval station sheet interior: hosts the reused read-only recap (CompletionRecapPanel) or a
+   per-milestone frame nesting the read-only EvidenceReviewList. The recap is built for the wide Eval
+   stage, so descendant-only overrides reflow it for the 560px sheet — collapse its 2-col grid to one
+   column, drop its max-width, wrap its metrics, and hide its own kicker (the sheet head carries the
+   EVAL label). Layout-only; never edit the pinned .od-eval-*/.od-recap-* base rules. */
+.od-journey-eval {
+  display: grid;
+  gap: 14px;
+}
+
+.od-journey-eval-item {
+  display: grid;
+  gap: 8px;
+}
+
+.od-journey-eval-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.od-journey-eval-title {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--od-type-body);
+  color: var(--ink);
+}
+
+.od-journey-eval-meta {
+  font-size: var(--od-type-meta);
+  color: var(--mut);
+}
+
+.od-journey-eval .od-completion-recap {
+  max-width: none;
+}
+
+.od-journey-eval .od-recap-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.od-journey-eval .od-stage-metrics {
+  flex-wrap: wrap;
+}
+
+.od-journey-eval .od-completion-recap > .od-stage-panel-head .od-stage-kicker {
+  display: none;
+}
+
 .od-journey-sheet-foot {
   margin-top: 16px;
   display: flex;

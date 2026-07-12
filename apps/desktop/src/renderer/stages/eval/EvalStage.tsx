@@ -1,7 +1,6 @@
 import type { AimProgressReadModel } from "@core/domain";
-import type { Evidence, Memory } from "@core/types";
+import type { Evidence } from "@core/types";
 
-import { ContextInbox, type ContextInboxScope } from "../../ContextInbox";
 import { useI18n, type I18n } from "../../i18n";
 import { pendingContextCandidates } from "../../labels";
 
@@ -10,12 +9,8 @@ type EvalEvidenceReviewItem = EvalStageMilestoneRow["evidence"][number];
 type EvalState = "passed" | "failed" | "needs_human" | "unsupported" | "error" | "pending";
 
 interface EvalStageProps {
-  goalTitle: string;
   rows: EvalStageMilestoneRow[];
   progress: AimProgressReadModel | null;
-  disabled: boolean;
-  onAcceptContextCandidate: (candidate: Memory, content: string, scope: ContextInboxScope) => void;
-  onRejectContextCandidate: (candidate: Memory) => void;
 }
 
 function shortText(value: string | undefined | null, max = 120): string {
@@ -337,7 +332,7 @@ function EvalMilestoneReviewCard({ row }: { row: EvalStageMilestoneRow }) {
   );
 }
 
-function CompletionRecapPanel(props: {
+export function CompletionRecapPanel(props: {
   progress: AimProgressReadModel;
 }) {
   const { t } = useI18n();
@@ -478,26 +473,6 @@ function CompletionRecapPanel(props: {
   );
 }
 
-function EvalContextReviewSection(props: {
-  candidates: Memory[];
-  goalTitle: string;
-  disabled: boolean;
-  onAcceptContextCandidate: (candidate: Memory, content: string, scope: ContextInboxScope) => void;
-  onRejectContextCandidate: (candidate: Memory) => void;
-}) {
-  if (props.candidates.length === 0) return null;
-
-  return (
-    <ContextInbox
-      candidates={props.candidates}
-      currentAimTitle={props.goalTitle}
-      disabled={props.disabled}
-      onAccept={props.onAcceptContextCandidate}
-      onReject={props.onRejectContextCandidate}
-    />
-  );
-}
-
 export function EvalStage(props: EvalStageProps) {
   const { t } = useI18n();
   const pendingCandidates = pendingContextCandidates(props.progress?.context_candidates ?? []);
@@ -506,13 +481,6 @@ export function EvalStage(props: EvalStageProps) {
     return (
       <div className="od-eval-stage-stack">
         <CompletionRecapPanel progress={props.progress} />
-        <EvalContextReviewSection
-          candidates={pendingCandidates}
-          goalTitle={props.goalTitle}
-          disabled={props.disabled}
-          onAcceptContextCandidate={props.onAcceptContextCandidate}
-          onRejectContextCandidate={props.onRejectContextCandidate}
-        />
       </div>
     );
   }
@@ -547,14 +515,6 @@ export function EvalStage(props: EvalStageProps) {
           <EvalMilestoneReviewCard key={row.milestone.id} row={row} />
         ))}
       </div>
-
-      <EvalContextReviewSection
-        candidates={pendingCandidates}
-        goalTitle={props.goalTitle}
-        disabled={props.disabled}
-        onAcceptContextCandidate={props.onAcceptContextCandidate}
-        onRejectContextCandidate={props.onRejectContextCandidate}
-      />
     </section>
   );
 }

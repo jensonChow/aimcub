@@ -1642,12 +1642,8 @@ function AimOsApp() {
 
   const evalPanel = selected && detail ? (
     <EvalStage
-      goalTitle={detail.goal.title}
       rows={progressRows(detail, progress)}
       progress={progress}
-      disabled={Boolean(busy)}
-      onAcceptContextCandidate={(candidate, content, scope) => void acceptContextCandidate(candidate, content, scope)}
-      onRejectContextCandidate={(candidate) => void rejectContextCandidate(candidate)}
     />
   ) : null;
 
