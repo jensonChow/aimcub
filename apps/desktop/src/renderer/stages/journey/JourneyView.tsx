@@ -44,6 +44,7 @@ import {
 import { ContextActivityPanel } from "../context/ContextActivityPanel";
 import type { ContextLoopModel } from "../context/contextLoop";
 import { ContextReviewPanel } from "../context/ContextReviewPanel";
+import { PlanPanel, type PlanPanelProps } from "../plan/PlanPanel";
 
 const STATION_NAME_KEY: Record<JourneyStationId, StringKey> = {
   aim: "glass.station.aim",
@@ -248,6 +249,41 @@ export function JourneyContextSheetBody(props: JourneyContextSheetBodyProps) {
   );
 }
 
+/**
+ * The Plan station sheet's interior: the saved-goal read-only plan review. Reuses `PlanPanel`
+ * verbatim with `saved` / `onChange={undefined}`, so it renders EXACTLY what the old contracts stage
+ * shows for a saved goal — the node selector + one read-only contract card (why / done-when /
+ * evidence / eval-signal / routing / acceptance-rule) + metrics + validation. There is no live
+ * in-place plan-edit path post-save (that is the Stage-6 in-place-update gap), so no mutation
+ * handlers are wired; `disabled` tracks the busy flag so honest node browsing — the one genuinely
+ * live affordance — keeps working. Stateless wrapper; rendered under `renderToStaticMarkup` in tests.
+ */
+export type JourneyPlanSheetBodyProps = Pick<
+  PlanPanelProps,
+  "plan" | "quality" | "review" | "validationErrors" | "routingAgents" | "routingValidation"
+> & { disabled: boolean };
+
+const NOOP_SAVE = () => {};
+
+export function JourneyPlanSheetBody(props: JourneyPlanSheetBodyProps) {
+  return (
+    <div className="od-journey-plan">
+      <PlanPanel
+        plan={props.plan}
+        quality={props.quality}
+        review={props.review}
+        saved
+        disabled={props.disabled}
+        validationErrors={props.validationErrors}
+        routingAgents={props.routingAgents}
+        routingValidation={props.routingValidation}
+        onChange={undefined}
+        onSave={NOOP_SAVE}
+      />
+    </div>
+  );
+}
+
 export interface JourneyViewProps {
   goal: Goal;
   progress: AimProgressReadModel | null;
@@ -264,6 +300,15 @@ export interface JourneyViewProps {
   contextReview?: ContextBundleReview;
   onAcceptContextCandidate?: (candidate: Memory, content: string, scope: ContextInboxScope) => void;
   onRejectContextCandidate?: (candidate: Memory) => void;
+  /**
+   * Pure Plan view-model for the Plan station sheet (the saved-goal read-only plan review). When
+   * present, the Plan sheet hosts the real contract interior (`PlanPanel`) instead of flat plan
+   * rows. Read-only: there is no live in-place plan-edit path post-save (the Stage-6 gap).
+   */
+  planReview?: Pick<
+    PlanPanelProps,
+    "plan" | "quality" | "review" | "validationErrors" | "routingAgents" | "routingValidation"
+  >;
   disabled?: boolean;
   /** Count of OTHER aims with a turn waiting on the user, for the header jump chip. */
   elsewhereCount?: number;
@@ -361,6 +406,9 @@ export function JourneyView(props: JourneyViewProps) {
           onReject: props.onRejectContextCandidate,
         }
       : null;
+  // The Plan station sheet hosts the saved-goal read-only plan review (the real contract interior)
+  // when App supplies the pure plan view-model; otherwise it falls back to flat plan rows.
+  const planBody = sheet?.station === "plan" && props.planReview ? props.planReview : null;
   const elsewhereCount = props.elsewhereCount ?? 0;
   const showElsewhere = elsewhereCount > 0 && Boolean(props.onJumpElsewhere);
   const hasMoveSecondary = Boolean(props.onHandToAgent || props.onSchedule || props.onLater);
@@ -566,6 +614,16 @@ export function JourneyView(props: JourneyViewProps) {
                 disabled={Boolean(props.disabled)}
                 onAccept={contextBody.onAccept}
                 onReject={contextBody.onReject}
+              />
+            ) : planBody ? (
+              <JourneyPlanSheetBody
+                plan={planBody.plan}
+                quality={planBody.quality}
+                review={planBody.review}
+                validationErrors={planBody.validationErrors}
+                routingAgents={planBody.routingAgents}
+                routingValidation={planBody.routingValidation}
+                disabled={Boolean(props.disabled)}
               />
             ) : sheet.rows.length === 0 ? (
               <p className="od-journey-sheet-empty">{t("glass.journey.sheetEmpty")}</p>

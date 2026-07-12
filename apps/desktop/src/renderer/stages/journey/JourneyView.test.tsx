@@ -1,4 +1,4 @@
-import type { AimProgressMilestoneRead, AimProgressReadModel, Goal, Memory } from "@core/domain";
+import type { AimProgressMilestoneRead, AimProgressReadModel, DecompositionOutput, Goal, Memory } from "@core/domain";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
@@ -6,7 +6,7 @@ import type { ContextBundleReview } from "../../contextReview";
 import { I18nProvider } from "../../i18n";
 import type { JourneyStationInteraction } from "../../workflow/journey";
 import { buildContextLoopModel } from "../context/contextLoop";
-import { JourneyContextSheetBody, JourneyRunSheetBody, JourneyView, type JourneyViewProps } from "./JourneyView";
+import { JourneyContextSheetBody, JourneyPlanSheetBody, JourneyRunSheetBody, JourneyView, type JourneyViewProps } from "./JourneyView";
 
 const OWNER = "owner-1";
 const noop = () => {};
@@ -287,5 +287,98 @@ describe("JourneyContextSheetBody", () => {
     expect(html).toContain("context-bundle-review");
     expect(html).toContain("Prefers nonstop flights");
     expect(html).not.toContain("Context is folded into the plan");
+  });
+});
+
+describe("JourneyPlanSheetBody", () => {
+  // Two nodes so the contract selector renders (PlanPanel gates it on nodes.length > 1); the second
+  // node's distinctive body text must NOT appear (only the selected first node's card is rendered).
+  const planFixture: DecompositionOutput = {
+    goal_summary: "Ship a useful contract review.",
+    domain: "software",
+    rationale: "The aim needs execution contracts before work is saved.",
+    nodes: [
+      {
+        key: "contract-review",
+        title: "Review execution contracts",
+        description: "Check the sub-aim contract before saving.",
+        est_effort: "s",
+        xp_reward: 10,
+        acceptance_rule: {
+          logic: "all",
+          threshold: 1,
+          completion_mode: "auto_then_confirm",
+          clauses: [{ evaluator: "manual_confirm", auto_verifiable: false, match: {} }],
+        },
+        decomposition_contract: {
+          why: "A clear agreement before execution starts.",
+          definition_of_done: "Every sub-aim has a clear owner and evidence standard.",
+          required_evidence: ["Reviewed contract notes."],
+          likely_owner: "human",
+          context_gaps: [],
+          eval_signal: "The saved aim contains reviewed contract terms.",
+        },
+        routing_override: null,
+      },
+      {
+        key: "ship-contract",
+        title: "Ship the reviewed contract",
+        description: "Deliver the final signed-off contract to the owner.",
+        est_effort: "s",
+        xp_reward: 10,
+        acceptance_rule: {
+          logic: "all",
+          threshold: 1,
+          completion_mode: "auto_then_confirm",
+          clauses: [{ evaluator: "manual_confirm", auto_verifiable: false, match: {} }],
+        },
+        decomposition_contract: {
+          why: "The reviewed contract must reach the owner.",
+          definition_of_done: "The owner has the signed-off contract.",
+          required_evidence: ["Delivery receipt."],
+          likely_owner: "human",
+          context_gaps: [],
+          eval_signal: "The owner acknowledges receipt.",
+        },
+        routing_override: null,
+      },
+    ],
+    edges: [],
+  };
+
+  function renderBody(disabled = false): string {
+    return renderToStaticMarkup(
+      <I18nProvider>
+        <JourneyPlanSheetBody
+          plan={planFixture}
+          quality={null}
+          review={null}
+          validationErrors={[]}
+          routingAgents={[]}
+          routingValidation={null}
+          disabled={disabled}
+        />
+      </I18nProvider>,
+    );
+  }
+
+  it("hosts the real read-only plan contract interior (selector + one contract card)", () => {
+    const html = renderBody();
+    expect(html).toContain("od-journey-plan");
+    expect(html).toContain('data-od-id="plan-contract-selector"');
+    expect(html.match(/class="od-plan-contract-card/g)).toHaveLength(1);
+    // The selected (first) node's contract renders read-only.
+    expect(html).toContain("od-plan-readonly-title");
+    expect(html).toContain("Review execution contracts");
+    // Only the selected node's card is shown — the other node's body text stays hidden.
+    expect(html).not.toContain("Deliver the final signed-off contract to the owner.");
+  });
+
+  it("renders no edit affordances for a saved goal (honest read-only, edit deferred to Stage 6)", () => {
+    const html = renderBody();
+    expect(html).not.toContain("<textarea"); // no editable contract/rule fields
+    expect(html).not.toContain("od-plan-routing-details"); // routing controls are editable-gated
+    expect(html).not.toContain("od-plan-structure-details"); // reorder/merge/split are editable-gated
+    expect(html).not.toContain("od-aim-primary"); // the Save button is hidden when saved
   });
 });
