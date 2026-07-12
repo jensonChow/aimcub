@@ -84,6 +84,38 @@ function render(progress: AimProgressReadModel | null, extra: Partial<JourneyVie
   );
 }
 
+// A minimal valid plan for the in-Journey first-plan review surface (Stage 6A).
+const miniPlan: DecompositionOutput = {
+  goal_summary: "Ship it.",
+  domain: "software",
+  rationale: "Needs a plan.",
+  nodes: [
+    {
+      key: "n1",
+      title: "Do the thing",
+      description: "d",
+      est_effort: "s",
+      xp_reward: 10,
+      acceptance_rule: {
+        logic: "all",
+        threshold: 1,
+        completion_mode: "auto_then_confirm",
+        clauses: [{ evaluator: "manual_confirm", auto_verifiable: false, match: {} }],
+      },
+      decomposition_contract: {
+        why: "w",
+        definition_of_done: "done",
+        required_evidence: ["e"],
+        likely_owner: "human",
+        context_gaps: [],
+        eval_signal: "s",
+      },
+      routing_override: null,
+    },
+  ],
+  edges: [],
+} as unknown as DecompositionOutput;
+
 describe("JourneyView", () => {
   it("renders the aim title, all six stations, and the journal", () => {
     const html = render(progressOf([row({ id: "m1", title: "Book flights", human: true })]));
@@ -153,6 +185,50 @@ describe("JourneyView", () => {
     const withTakeBack = render(p, { onTakeBack: noop });
     expect(withTakeBack).toContain("od-journey-ambient-btn");
     expect(withTakeBack).toContain("Take it back");
+  });
+
+  // ── Stage 6A: goal-first in-Journey first-plan ──
+
+  it("renders the build-the-plan card for a plan-less shell, not a false-complete ambient", () => {
+    // A shell has 0 milestones; buildAimProgressReadModel would report next_action "Aim is complete."
+    const html = render(progressOf([], { next_action: "Aim is complete." }), { onStartResearch: noop });
+    expect(html).toContain("journey-build-plan");
+    expect(html).toContain("Build the plan");
+    expect(html).not.toContain("journey-ambient");
+    expect(html).not.toContain("Aim is complete.");
+  });
+
+  it("links to Settings from the build-plan card when no planning runtime is configured", () => {
+    const html = render(progressOf([]), { onStartResearch: noop, planningRuntimeReady: false });
+    expect(html).toContain("Connect a runtime in Settings");
+    expect(html).not.toContain(">Build the plan<");
+  });
+
+  it("hosts the in-Journey clarify Q&A while a clarify phase is active", () => {
+    const html = render(progressOf([]), {
+      planning: { busy: false, clarifyPanel: <div>CLARIFY_QA_MARKER</div>, planReady: false, onCommitPlan: noop },
+    });
+    expect(html).toContain("journey-planning");
+    expect(html).toContain("CLARIFY_QA_MARKER");
+    expect(html).not.toContain("journey-build-plan");
+  });
+
+  it("hosts the generated plan review + Save when a plan is ready", () => {
+    const html = render(progressOf([]), {
+      planning: { busy: false, clarifyPanel: null, planReady: true, onCommitPlan: noop },
+      planReview: { plan: miniPlan, quality: null, review: null, validationErrors: [], routingAgents: [], routingValidation: null },
+    });
+    expect(html).toContain("Review the plan");
+    expect(html).toContain("Save plan");
+    expect(html).toContain("od-journey-plan");
+  });
+
+  it("shows a working indicator while the plan is generating", () => {
+    const html = render(progressOf([]), {
+      planning: { busy: true, clarifyPanel: null, planReady: false, onCommitPlan: noop },
+    });
+    expect(html).toContain("od-journey-planning-working");
+    expect(html).toContain("Working on the plan");
   });
 });
 
@@ -390,7 +466,7 @@ describe("JourneyPlanSheetBody", () => {
     edges: [],
   };
 
-  function renderBody(disabled = false): string {
+  function renderBody(opts: { editable?: boolean; disabled?: boolean } = {}): string {
     return renderToStaticMarkup(
       <I18nProvider>
         <JourneyPlanSheetBody
@@ -400,7 +476,8 @@ describe("JourneyPlanSheetBody", () => {
           validationErrors={[]}
           routingAgents={[]}
           routingValidation={null}
-          disabled={disabled}
+          disabled={opts.disabled ?? false}
+          onCommitPlan={opts.editable ? noop : undefined}
         />
       </I18nProvider>,
     );
@@ -418,12 +495,26 @@ describe("JourneyPlanSheetBody", () => {
     expect(html).not.toContain("Deliver the final signed-off contract to the owner.");
   });
 
-  it("renders no edit affordances for a saved goal (honest read-only, edit deferred to Stage 6)", () => {
+  it("renders read-only (no edit affordances) when no commit handler is wired", () => {
     const html = renderBody();
     expect(html).not.toContain("<textarea"); // no editable contract/rule fields
     expect(html).not.toContain("od-plan-routing-details"); // routing controls are editable-gated
     expect(html).not.toContain("od-plan-structure-details"); // reorder/merge/split are editable-gated
-    expect(html).not.toContain("od-aim-primary"); // the Save button is hidden when saved
+    expect(html).not.toContain("od-journey-plan-actions"); // no commit row without onCommitPlan
+    expect(html).not.toContain("Save plan changes");
+  });
+
+  it("becomes editable in place with a buffered Save plan changes commit (Stage 6B)", () => {
+    const html = renderBody({ editable: true });
+    // The editable contract interior appears (the affordances the read-only case denies).
+    expect(html).toContain("od-plan-structure-details");
+    expect(html).not.toContain("od-plan-readonly-title");
+    // The sheet's own commit row (distinct from the funnel's "Save aim" button).
+    expect(html).toContain("od-journey-plan-actions");
+    expect(html).toContain("Save plan changes");
+    // Disabled until the buffer is dirty (nothing edited yet at initial render).
+    expect(html).toMatch(/Save plan changes[\s\S]*?<\/button>/);
+    expect(html).not.toContain("Save aim"); // not the funnel save button
   });
 });
 

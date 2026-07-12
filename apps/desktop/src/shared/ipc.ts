@@ -85,6 +85,48 @@ export interface SaveRequest {
 }
 
 /**
+ * Create a plan-less "shell" aim (goal-first): the Goal is persisted immediately with no plan so the
+ * Journey mounts right away. There is intentionally NO `plan` — the first plan lands later via
+ * {@link UpdateGoalPlanRequest}.
+ */
+export interface CreateAimRequest {
+  title: string;
+  description?: string;
+  parentGoalId?: string;
+  parentMilestoneId?: string;
+}
+
+/**
+ * Land or re-plan the plan of an EXISTING aim in place (no fork). Two honest modes:
+ *  - planning-run mode (`questions`/`answers` present): the first plan for a shell, or a re-plan
+ *    from a fresh planning run — the handler recomputes the same synthesis bundle `saveGoal` folds
+ *    into metadata + records context candidates.
+ *  - manual-edit mode (no `questions`/`answers`): a direct plan edit — no fabricated intake/critique
+ *    metadata; existing metadata is preserved (only the handoff manifest is regenerated).
+ * Milestones are merged via `planMerge` (completed work frozen), never overwritten.
+ */
+export interface UpdateGoalPlanRequest {
+  goalId: string;
+  title?: string;
+  description?: string;
+  draft?: DecompositionOutput | null;
+  plan: DecompositionOutput;
+  quality?: PlanQualityReport | null;
+  review?: PlanReviewReport | null;
+  qualityRetry?: {
+    retried: boolean;
+    attempts: number;
+    firstQuality: PlanQualityReport | null;
+  };
+  debugTrace?: PlanningDebugTrace | null;
+  questions?: ClarifyQuestion[];
+  answers?: ClarifyAnswer[];
+  assumptions?: ClarifyAssumption[];
+  /** A funnel draft to discard once the plan lands (parity with `saveGoal`'s draft cleanup). */
+  draftId?: string;
+}
+
+/**
  * A decomposition result over IPC. There is no offline/template fallback: when no
  * provider is configured or the LLM call fails, `ok` is false and `errors` carries the
  * reason for the UI to surface honestly.
@@ -375,6 +417,10 @@ export interface AimcubApi {
   clarify(req: ClarifyRequest): Promise<ClarifyIpcResult>;
   refine(req: RefineRequest): Promise<PlanResult>;
   saveGoal(req: SaveRequest): Promise<SavedGoal>;
+  /** Create a plan-less shell aim (goal-first) so the Journey can mount before planning. */
+  createAim(req: CreateAimRequest): Promise<SavedGoal>;
+  /** Land or re-plan the plan of an existing aim in place (no fork); null if the aim is gone. */
+  updateGoalPlan(req: UpdateGoalPlanRequest): Promise<SavedGoal | null>;
   listGoals(): Promise<Goal[]>;
   getGoal(id: string): Promise<GoalDetail | null>;
   getAimProgress(id: string): Promise<AimProgressReadModel | null>;
@@ -428,6 +474,8 @@ export const IPC = {
   clarify: "aimcub:clarify",
   refine: "aimcub:refine",
   saveGoal: "aimcub:saveGoal",
+  createAim: "aimcub:createAim",
+  updateGoalPlan: "aimcub:updateGoalPlan",
   listGoals: "aimcub:listGoals",
   getGoal: "aimcub:getGoal",
   getAimProgress: "aimcub:getAimProgress",

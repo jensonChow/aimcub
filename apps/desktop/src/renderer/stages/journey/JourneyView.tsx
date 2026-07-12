@@ -17,8 +17,8 @@
  * every station change; the confirm is membership-gated so a background progress refresh
  * can't dispatch a milestone that dropped out of the option set.
  */
-import type { AimProgressReadModel, Goal, Memory, Milestone, RunEvent } from "@core/domain";
-import { useEffect, useRef, useState } from "react";
+import type { AimProgressReadModel, DecompositionOutput, Goal, Memory, Milestone, RunEvent } from "@core/domain";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import type { ConfirmMilestoneRequest } from "../../../shared/ipc";
 import { ContextInbox, type ContextInboxScope } from "../../ContextInbox";
@@ -291,36 +291,74 @@ export function JourneyContextSheetBody(props: JourneyContextSheetBodyProps) {
 }
 
 /**
- * The Plan station sheet's interior: the saved-goal read-only plan review. Reuses `PlanPanel`
- * verbatim with `saved` / `onChange={undefined}`, so it renders EXACTLY what the old contracts stage
- * shows for a saved goal — the node selector + one read-only contract card (why / done-when /
- * evidence / eval-signal / routing / acceptance-rule) + metrics + validation. There is no live
- * in-place plan-edit path post-save (that is the Stage-6 in-place-update gap), so no mutation
- * handlers are wired; `disabled` tracks the busy flag so honest node browsing — the one genuinely
- * live affordance — keeps working. Stateless wrapper; rendered under `renderToStaticMarkup` in tests.
+ * The Plan station sheet's interior. Reuses `PlanPanel` for a saved goal — the node selector + one
+ * contract card (why / done-when / evidence / eval-signal / routing / acceptance-rule) + metrics +
+ * validation.
+ *
+ * Read-only by default (no `onCommitPlan`): `saved` + `onChange={undefined}`, exactly what the old
+ * contracts stage shows. When `onCommitPlan` is supplied (Stage 6B), the sheet becomes editable
+ * in place: edits buffer into a component-local `editedPlan` (never persisted per-keystroke —
+ * `planMerge` matches milestones by title, so a per-keystroke merge would churn ids), and an
+ * explicit "Save plan changes" commits the whole buffered plan through the App handler
+ * (→ `updateGoalPlan`). The buffer is dropped whenever the underlying saved plan changes (commit /
+ * refresh / re-plan), so a background update never fights a stale local edit. Rendered under
+ * `renderToStaticMarkup` in tests (hooks are SSR-safe: the reset effect is a no-op there).
  */
 export type JourneyPlanSheetBodyProps = Pick<
   PlanPanelProps,
   "plan" | "quality" | "review" | "validationErrors" | "routingAgents" | "routingValidation"
-> & { disabled: boolean };
+> & {
+  disabled: boolean;
+  /** When present, the plan sheet is editable in place; commit persists the buffered plan. */
+  onCommitPlan?: (plan: DecompositionOutput) => void;
+};
 
 const NOOP_SAVE = () => {};
 
 export function JourneyPlanSheetBody(props: JourneyPlanSheetBodyProps) {
+  const { t } = useI18n();
+  const editable = Boolean(props.onCommitPlan);
+  const [editedPlan, setEditedPlan] = useState<DecompositionOutput | null>(null);
+  // Drop the local edit buffer whenever the underlying saved plan changes (commit / refresh / re-plan).
+  useEffect(() => {
+    setEditedPlan(null);
+  }, [props.plan]);
+  const plan = editedPlan ?? props.plan;
+  const dirty = editedPlan !== null && editedPlan !== props.plan;
   return (
     <div className="od-journey-plan">
       <PlanPanel
-        plan={props.plan}
+        plan={plan}
         quality={props.quality}
         review={props.review}
         saved
+        editableWhenSaved={editable}
         disabled={props.disabled}
         validationErrors={props.validationErrors}
         routingAgents={props.routingAgents}
         routingValidation={props.routingValidation}
-        onChange={undefined}
+        onChange={editable ? setEditedPlan : undefined}
         onSave={NOOP_SAVE}
       />
+      {editable ? (
+        <div className="od-journey-plan-actions">
+          <button
+            className="od-journey-primary"
+            type="button"
+            disabled={props.disabled || !dirty}
+            onClick={() => {
+              if (dirty) props.onCommitPlan?.(plan);
+            }}
+          >
+            {t("glass.journey.savePlanChanges")}
+          </button>
+          {dirty ? (
+            <button className="od-journey-secondary" type="button" onClick={() => setEditedPlan(null)}>
+              {t("glass.journey.discardPlanChanges")}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -387,14 +425,16 @@ export interface JourneyViewProps {
   onAcceptContextCandidate?: (candidate: Memory, content: string, scope: ContextInboxScope) => void;
   onRejectContextCandidate?: (candidate: Memory) => void;
   /**
-   * Pure Plan view-model for the Plan station sheet (the saved-goal read-only plan review). When
-   * present, the Plan sheet hosts the real contract interior (`PlanPanel`) instead of flat plan
-   * rows. Read-only: there is no live in-place plan-edit path post-save (the Stage-6 gap).
+   * Pure Plan view-model for the Plan station sheet. When present, the Plan sheet hosts the real
+   * contract interior (`PlanPanel`) instead of flat plan rows. `onCommitPlan` (Stage 6B) makes the
+   * saved-goal Plan drill-in sheet editable in place; omit it for a read-only review.
    */
   planReview?: Pick<
     PlanPanelProps,
     "plan" | "quality" | "review" | "validationErrors" | "routingAgents" | "routingValidation"
-  >;
+  > & { onCommitPlan?: (plan: DecompositionOutput) => void };
+  /** Re-plan the SAME aim with a fresh planning run (Stage 6B; merges, freezing completed work). */
+  onReplan?: () => void;
   disabled?: boolean;
   /** Count of OTHER aims with a turn waiting on the user, for the header jump chip. */
   elsewhereCount?: number;
@@ -423,6 +463,25 @@ export interface JourneyViewProps {
   onSchedule?: () => void;
   onLater?: () => void;
   onTakeBack?: () => void;
+  /**
+   * Goal-first (Stage 6). Whether a planning runtime is configured — gates the plan-less shell's
+   * "build the plan" action (a not-ready shell links to Settings instead of dead-ending).
+   */
+  planningRuntimeReady?: boolean;
+  /** Start the first-plan research run for a plan-less shell goal. */
+  onStartResearch?: () => void;
+  /**
+   * The in-Journey first-plan surface for a shell goal. When present, the Journey hosts the
+   * research/clarify/plan-review interaction in place of the Your-move card (never leaving the
+   * Journey): the clarify Q&A element while a clarify phase is active, then the generated plan
+   * review with an Accept action, else a working indicator.
+   */
+  planning?: {
+    busy: boolean;
+    clarifyPanel: ReactNode;
+    planReady: boolean;
+    onCommitPlan: () => void;
+  };
 }
 
 export function JourneyView(props: JourneyViewProps) {
@@ -628,7 +687,58 @@ export function JourneyView(props: JourneyViewProps) {
         ))}
       </div>
 
-      {move ? (
+      {props.planning ? (
+        <div className="od-journey-planning" data-od-id="journey-planning">
+          {props.planning.clarifyPanel ? (
+            props.planning.clarifyPanel
+          ) : props.planning.planReady && props.planReview ? (
+            <div className="od-journey-planning-review">
+              <div className="od-journey-eyebrow">{t("glass.journey.planReviewTitle")}</div>
+              <JourneyPlanSheetBody {...props.planReview} onCommitPlan={undefined} disabled={props.planning.busy} />
+              <div className="od-journey-move-actions">
+                <button
+                  className="od-journey-primary"
+                  type="button"
+                  disabled={props.planning.busy}
+                  onClick={props.planning.onCommitPlan}
+                >
+                  {t("glass.journey.savePlanCta")}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="od-journey-planning-working">
+              <i className="od-journey-dot od-journey-dot-active" aria-hidden="true" />
+              <div className="od-journey-ambient-title">{t("glass.journey.planningWorking")}</div>
+            </div>
+          )}
+        </div>
+      ) : progress.total_milestones === 0 ? (
+        <div className="od-journey-move" data-od-id="journey-build-plan">
+          <div className="od-journey-move-head">
+            <span className="od-journey-move-tag">{t("glass.journey.buildPlanTag")}</span>
+            <span className="od-journey-chip od-journey-chip-you">{t("glass.actor.you")}</span>
+          </div>
+          <div className="od-journey-move-title">{t("glass.journey.buildPlanTitle")}</div>
+          <p className="od-journey-move-body">{t("glass.journey.buildPlanBody")}</p>
+          <div className="od-journey-move-actions">
+            {props.planningRuntimeReady === false ? (
+              <button className="od-journey-secondary" type="button" onClick={() => props.onOpenStage("settings")}>
+                {t("glass.journey.buildPlanNoRuntime")}
+              </button>
+            ) : (
+              <button
+                className="od-journey-primary"
+                type="button"
+                disabled={props.disabled || !props.onStartResearch}
+                onClick={props.onStartResearch}
+              >
+                {t("glass.journey.buildPlanCta")}
+              </button>
+            )}
+          </div>
+        </div>
+      ) : move ? (
         <div className="od-journey-move" data-od-id="journey-move">
           <div className="od-journey-move-head">
             <span className="od-journey-move-tag">{tk(move.tagKey)}</span>
@@ -785,6 +895,7 @@ export function JourneyView(props: JourneyViewProps) {
                 validationErrors={planBody.validationErrors}
                 routingAgents={planBody.routingAgents}
                 routingValidation={planBody.routingValidation}
+                onCommitPlan={planBody.onCommitPlan}
                 disabled={Boolean(props.disabled)}
               />
             ) : evalBody ? (
@@ -802,19 +913,33 @@ export function JourneyView(props: JourneyViewProps) {
                 ))}
               </div>
             )}
-            {sheet.actionStage ? (
+            {sheet.actionStage || (sheet.station === "plan" && props.onReplan) ? (
               <div className="od-journey-sheet-foot">
-                <button
-                  className="od-journey-secondary"
-                  type="button"
-                  onClick={() => {
-                    const stage = sheet.actionStage;
-                    setOpenStation(null);
-                    if (stage) props.onOpenStage(stage);
-                  }}
-                >
-                  {t("glass.journey.continue")}
-                </button>
+                {sheet.station === "plan" && props.onReplan ? (
+                  <button
+                    className="od-journey-secondary"
+                    type="button"
+                    onClick={() => {
+                      setOpenStation(null);
+                      props.onReplan?.();
+                    }}
+                  >
+                    {t("glass.journey.replan")}
+                  </button>
+                ) : null}
+                {sheet.actionStage ? (
+                  <button
+                    className="od-journey-secondary"
+                    type="button"
+                    onClick={() => {
+                      const stage = sheet.actionStage;
+                      setOpenStation(null);
+                      if (stage) props.onOpenStage(stage);
+                    }}
+                  >
+                    {t("glass.journey.continue")}
+                  </button>
+                ) : null}
               </div>
             ) : null}
           </div>

@@ -44,6 +44,12 @@ export interface PlanPanelProps {
   routingValidation: PlanRoutingValidation | null;
   onChange?: (plan: DecompositionOutput) => void;
   onSave: () => void;
+  /**
+   * Allow editing a SAVED goal's plan in place (Stage 6B). The funnel keeps its `!saved` "Save aim"
+   * button; a saved-editable host (the Journey Plan sheet) renders its own "Save plan changes"
+   * commit, so this only flips the fields editable — the built-in Save button stays funnel-only.
+   */
+  editableWhenSaved?: boolean;
 }
 
 function StageMetric({ label, value }: { label: string; value: string }) {
@@ -57,7 +63,7 @@ function StageMetric({ label, value }: { label: string; value: string }) {
 
 export function PlanPanel(props: PlanPanelProps) {
   const { t } = useI18n();
-  const editable = !props.saved && Boolean(props.onChange);
+  const editable = Boolean(props.onChange) && (!props.saved || Boolean(props.editableWhenSaved));
   const [ruleDrafts, setRuleDrafts] = useState<Record<string, string>>({});
   const [ruleErrors, setRuleErrors] = useState<Record<string, string>>({});
   const [advancedOpen, setAdvancedOpen] = useState<Record<string, boolean>>({});

@@ -122,6 +122,23 @@ export interface CreateGoalInput {
   memories?: NewMemory[];
 }
 
+/**
+ * Create a plan-less "shell" aim — a Goal that exists before it has a plan, so the Journey can
+ * mount immediately (goal-first). Unlike {@link CreateGoalInput} there is NO `plan`: the shell is
+ * persisted with `plan_json: null` and zero milestones; a later {@link UpdateGoalInput} lands the
+ * first plan. (An empty `DecompositionOutput` can never flow through `createGoal`/`materialize`
+ * because `nodes.min(1)` rejects it — hence a dedicated shell path.)
+ */
+export interface CreateAimShellInput {
+  ownerId?: string;
+  title: string;
+  description?: string;
+  domain?: GoalDomain;
+  metadata?: Record<string, unknown>;
+  parentGoalId?: string;
+  parentMilestoneId?: string;
+}
+
 /** Re-plan an existing aim: swap in a new decomposition while preserving finished work. */
 export interface UpdateGoalInput {
   id: string;
@@ -324,6 +341,11 @@ export interface AimStore {
   listGoals(): Promise<Goal[]>;
   getGoal(id: string): Promise<{ goal: Goal; milestones: Milestone[] } | null>;
   createGoal(input: CreateGoalInput): Promise<{ goal: Goal; milestones: Milestone[] }>;
+  /**
+   * Create a plan-less shell aim (goal-first): a Goal with `plan_json: null` and zero milestones,
+   * so the Journey can mount before planning. The first plan lands later via {@link updateGoal}.
+   */
+  createAimShell(input: CreateAimShellInput): Promise<{ goal: Goal; milestones: Milestone[] }>;
   listAimDrafts(): Promise<AimDraftRow[]>;
   getAimDraft(id: string): Promise<AimDraftRow | null>;
   upsertAimDraft(input: UpsertAimDraftInput): Promise<AimDraftRow>;
@@ -736,6 +758,45 @@ function planNodeMetadata(node: PlanNode): Record<string, unknown> {
 }
 
 /**
+ * Record the parent→child sub-aim relation for a manually-decomposed child aim. Shared by
+ * `createGoal` and `createAimShell` (both can be created as a child). No-op when neither parent
+ * id is set; throws if only one is set or the parent goal/milestone is missing.
+ */
+function linkParentSubAim(
+  store: LocalStore,
+  args: {
+    childGoalId: string;
+    ownerId: string;
+    parentGoalId?: string;
+    parentMilestoneId?: string;
+    now: string;
+    nextId: () => string;
+  },
+): void {
+  const { parentGoalId, parentMilestoneId } = args;
+  if (!parentGoalId && !parentMilestoneId) return;
+  if (!parentGoalId || !parentMilestoneId) {
+    throw new Error("Both parentGoalId and parentMilestoneId are required for a child aim.");
+  }
+  const parentGoal = store.goals.find((g) => g.id === parentGoalId);
+  const parentMilestone = (store.milestonesByGoal[parentGoalId] ?? []).find((m) => m.id === parentMilestoneId);
+  if (!parentGoal || !parentMilestone) {
+    throw new Error("Parent aim or sub-aim not found.");
+  }
+  store.subAimRelations.push({
+    id: args.nextId(),
+    owner_id: args.ownerId,
+    parent_goal_id: parentGoalId,
+    parent_milestone_id: parentMilestoneId,
+    child_goal_id: args.childGoalId,
+    status: "active",
+    reason: "User manually decomposed this sub-aim into a child aim.",
+    created_at: args.now,
+    updated_at: args.now,
+  });
+}
+
+/**
  * Validate a DecompositionOutput and materialize it into linear Milestone rows.
  * Routes through {@link parseDecomposition} (shape + semantic gate, identical to web/desktop).
  */
@@ -799,7 +860,12 @@ export function mergeMilestones(
   const plan = parseDecomposition(next);
 
   const merged = planMerge(
-    existing.map((m) => ({ id: m.id, title: m.title, status: m.status })),
+    existing.map((m) => ({
+      id: m.id,
+      title: m.title,
+      status: m.status,
+      key: typeof m.metadata?.plan_key === "string" ? m.metadata.plan_key : null,
+    })),
     plan,
   );
   const existingById = new Map(existing.map((m) => [m.id, m]));
@@ -1303,32 +1369,57 @@ export function createJsonFileStore(dataDir: string = defaultDataDir(), options:
 
       const metadataParentGoalId = typeof input.metadata?.parent_goal_id === "string" ? input.metadata.parent_goal_id : undefined;
       const metadataParentMilestoneId = typeof input.metadata?.parent_milestone_id === "string" ? input.metadata.parent_milestone_id : undefined;
-      const parentGoalId = input.parentGoalId ?? metadataParentGoalId;
-      const parentMilestoneId = input.parentMilestoneId ?? metadataParentMilestoneId;
-      if (parentGoalId || parentMilestoneId) {
-        if (!parentGoalId || !parentMilestoneId) {
-          throw new Error("Both parentGoalId and parentMilestoneId are required for a child aim.");
-        }
-        const parentGoal = store.goals.find((g) => g.id === parentGoalId);
-        const parentMilestone = (store.milestonesByGoal[parentGoalId] ?? []).find((m) => m.id === parentMilestoneId);
-        if (!parentGoal || !parentMilestone) {
-          throw new Error("Parent aim or sub-aim not found.");
-        }
-        store.subAimRelations.push({
-          id: nextId(),
-          owner_id: ownerId,
-          parent_goal_id: parentGoalId,
-          parent_milestone_id: parentMilestoneId,
-          child_goal_id: goalId,
-          status: "active",
-          reason: "User manually decomposed this sub-aim into a child aim.",
-          created_at: now,
-          updated_at: now,
-        });
-      }
+      linkParentSubAim(store, {
+        childGoalId: goalId,
+        ownerId,
+        parentGoalId: input.parentGoalId ?? metadataParentGoalId,
+        parentMilestoneId: input.parentMilestoneId ?? metadataParentMilestoneId,
+        now,
+        nextId,
+      });
       save(store);
 
       return { goal, milestones };
+    },
+
+    async createAimShell(input: CreateAimShellInput): Promise<{ goal: Goal; milestones: Milestone[] }> {
+      const store = load();
+      const now = nowIso();
+      const ownerId = input.ownerId ?? store.ownerId ?? DEFAULT_OWNER;
+      const goalId = nextId();
+
+      // A plan-less shell: no plan, no milestones, no assignments. The first plan lands later via
+      // `updateGoal` (which materializes + routes then). `status` stays "active" like a planned goal
+      // — the read models derive the "planning" state from `total_milestones === 0`, not status.
+      const goal: Goal = {
+        id: goalId,
+        owner_id: ownerId,
+        title: input.title,
+        description: input.description ?? "",
+        domain: input.domain ?? "software",
+        status: "active",
+        target_date: null,
+        plan_json: null,
+        metadata: input.metadata ?? {},
+        created_at: now,
+      };
+
+      store.goals.push(goal);
+      store.milestonesByGoal[goalId] = [];
+
+      const metadataParentGoalId = typeof input.metadata?.parent_goal_id === "string" ? input.metadata.parent_goal_id : undefined;
+      const metadataParentMilestoneId = typeof input.metadata?.parent_milestone_id === "string" ? input.metadata.parent_milestone_id : undefined;
+      linkParentSubAim(store, {
+        childGoalId: goalId,
+        ownerId,
+        parentGoalId: input.parentGoalId ?? metadataParentGoalId,
+        parentMilestoneId: input.parentMilestoneId ?? metadataParentMilestoneId,
+        now,
+        nextId,
+      });
+      save(store);
+
+      return { goal, milestones: [] };
     },
 
     async updateGoal(input: UpdateGoalInput): Promise<{ goal: Goal; milestones: Milestone[] } | null> {
