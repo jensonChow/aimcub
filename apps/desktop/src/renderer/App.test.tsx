@@ -909,6 +909,23 @@ describe("App planning state guards", () => {
     expect(mainIpcSource).toContain("if (req.draftId) await aimStore.discardAimDraft(req.draftId);");
   });
 
+  it("discards a pre-goal draft when the goal-first shell is created", () => {
+    const appSource = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+    const createShell = appSource.match(/async function createAimAndOpenJourney[\s\S]*?\n {2}\/\*\* "Build the plan"/)?.[0]
+      ?? appSource.match(/async function createAimAndOpenJourney[\s\S]*?\n {2}async function/)?.[0]
+      ?? "";
+
+    // Capture + pause BEFORE createAim so the in-flight autosave timer can't re-mint the row.
+    expect(createShell).toContain(
+      "const pendingDraftId = draftPersistence.currentDraftId() ?? activeDraftIdRef.current ?? undefined;",
+    );
+    expect(createShell.indexOf("draftPersistence.pauseAutosave();")).toBeLessThan(
+      createShell.indexOf("window.aimcub.createAim"),
+    );
+    expect(createShell).toContain("window.aimcub.createAim({ title, description, draftId: pendingDraftId })");
+    expect(createShell).toContain("draftPersistence.resumeAutosave();");
+  });
+
   it("requires an explicit discard path for draft deletion", () => {
     const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
     const openDraft = source.match(/async function openAimDraft[\s\S]*?\n {2}async function discardAimDraft/)?.[0] ?? "";

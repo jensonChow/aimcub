@@ -94,6 +94,8 @@ export interface CreateAimRequest {
   description?: string;
   parentGoalId?: string;
   parentMilestoneId?: string;
+  /** A pre-goal composer draft to discard once the shell is created (parity with `saveGoal`). */
+  draftId?: string;
 }
 
 /**

@@ -944,6 +944,8 @@ export function registerIpc(): void {
       parentGoalId: req.parentGoalId,
       parentMilestoneId: req.parentMilestoneId,
     });
+    // Discard the pre-goal composer draft now that the shell exists (parity with `saveGoal`).
+    if (req.draftId) await aimStore.discardAimDraft(req.draftId);
     return { ...saved };
   });
 

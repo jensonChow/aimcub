@@ -1218,16 +1218,22 @@ function AimOsApp() {
       return;
     }
     const description = aimDescription.trim() || undefined;
+    // Discard any draft this composer autosaved, and pause autosave so the in-flight 500ms timer
+    // can't re-mint one while the shell is created (mirrors `savePlan`). The session is left intact
+    // so a pending autosave skips `beginSession` and honors the pause rather than un-pausing.
+    const pendingDraftId = draftPersistence.currentDraftId() ?? activeDraftIdRef.current ?? undefined;
+    draftPersistence.pauseAutosave();
     setError(null);
     setBusy(t("os.busy.save"));
     try {
-      const created = await window.aimcub.createAim({ title, description });
+      const created = await window.aimcub.createAim({ title, description, draftId: pendingDraftId });
       resetComposer();
       await refreshAll({ autoOpenFirstGoal: false });
       await openGoal(created.goal, { checkpointDraft: false });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
+      draftPersistence.resumeAutosave();
       setBusy(null);
     }
   }
