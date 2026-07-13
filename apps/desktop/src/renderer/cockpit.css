@@ -36,17 +36,48 @@
   --od-selection-shadow: inset 0 0 0 1px color-mix(in oklab, var(--od-bg), transparent 82%);
   --od-interaction-hover-shadow: var(--od-shadow-sidebar-action);
   --od-interaction-focus-shadow: var(--od-focus), var(--od-shadow-sidebar-action);
-  --od-type-meta: 12px;
-  --od-type-body: 13px;
-  --od-type-title: 16px;
+  /*
+   * Aimcub Glass type ramp — the single organized scale for every font-size in the app.
+   * tag: ALL-CAPS kickers + chip labels · meta: counts, timestamps, footnotes · sub: descriptions,
+   * menu items, compact controls · body: navigation, forms, content text · title-s: row/card
+   * titles, primary actions · title: surface titles · title-m: pane/section titles · title-l:
+   * spotlight titles · display: page titles · hero: first-run hero + composer input.
+   */
+  --od-type-tag: 10.5px;
+  --od-type-meta: 11.5px;
+  --od-type-sub: 12.5px;
+  --od-type-body: 13.5px;
+  --od-type-title-s: 14.5px;
+  --od-type-title: 15.5px;
+  --od-type-title-m: 17.5px;
+  --od-type-title-l: 19px;
+  --od-type-display: 24px;
+  --od-type-hero: 27px;
+  --od-line-tag: 14px;
   --od-line-meta: 16px;
-  --od-line-body: 18px;
-  --od-line-title: 22px;
+  --od-line-sub: 17px;
+  --od-line-body: 19px;
+  --od-line-title-s: 20px;
+  --od-line-title: 21px;
+  --od-line-title-m: 23px;
+  --od-line-title-l: 25px;
+  --od-line-display: 30px;
+  --od-line-hero: 34px;
+  /* Weight scale: regular for body/nav rest, medium for active/emphasis, semibold for titles
+     and true hierarchy, heavy for brand marks and caps tags only. */
   --od-font-weight-regular: 400;
-  --od-font-weight-medium: 400;
-  --od-font-weight-semibold: 450;
-  --od-font-weight-strong: 500;
-  --od-font-weight-heavy: var(--od-font-weight-strong);
+  --od-font-weight-medium: 500;
+  --od-font-weight-semibold: 600;
+  --od-font-weight-strong: var(--od-font-weight-semibold);
+  --od-font-weight-heavy: 700;
+  /* Tracking: 0 for body sizes; large titles pull in, caps tags space out. */
+  --od-ls-title: -0.01em;
+  --od-ls-display: -0.015em;
+  --od-ls-caps: 0.06em;
+  /* Font stacks — -apple-system is SF Pro with automatic optical sizing. Applied on body so
+     body-portaled layers (account-menu popover) inherit the app face, not the UA serif. */
+  --od-font-sans: -apple-system, "SF Pro Text", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --od-font-mono: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
   --od-icon-stroke: 1.55;
   --od-icon-stroke-strong: 1.65;
   --od-radius-sm: 8px;
@@ -216,6 +247,11 @@ body,
   margin: 0;
 }
 
+body {
+  font-family: var(--od-font-sans);
+  letter-spacing: 0;
+}
+
 button,
 input,
 textarea,
@@ -249,7 +285,7 @@ select:focus-visible {
   /* Aimcub Glass: the window is the translucent "desktop" the islands float on. */
   background: var(--desk);
   color: var(--ink);
-  font-family: "SF Pro Text", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-family: var(--od-font-sans);
   letter-spacing: 0;
 }
 
@@ -282,17 +318,21 @@ kbd {
   background: color-mix(in oklab, var(--od-bg), var(--od-surface) 56%);
   color: var(--od-meta);
   padding: 0 6px;
-  font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--od-font-mono);
   font-size: var(--od-type-meta);
-  font-weight: var(--od-font-weight-semibold);
+  font-weight: var(--od-font-weight-medium);
   line-height: 1;
 }
 
 .od-app {
-  --sidebar-width: 280px;
+  --sidebar-width: 224px;
+  /* Glass shell: islands float inside a padded desk — a titlebar-safe top band plus gutters. */
+  --shell-top: 44px;
+  --shell-gutter: 22px;
+  --shell-gap: 18px;
   --traffic-light-left: 16px;
   --traffic-light-row-height: 46px;
-  --window-drag-strip-height: 36px;
+  --window-drag-strip-height: var(--shell-top);
   --traffic-light-button-size: 14px;
   --traffic-light-cluster-width: 58px;
   --titlebar-control-gap: 8px;
@@ -301,7 +341,7 @@ kbd {
   --titlebar-toggle-size: 32px;
   --titlebar-toggle-top: calc((var(--traffic-light-row-height) - var(--titlebar-toggle-size)) / 2);
   --sidebar-horizontal-inset: 12px;
-  --sidebar-row-padding-x: 8px;
+  --sidebar-row-padding-x: 10px;
   --sidebar-icon-column: 28px;
   --sidebar-action-icon-slot: 18px;
   --sidebar-action-label-gap: 6px;
@@ -312,6 +352,8 @@ kbd {
   min-height: 0;
   display: grid;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  column-gap: var(--shell-gap);
+  padding: var(--shell-top) var(--shell-gutter) var(--shell-gutter);
   /* Transparent so the desktop gradient shows behind the translucent islands. */
   background: transparent;
   transition: grid-template-columns 180ms ease;
@@ -333,6 +375,7 @@ kbd {
 .od-app[data-sidebar-state="collapsed"],
 .od-app[data-sidebar-state="peek"] {
   grid-template-columns: 0 minmax(0, 1fr);
+  column-gap: 0;
 }
 
 .od-window-drag-strip {
@@ -424,26 +467,24 @@ kbd {
   min-height: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  align-content: start;
-  gap: 12px;
-  padding: 56px var(--sidebar-horizontal-inset) 16px;
-  overflow-x: hidden;
-  overflow-y: auto;
-  /* Aimcub Glass: translucent, blurred sidebar island floating on the desktop. */
+  gap: 16px;
+  padding: 18px var(--sidebar-horizontal-inset) 12px;
+  overflow: hidden;
+  /* Aimcub Glass: a floating, rounded, blurred island — the aim list scrolls inside it. */
+  border-radius: 18px;
   background: var(--island);
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
-  border-right: 1px solid var(--edge);
-  scrollbar-gutter: stable;
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  box-shadow: var(--sh-md), inset 0 0 0 1px var(--ring);
   transition: transform 180ms ease, opacity 160ms ease, box-shadow 180ms ease, visibility 0s linear 180ms;
 }
 
 .od-sidebar-resizer {
   position: absolute;
   z-index: 34;
-  top: 0;
-  bottom: 0;
-  left: calc(var(--sidebar-width) - 4px);
+  top: var(--shell-top);
+  bottom: var(--shell-gutter);
+  left: calc(var(--shell-gutter) + var(--sidebar-width) - 4px);
   width: 8px;
   border-radius: var(--od-radius-pill);
   background: transparent;
@@ -460,9 +501,12 @@ kbd {
 
 .od-app[data-sidebar-state="collapsed"] .od-sidebar,
 .od-app[data-sidebar-state="peek"] .od-sidebar {
+  /* The overlay peek keeps the same floating-island geometry the pinned sidebar has.
+     The aside is grid-column: 1, so its horizontal offsets resolve against the column-1
+     area — whose line already sits on the shell gutter — hence left is 0, not the gutter. */
   position: absolute;
-  inset: 0 auto 0 0;
-  height: 100%;
+  inset: var(--shell-top) auto var(--shell-gutter) 0;
+  height: auto;
 }
 
 .od-app[data-sidebar-state="pinned"] .od-sidebar,
@@ -472,9 +516,8 @@ kbd {
 
 .od-app[data-sidebar-state="collapsed"] .od-sidebar {
   visibility: hidden;
-  transform: translateX(calc(-1 * var(--sidebar-width)));
+  transform: translateX(calc(-1 * (var(--sidebar-width) + var(--shell-gutter) + 8px)));
   opacity: 0;
-  border-right: 0;
   pointer-events: none;
 }
 
@@ -483,7 +526,7 @@ kbd {
   visibility: visible;
   transform: translateX(0);
   opacity: 1;
-  box-shadow: var(--od-shadow-peek);
+  box-shadow: var(--sh-lg), inset 0 0 0 1px var(--ring);
 }
 
 .od-section-label,
@@ -529,7 +572,7 @@ kbd {
   color: var(--od-muted);
   padding: 0 12px;
   font-size: var(--od-type-meta);
-  font-weight: var(--od-font-weight-semibold);
+  font-weight: var(--od-font-weight-medium);
   white-space: nowrap;
   cursor: pointer;
 }
@@ -566,10 +609,10 @@ kbd {
   gap: 9px;
   min-height: 34px;
   border: 0;
-  border-radius: var(--od-radius-sm);
+  border-radius: 10px;
   background: transparent;
   color: var(--od-fg);
-  padding: 0 var(--sidebar-row-padding-x);
+  padding: 0 6px;
   text-align: left;
   cursor: pointer;
   transition: background 140ms ease;
@@ -594,16 +637,16 @@ kbd {
   border-radius: 8px;
   background: var(--acc);
   color: var(--acc-on);
-  font-size: var(--od-type-meta);
-  font-weight: var(--od-font-weight-strong);
+  font-size: var(--od-type-sub);
+  font-weight: var(--od-font-weight-heavy);
 }
 
 .od-brand-name {
   min-width: 0;
   overflow: hidden;
-  font-size: 13.5px;
-  font-weight: var(--od-font-weight-strong);
-  line-height: 18px;
+  font-size: var(--od-type-body);
+  font-weight: var(--od-font-weight-semibold);
+  line-height: var(--od-line-body);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -670,6 +713,7 @@ kbd {
   padding-right: 0;
 }
 
+/* Aim rows read quiet at rest (muted, regular); the open aim is an ink-on-field pill. */
 .od-aim-card {
   width: 100%;
   min-width: 0;
@@ -677,12 +721,12 @@ kbd {
   grid-template-columns: minmax(0, 1fr) auto;
   column-gap: 8px;
   align-items: center;
-  min-height: 36px;
+  min-height: 32px;
   padding: 0 var(--sidebar-row-padding-x);
   border: 1px solid transparent;
-  border-radius: var(--od-radius-sm);
+  border-radius: 10px;
   background: transparent;
-  color: var(--od-fg);
+  color: var(--mut);
   text-align: left;
   cursor: pointer;
 }
@@ -701,14 +745,14 @@ kbd {
 .od-aim-card.current {
   background: var(--field);
   border-color: transparent;
-  box-shadow: none;
+  box-shadow: 0 1px 3px rgba(30, 40, 70, 0.08);
   color: var(--od-fg);
 }
 
 .od-aim-card.selected:hover,
 .od-aim-card.current:hover {
   background: var(--field);
-  box-shadow: none;
+  box-shadow: 0 1px 3px rgba(30, 40, 70, 0.08);
 }
 
 .od-aim-card.selected:focus-visible,
@@ -722,14 +766,26 @@ kbd {
   display: block;
 }
 
-.od-aim-card strong,
+.od-aim-card strong {
+  min-width: 0;
+  color: inherit;
+  font-size: var(--od-type-body);
+  line-height: 1.25;
+  font-weight: var(--od-font-weight-regular);
+}
+
+.od-aim-card.selected strong,
+.od-aim-card.current strong {
+  font-weight: var(--od-font-weight-medium);
+}
+
 .od-content-entry-copy strong,
 .od-next-action strong {
   min-width: 0;
   color: var(--od-fg);
   font-size: var(--od-type-body);
   line-height: 1.25;
-  font-weight: var(--od-font-weight-semibold);
+  font-weight: var(--od-font-weight-medium);
 }
 
 .od-aim-card strong,
@@ -785,7 +841,7 @@ kbd {
   align-items: center;
   gap: 4px;
   border: 1px solid transparent;
-  border-radius: var(--od-radius-sm);
+  border-radius: 10px;
   background: transparent;
 }
 
@@ -817,11 +873,11 @@ kbd {
 }
 
 .od-draft-card {
-  min-height: 36px;
+  min-height: 32px;
 }
 
 .od-draft-card .od-content-entry-main {
-  min-height: 36px;
+  min-height: 32px;
   padding: 0 2px 0 var(--sidebar-row-padding-x);
 }
 
@@ -959,7 +1015,7 @@ kbd {
 .od-aim-list {
   display: grid;
   align-content: start;
-  gap: 4px;
+  gap: 3px;
 }
 
 .od-empty {
@@ -972,9 +1028,9 @@ kbd {
 
 .od-sidebar-empty {
   padding: 8px var(--sidebar-row-padding-x);
-  color: var(--od-meta);
-  font-size: var(--od-type-meta);
-  line-height: var(--od-line-meta);
+  color: var(--faint);
+  font-size: var(--od-type-sub);
+  line-height: var(--od-line-sub);
 }
 
 .od-app[data-empty-aim="true"] .od-aim-browser {
@@ -1003,7 +1059,7 @@ kbd {
   color: var(--od-fg);
   padding: 0 12px;
   font-size: var(--od-type-meta);
-  font-weight: var(--od-font-weight-semibold);
+  font-weight: var(--od-font-weight-medium);
   cursor: pointer;
 }
 
@@ -1059,13 +1115,13 @@ kbd {
   display: grid;
   grid-template-columns: var(--sidebar-icon-column) minmax(0, 1fr) 18px;
   align-items: center;
-  gap: 8px;
-  min-height: 44px;
+  gap: 9px;
+  min-height: 46px;
   border: 1px solid transparent;
-  border-radius: var(--od-radius-sm);
+  border-radius: 12px;
   background: transparent;
   color: var(--od-fg);
-  padding: 6px var(--sidebar-row-padding-x);
+  padding: 6px 8px;
   text-align: left;
   cursor: pointer;
 }
@@ -1115,7 +1171,7 @@ kbd {
   min-width: 0;
   overflow: hidden;
   color: var(--od-fg);
-  font-size: var(--od-type-meta);
+  font-size: var(--od-type-sub);
   line-height: 1.3;
   font-weight: var(--od-font-weight-semibold);
   text-overflow: ellipsis;
@@ -1142,7 +1198,6 @@ kbd {
   z-index: 1200;
   max-height: min(360px, calc(100vh - 96px));
   display: grid;
-  gap: 2px;
   overflow: visible;
   padding: 6px;
   border: 0;
@@ -1178,7 +1233,7 @@ kbd {
   border-radius: 9px;
   background: transparent;
   color: var(--od-fg);
-  padding: 0 8px;
+  padding: 0 var(--sidebar-row-padding-x);
   text-align: left;
   cursor: pointer;
 }
@@ -1199,9 +1254,9 @@ kbd {
 .od-user-menu-item span {
   min-width: 0;
   overflow: hidden;
-  font-size: var(--od-type-meta);
-  font-weight: var(--od-font-weight-medium);
-  line-height: var(--od-line-meta);
+  font-size: var(--od-type-sub);
+  font-weight: var(--od-font-weight-regular);
+  line-height: var(--od-line-sub);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1264,7 +1319,7 @@ kbd {
 
 .od-user-menu-separator {
   height: 1px;
-  margin: 4px 8px;
+  margin: 5px 8px;
   background: var(--ring);
 }
 
@@ -1339,7 +1394,7 @@ kbd {
 .od-runtime-strip strong {
   overflow: hidden;
   color: var(--od-fg);
-  font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--od-font-mono);
   font-size: var(--od-type-meta);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1355,7 +1410,6 @@ kbd {
 }
 
 .od-main {
-  --stage-nav-titlebar-safe-top: calc(var(--titlebar-toggle-top) + var(--titlebar-toggle-size) + 16px);
   --od-rail-operational: 940px;
   --od-rail-reading: 760px;
   --od-rail-compose: 560px;
@@ -1365,7 +1419,8 @@ kbd {
   display: grid;
   grid-template-rows: minmax(0, 1fr);
   gap: 16px;
-  padding: 24px clamp(24px, 4vw, 32px);
+  /* The shell's top band + gutters now frame the column; surfaces carry their own insets. */
+  padding: 2px clamp(18px, 3vw, 26px) 0;
   /* Transparent so the desktop gradient reads as the work area behind stage cards. */
   background: transparent;
 }
@@ -1384,7 +1439,8 @@ kbd {
 
 .od-app[data-sidebar-state="collapsed"] .od-main:not(.od-main-settings),
 .od-app[data-sidebar-state="peek"] .od-main:not(.od-main-settings) {
-  padding-top: max(24px, var(--stage-nav-titlebar-safe-top));
+  /* The shell's --shell-top band already clears the titlebar cluster in every sidebar state. */
+  padding-top: 2px;
 }
 
 .od-workspace {
@@ -1395,6 +1451,8 @@ kbd {
   overflow: auto;
   width: min(100%, var(--od-rail-operational));
   margin: 0 auto;
+  /* Bottom inset lives inside the scrollport so content clears the shell gutter when scrolled. */
+  padding-bottom: 24px;
   scrollbar-gutter: stable;
 }
 
@@ -1461,7 +1519,7 @@ kbd {
   color: var(--od-muted);
   font-size: var(--od-type-meta);
   line-height: var(--od-line-meta);
-  font-weight: var(--od-font-weight-semibold);
+  font-weight: var(--od-font-weight-medium);
   cursor: pointer;
 }
 
@@ -1479,7 +1537,7 @@ kbd {
   background: color-mix(in oklab, var(--od-bg), transparent 12%);
   color: var(--od-muted);
   padding: 8px 10px;
-  font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--od-font-mono);
   font-size: var(--od-type-meta);
   line-height: 1.45;
   white-space: pre-wrap;
@@ -1540,8 +1598,8 @@ kbd {
   background: transparent;
   color: var(--mut);
   padding: 0 8px;
-  font-size: var(--od-type-meta);
-  font-weight: var(--od-font-weight-semibold);
+  font-size: var(--od-type-sub);
+  font-weight: var(--od-font-weight-medium);
   cursor: pointer;
   transition: color 140ms ease, background 140ms ease;
 }
@@ -1570,11 +1628,10 @@ kbd {
 .od-settings-side-title {
   margin: 0;
   padding: 8px 10px 10px;
-  font-family: "SF Pro Display", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 19px;
-  line-height: 1.25;
-  font-weight: var(--od-font-weight-strong);
-  letter-spacing: 0;
+  font-size: var(--od-type-title-l);
+  line-height: var(--od-line-title-l);
+  font-weight: var(--od-font-weight-semibold);
+  letter-spacing: var(--od-ls-title);
   color: var(--ink);
 }
 
@@ -1643,17 +1700,17 @@ kbd {
 
 .od-settings-pane-head h3 {
   margin: 0;
-  font-size: var(--od-type-title);
-  line-height: var(--od-line-title);
-  font-weight: var(--od-font-weight-strong);
-  letter-spacing: 0;
+  font-size: var(--od-type-title-m);
+  line-height: var(--od-line-title-m);
+  font-weight: var(--od-font-weight-semibold);
+  letter-spacing: var(--od-ls-title);
   color: var(--ink);
 }
 
 .od-settings-pane-head p {
   margin: 4px 0 0;
-  font-size: var(--od-type-meta);
-  line-height: var(--od-line-meta);
+  font-size: var(--od-type-sub);
+  line-height: var(--od-line-sub);
   color: var(--mut);
 }
 
@@ -1694,15 +1751,15 @@ kbd {
 }
 
 .od-settings-card-copy strong {
-  font-size: var(--od-type-body);
-  line-height: var(--od-line-body);
-  font-weight: var(--od-font-weight-strong);
+  font-size: var(--od-type-title-s);
+  line-height: var(--od-line-title-s);
+  font-weight: var(--od-font-weight-semibold);
   color: var(--ink);
 }
 
 .od-settings-card-copy span {
-  font-size: var(--od-type-meta);
-  line-height: var(--od-line-meta);
+  font-size: var(--od-type-sub);
+  line-height: var(--od-line-sub);
   color: var(--mut);
 }
 
@@ -1724,7 +1781,7 @@ kbd {
   color: var(--mut);
   padding: 0 13px;
   font-family: inherit;
-  font-size: var(--od-type-meta);
+  font-size: var(--od-type-sub);
   font-weight: var(--od-font-weight-medium);
   cursor: pointer;
   transition: background 140ms ease, color 140ms ease;
@@ -1733,7 +1790,7 @@ kbd {
 .od-settings-seg button[data-active="true"] {
   background: var(--acc);
   color: var(--acc-on);
-  font-weight: var(--od-font-weight-semibold);
+  font-weight: var(--od-font-weight-medium);
 }
 
 .od-settings-seg button:focus-visible {
@@ -1748,8 +1805,8 @@ kbd {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
-  font-size: var(--od-type-meta);
+  font-family: var(--od-font-mono);
+  font-size: var(--od-type-sub);
   color: var(--mut);
 }
 
@@ -1820,7 +1877,7 @@ kbd {
   background: var(--field);
   color: var(--mut);
   padding: 0 14px;
-  font-size: var(--od-type-meta);
+  font-size: var(--od-type-sub);
   font-weight: var(--od-font-weight-medium);
   cursor: pointer;
   box-shadow: inset 0 0 0 1px var(--edge);
@@ -1846,7 +1903,7 @@ kbd {
 .od-settings-you-name {
   flex: none;
   font-size: var(--od-type-body);
-  font-weight: var(--od-font-weight-strong);
+  font-weight: var(--od-font-weight-medium);
   color: var(--ink);
 }
 
@@ -2003,11 +2060,10 @@ kbd {
 .od-aim-intake h1 {
   margin: 0;
   color: var(--od-fg);
-  font-family: "SF Pro Display", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-size: var(--od-type-title);
-  font-weight: var(--od-font-weight-heavy);
+  font-weight: var(--od-font-weight-semibold);
   line-height: 1.16;
-  letter-spacing: 0;
+  letter-spacing: var(--od-ls-title);
 }
 
 .od-aim-intake p {
@@ -2044,11 +2100,10 @@ kbd {
 .od-initial-workspace h1 {
   margin: 0;
   color: var(--od-fg);
-  font-family: "SF Pro Display", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-size: var(--od-type-title);
-  font-weight: var(--od-font-weight-strong);
+  font-weight: var(--od-font-weight-semibold);
   line-height: var(--od-line-title);
-  letter-spacing: 0;
+  letter-spacing: var(--od-ls-title);
 }
 
 .od-initial-workspace p {
@@ -2068,10 +2123,10 @@ kbd {
 .od-draft-recovery-head h2 {
   margin: 0;
   color: var(--od-fg);
-  font-family: "SF Pro Display", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-size: var(--od-type-title);
   line-height: var(--od-line-title);
-  font-weight: var(--od-font-weight-strong);
+  font-weight: var(--od-font-weight-semibold);
+  letter-spacing: var(--od-ls-title);
 }
 
 .od-draft-recovery-head p {
@@ -2302,7 +2357,7 @@ kbd {
 .od-context-review-disclosure summary::after {
   content: "+";
   color: var(--od-meta);
-  font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--od-font-mono);
   font-size: var(--od-type-meta);
   line-height: 1;
 }
@@ -2753,7 +2808,7 @@ kbd {
 .od-context-review-more {
   padding-top: 8px;
   border-top: 1px solid var(--od-border-soft);
-  font-weight: var(--od-font-weight-semibold);
+  font-weight: var(--od-font-weight-medium);
 }
 
 .od-stage-panel-head {
@@ -2950,7 +3005,7 @@ kbd {
   color: var(--od-muted);
   padding: 0 12px;
   font-size: var(--od-type-meta);
-  font-weight: var(--od-font-weight-strong);
+  font-weight: var(--od-font-weight-medium);
   cursor: pointer;
 }
 
@@ -3025,7 +3080,7 @@ kbd {
   color: var(--od-muted);
   padding: 0 12px;
   font-size: var(--od-type-meta);
-  font-weight: var(--od-font-weight-strong);
+  font-weight: var(--od-font-weight-medium);
   white-space: nowrap;
   cursor: pointer;
 }
@@ -3164,7 +3219,7 @@ kbd {
 .od-work-note strong,
 .od-next-work span {
   color: var(--od-fg);
-  font-weight: var(--od-font-weight-strong);
+  font-weight: var(--od-font-weight-medium);
 }
 
 .od-next-work strong {
@@ -3667,7 +3722,7 @@ kbd {
   border-radius: 50%;
   background: var(--od-surface-warm);
   color: var(--od-muted);
-  font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--od-font-mono);
   font-size: var(--od-type-meta);
   font-weight: var(--od-font-weight-strong);
 }
@@ -3789,7 +3844,7 @@ kbd {
   padding: 0 2px;
   font-size: var(--od-type-meta);
   line-height: var(--od-line-meta);
-  font-weight: var(--od-font-weight-semibold);
+  font-weight: var(--od-font-weight-medium);
   cursor: pointer;
 }
 
@@ -3823,7 +3878,7 @@ kbd {
   color: var(--od-fg);
   padding: 0 10px;
   font-size: var(--od-type-meta);
-  font-weight: var(--od-font-weight-semibold);
+  font-weight: var(--od-font-weight-medium);
   cursor: pointer;
   transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
 }
@@ -4023,7 +4078,7 @@ kbd {
 }
 
 .od-plan-rule-input {
-  font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--od-font-mono);
   font-size: var(--od-type-meta);
   line-height: 1.5;
 }
@@ -4032,7 +4087,7 @@ kbd {
   max-height: 240px;
   margin: 0;
   overflow: auto;
-  font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--od-font-mono);
   font-size: var(--od-type-meta);
   line-height: 1.5;
   white-space: pre-wrap;
@@ -4189,7 +4244,7 @@ kbd {
   color: var(--od-fg);
   padding: 0 10px;
   font-size: var(--od-type-meta);
-  font-weight: var(--od-font-weight-strong);
+  font-weight: var(--od-font-weight-medium);
 }
 
 .od-proof-required {
@@ -4438,7 +4493,7 @@ kbd {
 .od-eval-detail-section summary::after {
   content: "+";
   color: var(--od-meta);
-  font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--od-font-mono);
   font-weight: var(--od-font-weight-medium);
 }
 
@@ -4697,7 +4752,7 @@ kbd {
   color: var(--od-muted);
   padding: 0 12px;
   font-size: var(--od-type-meta);
-  font-weight: var(--od-font-weight-strong);
+  font-weight: var(--od-font-weight-medium);
   cursor: pointer;
   transition: background 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
 }
@@ -4883,7 +4938,7 @@ kbd {
 
 .od-inspector-head span {
   color: var(--od-meta);
-  font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--od-font-mono);
   font-size: var(--od-type-meta);
 }
 
@@ -4906,7 +4961,7 @@ kbd {
   color: var(--od-muted);
   padding: 0 10px;
   font-size: var(--od-type-meta);
-  font-weight: var(--od-font-weight-strong);
+  font-weight: var(--od-font-weight-medium);
   white-space: nowrap;
 }
 
@@ -5073,7 +5128,7 @@ kbd {
   background: var(--od-surface);
   color: var(--od-muted);
   padding: 8px 10px;
-  font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--od-font-mono);
   font-size: var(--od-type-meta);
   line-height: 1.4;
 }
@@ -5191,7 +5246,7 @@ kbd {
 
 .od-context-gate-row strong {
   color: var(--od-fg);
-  font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--od-font-mono);
   font-size: var(--od-type-meta);
   line-height: 1.25;
 }
@@ -5325,7 +5380,7 @@ kbd {
   color: var(--od-muted);
   padding: 0 10px;
   font-size: var(--od-type-meta);
-  font-weight: var(--od-font-weight-strong);
+  font-weight: var(--od-font-weight-medium);
   cursor: pointer;
 }
 
@@ -5475,7 +5530,7 @@ kbd {
   }
 
   .od-main {
-    padding: 16px;
+    padding: 2px 16px 0;
   }
 
   .od-context-source-status-list,
@@ -5499,20 +5554,10 @@ kbd {
 }
 
 @media (max-width: 1040px) {
+  /* Auto-collapse: the floating peek island keeps the base geometry at every width. */
   .od-app[data-sidebar-state="collapsed"],
   .od-app[data-sidebar-state="peek"] {
     grid-template-columns: 0 minmax(0, 1fr);
-  }
-
-  .od-app[data-sidebar-state="peek"] .od-sidebar {
-    position: absolute;
-    inset: 0 auto 0 0;
-    height: 100%;
-    z-index: 24;
-    visibility: visible;
-    transform: translateX(0);
-    opacity: 1;
-    box-shadow: var(--od-shadow-peek);
   }
 }
 
@@ -5520,20 +5565,6 @@ kbd {
   .od-app[data-sidebar-state="collapsed"],
   .od-app[data-sidebar-state="peek"] {
     grid-template-columns: 0 minmax(0, 1fr);
-  }
-
-  .od-app[data-sidebar-state="collapsed"] .od-main {
-    padding-top: calc(32px + 24px);
-  }
-
-  .od-app[data-sidebar-state="peek"] .od-sidebar {
-    position: absolute;
-    inset: 0 auto 0 0;
-    height: 100%;
-    z-index: 24;
-    visibility: visible;
-    transform: translateX(0);
-    opacity: 1;
   }
 
   .od-context-source-status-list,
@@ -5728,7 +5759,8 @@ kbd {
 .od-journey-title {
   margin: 0;
   font-size: var(--od-type-title);
-  font-weight: var(--od-font-weight-strong);
+  font-weight: var(--od-font-weight-semibold);
+  letter-spacing: var(--od-ls-title);
   color: var(--ink);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -5804,7 +5836,7 @@ kbd {
 
 .od-journey-meta {
   flex: none;
-  font-size: var(--od-type-body);
+  font-size: var(--od-type-sub);
   color: var(--mut);
   font-variant-numeric: tabular-nums;
 }
@@ -5877,7 +5909,7 @@ kbd {
   gap: 7px;
   min-width: 0;
   width: 100%;
-  font-size: 12.5px;
+  font-size: var(--od-type-sub);
   font-weight: var(--od-font-weight-semibold);
   color: var(--ink);
 }
@@ -5889,7 +5921,7 @@ kbd {
 
 .od-journey-station-line {
   width: 100%;
-  font-size: 10.5px;
+  font-size: var(--od-type-tag);
   color: var(--faint);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -5938,15 +5970,17 @@ kbd {
 
 .od-journey-move-tag {
   font-size: var(--od-type-meta);
-  font-weight: var(--od-font-weight-strong);
-  letter-spacing: 0;
+  font-weight: var(--od-font-weight-heavy);
+  letter-spacing: var(--od-ls-caps);
+  text-transform: uppercase;
   color: var(--acc);
 }
 
 .od-journey-move-title {
   margin-top: 12px;
-  font-size: 19px;
-  font-weight: var(--od-font-weight-strong);
+  font-size: var(--od-type-title-l);
+  font-weight: var(--od-font-weight-semibold);
+  letter-spacing: var(--od-ls-title);
   line-height: 1.3;
   color: var(--ink);
 }
@@ -6010,7 +6044,7 @@ kbd {
   border: 0;
   background: transparent;
   color: var(--faint);
-  font-size: 12.5px;
+  font-size: var(--od-type-sub);
   cursor: pointer;
   transition: color 150ms ease;
 }
@@ -6025,7 +6059,7 @@ kbd {
   border-radius: 13px;
   background: var(--acc);
   color: var(--acc-on);
-  font-size: var(--od-type-body);
+  font-size: var(--od-type-title-s);
   font-weight: var(--od-font-weight-medium);
   cursor: pointer;
   box-shadow: var(--sh-btn);
@@ -6044,8 +6078,8 @@ kbd {
   border-radius: 11px;
   background: var(--island2);
   color: var(--ink2);
-  font-size: 12.5px;
-  font-weight: var(--od-font-weight-medium);
+  font-size: var(--od-type-body);
+  font-weight: var(--od-font-weight-regular);
   cursor: pointer;
   box-shadow: inset 0 0 0 1px var(--ring);
   transition: background 150ms ease;
@@ -6081,7 +6115,7 @@ kbd {
   border-radius: 11px;
   background: var(--island2);
   color: var(--ink2);
-  font-size: 12.5px;
+  font-size: var(--od-type-sub);
   font-weight: var(--od-font-weight-medium);
   cursor: pointer;
   box-shadow: inset 0 0 0 1px var(--ring);
@@ -6099,7 +6133,7 @@ kbd {
 
 .od-journey-ambient-body {
   margin-top: 2px;
-  font-size: 12.5px;
+  font-size: var(--od-type-sub);
   color: var(--mut);
 }
 
@@ -6115,8 +6149,9 @@ kbd {
 .od-journey-eyebrow {
   padding: 10px 0 4px;
   font-size: var(--od-type-meta);
-  font-weight: var(--od-font-weight-strong);
-  letter-spacing: 0;
+  font-weight: var(--od-font-weight-heavy);
+  letter-spacing: var(--od-ls-caps);
+  text-transform: uppercase;
   color: var(--faint);
 }
 
@@ -6132,7 +6167,7 @@ kbd {
 .od-journey-turn-doing {
   flex: 1;
   min-width: 0;
-  font-size: 12.5px;
+  font-size: var(--od-type-sub);
   color: var(--mut);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -6187,7 +6222,7 @@ kbd {
 
 .od-journey-journal-empty {
   padding: 14px 10px;
-  font-size: 12.5px;
+  font-size: var(--od-type-sub);
   color: var(--faint);
 }
 
@@ -6208,16 +6243,16 @@ kbd {
 .od-journey-journal-time {
   flex: none;
   width: 46px;
-  font-size: 10.5px;
+  font-size: var(--od-type-tag);
   color: var(--faint);
   font-variant-numeric: tabular-nums;
-  font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--od-font-mono);
 }
 
 .od-journey-journal-what {
   flex: 1;
   min-width: 0;
-  font-size: 12.5px;
+  font-size: var(--od-type-sub);
   color: var(--mut);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -6234,7 +6269,7 @@ kbd {
   border-radius: 8px;
   background: transparent;
   color: var(--acc);
-  font-size: 11.5px;
+  font-size: var(--od-type-meta);
   cursor: pointer;
   transition: background 150ms ease;
 }
@@ -6280,8 +6315,8 @@ kbd {
 .od-journey-sheet-title {
   flex: none;
   font-size: var(--od-type-meta);
-  font-weight: var(--od-font-weight-strong);
-  letter-spacing: 0;
+  font-weight: var(--od-font-weight-heavy);
+  letter-spacing: var(--od-ls-caps);
   color: var(--acc);
   text-transform: uppercase;
 }
@@ -6555,17 +6590,16 @@ kbd {
 
 .od-home-aims-wrap .od-home-heading {
   margin: 0;
-  font-family: "SF Pro Display", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 24px;
-  font-weight: var(--od-font-weight-strong);
-  letter-spacing: 0;
-  line-height: 1.2;
+  font-size: var(--od-type-display);
+  font-weight: var(--od-font-weight-semibold);
+  letter-spacing: var(--od-ls-display);
+  line-height: var(--od-line-display);
   color: var(--ink);
 }
 
 .od-home-aims-wrap .od-home-sub {
   margin: 6px 0 18px;
-  font-size: 13.5px;
+  font-size: var(--od-type-body);
   line-height: var(--od-line-body);
   color: var(--mut);
 }
@@ -6616,8 +6650,8 @@ kbd {
 
 .od-home-card-title {
   min-width: 0;
-  font-size: 13.5px;
-  font-weight: var(--od-font-weight-strong);
+  font-size: var(--od-type-title-s);
+  font-weight: var(--od-font-weight-medium);
   color: var(--ink);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -6626,8 +6660,8 @@ kbd {
 
 .od-home-card-state {
   min-width: 0;
-  font-size: var(--od-type-meta);
-  line-height: var(--od-line-meta);
+  font-size: var(--od-type-sub);
+  line-height: var(--od-line-sub);
   color: var(--mut);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -6679,25 +6713,25 @@ kbd {
   border-radius: 12px;
   background: var(--acc);
   color: var(--acc-on);
-  font-size: 19px;
-  font-weight: var(--od-font-weight-strong);
+  font-size: var(--od-type-title-m);
+  font-weight: var(--od-font-weight-heavy);
   box-shadow: var(--sh-btn);
 }
 
 .od-home-firstrun-wrap .od-home-hero-title {
   margin: 26px 0 0;
-  font-family: "SF Pro Display", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 27px;
-  font-weight: var(--od-font-weight-strong);
-  letter-spacing: 0;
-  line-height: 1.25;
+  font-size: var(--od-type-hero);
+  font-weight: var(--od-font-weight-semibold);
+  letter-spacing: var(--od-ls-display);
+  line-height: var(--od-line-hero);
   color: var(--ink);
 }
 
 .od-home-firstrun-wrap .od-home-hero-body {
   margin: 10px 0 0;
   max-width: 46ch;
-  font-size: 13.5px;
+  font-size: var(--od-type-title-s);
+  font-weight: var(--od-font-weight-regular);
   line-height: 1.55;
   color: var(--mut);
 }
@@ -6710,8 +6744,8 @@ kbd {
   border-radius: 14px;
   background: var(--acc);
   color: var(--acc-on);
-  font-size: 14.5px;
-  font-weight: var(--od-font-weight-strong);
+  font-size: var(--od-type-title-s);
+  font-weight: var(--od-font-weight-medium);
   cursor: pointer;
   box-shadow: var(--sh-btn);
   transition: filter 150ms ease, transform 120ms ease;
@@ -6757,7 +6791,7 @@ kbd {
 
 .od-home-setup-body {
   margin-top: 2px;
-  font-size: var(--od-type-meta);
+  font-size: var(--od-type-sub);
   color: var(--mut);
 }
 
@@ -6769,7 +6803,7 @@ kbd {
   border-radius: 10px;
   background: var(--island2);
   color: var(--ink2);
-  font-size: var(--od-type-meta);
+  font-size: var(--od-type-sub);
   font-weight: var(--od-font-weight-medium);
   cursor: pointer;
   box-shadow: inset 0 0 0 1px var(--ring);
@@ -6803,8 +6837,9 @@ kbd {
 
 .od-newaim-eyebrow {
   font-size: var(--od-type-meta);
-  font-weight: var(--od-font-weight-strong);
-  letter-spacing: 0;
+  font-weight: var(--od-font-weight-heavy);
+  letter-spacing: var(--od-ls-caps);
+  text-transform: uppercase;
   color: var(--acc);
 }
 
@@ -6822,8 +6857,9 @@ kbd {
   border-bottom: 1px solid var(--edge);
   background: transparent;
   color: var(--ink);
-  font-size: 27px;
-  font-weight: var(--od-font-weight-strong);
+  font-size: var(--od-type-hero);
+  font-weight: var(--od-font-weight-semibold);
+  letter-spacing: var(--od-ls-display);
   line-height: 1.3;
   outline: none;
   padding: 0 0 14px;
@@ -6887,7 +6923,7 @@ kbd {
 }
 
 .od-newaim-helper {
-  font-size: var(--od-type-meta);
+  font-size: var(--od-type-sub);
   color: var(--faint);
 }
 
@@ -6896,7 +6932,7 @@ kbd {
   border: 0;
   background: transparent;
   color: var(--acc);
-  font-size: var(--od-type-meta);
+  font-size: var(--od-type-sub);
   cursor: pointer;
   padding: 4px 6px;
   border-radius: 8px;
@@ -6941,7 +6977,7 @@ kbd {
   border-radius: var(--od-radius-pill);
   background: var(--island2);
   color: var(--mut);
-  font-size: 12.5px;
+  font-size: var(--od-type-sub);
   cursor: pointer;
   box-shadow: inset 0 0 0 1px var(--ring);
   transition: background 150ms ease, color 150ms ease;
@@ -6952,7 +6988,7 @@ kbd {
 
 .od-newaim-foot {
   margin: 48px 0 0;
-  font-size: 11.5px;
+  font-size: var(--od-type-meta);
   color: var(--faint);
   line-height: 1.5;
 }
@@ -6971,17 +7007,16 @@ kbd {
 
 .od-memory-title {
   margin: 0;
-  font-family: "SF Pro Display", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 24px;
-  font-weight: var(--od-font-weight-strong);
-  letter-spacing: 0;
-  line-height: 1.2;
+  font-size: var(--od-type-display);
+  font-weight: var(--od-font-weight-semibold);
+  letter-spacing: var(--od-ls-display);
+  line-height: var(--od-line-display);
   color: var(--ink);
 }
 
 .od-memory-sub {
   margin: 6px 0 0;
-  font-size: 13.5px;
+  font-size: var(--od-type-body);
   line-height: var(--od-line-body);
   color: var(--mut);
 }
@@ -6999,8 +7034,9 @@ kbd {
 .od-memory-group-label {
   padding: 10px 0 4px;
   font-size: var(--od-type-meta);
-  font-weight: var(--od-font-weight-strong);
-  letter-spacing: 0;
+  font-weight: var(--od-font-weight-semibold);
+  letter-spacing: var(--od-ls-caps);
+  text-transform: uppercase;
   color: var(--faint);
 }
 
@@ -7026,7 +7062,7 @@ kbd {
 
 .od-memory-source {
   margin-top: 2px;
-  font-size: 11.5px;
+  font-size: var(--od-type-meta);
   color: var(--faint);
 }
 
@@ -7038,7 +7074,7 @@ kbd {
   border: 0;
   background: transparent;
   color: var(--faint);
-  font-size: 11.5px;
+  font-size: var(--od-type-meta);
   cursor: pointer;
   padding: 5px 8px;
   border-radius: 8px;
@@ -7070,15 +7106,15 @@ kbd {
 }
 
 .od-memory-empty-title {
-  font-size: 13.5px;
-  font-weight: var(--od-font-weight-strong);
+  font-size: var(--od-type-title-s);
+  font-weight: var(--od-font-weight-semibold);
   color: var(--ink);
 }
 
 .od-memory-empty-body {
   margin: 5px 0 0;
   max-width: 52ch;
-  font-size: 12.5px;
+  font-size: var(--od-type-sub);
   line-height: 1.55;
   color: var(--mut);
 }

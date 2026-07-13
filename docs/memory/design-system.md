@@ -1,6 +1,6 @@
 # Design System Memory
 
-Last updated: 2026-07-12
+Last updated: 2026-07-13
 
 ## Scope
 
@@ -38,9 +38,12 @@ glassification, the `listMemories` / `getAimJournal` / `listAimProgressSummaries
 real (`@core`) Research station and run-lifecycle journal, and the batch per-aim progress
 dots. A **2026-07-12 design re-sync** (branch `glass-design-resync`, from the updated
 `Aimcub Glass.dc.html`) then rebuilt the sidebar (brand row + account-menu popover), Home
-cards, and the Settings IA to the latest reference — the sections below describe the
-re-synced state. Before making desktop visual changes, read `docs/handoff.md` and the
-loading order in `docs/memory/desktop.md`.
+cards, and the Settings IA to the latest reference. A **2026-07-13 sidebar + typography
+re-sync** (branch `glass-sidebar-type-resync`) finished the job the founder flagged as still
+off: the sidebar became the reference's floating island (44/22 shell band + gutters, 224px,
+32px muted rows) and the whole app's typography was reorganized onto the tokenized Glass type
+ramp below. The sections below describe the re-synced state. Before making desktop visual
+changes, read `docs/handoff.md` and the loading order in `docs/memory/desktop.md`.
 
 ## Design Tokens
 
@@ -189,10 +192,13 @@ Reference links:
 
 ## Desktop Information Architecture
 
-- Default shell: no visible full-width top titlebar/status strip. A left aim sidebar island and
-  a center workspace island float over the `--desk` gradient. macOS window controls sit in the
-  sidebar-safe top area; the app must not reserve a full-width bar above the workbench. No
-  default right inspector.
+- Default shell (2026-07-13 sidebar re-sync): the `.od-app` grid is padded like the reference —
+  a 44px titlebar-safe top band plus 22px side/bottom gutters (`--shell-top` / `--shell-gutter`),
+  with an 18px `--shell-gap` between columns — so the sidebar reads as a **floating island** with
+  the desk gradient visible on all sides, not an edge-attached pane. No visible full-width top
+  titlebar/status strip; macOS window controls live in the top band; the workspace column is
+  transparent (its cards are the islands). No default right inspector. Window-chrome clearance is
+  purely geometric via the top band — there are no per-stage titlebar-safe padding rules.
 - **Native macOS traffic lights must stay native.** AppKit/Electron draws and owns the
   red/yellow/green controls; Aimcub's main process only positions them (`titleBarStyle:
   "hiddenInset"`, `trafficLightPosition`, `setWindowButtonPosition`, `setWindowButtonVisibility`).
@@ -210,27 +216,35 @@ Reference links:
   state), so an in-app override never desyncs the native titlebar/traffic-light context. "system"
   hands appearance back to the OS. Renderer dark tokens respond to both
   `prefers-color-scheme: dark` and `data-system-appearance="dark"`.
-- Sidebar (re-synced): the top-left is a **brand row** — an accent "A" mark + "Aimcub" button that
-  goes Home, and a compact trailing "+" icon button for New Aim (26px, quiet `--field` hover) —
-  followed by a plain aim list (no search field, no all/active/paused filter pills, no "Recent
-  aims" section label; Cmd+K covers navigation, drafts keep their labelled rows). Empty list shows
-  one quiet line: "Your aims will live here." Glass hover/selected states use translucent
-  `--island2` / `--field` washes (not flat gray fills); selected rows show a quiet fill with no
-  border/outline/selected-shadow. Aim rows carry a small trailing **status dot marker** (see
-  Status markers) — a marker, never a status subtitle.
+- Sidebar (re-synced 2026-07-13, exact reference geometry): the aside is a rounded island —
+  radius 18px, `--island` fill, blur(30px), `box-shadow: var(--sh-md), inset 0 0 0 1px var(--ring)`,
+  padding `18px 12px 12px`, 16px gap between its three zones (brand row / aim list / account
+  trigger), `overflow: hidden` with the aim list scrolling inside. The top-left is a **brand
+  row** — an accent "A" mark (26px, radius 8, 700 weight glyph) + "Aimcub" (body size, 600) going
+  Home, padding `0 6px`, and a compact trailing "+" icon button for New Aim (26px, quiet `--field`
+  hover) — followed by a plain aim list (no search field, no filter pills, no section label; Cmd+K
+  covers navigation, drafts keep their labelled rows). Empty list shows one quiet line ("Your aims
+  will live here.", sub size, `--faint`). Aim rows carry a small trailing **status dot marker**
+  (see Status markers) — a marker, never a status subtitle.
 - Sidebar aim and draft rows are compact one-line navigation rows: prefer a concise generated
   `goal_summary`, else conservative intent-prefix cleanup with a grapheme-safe bound; keep the
-  canonical title for editing/planning/search/CLI/agents. One 36px line with CSS ellipsis; the
-  full cleaned summary is exposed from the focusable row tooltip. Do not show workflow status
-  subtitles ("Context needed", "Plan ready", "active", …) under titles.
+  canonical title for editing/planning/search/CLI/agents. One **32px** line (radius 10, padding
+  `0 10px`, 3px list gap) with CSS ellipsis; the full cleaned summary is exposed from the
+  focusable row tooltip. Rows read **quiet at rest — `--mut` text at regular weight**; hover is a
+  translucent `--island2` wash; the open aim is an ink-on-`--field` pill at medium (500) weight
+  with the soft row shadow `0 1px 3px rgba(30,40,70,.08)` (the one sanctioned selected-shadow).
+  Do not show workflow status subtitles ("Context needed", "Plan ready", "active", …) under titles.
 - Sidebar footer account menu (re-synced): the lower-left trigger is the workspace identity —
-  a person-icon avatar tile + "Local workspace / ~/.aimcub" + up-down chevron. Its glass popover
-  (island fill, blur, `--ring` inset, 14px radius) holds **Memory** (with a trailing count and
-  `aria-current` while the Memory page is open), **Settings**, **Language** (Claude-like hover
-  side submenu), a separator, an **Appearance** row (icon + current value; click toggles
-  light/dark), and a non-interactive ok-dot `~/.aimcub · on device` line. There is no separate
-  footer Memory row / path line / theme-toggle button. No auto first-item focus ring on pointer
-  open.
+  a person-icon avatar tile (28px, radius 9) + "Local workspace" (sub size, 600) over "~/.aimcub"
+  (meta, `--faint`) + up-down chevron, on a 46px min-height radius-12 row (padding `6px 8px`;
+  open/hover = `--island2`). Its glass popover (island fill, blur 30, `--ring` inset, 14px radius,
+  6px padding) holds **Memory** (with a trailing count and `aria-current` while the Memory page is
+  open), **Settings**, **Language** (Claude-like hover side submenu — an Aimcub addition the
+  reference frame doesn't show; keep it), a separator (1px `--ring`, margin 5px 8px), an
+  **Appearance** row (icon + current value; click toggles light/dark), and a non-interactive
+  ok-dot `~/.aimcub · on device` line. Menu items are 34px min-height, radius 9, sub size at
+  regular weight, `0 10px` padding. There is no separate footer Memory row / path line /
+  theme-toggle button. No auto first-item focus ring on pointer open.
 - Sidebar toggle: a top-left titlebar-cluster icon button (pinned / collapsed / peek). Clicking
   toggles pinned/collapsed; pinned reserves layout space and never covers the workspace; while
   collapsed, hovering the button or the 32px left-edge rail reveals a transient overlay peek
@@ -289,10 +303,11 @@ Reference links:
   (`completion_recap.complete`) open Eval with the recap.
 - Settings (re-synced IA, sidebar-nav revision): while Settings is open the SIDEBAR swaps its aim
   list for the settings navigation — the brand row and the bottom account trigger stay; between
-  them sit a quiet **Back** row (chevron + label, `--mut` → `--ink` on hover; returns to the
-  recorded pre-settings surface), a **"Settings"** title (19px display), and the category nav
-  (**General / Planning brain / Workers / Research / About**; selected item = `--acc-soft` wash
-  with accent text). The workspace holds ONE centered detail pane (max ~620px, 40px top padding)
+  them sit a quiet **Back** row (chevron + label, sub size at 500, `--mut` → `--ink` on hover;
+  returns to the recorded pre-settings surface), a **"Settings"** title (title-l 19px, 600, title
+  tracking), and the icon category nav (**General / Planning brain / Workers / Research / About**;
+  16px line icons; rest = `--ink` at 500, selected = `--acc-soft` wash with accent text at 600).
+  The workspace holds ONE centered detail pane (max ~620px, 40px top padding)
   — no in-workspace rail. One glass island per control group (18px radius, `--island` + blur +
   `--ring` inset), rows divided by `--edge` hairlines. General = Appearance segmented
   (Light/Dark/System) + Workspace row (real tilde-shortened path via `getAppInfo`, Reveal via the
@@ -323,10 +338,13 @@ Reference links:
   content (a full Journey, a long saved-aims Home) anchors to the scrollable start edge instead of
   being clipped above `scrollTop: 0` and made unreachable at small window heights. The aim-stage
   workspace base (`.od-workspace-aim`) centers safely for this reason; verify at 640×520.
-- Sidebar width: default 280px, stable bounds ~216–360px, transparent resize hot zone with the
-  native cursor (not a permanent divider). The normal Aim sidebar may auto-collapse before the
-  workspace is squeezed below a usable width; a user-pinned sidebar reserves space and never
-  covers the workspace. Settings keeps its always-visible category sidebar.
+- Sidebar width: default **224px** (the reference island width; the persisted-width storage key
+  was bumped to `aimcub.sidebarWidth.v2` so pre-island widths don't mask it), stable bounds
+  ~216–360px, transparent resize hot zone with the native cursor (not a permanent divider). The
+  normal Aim sidebar may auto-collapse before the workspace is squeezed below a usable width; a
+  user-pinned sidebar reserves space and never covers the workspace. The collapsed/peek overlay
+  keeps the same floating-island geometry (gutter-inset, rounded, `--sh-lg` while peeking) — it
+  never reverts to a full-height edge pane. Settings keeps its always-visible category sidebar.
 - Window sizing stays compact: default ~960×680px, minimum ~640×520px. The Journey's 6-station
   strip must degrade gracefully (wrap/stack) at 760×600 and 640×520 with no horizontal overflow.
 - Vertical rhythm: 22–24px between major page bands, 12–16px between controls in a group, 6–10px
@@ -342,26 +360,44 @@ Reference links:
 
 ## Typography
 
-- Desktop font stack: `"SF Pro Text", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial,
-  sans-serif`. Display/title: `"SF Pro Display", …`. Mono: `"SF Mono", ui-monospace, Menlo,
-  Monaco, Consolas, monospace`. Windows fallback: `"Segoe UI Variable", "Segoe UI", Arial,
-  sans-serif`. One UI family per surface; no decorative fonts in product UI.
-- Letter spacing is always `0` (no negative tracking). Do not scale fonts with viewport width;
-  use the defined ramp.
-- **Type ramp (capped at three visible sizes).** `--od-type-meta` 12px / 16px line-height for
-  meta, captions, small labels, chips, keyboard hints; `--od-type-body` 13px / 18px for
-  navigation, body, controls, rows, form copy; `--od-type-title` 16px / 22px for page/panel/
-  section/composer/card titles. New CSS `font-size` must use a ramp token or a value outside the
-  guarded integer set — a test forbids raw `font-size:` at {9,10,11,12,13,14,15,16,18,20,22,28,
-  32}px, so non-listed decimals (13.5, 19) are the escape hatch for a one-off.
-- Weights stay light and tokenized: regular and medium both 400, semibold 450, strong 500. Treat
-  any heavier title/emphasis token as an alias of strong. Use regular/medium for navigation and
-  body; reserve strong only for true hierarchy, selected actions, or primary commands. Avoid
-  600+ in shell chrome, sidebar rows, compact labels, or Chinese UI text. Line icons use a 1.5–
-  1.6px stroke unless a selected/primary state needs more. Avoid italics and all caps.
-- Sentence case for labels and action text; short action verbs on buttons. Keep paragraph line
-  length ~50–70 characters. Single-line rows use ellipsis; multi-line content wraps with a max
-  line count when the surrounding layout is fixed.
+Reorganized 2026-07-13 to the reference design's scale (the founder asked for the app's font
+sizes/weights to be organized to match `Aimcub Glass.dc.html`; this supersedes the earlier
+three-size / ≤500-weight policy).
+
+- Font stacks are tokens: `--od-font-sans: -apple-system, "SF Pro Text", "SF Pro Icons",
+  "Helvetica Neue", Helvetica, Arial, sans-serif` (`-apple-system` gives SF Pro with automatic
+  optical sizing, so there is no separate Display stack) and `--od-font-mono: "SF Mono",
+  ui-monospace, Menlo, Monaco, Consolas, monospace`. The sans stack is applied on **`body`** (not
+  only `.od-window`) so body-portaled layers (the account-menu popover) inherit the app face —
+  a popover regression once shipped serif because only `.od-window` carried the family; a test
+  now guards the `body` rule. One UI family per surface; no decorative fonts in product UI.
+- **Type ramp (10 tokenized steps — every `font-size` in cockpit.css routes through one; a test
+  forbids any raw numeric font-size/font-weight/letter-spacing outside the token definitions):**
+  - `--od-type-tag` 10.5px/14 — ALL-CAPS kickers and chip labels (journal time, station line).
+  - `--od-type-meta` 11.5px/16 — counts, timestamps, footnotes, ok-dot lines, micro buttons.
+  - `--od-type-sub` 12.5px/17 — descriptions/sub-lines, menu items, compact controls, seg buttons.
+  - `--od-type-body` 13.5px/19 — the default: navigation rows, forms, content text, brand label.
+  - `--od-type-title-s` 14.5px/20 — row/card titles, primary action labels, lead paragraphs.
+  - `--od-type-title` 15.5px/21 — surface titles (Journey aim header, ambient title).
+  - `--od-type-title-m` 17.5px/23 — pane/section titles (Settings pane head, first-run mark).
+  - `--od-type-title-l` 19px/25 — spotlight titles (your-move title, sidebar "Settings" title).
+  - `--od-type-display` 24px/30 — page titles (Welcome back, Memory).
+  - `--od-type-hero` 27px/34 — first-run hero and the composer headline input.
+- **Weights (tokens): regular 400, medium 500, semibold 600, heavy 700; `strong` is an alias of
+  semibold.** Body/nav rest text is regular; medium marks active nav rows, segmented/primary
+  button labels, and quiet emphasis; semibold is for true titles and selected hierarchy; heavy is
+  ONLY for the brand "A" marks and ALL-CAPS kicker tags. Avoid heavier-than-600 running text and
+  avoid 600+ on Chinese UI text where 500 reads better.
+- **Tracking (tokens):** `--od-ls-title` −0.01em on title/title-m/title-l, `--od-ls-display`
+  −0.015em on display/hero, `--od-ls-caps` +0.06em on ALL-CAPS tags (with CSS
+  `text-transform: uppercase` so `zh` strings are unaffected). Everything else stays at 0. Do not
+  scale fonts with viewport width.
+- Caps-kicker idiom (move tag, TURNS/JOURNAL eyebrows, NEW AIM, sheet title, memory group
+  labels): meta size + heavy (or semibold for quiet group labels) + caps tracking + uppercase.
+- Line icons use a 1.5–1.6px stroke unless a selected/primary state needs more. Avoid italics.
+- Sentence case for labels and action text (the caps idiom above is the exception); short action
+  verbs on buttons. Keep paragraph line length ~50–70 characters. Single-line rows use ellipsis;
+  multi-line content wraps with a max line count when the surrounding layout is fixed.
 
 ## Color, Surfaces, and Materials
 
@@ -395,7 +431,8 @@ Reference links:
 - Structure comes from hairlines and translucency, not heavy borders: use the `--ring` inner
   highlight + `--edge` hairline on islands, and 1px borders where a control genuinely needs one.
   Active/selected list items change background (translucent `--field`) rather than only text
-  color, with no visible border/outline/selected-shadow.
+  color, with no visible border/outline; the only sanctioned selected-shadow is the sidebar row's
+  soft `0 1px 3px rgba(30,40,70,.08)` lift from the reference design.
 - Elevation is soft and shallow: `--sh-md` for resting cards, `--sh-lg` on hover/overlays,
   `--sh-btn` for the accent primary. Reserve stronger elevation for overlays, popovers, the
   station sheet, and modal-like layers. Non-primary controls converge on the shared quiet
@@ -516,8 +553,9 @@ Reference links:
 
 - Does the screen expose one primary next action (on the Journey, the single "Your move")?
 - Does the layout preserve the default two-column glass shell unless an opt-in surface is opened?
-- Are type sizes, weights, line heights, and spacing from this file? Do new `font-size`s use ramp
-  tokens (or non-listed decimals)?
+- Are type sizes, weights, line heights, and spacing from this file? Every `font-size`,
+  `font-weight`, and `letter-spacing` must use a ramp token — no raw numeric values (a test
+  enforces it).
 - Do Glass tokens appear identically in all three theme blocks? Is text legible over the gradient
   and translucent islands in both light and dark?
 - Are the 15 `data-od-id` anchors intact and the native macOS traffic lights native (no
