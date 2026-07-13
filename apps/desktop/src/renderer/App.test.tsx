@@ -1811,7 +1811,7 @@ describe("CockpitShell", () => {
       /\.od-window-drag-strip\s*{[^}]*left:\s*calc\(var\(--titlebar-toggle-left\) \+ var\(--titlebar-toggle-size\) \+ 8px\);[^}]*height:\s*var\(--window-drag-strip-height\);/s,
     );
     expect(css).toMatch(/\.od-sidebar-toggle\s*{[^}]*app-region:\s*no-drag;[^}]*-webkit-app-region:\s*no-drag;/s);
-    expect(css).toMatch(/\.od-user-menu-anchor,\s*\.od-user-menu-anchor \*,\s*\.od-action-menu-anchor,\s*\.od-action-menu-anchor \*\s*{[^}]*app-region:\s*no-drag;[^}]*-webkit-app-region:\s*no-drag;/s);
+    expect(css).toMatch(/\.od-user-menu-anchor,\s*\.od-user-menu-anchor \*,\s*\.od-user-menu-popover,\s*\.od-user-menu-popover \*,\s*\.od-action-menu-anchor,\s*\.od-action-menu-anchor \*\s*{[^}]*app-region:\s*no-drag;[^}]*-webkit-app-region:\s*no-drag;/s);
   });
 
   it("leaves macOS traffic lights to native window chrome", () => {

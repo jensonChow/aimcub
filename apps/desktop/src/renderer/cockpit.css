@@ -264,6 +264,8 @@ select:focus-visible {
 .od-sidebar-brand *,
 .od-user-menu-anchor,
 .od-user-menu-anchor *,
+.od-user-menu-popover,
+.od-user-menu-popover *,
 .od-action-menu-anchor,
 .od-action-menu-anchor * {
   app-region: no-drag;
@@ -1130,12 +1132,14 @@ kbd {
   white-space: nowrap;
 }
 
+/*
+ * Rendered in a body PORTAL (position set inline from the trigger rect): inside the
+ * sidebar, its backdrop-filter would make the aside the fixed-position containing block
+ * and the sidebar's overflow would clip the Language submenu to an unusable sliver.
+ */
 .od-user-menu-popover {
   position: fixed;
   z-index: 1200;
-  left: var(--sidebar-horizontal-inset);
-  bottom: 76px;
-  width: var(--sidebar-content-width);
   max-height: min(360px, calc(100vh - 96px));
   display: grid;
   gap: 2px;

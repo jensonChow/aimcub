@@ -39,6 +39,14 @@ commits, each independently full-gate green:
 5. **Live-QA fixes** — `os.settings` legacy value ("Aim helpers") → "Settings"; long
    `$AIMCUB_HOME` paths ellipsize in the Workspace row (tooltip keeps the full path); detail pane
    clips horizontal overflow.
+6. **Founder-reported menu bug (post-merge fix)** — the account-menu **Language submenu rendered
+   as a dead clipped sliver**: the sidebar's `backdrop-filter` makes the aside the containing
+   block for the `position: fixed` popover, and the sidebar's `overflow: hidden auto` clipped
+   everything past its edge (submenu unclickable → language switching broken from the menu). Fixed
+   by rendering the popover through a **body portal**, positioned inline from the trigger rect
+   (outside-click also checks the portaled panel). Verified live: popover anchors exactly above
+   the trigger, the submenu is fully visible + hit-testable, and switching 中文 ⇄ English through
+   it works.
 
 ## Verification
 
