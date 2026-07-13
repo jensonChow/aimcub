@@ -1,97 +1,83 @@
 # Aimcub Handoff
 
-Last updated: 2026-07-12
-Branch: `main`. **The Glass design re-sync is COMPLETE, merged, and PUSHED** — three branches
-landed on `main` (`glass-design-resync`, `glass-menu-portal-fix`, `glass-settings-sidebar`; the
-settings-sidebar revision is the founder's second design update). Full gate + live packaged-app
-QA green; root `Aimcub.app` repacked. No open threads.
+Last updated: 2026-07-13
+Branch: `main`. **The Glass sidebar + typography re-sync is COMPLETE and merged**
+(branch `glass-sidebar-type-resync`). Full gate + live packaged-app QA green; root
+`Aimcub.app` repacked. No open threads.
 
-## Glass design re-sync — DONE
+## Sidebar + typography re-sync — DONE
 
-The founder re-imported `Aimcub Glass.dc.html` from his claude.ai/design project
-(`b99a9242-7164-4141-81e4-e6c363ecaf5f`, via the DesignSync MCP) and asked for it to be
-implemented. A precision diff against the shipped Journey-first app showed the Journey, New Aim
-composer, Memory page, and station sheets already matched the latest design; the real deltas were
-the sidebar, Home cards, Settings IA, and a station-glyph policy. Implemented as five focused
-commits, each independently full-gate green:
+The founder re-checked `Aimcub Glass.dc.html` (project `b99a9242-…`, via DesignSync) and said
+the sidebar still didn't match the design, and asked for the app's font/weight/size typography
+to be organized. Root causes found and fixed:
 
-1. **Sidebar** — brand row ("A" mark + Aimcub → Home, compact "+" → New Aim) replaces the two
-   action rows; sidebar search + all/active/paused filters + "Recent aims" label deleted (Cmd+K
-   covers navigation; draft rows unchanged). The footer collapsed into the account trigger
-   ("Local workspace / ~/.aimcub") whose glass popover holds Memory(+count), Settings, Language,
-   an Appearance toggle, and the ok-dot on-device line. Sidebar dots now mark only needs-you
-   (accent) and blocked (danger). Theme pref moved to a shared store (`renderer/theme.ts`);
-   CockpitShell keeps the single native `setThemeSource` sync. Dead: `aimMatchesNavigationQuery`.
-2. **Home** — dynamic sub ("{n} aims in motion. One needs you."); cards carry a status phrase
-   sub-line + accent "your move" pill (needs_you) + 64×4 trailing bar; dot and `{done}/{total}`
-   text removed; first-run "connected" line gains "· {model}" when a provider model is set.
-3. **Settings re-IA** — aim sidebar stays; in-workspace "Settings" title + 196px rail with
-   General / Planning brain / Workers / Research / About + ~600px detail pane. New validated IPC:
-   `getAppInfo` (version + tilde-shortened workspace path) and `revealWorkspace` (no renderer
-   input; opens the fixed workspace root). Provider chooser became pills; local agents became
-   dot/name/meta/Test-run rows + an honest "You" row; Research holds the web form + a
-   "{n} of 6 active" context-sources row toggling the full panel; About states version + on-device
-   facts only (no fake updater). Deleted: SettingsPrimarySidebar/back/search/nav, the readiness
-   Overview + `buildSettingsModel`, the aim-context return card, `od-app-stage-settings` sidebar
-   locking, ~75 orphaned i18n keys. Section ids → `general|brain|workers|research|about`
-   (focus remap provider→brain, local→workers, web/context→research). The settings-return stage
-   is still recorded for draft persistence.
-4. **Journey polish** — only the active station shows a (pulsing accent) dot; header meta reads
-   as percent with the exact fraction on the accessible name (hidden on a plan-less shell).
-5. **Live-QA fixes** — `os.settings` legacy value ("Aim helpers") → "Settings"; long
-   `$AIMCUB_HOME` paths ellipsize in the Workspace row (tooltip keeps the full path); detail pane
-   clips horizontal overflow.
-6. **Founder-reported menu bug (post-merge fix)** — the account-menu **Language submenu rendered
-   as a dead clipped sliver**: the sidebar's `backdrop-filter` makes the aside the containing
-   block for the `position: fixed` popover, and the sidebar's `overflow: hidden auto` clipped
-   everything past its edge (submenu unclickable → language switching broken from the menu). Fixed
-   by rendering the popover through a **body portal**, positioned inline from the trigger rect
-   (outside-click also checks the portaled panel). Verified live: popover anchors exactly above
-   the trigger, the submenu is fully visible + hit-testable, and switching 中文 ⇄ English through
-   it works.
-7. **Settings-sidebar revision (second design update, branch `glass-settings-sidebar`)** — the
-   founder updated `Aimcub Glass.dc.html` again: the settings category nav moves INTO the sidebar.
-   While Settings is open the aim list gives way to a quiet **Back** row (→ the recorded
-   pre-settings surface via the reinstated `returnFromSettings`), a "Settings" title, and the
-   5-item nav (`SettingsSidebarNav`, swapped in through the shell's `settingsSidebar` prop; brand
-   row + account trigger stay; `data-mode="settings"`). The workspace now holds ONE centered
-   detail pane (max 620px, 40px top padding) — the in-workspace rail is gone. Live-verified
-   (12/12): nav swap, aim list hidden/restored, tab switching from the sidebar, Back → Journey,
-   pane centered; light screenshot matches the mock.
+1. **Floating-island shell** — the app drew the sidebar as an edge-attached full-height pane
+   (280px, `border-right`, 56px top pad). The reference floats a **224px rounded island**
+   inside a padded desk: `.od-app` now has `padding: 44px 22px 22px` (`--shell-top` /
+   `--shell-gutter`) + 18px `--shell-gap`; the aside gets radius 18, `--sh-md` + `--ring`
+   inset, `padding: 18px 12px 12px`, gap 16, `overflow: hidden` (list scrolls inside).
+   Collapsed/peek keeps island geometry (abspos within the grid — horizontal insets resolve
+   against the **grid-column-1 area**, so `left: 0`, not the gutter again). The drag strip
+   spans the 44px band; the old per-stage titlebar-safe padding rules were deleted (clearance
+   is geometric now). `DEFAULT_SIDEBAR_WIDTH` 280→224 and the width storage key bumped to
+   `aimcub.sidebarWidth.v2` so persisted pre-island widths don't mask the new default.
+2. **Row + menu metrics to reference spec** — aim rows 36→32px, radius 10, `0 10px` padding,
+   3px list gap, **rest = `--mut` at 400**, hover `--island2`, selected = `--field` + ink +
+   500 + `0 1px 3px rgba(30,40,70,.08)`; draft rows follow (32px). Brand row: home button
+   radius 10 / `0 6px`, name 13.5/600, mark 700. Account trigger 46px/radius 12/`6px 8px`,
+   label sub/600. Menu items sub-size/400, `0 10px`; separator margin 5px 8px. Settings-mode:
+   back = sub/500, title = title-l 19/600 + title tracking, rail rest 500 / active 600.
+3. **Organized Glass type ramp** — cockpit.css now has 10 size tokens (tag 10.5 / meta 11.5 /
+   sub 12.5 / body 13.5 / title-s 14.5 / title 15.5 / title-m 17.5 / title-l 19 / display 24 /
+   hero 27, each with a line token), weights regular 400 / medium 500 / semibold 600 / heavy
+   700 (strong = semibold alias), and tracking tokens (title −0.01em, display −0.015em, caps
+   +0.06em with CSS uppercase so zh is unaffected). Every `font-size` / `font-weight` /
+   `letter-spacing` in cockpit.css routes through tokens — the old three-size/450-weight guard
+   test was REWRITTEN to enforce exactly this (no raw numerics anywhere). All ~270 size and
+   ~135 weight sites were swept to the design mapping (titles 600, buttons/active 500, caps
+   kickers 700+tracking+uppercase, descriptions promoted meta→sub, etc.). `styles.ts`
+   TYPE/WEIGHT fallbacks updated and extended.
+4. **Serif-portal bug (real founder-visible defect)** — the body-portaled account-menu popover
+   rendered in the UA serif because only `.od-window` carried the font family. Font stacks are
+   now tokens (`--od-font-sans` with `-apple-system` first for optical sizing — the separate
+   "SF Pro Display" declarations were dropped; `--od-font-mono`) and the sans stack is applied
+   on **`body`**; a test guards it.
 
 ## Verification
 
-- **Full gate green per commit**: build (+ `@core` no-leak) + tests (**283 desktop** + store +
-  llm + local-agent + 88 cli) + typecheck + lint + core:purity. en/zh parity kept (~75 dead keys
-  pruned, ~40 added).
-- **Live packaged-app QA via CDP** (isolated `AIMCUB_HOME` with real settings.json copied in;
-  real `~/.aimcub/store.json` mtime verified unchanged): 35/35 scripted checks — brand row/menu
-  contents/appearance toggle flip, Settings rail + all five tabs (segmented appearance, Reveal
-  row, provider pills, You row, Manage expand, About version), composer sparks + circular submit,
-  goal-first submit → Journey with one strip + active-only dot + no % meta on a shell, Home
-  card state line/pill/bar, no horizontal overflow at 640px. Visual pass at 1180×780 in light +
-  dark (screenshots in the session scratchpad).
+- **Full gate green**: build (+ `@core` no-leak) + tests (**283 desktop**, incl. rewritten
+  typography guard + updated sidebar metric assertions) + typecheck + lint + core:purity.
+- **Live packaged-app QA via CDP** (isolated `AIMCUB_HOME`, real settings.json copied in; real
+  `~/.aimcub/store.json` mtime verified unchanged): computed-style probes matched the reference
+  spec exactly (shell 44/22/22, island 224/18px/18-12-12/blur30, brand 13.5·600 / mark 700,
+  rows 32px rest mut·400 / selected field+ink+500+shadow, trigger 46/12, popover portal font
+  `-apple-system`, items 12.5·400, settings title 19·600 / pane title 17.5·600 / rail active
+  acc-soft·600); screenshots of composer, Journey, Home (first-run + with-aims), account menu
+  (+ Language submenu open and hit-testable), Settings, Memory in **light + dark**; 640×520 no
+  horizontal overflow, auto-collapse works, hover-peek overlays as a floating island at exact
+  gutters (22/44/22, width clamps to 216).
 - Repacked (`pnpm desktop:pack`) + refreshed root `Aimcub.app`.
 
 ## Invariants (still enforced)
 
-- Native traffic lights; `data-od-id` anchors (memory action moved INTO the account menu but kept
-  `data-od-id="sidebar-memory-action"`); glass-token 3-block mirror; AA overrides (`--faint`,
-  light `--acc #0064cc`) untouched; type ramp guard (new 13.5/19px are non-guarded decimals);
-  `@core` pure — the re-sync is renderer + thin validated IPC only.
-- Honest UI: no flight-demo content, no fake updater, Journey secondary affordances
-  (hand-to-agent/schedule/later) still render only when a real handler exists.
+- Native traffic lights (untouched main-process geometry 16/46/14); `data-od-id` anchors
+  intact; glass-token 3-block mirror; AA overrides (`--faint`, light `--acc #0064cc`)
+  untouched; `@core` pure — this re-sync is renderer CSS + CockpitShell constants + tests only.
+- New guard: no raw numeric font-size/font-weight/letter-spacing in cockpit.css (tokens only);
+  `body` must carry `--od-font-sans` (portal font).
 
 ## Ops gotchas (reusable)
 
-- Live packaged-app QA via CDP: repack + refresh root `Aimcub.app`, launch the binary with
-  `AIMCUB_HOME=<isolated>` + `--remote-debugging-port=NNNN` + `--user-data-dir=<isolated>`; copy
-  real `~/.aimcub/settings.json` (+ `context-sources.json`) in, empty store; drive
-  `Runtime.evaluate` + `Page.captureScreenshot` from Node 22 (global WebSocket). **The default
-  960×680 window auto-collapses the sidebar (`max-width: 1040px`)** — pin it via the toggle (or
-  emulate ≥1180px width) before menu/sidebar assertions; a popover inside the collapsed aside is
-  clickable in DOM but invisible. Always verify real `~/.aimcub/store.json` mtime unchanged.
+- Live packaged-app QA via CDP: launch the packaged binary with isolated `AIMCUB_HOME` +
+  `--remote-debugging-port` + isolated `--user-data-dir`; drive `Runtime.evaluate` +
+  `Page.captureScreenshot` from Node 22. Use `Emulation.setDeviceMetricsOverride` (≥1180 wide)
+  to keep the sidebar pinned. React synthetic `onPointerEnter` fires from dispatched
+  `pointerover` (not `pointerenter`). `Emulation.setEmulatedMedia` prefers-color-scheme does
+  NOT flip the app's theme (native-first via `data-system-appearance`) — toggle dark through
+  the in-app Appearance row instead. Always verify real `~/.aimcub/store.json` mtime unchanged.
 - Design re-sync flow: `DesignSync get_file` → serve the `.dc.html` + project `support.js`
-  locally (support.js pulls React/Babel from unpkg) → click through in a browser for the target
-  visuals before diffing code.
-- Pre-existing (carried): `com.aimcub.desktop` vs ASC `com.jensonchow.aimcub` bundle-id mismatch.
+  locally → click through in a browser for target visuals before diffing code.
+- Abspos children of the `.od-app` grid resolve horizontal insets against their grid-column
+  area, not the padding box — mind this for any future overlay pinned to the shell.
+- Pre-existing (carried): `com.aimcub.desktop` vs ASC `com.jensonchow.aimcub` bundle-id
+  mismatch.

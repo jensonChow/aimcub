@@ -26,16 +26,24 @@ export const C = {
 };
 
 export const TYPE = {
-  meta: "var(--od-type-meta, 12px)",
-  body: "var(--od-type-body, 13px)",
-  title: "var(--od-type-title, 16px)",
+  tag: "var(--od-type-tag, 10.5px)",
+  meta: "var(--od-type-meta, 11.5px)",
+  sub: "var(--od-type-sub, 12.5px)",
+  body: "var(--od-type-body, 13.5px)",
+  titleS: "var(--od-type-title-s, 14.5px)",
+  title: "var(--od-type-title, 15.5px)",
+  titleM: "var(--od-type-title-m, 17.5px)",
+  titleL: "var(--od-type-title-l, 19px)",
+  display: "var(--od-type-display, 24px)",
+  hero: "var(--od-type-hero, 27px)",
 } as const;
 
 export const WEIGHT = {
   regular: "var(--od-font-weight-regular, 400)",
-  medium: "var(--od-font-weight-medium, 400)",
-  semibold: "var(--od-font-weight-semibold, 450)",
-  strong: "var(--od-font-weight-strong, 500)",
+  medium: "var(--od-font-weight-medium, 500)",
+  semibold: "var(--od-font-weight-semibold, 600)",
+  strong: "var(--od-font-weight-strong, 600)",
+  heavy: "var(--od-font-weight-heavy, 700)",
 } as const;
 
 export function card(): CSSProperties {
@@ -58,11 +66,11 @@ export function inputStyle(): CSSProperties {
 }
 
 export function primaryButton(disabled: boolean): CSSProperties {
-  return { marginTop: 16, minHeight: 40, padding: "0 16px", borderRadius: 12, border: "none", background: disabled ? C.disabledBg : C.accent, color: disabled ? C.disabledText : C.accentOn, fontSize: TYPE.body, fontWeight: WEIGHT.strong, cursor: disabled ? "default" : "pointer", boxShadow: disabled ? "none" : "var(--sh-btn, 0 2px 8px rgba(0, 113, 227, 0.2))" };
+  return { marginTop: 16, minHeight: 40, padding: "0 16px", borderRadius: 12, border: "none", background: disabled ? C.disabledBg : C.accent, color: disabled ? C.disabledText : C.accentOn, fontSize: TYPE.body, fontWeight: WEIGHT.medium, cursor: disabled ? "default" : "pointer", boxShadow: disabled ? "none" : "var(--sh-btn, 0 2px 8px rgba(0, 113, 227, 0.2))" };
 }
 
 export function secondaryButton(): CSSProperties {
-  return { marginTop: 16, minHeight: 40, padding: "0 14px", borderRadius: 999, border: `1px solid ${C.border}`, background: C.surface, color: C.text, fontSize: TYPE.body, fontWeight: WEIGHT.semibold, cursor: "pointer" };
+  return { marginTop: 16, minHeight: 40, padding: "0 14px", borderRadius: 999, border: `1px solid ${C.border}`, background: C.surface, color: C.text, fontSize: TYPE.body, fontWeight: WEIGHT.medium, cursor: "pointer" };
 }
 
 export function optionButton(selected: boolean): CSSProperties {

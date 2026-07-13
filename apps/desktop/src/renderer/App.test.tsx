@@ -1394,18 +1394,20 @@ describe("CockpitShell", () => {
     expect(html).not.toContain("od-sidebar-action");
     expect(html).not.toContain("<kbd");
     expect(css).toContain("--sidebar-horizontal-inset: 12px;");
-    expect(css).toContain("--sidebar-row-padding-x: 8px;");
+    expect(css).toContain("--sidebar-row-padding-x: 10px;");
     expect(css).toContain("--sidebar-icon-column: 28px;");
     expect(css).toContain("--sidebar-content-width: calc(var(--sidebar-width) - (var(--sidebar-horizontal-inset) * 2) - 1px);");
-    expect(css).toContain("--od-type-meta: 12px;");
-    expect(css).toContain("--od-type-body: 13px;");
-    expect(css).toContain("--od-type-title: 16px;");
-    expect(css).toContain("--od-font-weight-medium: 400;");
-    expect(css).toContain("--od-font-weight-semibold: 450;");
+    expect(css).toContain("--od-type-meta: 11.5px;");
+    expect(css).toContain("--od-type-body: 13.5px;");
+    expect(css).toContain("--od-type-title: 15.5px;");
+    expect(css).toContain("--od-font-weight-medium: 500;");
+    expect(css).toContain("--od-font-weight-semibold: 600;");
     expect(css).toContain("--od-icon-stroke: 1.55;");
-    expect(css).toMatch(/\.od-sidebar\s*{[^}]*padding:\s*56px var\(--sidebar-horizontal-inset\) 16px;[^}]*overflow-x:\s*hidden;[^}]*overflow-y:\s*auto;/s);
+    // Floating Glass island: rounded, ring-inset, blurred, clipped — the aim list scrolls inside.
+    expect(css).toMatch(/\.od-sidebar\s*{[^}]*padding:\s*18px var\(--sidebar-horizontal-inset\) 12px;[^}]*overflow:\s*hidden;[^}]*border-radius:\s*18px;[^}]*box-shadow:\s*var\(--sh-md\), inset 0 0 0 1px var\(--ring\);/s);
+    expect(css).toMatch(/\.od-app\s*{[^}]*--sidebar-width:\s*224px;[^}]*--shell-top:\s*44px;[^}]*--shell-gutter:\s*22px;[^}]*--shell-gap:\s*18px;/s);
     expect(css).toMatch(/\.od-sidebar-brand\s*{[^}]*width:\s*var\(--sidebar-content-width\);[^}]*display:\s*flex;[^}]*justify-self:\s*center;[^}]*align-items:\s*center;[^}]*gap:\s*6px;/s);
-    expect(css).toMatch(/\.od-sidebar-brand-home\s*{[^}]*flex:\s*1;[^}]*min-height:\s*34px;[^}]*background:\s*transparent;[^}]*padding:\s*0 var\(--sidebar-row-padding-x\);/s);
+    expect(css).toMatch(/\.od-sidebar-brand-home\s*{[^}]*flex:\s*1;[^}]*min-height:\s*34px;[^}]*border-radius:\s*10px;[^}]*background:\s*transparent;[^}]*padding:\s*0 6px;/s);
     expect(css).toMatch(/\.od-sidebar-brand-home:hover[^{]*{[^}]*background:\s*var\(--island2\);/s);
     expect(css).toMatch(/\.od-brand-mark\s*{[^}]*width:\s*26px;[^}]*height:\s*26px;[^}]*border-radius:\s*8px;[^}]*background:\s*var\(--acc\);[^}]*color:\s*var\(--acc-on\);/s);
     expect(css).toMatch(/\.od-sidebar-plus\s*{[^}]*width:\s*26px;[^}]*height:\s*26px;[^}]*border-radius:\s*8px;[^}]*background:\s*transparent;[^}]*color:\s*var\(--od-muted\);/s);
@@ -1532,14 +1534,34 @@ describe("CockpitShell", () => {
     }
   });
 
-  it("keeps Desktop typography on three sizes and light shared weights", () => {
+  it("keeps Desktop typography fully on the organized Glass type ramp", () => {
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
 
-    expect(css).toMatch(/font-size:\s*var\(--od-type-(meta|body|title)\);/);
-    expect(css).not.toMatch(/font-size:\s*(9|10|11|12|13|14|15|16|18|20|22|28|32)px;/);
-    expect(css).not.toMatch(/font-weight:\s*(600|650|700|750|800);/);
-    expect(css).toContain("--od-font-weight-strong: 500;");
-    expect(css).toContain("--od-font-weight-heavy: var(--od-font-weight-strong);");
+    // Every font-size / font-weight / letter-spacing routes through a ramp token — no raw
+    // numeric values anywhere outside the token definitions themselves.
+    expect(css).not.toMatch(/font-size:\s*[\d.]/);
+    expect(css).not.toMatch(/font-weight:\s*\d/);
+    expect(css).not.toMatch(/letter-spacing:\s*-?\.?\d*[1-9]/);
+
+    // The ramp contract (sizes climb tag → hero; weights 400/500/600/700, strong = semibold).
+    expect(css).toContain("--od-type-tag: 10.5px;");
+    expect(css).toContain("--od-type-meta: 11.5px;");
+    expect(css).toContain("--od-type-sub: 12.5px;");
+    expect(css).toContain("--od-type-body: 13.5px;");
+    expect(css).toContain("--od-type-title-s: 14.5px;");
+    expect(css).toContain("--od-type-title: 15.5px;");
+    expect(css).toContain("--od-type-title-m: 17.5px;");
+    expect(css).toContain("--od-type-title-l: 19px;");
+    expect(css).toContain("--od-type-display: 24px;");
+    expect(css).toContain("--od-type-hero: 27px;");
+    expect(css).toContain("--od-font-weight-regular: 400;");
+    expect(css).toContain("--od-font-weight-medium: 500;");
+    expect(css).toContain("--od-font-weight-semibold: 600;");
+    expect(css).toContain("--od-font-weight-strong: var(--od-font-weight-semibold);");
+    expect(css).toContain("--od-font-weight-heavy: 700;");
+    expect(css).toContain("--od-ls-title: -0.01em;");
+    expect(css).toContain("--od-ls-display: -0.015em;");
+    expect(css).toContain("--od-ls-caps: 0.06em;");
   });
 
   it("keeps sidebar Aim rows compact, single-line, and free of status subtitles", () => {
@@ -1583,10 +1605,10 @@ describe("CockpitShell", () => {
     expect(html).toContain("Coordinate the entire desktop application…");
     expect(html).not.toContain(">active<");
     expect(html).not.toContain("Save blocked");
-    expect(css).toMatch(/\.od-aim-card\s*{[^}]*min-height:\s*36px;[^}]*padding:\s*0 var\(--sidebar-row-padding-x\);/s);
-    expect(css).toMatch(/\.od-aim-card\.selected,\s*\.od-aim-card\.current\s*{[^}]*background:\s*var\(--field\);[^}]*border-color:\s*transparent;[^}]*box-shadow:\s*none;/s);
+    expect(css).toMatch(/\.od-aim-card\s*{[^}]*min-height:\s*32px;[^}]*padding:\s*0 var\(--sidebar-row-padding-x\);[^}]*border-radius:\s*10px;[^}]*color:\s*var\(--mut\);/s);
+    expect(css).toMatch(/\.od-aim-card\.selected,\s*\.od-aim-card\.current\s*{[^}]*background:\s*var\(--field\);[^}]*border-color:\s*transparent;[^}]*box-shadow:\s*0 1px 3px rgba\(30, 40, 70, 0\.08\);/s);
     expect(css).toMatch(/\.od-aim-card\.selected:focus-visible,\s*\.od-aim-card\.current:focus-visible\s*{[^}]*box-shadow:\s*var\(--od-focus\);/s);
-    expect(css).toMatch(/\.od-draft-card \.od-content-entry-main\s*{[^}]*min-height:\s*36px;[^}]*padding:\s*0 2px 0 var\(--sidebar-row-padding-x\);/s);
+    expect(css).toMatch(/\.od-draft-card \.od-content-entry-main\s*{[^}]*min-height:\s*32px;[^}]*padding:\s*0 2px 0 var\(--sidebar-row-padding-x\);/s);
     expect(css).toMatch(/\.od-aim-card strong,\s*\.od-draft-card \.od-content-entry-copy strong\s*{[^}]*overflow:\s*hidden;[^}]*text-overflow:\s*ellipsis;[^}]*white-space:\s*nowrap;/s);
   });
 
@@ -1643,9 +1665,9 @@ describe("CockpitShell", () => {
     expect(html).toContain('<div class="od-sidebar-empty">Your aims will live here.</div>');
     expect(css).toMatch(/\.od-aim-browser\s*{[^}]*width:\s*var\(--sidebar-content-width\);[^}]*justify-self:\s*center;[^}]*padding-right:\s*0;/s);
     expect(css).toMatch(/\.od-section-label\s*{[^}]*justify-content:\s*flex-start;[^}]*padding:\s*0 var\(--sidebar-row-padding-x\);/s);
-    expect(css).toMatch(/\.od-sidebar-empty\s*{[^}]*padding:\s*8px var\(--sidebar-row-padding-x\);[^}]*font-size:\s*var\(--od-type-meta\);/s);
+    expect(css).toMatch(/\.od-sidebar-empty\s*{[^}]*padding:\s*8px var\(--sidebar-row-padding-x\);[^}]*font-size:\s*var\(--od-type-sub\);/s);
     expect(css).toMatch(/\.od-aim-card\s*{[^}]*padding:\s*0 var\(--sidebar-row-padding-x\);/s);
-    expect(css).toMatch(/\.od-aim-card\.selected,\s*\.od-aim-card\.current\s*{[^}]*background:\s*var\(--field\);[^}]*border-color:\s*transparent;[^}]*box-shadow:\s*none;[^}]*color:\s*var\(--od-fg\);/s);
+    expect(css).toMatch(/\.od-aim-card\.selected,\s*\.od-aim-card\.current\s*{[^}]*background:\s*var\(--field\);[^}]*border-color:\s*transparent;[^}]*box-shadow:\s*0 1px 3px rgba\(30, 40, 70, 0\.08\);[^}]*color:\s*var\(--od-fg\);/s);
     expect(css).toMatch(/\.od-aim-card\.selected:focus-visible,\s*\.od-aim-card\.current:focus-visible\s*{[^}]*background:\s*var\(--field\);[^}]*box-shadow:\s*var\(--od-focus\);/s);
     // The sidebar-row status dot marks only attention states.
     expect(css).toMatch(/\.od-aim-progress-dot\.is-needs_you\s*{\s*background:\s*var\(--acc\);\s*}/s);
@@ -1655,10 +1677,13 @@ describe("CockpitShell", () => {
     expect(css).not.toContain(".od-aim-progress-dot.is-planning");
     // Account menu: glass island popover anchored to the workspace trigger.
     expect(css).toMatch(/\.od-user-menu-anchor\s*{[^}]*width:\s*var\(--sidebar-content-width\);[^}]*justify-self:\s*center;/s);
-    expect(css).toMatch(/\.od-user-menu-trigger\s*{[^}]*grid-template-columns:\s*var\(--sidebar-icon-column\) minmax\(0, 1fr\) 18px;[^}]*padding:\s*6px var\(--sidebar-row-padding-x\);/s);
+    expect(css).toMatch(/\.od-user-menu-trigger\s*{[^}]*grid-template-columns:\s*var\(--sidebar-icon-column\) minmax\(0, 1fr\) 18px;[^}]*min-height:\s*46px;[^}]*border-radius:\s*12px;[^}]*padding:\s*6px 8px;/s);
     expect(css).toMatch(/\.od-user-menu-popover\s*{[^}]*border-radius:\s*14px;[^}]*background:\s*var\(--island\);[^}]*backdrop-filter:\s*blur\(30px\);[^}]*box-shadow:\s*var\(--sh-lg\), inset 0 0 0 1px var\(--ring\);/s);
-    expect(css).toMatch(/\.od-user-menu-item\s*{[^}]*min-height:\s*34px;[^}]*grid-template-columns:\s*18px minmax\(0, 1fr\) auto;[^}]*padding:\s*0 8px;/s);
-    expect(css).toMatch(/\.od-user-menu-item span\s*{[^}]*font-size:\s*var\(--od-type-meta\);[^}]*line-height:\s*var\(--od-line-meta\);/s);
+    // The popover lives in a body portal — body must carry the app font stack or it falls
+    // back to the UA serif face.
+    expect(css).toMatch(/\nbody\s*{[^}]*font-family:\s*var\(--od-font-sans\);/s);
+    expect(css).toMatch(/\.od-user-menu-item\s*{[^}]*min-height:\s*34px;[^}]*grid-template-columns:\s*18px minmax\(0, 1fr\) auto;[^}]*padding:\s*0 var\(--sidebar-row-padding-x\);/s);
+    expect(css).toMatch(/\.od-user-menu-item span\s*{[^}]*font-size:\s*var\(--od-type-sub\);[^}]*line-height:\s*var\(--od-line-sub\);/s);
     expect(css).toMatch(/\.od-user-menu-value\s*{[^}]*justify-self:\s*end;[^}]*color:\s*var\(--faint\);[^}]*font-variant-numeric:\s*tabular-nums;/s);
     expect(css).toMatch(/\.od-user-menu-device\s*{[^}]*display:\s*flex;[^}]*align-items:\s*center;[^}]*gap:\s*7px;/s);
     expect(css).toMatch(/\.od-user-menu-device-dot\s*{[^}]*border-radius:\s*50%;[^}]*background:\s*var\(--ok\);/s);
@@ -1706,7 +1731,7 @@ describe("CockpitShell", () => {
     );
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
 
-    expect(html).toContain('style="--sidebar-width:280px"');
+    expect(html).toContain('style="--sidebar-width:224px"');
     expect(html).toContain('id="od-left-aim-sidebar"');
     expect(html).toContain('data-od-id="sidebar-resizer"');
     expect(html).toContain('role="separator"');
@@ -1715,7 +1740,7 @@ describe("CockpitShell", () => {
     expect(html).toContain('aria-orientation="vertical"');
     expect(html).toContain('aria-valuemin="216"');
     expect(html).toContain('aria-valuemax="360"');
-    expect(html).toContain('aria-valuenow="280"');
+    expect(html).toContain('aria-valuenow="224"');
     expect(css).toMatch(/\.od-sidebar-resizer\s*{[^}]*cursor:\s*col-resize;[^}]*touch-action:\s*none;/s);
     expect(css).toMatch(/\.od-sidebar-resizer\s*{[^}]*background:\s*transparent;/s);
     expect(css).not.toContain(".od-sidebar-resizer::before");
@@ -1746,17 +1771,15 @@ describe("CockpitShell", () => {
     expect(source).toContain("isWorkbenchStageAvailable(workspaceTarget, stage)");
   });
 
-  it("keeps workbench navigation clear of titlebar controls at compact widths", () => {
+  it("keeps workbench navigation clear of titlebar controls in every sidebar state", () => {
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
-    const stageSafeAreaRule = css.match(
-      /\.od-app\[data-sidebar-state="collapsed"\] \.od-main:not\(\.od-main-settings\),[\s\S]*?\{[^}]*}/s,
-    )?.[0] ?? "";
 
-    expect(css).toMatch(/\.od-main\s*{[^}]*--stage-nav-titlebar-safe-top:\s*calc\(var\(--titlebar-toggle-top\) \+ var\(--titlebar-toggle-size\) \+ 16px\);/s);
-    expect(stageSafeAreaRule).toContain('.od-app[data-sidebar-state="peek"] .od-main:not(.od-main-settings)');
-    expect(stageSafeAreaRule).toContain("padding-top: max(24px, var(--stage-nav-titlebar-safe-top));");
+    // Window-chrome clearance is geometric: the shell's --shell-top band frames every island
+    // below the titlebar cluster, so no per-stage safe-area padding rules exist anymore.
+    expect(css).toMatch(/\.od-app\s*{[^}]*--shell-top:\s*44px;/s);
+    expect(css).toMatch(/\.od-app\s*{[^}]*padding:\s*var\(--shell-top\) var\(--shell-gutter\) var\(--shell-gutter\);/s);
+    expect(css).not.toContain("--stage-nav-titlebar-safe-top");
     expect(css).not.toContain('.od-main:not(.od-main-aim):not(.od-main-settings)');
-    expect(stageSafeAreaRule).not.toMatch(/\.od-sidebar|\.od-user-menu-|\.od-window-drag-strip/);
     expect(css).not.toContain(".od-stage-index");
   });
 
@@ -1823,7 +1846,7 @@ describe("CockpitShell", () => {
     expect(html).not.toContain("data-window-focused");
     expect(html).not.toContain("data-window-traffic-lights");
     expect(css).toMatch(/\.od-window-drag-strip\s*{[^}]*app-region:\s*drag;[^}]*-webkit-app-region:\s*drag;/s);
-    expect(css).toContain("--window-drag-strip-height: 36px;");
+    expect(css).toContain("--window-drag-strip-height: var(--shell-top);");
     expect(css).toMatch(
       /\.od-window-drag-strip\s*{[^}]*left:\s*calc\(var\(--titlebar-toggle-left\) \+ var\(--titlebar-toggle-size\) \+ 8px\);[^}]*height:\s*var\(--window-drag-strip-height\);/s,
     );

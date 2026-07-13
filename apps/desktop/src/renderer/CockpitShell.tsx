@@ -25,11 +25,13 @@ export type { CockpitStage, WorkbenchStage, WorkspaceTarget };
 type SidebarState = "pinned" | "collapsed" | "peek";
 const USER_MENU_ID = "od-sidebar-user-menu";
 const LANGUAGE_MENU_ID = "od-sidebar-language-menu";
-const SIDEBAR_WIDTH_STORAGE_KEY = "aimcub.sidebarWidth";
+/* v2: the Glass island re-sync changed the default width to 224 — retire widths saved
+   against the old attached-pane layout so the new geometry actually shows up. */
+const SIDEBAR_WIDTH_STORAGE_KEY = "aimcub.sidebarWidth.v2";
 const SIDEBAR_REVEAL_DELAY_MS = 180;
 const SIDEBAR_CLOSE_DELAY_MS = 180;
 const SIDEBAR_AUTO_COLLAPSE_QUERY = "(max-width: 1040px)";
-const DEFAULT_SIDEBAR_WIDTH = 280;
+const DEFAULT_SIDEBAR_WIDTH = 224;
 const MIN_SIDEBAR_WIDTH = 216;
 const MAX_SIDEBAR_WIDTH = 360;
 const DEFAULT_WINDOW_CHROME_STATE: WindowChromeState = {
