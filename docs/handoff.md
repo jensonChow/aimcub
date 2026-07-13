@@ -47,6 +47,15 @@ commits, each independently full-gate green:
    (outside-click also checks the portaled panel). Verified live: popover anchors exactly above
    the trigger, the submenu is fully visible + hit-testable, and switching 中文 ⇄ English through
    it works.
+7. **Settings-sidebar revision (second design update, branch `glass-settings-sidebar`)** — the
+   founder updated `Aimcub Glass.dc.html` again: the settings category nav moves INTO the sidebar.
+   While Settings is open the aim list gives way to a quiet **Back** row (→ the recorded
+   pre-settings surface via the reinstated `returnFromSettings`), a "Settings" title, and the
+   5-item nav (`SettingsSidebarNav`, swapped in through the shell's `settingsSidebar` prop; brand
+   row + account trigger stay; `data-mode="settings"`). The workspace now holds ONE centered
+   detail pane (max 620px, 40px top padding) — the in-workspace rail is gone. Live-verified
+   (12/12): nav swap, aim list hidden/restored, tab switching from the sidebar, Back → Journey,
+   pane centered; light screenshot matches the mock.
 
 ## Verification
 

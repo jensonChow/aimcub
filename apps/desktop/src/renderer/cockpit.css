@@ -1509,35 +1509,73 @@ kbd {
   line-height: 1.5;
 }
 
-/* ── Settings — in-workspace category rail + detail pane (re-synced Glass IA) ── */
+/* ── Settings — sidebar category nav + one centered detail pane (re-synced Glass IA) ── */
 .od-settings {
   min-width: 0;
   min-height: 0;
   display: flex;
-  gap: 28px;
-  padding: 2px 4px 6px;
+  justify-content: center;
 }
 
-.od-settings-rail {
-  width: 196px;
+/* The sidebar's settings mode: Back row + title + category nav, on the shared sidebar rails. */
+.od-settings-side {
+  width: var(--sidebar-content-width);
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  gap: 2px;
+  align-content: start;
+  justify-self: center;
+  overflow-y: auto;
+}
+
+.od-settings-back {
+  justify-self: start;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 26px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--mut);
+  padding: 0 8px;
+  font-size: var(--od-type-meta);
+  font-weight: var(--od-font-weight-semibold);
+  cursor: pointer;
+  transition: color 140ms ease, background 140ms ease;
+}
+
+.od-settings-back:hover {
+  color: var(--ink);
+}
+
+.od-settings-back:focus-visible {
+  outline: 0;
+  background: var(--island2);
+  box-shadow: var(--od-focus);
+}
+
+.od-settings-back svg {
+  width: 13px;
+  height: 13px;
   flex: none;
-  padding-top: 4px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
-.od-settings-title {
+.od-settings-side-title {
   margin: 0;
-  padding: 0 10px 12px;
+  padding: 8px 10px 10px;
   font-family: "SF Pro Display", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-size: 19px;
   line-height: 1.25;
   font-weight: var(--od-font-weight-strong);
   letter-spacing: 0;
   color: var(--ink);
-}
-
-.od-settings-rail-nav {
-  display: grid;
-  gap: 2px;
 }
 
 .od-settings-rail-item {
@@ -1593,21 +1631,14 @@ kbd {
   stroke-linejoin: round;
 }
 
-.od-settings-detail {
-  flex: 1;
-  min-width: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-
 .od-settings-pane {
   width: 100%;
-  max-width: 600px;
+  max-width: 620px;
   min-width: 0;
   display: grid;
   gap: 16px;
   align-content: start;
-  padding: 6px 8px 44px;
+  padding: 40px 24px 44px;
 }
 
 .od-settings-pane-head h3 {
@@ -1828,28 +1859,6 @@ kbd {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* Compact windows: the rail stacks above the detail pane and wraps horizontally. */
-@media (max-width: 760px) {
-  .od-settings {
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .od-settings-rail {
-    width: 100%;
-  }
-
-  .od-settings-rail-nav {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 3px;
-  }
-
-  .od-settings-rail-item {
-    width: auto;
-  }
 }
 
 .od-preference-card {

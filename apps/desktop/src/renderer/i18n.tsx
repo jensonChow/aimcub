@@ -574,6 +574,7 @@ export const STRINGS = {
     zh: "请先创建或打开带子目标契约的 Aim。之后这里会展示分派、agent 运行、证据和评估结果。",
   },
 
+  "settings.back": { en: "Back", zh: "返回" },
   "settings.tab.general": { en: "General", zh: "通用" },
   "settings.tab.brain": { en: "Planning brain", zh: "规划大脑" },
   "settings.tab.workers": { en: "Workers", zh: "工作者" },

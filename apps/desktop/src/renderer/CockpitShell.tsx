@@ -61,6 +61,8 @@ interface CockpitShellProps {
   onMemory?: () => void;
   memoryCount?: number;
   main: ReactNode;
+  /** While the Settings stage is open, replaces the aim list (brand row + account menu stay). */
+  settingsSidebar?: ReactNode;
   commands?: CockpitCommand[];
 }
 
@@ -110,6 +112,7 @@ export function CockpitShell({
   onMemory,
   memoryCount,
   main,
+  settingsSidebar,
   commands,
 }: CockpitShellProps) {
   const { t } = useI18n();
@@ -129,6 +132,7 @@ export function CockpitShell({
   const suppressSidebarPeekUntilExit = useRef(false);
   // Memory and Settings are overlay detours: while one is open no sidebar nav row reads as current.
   const overlayStage = activeStage === "memory" || activeStage === "settings";
+  const usingSettingsSidebar = activeStage === "settings" && Boolean(settingsSidebar);
   const hasGoals = goals.length > 0;
   const firstRunAim = activeStage === "aim"
     && workspaceTarget.kind !== "draft"
@@ -514,7 +518,7 @@ export function CockpitShell({
           id={sidebarId}
           ref={sidebarRef}
           className="od-sidebar"
-          data-mode="aims"
+          data-mode={usingSettingsSidebar ? "settings" : "aims"}
           data-od-id="left-aim-sidebar"
           aria-hidden={sidebarVisible ? undefined : true}
           onPointerEnter={keepSidebarPeekOpen}
@@ -548,6 +552,7 @@ export function CockpitShell({
                 </button>
               </nav>
 
+              {usingSettingsSidebar ? settingsSidebar : (
               <section className="od-aim-browser" aria-label={t("shell.recentAims")}>
                 {drafts.length > 0 && onOpenDraft && onDiscardDraft ? (
                   <AimDraftSidebarRows
@@ -594,6 +599,7 @@ export function CockpitShell({
                   })}
                 </div>
               </section>
+              )}
 
           <SidebarUserMenu
             appearance={effectiveAppearance}

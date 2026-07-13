@@ -287,21 +287,24 @@ Reference links:
   and is opened from the Journey / palette / keyboard, not a persistent segmented control.
 - Existing aims open to the Journey (aim overview) first, not Run details; completed aims
   (`completion_recap.complete`) open Eval with the recap.
-- Settings (re-synced IA): the aim sidebar **stays in place**; Settings renders in the workspace
-  as a "Settings" title + 196px category rail (**General / Planning brain / Workers / Research /
-  About**) beside one ~600px detail pane. The selected rail item uses an `--acc-soft` wash with
-  accent text. One glass island per control group (18px radius, `--island` + blur + `--ring`
-  inset), rows divided by `--edge` hairlines. General = Appearance segmented (Light/Dark/System)
-  + Workspace row (real tilde-shortened path via `getAppInfo`, Reveal via the no-input
-  `revealWorkspace` IPC). Planning brain = provider **pills** (selected = accent, description
-  shown only for the selected provider) + model select + key + Test/Save. Workers = an honest
-  "You" row ("judgment, approvals, anything with your card") + local-agent rows (ok/warn dot ·
-  name · version/auth/models meta · Test run). Research = web-research form + a Context-sources
-  summary row ("{n} of 6 active") whose Manage toggles the full sources panel inline. About =
-  version + on-device data row only — no fabricated updater. There is no readiness Overview; each
-  form carries its own status copy. Compact windows stack the rail above the pane (wrapping
-  pills). Command palette (Cmd/Ctrl+K) provides keyboard-first navigation; add entries when a
-  workflow becomes top-level (Memory is a candidate follow-up).
+- Settings (re-synced IA, sidebar-nav revision): while Settings is open the SIDEBAR swaps its aim
+  list for the settings navigation — the brand row and the bottom account trigger stay; between
+  them sit a quiet **Back** row (chevron + label, `--mut` → `--ink` on hover; returns to the
+  recorded pre-settings surface), a **"Settings"** title (19px display), and the category nav
+  (**General / Planning brain / Workers / Research / About**; selected item = `--acc-soft` wash
+  with accent text). The workspace holds ONE centered detail pane (max ~620px, 40px top padding)
+  — no in-workspace rail. One glass island per control group (18px radius, `--island` + blur +
+  `--ring` inset), rows divided by `--edge` hairlines. General = Appearance segmented
+  (Light/Dark/System) + Workspace row (real tilde-shortened path via `getAppInfo`, Reveal via the
+  no-input `revealWorkspace` IPC). Planning brain = provider **pills** (selected = accent,
+  description shown only for the selected provider) + model select + key + Test/Save. Workers =
+  an honest "You" row ("judgment, approvals, anything with your card") + local-agent rows
+  (ok/warn dot · name · version/auth/models meta · Test run). Research = web-research form + a
+  Context-sources summary row ("{n} of 6 active") whose Manage toggles the full sources panel
+  inline. About = version + on-device data row only — no fabricated updater. There is no
+  readiness Overview; each form carries its own status copy. Command palette (Cmd/Ctrl+K)
+  provides keyboard-first navigation; add entries when a workflow becomes top-level (Memory is a
+  candidate follow-up).
 
 ## Layout Rules
 

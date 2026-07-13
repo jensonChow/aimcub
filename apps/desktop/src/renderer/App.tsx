@@ -1625,6 +1625,11 @@ function AimOsApp() {
     setStageOverride("settings");
   }
 
+  function returnFromSettings() {
+    if (planningRuntimeReady) setRuntimeGuidanceVisible(false);
+    openCockpitStage(settingsReturnStageRef.current);
+  }
+
   async function refreshMemories() {
     setMemories(await window.aimcub.listMemories().catch(() => []));
   }
@@ -1723,11 +1728,17 @@ function AimOsApp() {
       contextSources={contextSources}
       localAgents={localAgents}
       activeSection={settingsSection}
-      onSection={setSettingsSection}
       onProvider={setProvider}
       onWeb={setWebResearch}
       onContextSources={setContextSources}
       onRefreshAgents={async () => setLocalAgents(await window.aimcub.listLocalAgents())}
+    />
+  );
+  const settingsSidebar = (
+    <SettingsSidebarNav
+      activeSection={settingsSection}
+      onSection={setSettingsSection}
+      onBack={returnFromSettings}
     />
   );
   const continueContextToPlan = () => {
@@ -1932,6 +1943,7 @@ function AimOsApp() {
       onStage={openCockpitStage}
       onMemory={openMemory}
       memoryCount={memories.length}
+      settingsSidebar={settingsSidebar}
       main={(
         <>
           {error ? <ProductErrorNotice error={error} /> : null}
@@ -2072,9 +2084,10 @@ function LockedStagePanel(props: {
 
 /**
  * Settings — the re-synced Glass IA: the aim sidebar stays put; the workspace hosts a
- * "Settings" title + category rail (General / Planning brain / Workers / Research / About)
- * beside one detail pane. Forms keep their full capability; this component only arranges
- * them and owns the two General controls (appearance pref + workspace reveal).
+ * "Settings" title + category nav (General / Planning brain / Workers / Research / About)
+ * rendered IN THE SIDEBAR (`SettingsSidebarNav`, swapped in for the aim list) while the
+ * workspace holds one centered detail pane. Forms keep their full capability; this component
+ * only arranges them and owns the two General controls (appearance pref + workspace reveal).
  */
 const SETTINGS_TABS: Array<{ id: SettingsSectionId; labelKey: StringKey }> = [
   { id: "general", labelKey: "settings.tab.general" },
@@ -2084,13 +2097,50 @@ const SETTINGS_TABS: Array<{ id: SettingsSectionId; labelKey: StringKey }> = [
   { id: "about", labelKey: "settings.tab.about" },
 ];
 
+/** The sidebar's settings mode: a quiet Back row, the Settings title, and the category nav. */
+export function SettingsSidebarNav(props: {
+  activeSection: SettingsSectionId;
+  onSection: (section: SettingsSectionId) => void;
+  onBack: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <nav className="od-settings-side" aria-label={t("os.settings")} data-od-id="settings-sidebar-nav">
+      <button className="od-settings-back" type="button" onClick={props.onBack}>
+        <SettingsBackIcon />
+        <span>{t("settings.back")}</span>
+      </button>
+      <h1 className="od-settings-side-title">{t("os.settings")}</h1>
+      {SETTINGS_TABS.map((tab) => (
+        <button
+          key={tab.id}
+          type="button"
+          className="od-settings-rail-item"
+          aria-current={tab.id === props.activeSection ? "page" : undefined}
+          onClick={() => props.onSection(tab.id)}
+        >
+          <SettingsTabIcon section={tab.id} />
+          <span>{t(tab.labelKey)}</span>
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+function SettingsBackIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
+      <path d="M12 4.5 6.5 10 12 15.5" />
+    </svg>
+  );
+}
+
 export function SettingsPanel(props: {
   provider: ProviderStatus | null;
   webResearch: WebResearchStatus | null;
   contextSources: ContextSourceStatus | null;
   localAgents: LocalAgentDetection[];
   activeSection: SettingsSectionId;
-  onSection: (section: SettingsSectionId) => void;
   onProvider: (status: ProviderStatus) => void;
   onWeb: (status: WebResearchStatus) => void;
   onContextSources: (status: ContextSourceStatus) => void;
@@ -2147,27 +2197,8 @@ export function SettingsPanel(props: {
   }
 
   return (
-    <section className="od-settings" data-od-id="settings-view">
-      <div className="od-settings-rail">
-        <h1 className="od-settings-title">{t("os.settings")}</h1>
-        <nav className="od-settings-rail-nav" aria-label={t("os.settings")}>
-          {SETTINGS_TABS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              className="od-settings-rail-item"
-              aria-current={tab.id === activeSection ? "page" : undefined}
-              onClick={() => props.onSection(tab.id)}
-            >
-              <SettingsTabIcon section={tab.id} />
-              <span>{t(tab.labelKey)}</span>
-            </button>
-          ))}
-        </nav>
-      </div>
-      <div className="od-settings-detail" aria-live="polite">
-        {detailPane}
-      </div>
+    <section className="od-settings" data-od-id="settings-view" aria-live="polite">
+      {detailPane}
     </section>
   );
 }
