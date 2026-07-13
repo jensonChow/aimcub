@@ -7,7 +7,7 @@ import { routingRecommendationForPlanNode, type RoutingRuntimeAgentOption } from
 import type { AimDraft, AimProgressReadModel, DecompositionOutput, Goal, Milestone } from "@core/types";
 import type { ContextSourceStatus, GoalDetail, ProviderStatus, WebResearchStatus } from "../shared/ipc";
 
-import { App, SettingsPanel } from "./App";
+import { App, SettingsPanel, SettingsSidebarNav } from "./App";
 import { HomeView } from "./stages/home/HomeView";
 import { CockpitShell, WORKBENCH_STAGE_IDS } from "./CockpitShell";
 import { I18nProvider, STRINGS } from "./i18n";
@@ -1273,7 +1273,6 @@ describe("SettingsPanel", () => {
           contextSources={contextSourceStatus}
           localAgents={[]}
           activeSection={section}
-          onSection={noop}
           onProvider={noop}
           onWeb={noop}
           onContextSources={noop}
@@ -1283,20 +1282,31 @@ describe("SettingsPanel", () => {
     );
   }
 
-  it("keeps the aim sidebar and renders the in-workspace category rail", () => {
-    const html = renderSettings("general");
+  it("renders the settings nav in the sidebar and one centered detail pane", () => {
+    const navHtml = renderToStaticMarkup(
+      <I18nProvider>
+        <SettingsSidebarNav activeSection="general" onSection={noop} onBack={noop} />
+      </I18nProvider>,
+    );
+    const paneHtml = renderSettings("general");
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
 
-    // The rail lives in the workspace (the shell no longer swaps in a settings sidebar).
-    expect(html).toContain('data-od-id="settings-view"');
+    // The category nav is sidebar content now (swapped in for the aim list by CockpitShell).
+    expect(navHtml).toContain('data-od-id="settings-sidebar-nav"');
+    expect(navHtml).toContain(">Back</span>");
+    expect(navHtml).toContain('class="od-settings-side-title"');
     for (const label of ["General", "Planning brain", "Workers", "Research", "About"]) {
-      expect(html).toContain(`<span>${label}</span>`);
+      expect(navHtml).toContain(`<span>${label}</span>`);
     }
-    expect(html).toContain('aria-current="page"');
-    expect(html).not.toContain("Back to aims");
-    expect(html).not.toContain("Overview");
-    expect(css).toMatch(/\.od-settings\s*{[^}]*display:\s*flex;[^}]*gap:\s*28px;/s);
-    expect(css).toMatch(/\.od-settings-rail\s*{[^}]*width:\s*196px;[^}]*flex:\s*none;/s);
+    expect(navHtml).toContain('aria-current="page"');
+    // The workspace holds only the centered detail pane — no in-workspace rail.
+    expect(paneHtml).toContain('data-od-id="settings-view"');
+    expect(paneHtml).not.toContain("od-settings-rail-item");
+    expect(paneHtml).not.toContain("od-settings-side");
+    expect(css).toMatch(/\.od-settings\s*{[^}]*display:\s*flex;[^}]*justify-content:\s*center;/s);
+    expect(css).toMatch(/\.od-settings-side\s*{[^}]*width:\s*var\(--sidebar-content-width\);[^}]*justify-self:\s*center;/s);
+    expect(css).toMatch(/\.od-settings-back\s*{[^}]*min-height:\s*26px;[^}]*color:\s*var\(--mut\);/s);
+    expect(css).toMatch(/\.od-settings-pane\s*{[^}]*max-width:\s*620px;[^}]*padding:\s*40px 24px 44px;/s);
     expect(css).toMatch(/\.od-settings-rail-item\[aria-current="page"\]\s*{[^}]*background:\s*var\(--acc-soft\);[^}]*color:\s*var\(--acc\);/s);
     expect(css).toMatch(/\.od-settings-card\s*{[^}]*border-radius:\s*18px;[^}]*background:\s*var\(--island\);[^}]*backdrop-filter:\s*blur\(28px\);/s);
     expect(css).toMatch(/\.od-settings-card-row \+ \.od-settings-card-row\s*{[^}]*border-top:\s*1px solid var\(--edge\);/s);
@@ -1750,7 +1760,10 @@ describe("CockpitShell", () => {
     expect(css).not.toContain(".od-stage-index");
   });
 
-  it("keeps the aim sidebar in place on the settings stage", () => {
+  it("swaps the aim list for the settings nav on the settings stage", () => {
+    const settingsNav = (
+      <SettingsSidebarNav activeSection="general" onSection={noop} onBack={noop} />
+    );
     const html = renderToStaticMarkup(
       <I18nProvider>
         <CockpitShell
@@ -1761,24 +1774,28 @@ describe("CockpitShell", () => {
           onNewAim={noop}
           onOpenGoal={noop}
           onStage={noop}
+          settingsSidebar={settingsNav}
           main={<div>Settings detail pane</div>}
         />
       </I18nProvider>,
     );
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
 
-    // Settings renders inside the workspace; the shell keeps the normal aim sidebar + toggle.
-    expect(html).not.toContain('data-od-id="left-settings-sidebar"');
+    // Same aside, settings mode: brand row + account trigger stay; the aim list gives way
+    // to the Back + Settings + category nav; the workspace holds only the detail pane.
     expect(html).toContain('data-od-id="left-aim-sidebar"');
+    expect(html).toContain('data-mode="settings"');
+    expect(html).toContain('data-od-id="sidebar-global-actions"');
+    expect(html).toContain('data-od-id="settings-sidebar-nav"');
+    expect(html).toContain(">Back</span>");
+    expect(html).toContain('data-od-id="sidebar-user-menu-trigger"');
     expect(html).toContain('data-od-id="sidebar-toggle"');
     expect(html).toContain("Settings detail pane");
-    expect(html).toContain('data-od-id="sidebar-user-menu-trigger"');
-    // While Settings is open no sidebar nav row reads as current.
-    expect(html).not.toContain('class="od-aim-card selected"');
+    expect(html).not.toContain("od-aim-card");
+    expect(html).not.toContain("Ship a sidebar pass");
     expect(css).toMatch(/\.od-workspace-settings\s*{[^}]*width:\s*min\(100%, 1080px\);/s);
     expect(css).not.toContain(".od-settings-sidebar-content");
-    expect(css).not.toContain(".od-settings-back");
-    expect(css).not.toContain(".od-settings-nav");
+    expect(css).not.toContain(".od-settings-nav-item");
     expect(css).not.toContain(".od-settings-search");
   });
 
