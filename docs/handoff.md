@@ -1,8 +1,10 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-12
-Branch: `main`. **The Glass design re-sync is COMPLETE and merged** (branch
-`glass-design-resync`). Full gate + live packaged-app QA green; root `Aimcub.app` repacked.
+Branch: `main`. **The Glass design re-sync is COMPLETE, merged, and PUSHED** — three branches
+landed on `main` (`glass-design-resync`, `glass-menu-portal-fix`, `glass-settings-sidebar`; the
+settings-sidebar revision is the founder's second design update). Full gate + live packaged-app
+QA green; root `Aimcub.app` repacked. No open threads.
 
 ## Glass design re-sync — DONE
 
