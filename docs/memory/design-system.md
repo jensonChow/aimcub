@@ -488,6 +488,11 @@ Reference links:
 - Keep a restrictive CSP; avoid remote content with Node integration; avoid blocking the main or
   renderer process (defer noncritical work); do not add dependencies for simple UI behavior
   without measuring size/startup/maintenance cost; bundle fonts/assets locally.
+- **Popovers must not live inside a blurred, overflow-clipped ancestor.** `backdrop-filter` (the
+  sidebar island) makes that ancestor the containing block for `position: fixed` descendants, so
+  the ancestor's `overflow` clips them — the account-menu popover renders through a **body
+  portal** (geometry captured from its trigger at open time; outside-click checks the portaled
+  panel too). Follow the same pattern for any future flyout that must escape an island.
 
 ## Implementation Guardrails
 

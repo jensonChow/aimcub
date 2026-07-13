@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 import type { AimDraft, AimProgressSummary, Goal } from "@core/types";
 
@@ -716,6 +717,11 @@ function SidebarUserMenu(props: SidebarUserMenuProps) {
   const { lang, setLang, t } = useI18n();
   const [open, setOpen] = useState(false);
   const [languageOpen, setLanguageOpen] = useState(false);
+  // Viewport-anchored geometry captured from the trigger at open time. The popover renders in a
+  // body portal: the sidebar's backdrop-filter makes it the containing block for position:fixed,
+  // so a popover left inside it gets clipped by the sidebar's overflow (the Language submenu
+  // extends past the sidebar edge and was cut to a dead sliver).
+  const [menuPos, setMenuPos] = useState<{ left: number; bottom: number; width: number } | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -766,6 +772,10 @@ function SidebarUserMenu(props: SidebarUserMenuProps) {
 
   function openMenu(focusFirstItem = false) {
     focusFirstItemOnOpen.current = focusFirstItem;
+    const rect = triggerRef.current?.getBoundingClientRect();
+    setMenuPos(rect
+      ? { left: Math.round(rect.left), bottom: Math.round(window.innerHeight - rect.top + 8), width: Math.round(rect.width) }
+      : null);
     setOpen(true);
   }
 
@@ -818,6 +828,8 @@ function SidebarUserMenu(props: SidebarUserMenuProps) {
       const target = event.target;
       if (!(target instanceof Node)) return;
       if (rootRef.current?.contains(target)) return;
+      // The popover lives in a body portal, so it is not inside rootRef.
+      if (panelRef.current?.contains(target)) return;
       closeMenu();
     }
 
@@ -837,13 +849,14 @@ function SidebarUserMenu(props: SidebarUserMenuProps) {
 
   return (
     <div className="od-user-menu-anchor" ref={rootRef} data-od-id="sidebar-user-menu">
-      {open ? (
+      {open && typeof document !== "undefined" ? createPortal(
         <div
           className="od-user-menu-popover"
           id={USER_MENU_ID}
           ref={panelRef}
           role="menu"
           aria-label={t("userMenu.menuLabel")}
+          style={menuPos ? { left: menuPos.left, bottom: menuPos.bottom, width: menuPos.width } : undefined}
           onKeyDown={(event) => {
             if (event.key === "ArrowDown") {
               event.preventDefault();
@@ -985,7 +998,8 @@ function SidebarUserMenu(props: SidebarUserMenuProps) {
             <span className="od-user-menu-device-dot" aria-hidden="true" />
             <span>{t("glass.shell.onDevice")}</span>
           </div>
-        </div>
+        </div>,
+        document.body,
       ) : null}
 
       <button
