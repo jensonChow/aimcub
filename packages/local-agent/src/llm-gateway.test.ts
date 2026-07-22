@@ -19,6 +19,7 @@ const successfulRun: LocalAgentRunResult = {
   outputText: '{"ok":true}',
   exitCode: 0,
   error: null,
+  failure: null,
   durationMs: 5,
 };
 
@@ -82,7 +83,25 @@ describe("LocalCliLlmGateway", () => {
       cwd: "/tmp/workspace",
       model: "gpt-live",
       permission: { sandbox: "read-only", network: true },
-    }));
+    }), expect.objectContaining({}));
+  });
+
+  it("falls back across every registered agent in registration order by default", async () => {
+    vi.mocked(runLocalAgent)
+      .mockResolvedValueOnce({
+        ...successfulRun,
+        ok: false,
+        agentId: "codex",
+        error: "codex failed",
+        failure: { code: "nonzero_exit", message: "codex failed", retryable: false },
+      })
+      .mockResolvedValueOnce({ ...successfulRun, agentId: "claude" });
+    const gateway = new LocalCliLlmGateway();
+
+    const result = await gateway.complete({ task: "classify", prompt: "Summarize." });
+
+    expect(result.output).toBe('{"ok":true}');
+    expect(vi.mocked(runLocalAgent).mock.calls.map(([request]) => request.agentId)).toEqual(["codex", "claude"]);
   });
 
   it("falls through configured local agents and reports their errors honestly", async () => {

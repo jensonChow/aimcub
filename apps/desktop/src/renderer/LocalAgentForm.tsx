@@ -21,10 +21,8 @@ function authLabelKey(status: LocalAgentDetection["authStatus"]) {
 export function LocalAgentForm({ agents, onRefresh }: LocalAgentFormProps) {
   const { t } = useI18n();
   const [refreshing, setRefreshing] = useState(false);
-  const [tests, setTests] = useState<TestState>({
-    codex: { busy: false, result: null, error: null },
-    claude: { busy: false, result: null, error: null },
-  });
+  // Keyed by whichever adapters are registered; reads are optional-chained.
+  const [tests, setTests] = useState<TestState>({});
 
   async function refresh() {
     setRefreshing(true);

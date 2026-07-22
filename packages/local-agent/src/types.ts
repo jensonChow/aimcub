@@ -1,4 +1,12 @@
-export type LocalAgentId = "codex" | "claude";
+// This module intentionally has no module-level imports: adapters, the registry
+// and the engine all depend on it, so keeping it import-free keeps them cycle-free.
+
+/**
+ * A registered local agent runtime id (for example "codex" or "claude").
+ * Ids are free strings so a community adapter can add a runtime without any
+ * change to core dispatch; `LocalAgentRegistry` validates them on registration.
+ */
+export type LocalAgentId = string;
 
 export type LocalAgentSandboxMode = "read-only" | "workspace-write" | "danger-full-access";
 
@@ -53,6 +61,26 @@ export interface LocalAgentEvent {
   toolName?: string;
   usage?: Record<string, number>;
   raw?: unknown;
+  /**
+   * Only meaningful on "agent.message.delta": when true this summary is the
+   * runtime's authoritative final output and REPLACES the accumulated output
+   * text instead of being appended to it.
+   */
+  replacesOutput?: boolean;
+}
+
+export type LocalAgentFailureCode =
+  | "executable_not_found"
+  | "timeout"
+  | "canceled"
+  | "nonzero_exit"
+  | "spawn_error"
+  | "event_callback_error";
+
+export interface LocalAgentFailure {
+  code: LocalAgentFailureCode;
+  message: string;
+  retryable: boolean;
 }
 
 export interface LocalAgentRunResult {
@@ -63,7 +91,9 @@ export interface LocalAgentRunResult {
   events: LocalAgentEvent[];
   outputText: string;
   exitCode: number | null;
+  /** Human-readable failure text; `failure` carries the machine-readable form. */
   error: string | null;
+  failure: LocalAgentFailure | null;
   durationMs: number;
 }
 
@@ -72,6 +102,10 @@ export interface LocalAgentRunOptions {
   env?: NodeJS.ProcessEnv;
   timeoutMs?: number;
   onEvent?: (event: LocalAgentEvent) => void | Promise<void>;
+  /** Aborting sends SIGTERM and settles the run with failure code "canceled". */
+  signal?: AbortSignal;
+  /** Defaults to the module singleton; tests inject isolated registries. */
+  registry?: LocalAgentRegistry;
 }
 
 export interface LocalAgentProcessRunner {
@@ -90,4 +124,56 @@ export interface LocalAgentProcessRunner {
     cwd?: string;
     env: NodeJS.ProcessEnv;
   }): import("node:child_process").ChildProcess;
+}
+
+/** What an adapter turns a sanitized run request into. Adapters never spawn. */
+export interface LocalAgentInvocation {
+  args: string[];
+  stdin: string;
+}
+
+/**
+ * Everything the engine needs to detect, launch and normalize one CLI runtime.
+ * Adapters are pure description plus two pure functions; process handling,
+ * timeouts, cancellation and event delivery stay engine-owned.
+ */
+export interface LocalAgentAdapter {
+  /** Stable runtime id; must match /^[a-z][a-z0-9-]*$/. */
+  id: LocalAgentId;
+  /** The single source of truth for this runtime's display name. */
+  name: string;
+  bin: string;
+  envVar: string;
+  fallbackBins?: string[];
+  fallbackPaths?: () => string[];
+  versionArgs: string[];
+  authProbe?: { args: string[]; timeoutMs?: number };
+  listModels?: {
+    args: string[];
+    timeoutMs?: number;
+    parse: (stdout: string) => LocalAgentModelOption[] | null;
+  };
+  fallbackModels: LocalAgentModelOption[];
+  reasoningOptions?: LocalAgentModelOption[];
+  /**
+   * Build the CLI invocation for an already-sanitized request. This MUST honor
+   * `request.permission.sandbox` and `request.permission.network` — mapping
+   * them onto the runtime's own flags is the security contract of an adapter.
+   */
+  buildInvocation: (request: LocalAgentRunRequest) => LocalAgentInvocation;
+  /**
+   * Normalize one line of runtime stdout/stderr. Returning null means "not mine":
+   * the engine emits `agent.raw` (or `agent.stderr` on the stderr path) instead.
+   */
+  parseLine: (line: string) => LocalAgentEvent[] | null;
+}
+
+export interface LocalAgentRegistry {
+  /** Throws on a duplicate or invalid adapter. */
+  register(adapter: LocalAgentAdapter): void;
+  has(id: LocalAgentId): boolean;
+  get(id: LocalAgentId): LocalAgentAdapter | null;
+  /** Registration order — this order IS the preference order. */
+  list(): LocalAgentAdapter[];
+  ids(): LocalAgentId[];
 }

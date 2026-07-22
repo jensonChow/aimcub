@@ -128,15 +128,21 @@ function chooseAgent(
   milestone: Milestone,
 ): LocalAgentDetection {
   const override = routingOverrideForMilestone(milestone);
-  const routed = override?.owner === "agent" && (override.agent_id === "codex" || override.agent_id === "claude")
-    ? override.agent_id
-    : undefined;
+  const routedId = override?.owner === "agent" ? override.agent_id : null;
+  // An override naming an agent nobody registered falls through to the default
+  // pick rather than failing the run.
+  const routed = routedId && detections.some((agent) => agent.id === routedId) ? routedId : undefined;
   const selectedId = requested ?? routed;
-  const ready = detections.filter((agent) => agent.available && agent.authStatus === "ok");
-  const selected = selectedId
-    ? detections.find((agent) => agent.id === selectedId)
-    : ready.find((agent) => agent.id === "codex") ?? ready[0];
-  if (!selected) throw new Error("No authenticated Codex or Claude CLI is available.");
+  if (!selectedId) {
+    // Registration order is the preference order.
+    const ready = detections.find((agent) => agent.available && agent.authStatus === "ok");
+    if (!ready) throw new Error("No authenticated local agent CLI is available.");
+    return ready;
+  }
+  const selected = detections.find((agent) => agent.id === selectedId);
+  if (!selected) {
+    throw new Error(`Unknown local agent "${selectedId}". Registered agents: ${detections.map((agent) => agent.id).join(", ")}.`);
+  }
   if (!selected.available) throw new Error(`${selected.name} is not installed or executable.`);
   if (selected.authStatus !== "ok") throw new Error(`${selected.name} is not authenticated.`);
   return selected;

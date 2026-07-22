@@ -72,6 +72,7 @@ import {
 import { getDefaultModel, getLlmProviderDefinition } from "@core/llm/providers";
 import {
   listLocalAgents,
+  listRegisteredLocalAgentIds,
   type LocalAgentEvent,
   type LocalAgentId,
 } from "@core/local-agent";
@@ -171,9 +172,9 @@ Stored (shared ~/.aimcub store — the desktop app sees these too):
   aimcub context accept <id> [--text "..."] [--kind k] [--category c] [--scope aim|global]
                                                        Accept a pending context candidate
   aimcub context reject <id>                             Reject a pending context candidate
-  aimcub agents [--json]                                 Detect authenticated Codex/Claude CLIs
+  aimcub agents [--json]                                 Detect authenticated local agent CLIs
   aimcub run <id> --workspace <absolute-path> [opts]     Run one ready agent-owned sub-aim
-       [--milestone <ref>] [--agent codex|claude] [--model <m>] [--reasoning <r>]
+       [--milestone <ref>] [--agent <id>] [--model <m>] [--reasoning <r>]
        [--network] [--read-only] [--jsonl]
   aimcub replan <id> [--title "..."] [--desc "..."] [--json]
                                                        Re-decompose a saved aim (keeps done work)
@@ -1190,8 +1191,9 @@ async function runAgents(json: boolean): Promise<void> {
 
 function localAgentId(raw: string | undefined): LocalAgentId | undefined {
   if (raw === undefined) return undefined;
-  if (raw === "codex" || raw === "claude") return raw;
-  throw new UserError(`Unknown local agent "${raw}". Use codex or claude.`);
+  const registered = listRegisteredLocalAgentIds();
+  if (registered.includes(raw)) return raw;
+  throw new UserError(`Unknown local agent "${raw}". Use ${registered.join(" or ")}.`);
 }
 
 function absoluteWorkspace(raw: string | undefined, readOnly: boolean): string {

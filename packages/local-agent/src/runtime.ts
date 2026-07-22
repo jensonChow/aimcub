@@ -4,34 +4,40 @@ import { delimiter, join } from "node:path";
 import { homedir } from "node:os";
 
 import type {
+  LocalAgentAdapter,
   LocalAgentDetection,
   LocalAgentEvent,
-  LocalAgentId,
-  LocalAgentModelOption,
+  LocalAgentFailure,
   LocalAgentProcessRunner,
+  LocalAgentRegistry,
   LocalAgentRunOptions,
   LocalAgentRunRequest,
   LocalAgentRunResult,
-  LocalAgentSandboxMode,
 } from "./types";
+import { defaultLocalAgentRegistry } from "./registry";
 
 export type {
+  LocalAgentAdapter,
   LocalAgentDetection,
   LocalAgentEvent,
+  LocalAgentFailure,
+  LocalAgentFailureCode,
   LocalAgentId,
+  LocalAgentInvocation,
   LocalAgentModelOption,
   LocalAgentProcessRunner,
+  LocalAgentRegistry,
   LocalAgentRunOptions,
   LocalAgentRunRequest,
   LocalAgentRunResult,
   LocalAgentSandboxMode,
 } from "./types";
 
-
-const DEFAULT_MODEL: LocalAgentModelOption = { id: "default", label: "Default" };
 const DEFAULT_PROBE_TIMEOUT_MS = 5_000;
 const DEFAULT_RUN_TIMEOUT_MS = 120_000;
 const MAX_STDIO_BYTES = 8 * 1024 * 1024;
+const CANCELED_MESSAGE = "Local agent run was canceled.";
+const TIMEOUT_MESSAGE = "Local agent run timed out.";
 
 type ProbeResult = {
   exitCode: number | null;
@@ -39,29 +45,6 @@ type ProbeResult = {
   stderr: string;
   error?: NodeJS.ErrnoException;
   timedOut?: boolean;
-};
-
-type LocalAgentDefinition = {
-  id: LocalAgentId;
-  name: string;
-  bin: string;
-  envVar: string;
-  fallbackBins?: string[];
-  fallbackPaths?: () => string[];
-  versionArgs: string[];
-  authProbe?: { args: string[]; timeoutMs?: number };
-  listModels?: {
-    args: string[];
-    timeoutMs?: number;
-    parse: (stdout: string) => LocalAgentModelOption[] | null;
-  };
-  fallbackModels: LocalAgentModelOption[];
-  reasoningOptions?: LocalAgentModelOption[];
-  buildArgs: (request: LocalAgentRunRequest) => {
-    args: string[];
-    stdin: string;
-    parser: "codex-jsonl" | "claude-stream-json";
-  };
 };
 
 const defaultRunner: LocalAgentProcessRunner = {
@@ -109,20 +92,20 @@ function commonExecutableDirs(): string[] {
   ];
 }
 
-function executableCandidates(def: LocalAgentDefinition, env: NodeJS.ProcessEnv): string[] {
+function executableCandidates(adapter: LocalAgentAdapter, env: NodeJS.ProcessEnv): string[] {
   const out: string[] = [];
-  const envPath = env[def.envVar]?.trim();
+  const envPath = env[adapter.envVar]?.trim();
   if (envPath) return [envPath];
-  const bins = [def.bin, ...(def.fallbackBins ?? [])];
+  const bins = [adapter.bin, ...(adapter.fallbackBins ?? [])];
   for (const dir of [...splitPath(env.PATH), ...commonExecutableDirs()]) {
     for (const bin of bins) out.push(join(dir, bin));
   }
-  out.push(...(def.fallbackPaths?.() ?? []));
+  out.push(...(adapter.fallbackPaths?.() ?? []));
   return [...new Set(out)];
 }
 
-function resolveExecutable(def: LocalAgentDefinition, env: NodeJS.ProcessEnv = process.env): string | null {
-  for (const candidate of executableCandidates(def, env)) {
+function resolveExecutable(adapter: LocalAgentAdapter, env: NodeJS.ProcessEnv = process.env): string | null {
+  for (const candidate of executableCandidates(adapter, env)) {
     if (existsSync(candidate) && safeAccessExecutable(candidate)) return candidate;
   }
   return null;
@@ -151,167 +134,6 @@ function execFileProbe(
   });
 }
 
-function parseCodexDebugModels(stdout: string): LocalAgentModelOption[] | null {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(stdout);
-  } catch {
-    return null;
-  }
-  if (!parsed || typeof parsed !== "object") return null;
-  const rawModels = (parsed as { models?: unknown }).models;
-  if (!Array.isArray(rawModels)) return null;
-  const models = [DEFAULT_MODEL];
-  const seen = new Set(models.map((item) => item.id));
-  for (const raw of rawModels) {
-    if (!raw || typeof raw !== "object") continue;
-    const entry = raw as {
-      slug?: unknown;
-      id?: unknown;
-      display_name?: unknown;
-      name?: unknown;
-      visibility?: unknown;
-    };
-    if (entry.visibility === "hidden") continue;
-    const id = typeof entry.slug === "string" && entry.slug.trim()
-      ? entry.slug.trim()
-      : typeof entry.id === "string" && entry.id.trim()
-        ? entry.id.trim()
-        : "";
-    if (!id || seen.has(id)) continue;
-    const label = typeof entry.display_name === "string" && entry.display_name.trim()
-      ? entry.display_name.trim()
-      : typeof entry.name === "string" && entry.name.trim()
-        ? entry.name.trim()
-        : id;
-    seen.add(id);
-    models.push({ id, label });
-  }
-  return models.length > 1 ? models : null;
-}
-
-function codexFallbackPaths(): string[] {
-  if (process.platform !== "darwin") return [];
-  return [
-    "/Applications/Codex.app/Contents/Resources/codex",
-    join(homedir(), "Applications", "Codex.app", "Contents", "Resources", "codex"),
-  ];
-}
-
-function codexSandboxArgs(sandbox: LocalAgentSandboxMode, network: boolean): string[] {
-  if (sandbox === "danger-full-access") return ["--sandbox", "danger-full-access"];
-  const mode = sandbox === "read-only" ? "read-only" : "workspace-write";
-  const args = ["--sandbox", mode];
-  if (mode === "workspace-write" && network) {
-    args.push("-c", "sandbox_workspace_write.network_access=true");
-  }
-  return args;
-}
-
-function quoteConfigString(value: string): string {
-  return `"${value.replace(/\\/g, "\\\\").replace(/"/g, "\\\"")}"`;
-}
-
-function buildCodexArgs(request: LocalAgentRunRequest) {
-  const permission = request.permission ?? {};
-  const sandbox = permission.sandbox ?? "read-only";
-  const args = [
-    ...(permission.network ? ["--search"] : []),
-    "exec",
-    "--json",
-    "--skip-git-repo-check",
-    ...codexSandboxArgs(sandbox, permission.network ?? false),
-  ];
-  if (request.cwd) args.push("-C", request.cwd);
-  for (const dir of request.extraAllowedDirs ?? []) {
-    if (dir.trim()) args.push("--add-dir", dir.trim());
-  }
-  if (request.model && request.model !== "default") args.push("--model", request.model);
-  if (request.reasoning && request.reasoning !== "default") {
-    args.push("-c", `model_reasoning_effort=${quoteConfigString(request.reasoning)}`);
-  }
-  return { args, stdin: request.prompt, parser: "codex-jsonl" as const };
-}
-
-function buildClaudeArgs(request: LocalAgentRunRequest) {
-  const args = ["-p", "--output-format", "stream-json", "--verbose"];
-  if (request.model && request.model !== "default") args.push("--model", request.model);
-  if (request.reasoning && request.reasoning !== "default") args.push("--effort", request.reasoning);
-  for (const dir of request.extraAllowedDirs ?? []) {
-    if (dir.trim()) args.push("--add-dir", dir.trim());
-  }
-  const sandbox = request.permission?.sandbox ?? "read-only";
-  const permissionMode = sandbox === "read-only"
-    ? "plan"
-    : sandbox === "workspace-write"
-      ? "acceptEdits"
-      : "bypassPermissions";
-  args.push("--permission-mode", permissionMode);
-  if (request.permission?.network !== true) args.push("--disallowedTools", "WebSearch,WebFetch");
-  return { args, stdin: request.prompt, parser: "claude-stream-json" as const };
-}
-
-const LOCAL_AGENT_DEFS: LocalAgentDefinition[] = [
-  {
-    id: "codex",
-    name: "Codex CLI",
-    bin: "codex",
-    envVar: "CODEX_BIN",
-    versionArgs: ["--version"],
-    authProbe: { args: ["login", "status"], timeoutMs: DEFAULT_PROBE_TIMEOUT_MS },
-    listModels: {
-      args: ["debug", "models"],
-      parse: parseCodexDebugModels,
-      timeoutMs: DEFAULT_PROBE_TIMEOUT_MS,
-    },
-    fallbackPaths: codexFallbackPaths,
-    fallbackModels: [
-      DEFAULT_MODEL,
-      { id: "gpt-5.5", label: "gpt-5.5" },
-      { id: "gpt-5.4", label: "gpt-5.4" },
-      { id: "gpt-5.4-mini", label: "gpt-5.4-mini" },
-      { id: "gpt-5.3-codex", label: "gpt-5.3-codex" },
-      { id: "gpt-5.1", label: "gpt-5.1" },
-      { id: "gpt-5-codex", label: "gpt-5-codex" },
-      { id: "gpt-5", label: "gpt-5" },
-      { id: "o3", label: "o3" },
-      { id: "o4-mini", label: "o4-mini" },
-    ],
-    reasoningOptions: [
-      DEFAULT_MODEL,
-      { id: "minimal", label: "Minimal" },
-      { id: "low", label: "Low" },
-      { id: "medium", label: "Medium" },
-      { id: "high", label: "High" },
-    ],
-    buildArgs: buildCodexArgs,
-  },
-  {
-    id: "claude",
-    name: "Claude Code",
-    bin: "claude",
-    envVar: "CLAUDE_BIN",
-    fallbackBins: ["openclaude"],
-    versionArgs: ["--version"],
-    authProbe: { args: ["auth", "status"], timeoutMs: DEFAULT_PROBE_TIMEOUT_MS },
-    fallbackModels: [
-      DEFAULT_MODEL,
-      { id: "sonnet", label: "Sonnet" },
-      { id: "opus", label: "Opus" },
-      { id: "haiku", label: "Haiku" },
-      { id: "claude-sonnet-5", label: "claude-sonnet-5" },
-      { id: "claude-haiku-4-5-20251001", label: "claude-haiku-4-5-20251001" },
-    ],
-    buildArgs: buildClaudeArgs,
-  },
-];
-
-function getLocalAgentDef(id: LocalAgentId): LocalAgentDefinition {
-  const def = LOCAL_AGENT_DEFS.find((item) => item.id === id);
-  if (!def) throw new Error(`Unknown local agent: ${id}`);
-  return def;
-}
-
 function authStatusFromProbe(probe: ProbeResult): Pick<LocalAgentDetection, "authStatus" | "authMessage"> {
   const output = `${probe.stdout}\n${probe.stderr}`.trim();
   if (probe.exitCode === 0) return { authStatus: "ok", authMessage: output || null };
@@ -320,18 +142,18 @@ function authStatusFromProbe(probe: ProbeResult): Pick<LocalAgentDetection, "aut
 }
 
 async function detectLocalAgent(
-  def: LocalAgentDefinition,
+  adapter: LocalAgentAdapter,
   runner: LocalAgentProcessRunner,
   env: NodeJS.ProcessEnv,
 ): Promise<LocalAgentDetection> {
-  const path = resolveExecutable(def, env);
+  const path = resolveExecutable(adapter, env);
   const base = {
-    id: def.id,
-    name: def.name,
+    id: adapter.id,
+    name: adapter.name,
     runMode: "local_cli" as const,
-    models: def.fallbackModels,
+    models: adapter.fallbackModels,
     modelsSource: "fallback" as const,
-    reasoningOptions: def.reasoningOptions ?? [],
+    reasoningOptions: adapter.reasoningOptions ?? [],
   };
   if (!path) {
     return {
@@ -341,11 +163,11 @@ async function detectLocalAgent(
       version: null,
       authStatus: "unknown",
       authMessage: null,
-      diagnostics: [`Install ${def.name} or set ${def.envVar} to its executable path.`],
+      diagnostics: [`Install ${adapter.name} or set ${adapter.envVar} to its executable path.`],
     };
   }
 
-  const versionProbe = await runner.execFile(path, def.versionArgs, {
+  const versionProbe = await runner.execFile(path, adapter.versionArgs, {
     env,
     timeoutMs: DEFAULT_PROBE_TIMEOUT_MS,
     maxBuffer: MAX_STDIO_BYTES,
@@ -358,7 +180,7 @@ async function detectLocalAgent(
       version: null,
       authStatus: "unknown",
       authMessage: null,
-      diagnostics: [`${def.name} was found but is not executable.`],
+      diagnostics: [`${adapter.name} was found but is not executable.`],
     };
   }
   if (versionProbe.error?.code === "ENOENT" || versionProbe.exitCode === 127) {
@@ -369,29 +191,29 @@ async function detectLocalAgent(
       version: null,
       authStatus: "unknown",
       authMessage: null,
-      diagnostics: [`${def.name} points to a missing executable target.`],
+      diagnostics: [`${adapter.name} points to a missing executable target.`],
     };
   }
 
   const [authProbe, modelProbe] = await Promise.all([
-    def.authProbe
-      ? runner.execFile(path, def.authProbe.args, {
+    adapter.authProbe
+      ? runner.execFile(path, adapter.authProbe.args, {
           env,
-          timeoutMs: def.authProbe.timeoutMs ?? DEFAULT_PROBE_TIMEOUT_MS,
+          timeoutMs: adapter.authProbe.timeoutMs ?? DEFAULT_PROBE_TIMEOUT_MS,
           maxBuffer: MAX_STDIO_BYTES,
         })
       : Promise.resolve<ProbeResult>({ exitCode: 0, stdout: "", stderr: "" }),
-    def.listModels
-      ? runner.execFile(path, def.listModels.args, {
+    adapter.listModels
+      ? runner.execFile(path, adapter.listModels.args, {
           env,
-          timeoutMs: def.listModels.timeoutMs ?? DEFAULT_PROBE_TIMEOUT_MS,
+          timeoutMs: adapter.listModels.timeoutMs ?? DEFAULT_PROBE_TIMEOUT_MS,
           maxBuffer: MAX_STDIO_BYTES,
         })
       : Promise.resolve<ProbeResult>({ exitCode: 1, stdout: "", stderr: "" }),
   ]);
 
-  const parsedModels = def.listModels && modelProbe.exitCode === 0
-    ? def.listModels.parse(modelProbe.stdout)
+  const parsedModels = adapter.listModels && modelProbe.exitCode === 0
+    ? adapter.listModels.parse(modelProbe.stdout)
     : null;
   return {
     ...base,
@@ -399,7 +221,7 @@ async function detectLocalAgent(
     path,
     version: versionProbe.stdout.trim().split(/\r?\n/u)[0]?.trim() || null,
     ...authStatusFromProbe(authProbe),
-    models: parsedModels ?? def.fallbackModels,
+    models: parsedModels ?? adapter.fallbackModels,
     modelsSource: parsedModels ? "live" : "fallback",
     diagnostics: [],
   };
@@ -408,192 +230,34 @@ async function detectLocalAgent(
 export async function listLocalAgents(options: {
   runner?: LocalAgentProcessRunner;
   env?: NodeJS.ProcessEnv;
+  registry?: LocalAgentRegistry;
 } = {}): Promise<LocalAgentDetection[]> {
   const runner = options.runner ?? defaultRunner;
   const env = options.env ?? process.env;
-  return Promise.all(LOCAL_AGENT_DEFS.map((def) => detectLocalAgent(def, runner, env)));
+  const adapters = (options.registry ?? defaultLocalAgentRegistry).list();
+  return Promise.all(adapters.map((adapter) => detectLocalAgent(adapter, runner, env)));
 }
 
-function safeJsonParse(line: string): unknown {
-  try {
-    return JSON.parse(line);
-  } catch {
-    return null;
-  }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
-function stringifyValue(value: unknown): string {
-  if (typeof value === "string") return value;
-  if (value == null) return "";
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
-  }
-}
-
-function usageFromRecord(value: unknown): Record<string, number> | null {
-  if (!isRecord(value)) return null;
-  const usage: Record<string, number> = {};
-  for (const [key, raw] of Object.entries(value)) {
-    if (typeof raw === "number") usage[key] = raw;
-  }
-  return Object.keys(usage).length > 0 ? usage : null;
-}
-
-function textFromContent(value: unknown): string {
-  if (typeof value === "string") return value;
-  if (Array.isArray(value)) {
-    return value
-      .map((item) => {
-        if (typeof item === "string") return item;
-        if (isRecord(item) && typeof item.text === "string") return item.text;
-        return "";
-      })
-      .join("");
-  }
-  if (isRecord(value) && typeof value.text === "string") return value.text;
-  return "";
-}
-
-function parseCodexEvent(raw: Record<string, unknown>): LocalAgentEvent[] {
-  const type = typeof raw.type === "string" ? raw.type : "";
-  if (type === "thread.started") {
-    const sessionId = typeof raw.thread_id === "string" ? raw.thread_id : undefined;
-    return [{ type: "agent.run.started", summary: "Codex thread started.", sessionId, raw }];
-  }
-  if (type.includes("agent_message")) {
-    const text = textFromContent(raw.delta ?? raw.text ?? raw.message ?? raw.content);
-    return text ? [{ type: "agent.message.delta", summary: text, raw }] : [{ type: "agent.raw", summary: type, raw }];
-  }
-  const item = isRecord(raw.item) ? raw.item : null;
-  const itemType = typeof item?.type === "string" ? item.type : "";
-  if (type.startsWith("item.") && itemType === "agent_message") {
-    const text = textFromContent(item?.text ?? item?.content ?? item?.message);
-    return text
-      ? [{ type: "agent.message.delta", summary: text, raw }]
-      : [{ type: "agent.raw", summary: `${type}:${itemType}`, raw }];
-  }
-  if (type.startsWith("item.") && (itemType.includes("command") || itemType.includes("tool"))) {
-    const id = typeof item?.id === "string" ? item.id : undefined;
-    const name = typeof item?.name === "string"
-      ? item.name
-      : typeof item?.command === "string"
-        ? item.command
-        : itemType.includes("command") ? "shell" : "tool";
-    return [{
-      type: type === "item.completed" ? "agent.tool.finished" : "agent.tool.started",
-      summary: name,
-      toolId: id,
-      toolName: name,
-      raw,
-    }];
-  }
-  if (type.includes("tool") || type.includes("exec_command") || type.includes("command")) {
-    const id = typeof raw.id === "string" ? raw.id : typeof raw.call_id === "string" ? raw.call_id : undefined;
-    const name = typeof raw.name === "string"
-      ? raw.name
-      : typeof raw.command === "string"
-        ? raw.command
-        : type.includes("exec") ? "shell" : "tool";
-    if (type.includes("completed") || type.includes("finished") || type.includes("end")) {
-      return [{
-        type: "agent.tool.finished",
-        summary: name,
-        toolId: id,
-        toolName: name,
-        raw,
-      }];
-    }
-    return [{
-      type: "agent.tool.started",
-      summary: name,
-      toolId: id,
-      toolName: name,
-      raw,
-    }];
-  }
-  const usage = usageFromRecord(raw.usage ?? raw.token_usage);
-  if (usage) return [{ type: "agent.usage.reported", summary: "Token usage reported.", usage, raw }];
-  if (type.includes("error")) {
-    return [{ type: "agent.run.failed", summary: stringifyValue(raw.error ?? raw.message ?? "Codex error"), raw }];
-  }
-  return [{ type: "agent.raw", summary: type || "codex event", raw }];
-}
-
-function parseClaudeEvent(raw: Record<string, unknown>): LocalAgentEvent[] {
-  const type = typeof raw.type === "string" ? raw.type : "";
-  if (type === "system") {
-    const sessionId = typeof raw.session_id === "string" ? raw.session_id : undefined;
-    return [{ type: "agent.run.started", summary: "Claude session started.", sessionId, raw }];
-  }
-  if (type === "assistant" && isRecord(raw.message)) {
-    const text = textFromContent(raw.message.content);
-    return text ? [{ type: "agent.message.delta", summary: text, raw }] : [{ type: "agent.raw", summary: "assistant", raw }];
-  }
-  if (type === "result") {
-    const events: LocalAgentEvent[] = [];
-    const resultText = textFromContent(raw.result);
-    if (resultText) events.push({ type: "agent.message.delta", summary: resultText, raw });
-    const usage = usageFromRecord(raw.usage);
-    if (usage) events.push({ type: "agent.usage.reported", summary: "Token usage reported.", usage, raw });
-    events.push({
-      type: "agent.run.completed",
-      summary: typeof raw.subtype === "string" ? raw.subtype : "Claude run completed.",
-      raw,
-    });
-    return events;
-  }
-  if (type.includes("tool_use")) {
-    const id = typeof raw.id === "string" ? raw.id : undefined;
-    const name = typeof raw.name === "string" ? raw.name : "tool";
-    return [{ type: "agent.tool.started", summary: name, toolId: id, toolName: name, raw }];
-  }
-  if (type.includes("tool_result")) {
-    const id = typeof raw.tool_use_id === "string" ? raw.tool_use_id : undefined;
-    return [{ type: "agent.tool.finished", summary: "tool result", toolId: id, raw }];
-  }
-  if (type === "error") {
-    return [{ type: "agent.run.failed", summary: stringifyValue(raw.error ?? raw.message ?? "Claude error"), raw }];
-  }
-  return [{ type: "agent.raw", summary: type || "claude event", raw }];
-}
-
-function parseAgentLine(line: string, parser: "codex-jsonl" | "claude-stream-json"): LocalAgentEvent[] {
-  const parsed = safeJsonParse(line);
-  if (!isRecord(parsed)) return [{ type: "agent.raw", summary: line }];
-  return parser === "codex-jsonl" ? parseCodexEvent(parsed) : parseClaudeEvent(parsed);
+function parseAgentLine(line: string, adapter: LocalAgentAdapter): LocalAgentEvent[] {
+  return adapter.parseLine(line) ?? [{ type: "agent.raw", summary: line }];
 }
 
 function collectLineBufferedEvents(
   chunk: Buffer | string,
   buffer: { value: string },
-  parser: "codex-jsonl" | "claude-stream-json",
+  adapter: LocalAgentAdapter,
 ): LocalAgentEvent[] {
   buffer.value += chunk.toString();
   const lines = buffer.value.split(/\r?\n/u);
   buffer.value = lines.pop() ?? "";
-  return lines.flatMap((line) => line.trim() ? parseAgentLine(line.trim(), parser) : []);
+  return lines.flatMap((line) => line.trim() ? parseAgentLine(line.trim(), adapter) : []);
 }
 
-function mergeOutputText(
-  current: string,
-  events: readonly LocalAgentEvent[],
-  parser: "codex-jsonl" | "claude-stream-json",
-): string {
-  const messageText = events
-    .filter((event) => event.type === "agent.message.delta")
-    .map((event) => event.summary)
-    .join("");
-  if (parser === "claude-stream-json") {
-    const resultEvent = events.find((event) => isRecord(event.raw) && event.raw.type === "result" && event.type === "agent.message.delta");
-    if (resultEvent) return resultEvent.summary;
-  }
-  return current + messageText;
+function mergeOutputText(current: string, events: readonly LocalAgentEvent[]): string {
+  const deltas = events.filter((event) => event.type === "agent.message.delta");
+  const replacing = deltas.find((event) => event.replacesOutput);
+  if (replacing) return replacing.summary;
+  return current + deltas.map((event) => event.summary).join("");
 }
 
 function sanitizeRunRequest(request: LocalAgentRunRequest): LocalAgentRunRequest {
@@ -607,16 +271,25 @@ function sanitizeRunRequest(request: LocalAgentRunRequest): LocalAgentRunRequest
   };
 }
 
+function resolveAdapter(agentId: string, registry: LocalAgentRegistry): LocalAgentAdapter {
+  const adapter = registry.get(agentId);
+  // A misconfigured id is a programming/config error, not a runtime failure a
+  // queue could retry — so it throws instead of returning a failed result.
+  if (!adapter) throw new Error(`Unknown local agent "${agentId}". Registered agents: ${registry.ids().join(", ")}.`);
+  return adapter;
+}
+
 export async function runLocalAgent(
   rawRequest: LocalAgentRunRequest,
   options: LocalAgentRunOptions = {},
 ): Promise<LocalAgentRunResult> {
+  const adapter = resolveAdapter(rawRequest.agentId, options.registry ?? defaultLocalAgentRegistry);
   const request = sanitizeRunRequest(rawRequest);
   const startedAt = Date.now();
   const runner = options.runner ?? defaultRunner;
   const env = options.env ?? process.env;
-  const def = getLocalAgentDef(request.agentId);
-  const executable = resolveExecutable(def, env);
+  const signal = options.signal;
+  const executable = resolveExecutable(adapter, env);
   const events: LocalAgentEvent[] = [];
   let outputText = "";
   let eventDelivery = Promise.resolve();
@@ -633,89 +306,135 @@ export async function runLocalAgent(
       });
   }
 
-  if (!executable) {
-    const failure: LocalAgentEvent = {
-      type: "agent.run.failed",
-      summary: `Install ${def.name} or set ${def.envVar} to its executable path.`,
-    };
-    emitEvent(failure);
+  async function settleWithoutSpawning(
+    command: string,
+    failure: LocalAgentFailure,
+  ): Promise<LocalAgentRunResult> {
     await eventDelivery;
     return {
       ok: false,
       agentId: request.agentId,
-      command: def.bin,
+      command,
       args: [],
       events,
       outputText: "",
       exitCode: null,
-      error: `Local agent executable was not found: ${def.name}.`,
+      error: failure.message,
+      failure,
       durationMs: Date.now() - startedAt,
     };
   }
+
+  if (!executable) {
+    emitEvent({
+      type: "agent.run.failed",
+      summary: `Install ${adapter.name} or set ${adapter.envVar} to its executable path.`,
+    });
+    return settleWithoutSpawning(adapter.bin, {
+      code: "executable_not_found",
+      message: `Local agent executable was not found: ${adapter.name}.`,
+      retryable: false,
+    });
+  }
   const command = executable;
 
-  const built = def.buildArgs(request);
-  emitEvent({ type: "agent.run.started", summary: `${def.name} started.`, raw: { command, args: built.args } });
+  if (signal?.aborted) {
+    emitEvent({ type: "agent.run.failed", summary: CANCELED_MESSAGE });
+    return settleWithoutSpawning(command, { code: "canceled", message: CANCELED_MESSAGE, retryable: false });
+  }
+
+  const invocation = adapter.buildInvocation(request);
+  emitEvent({ type: "agent.run.started", summary: `${adapter.name} started.`, raw: { command, args: invocation.args } });
 
   return new Promise((resolve) => {
-    const child = runner.spawn(command, built.args, { cwd: request.cwd, env });
+    const child = runner.spawn(command, invocation.args, { cwd: request.cwd, env });
     const stdoutBuffer = { value: "" };
     const stderrBuffer = { value: "" };
     let settled = false;
     let killedByTimeout = false;
+    let killedByAbort = false;
     const timeout = setTimeout(() => {
       killedByTimeout = true;
       child.kill("SIGTERM");
     }, options.timeoutMs ?? request.timeoutMs ?? DEFAULT_RUN_TIMEOUT_MS);
+    function onAbort(): void {
+      killedByAbort = true;
+      child.kill("SIGTERM");
+    }
+    signal?.addEventListener("abort", onAbort);
+
+    function classifyFailure(
+      exitCode: number | null,
+      error: string | undefined,
+      callbackError: string | null,
+      failed: boolean,
+    ): LocalAgentFailure | null {
+      if (callbackError) {
+        return {
+          code: "event_callback_error",
+          message: `Local agent event callback failed: ${callbackError}`,
+          retryable: false,
+        };
+      }
+      if (!failed) return null;
+      if (killedByAbort) return { code: "canceled", message: CANCELED_MESSAGE, retryable: false };
+      // Only a timeout is retryable for now; the future run queue widens this.
+      if (killedByTimeout) return { code: "timeout", message: TIMEOUT_MESSAGE, retryable: true };
+      if (error) return { code: "spawn_error", message: error, retryable: false };
+      return { code: "nonzero_exit", message: `Local agent exited with code ${exitCode}.`, retryable: false };
+    }
 
     async function finish(exitCode: number | null, error?: string) {
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
+      signal?.removeEventListener("abort", onAbort);
       const stdoutRemainder = stdoutBuffer.value.trim();
       if (stdoutRemainder) {
-        const parsed = parseAgentLine(stdoutRemainder, built.parser);
+        const parsed = parseAgentLine(stdoutRemainder, adapter);
         for (const event of parsed) emitEvent(event);
-        outputText = mergeOutputText(outputText, parsed, built.parser);
+        outputText = mergeOutputText(outputText, parsed);
       }
       const stderrRemainder = stderrBuffer.value.trim();
       if (stderrRemainder) emitEvent({ type: "agent.stderr", summary: stderrRemainder });
-      const failed = Boolean(error) || killedByTimeout || (exitCode !== 0 && exitCode !== null);
+      const failed = Boolean(error) || killedByTimeout || killedByAbort || (exitCode !== 0 && exitCode !== null);
+      const failureSummary = killedByAbort
+        ? CANCELED_MESSAGE
+        : killedByTimeout
+          ? TIMEOUT_MESSAGE
+          : error ?? `Local agent exited with code ${exitCode}.`;
       emitEvent({
         type: failed ? "agent.run.failed" : "agent.run.completed",
-        summary: killedByTimeout ? "Local agent run timed out." : failed ? error ?? `Local agent exited with code ${exitCode}.` : "Local agent run completed.",
+        summary: failed ? failureSummary : "Local agent run completed.",
       });
       await eventDelivery;
       const callbackError = eventDeliveryError;
-      const effectiveFailure = failed || Boolean(callbackError);
+      const failure = classifyFailure(exitCode, error, callbackError, failed);
       resolve({
-        ok: !effectiveFailure,
+        ok: !failure,
         agentId: request.agentId,
         command,
-        args: built.args,
+        args: invocation.args,
         events,
         outputText,
         exitCode,
-        error: callbackError
-          ? `Local agent event callback failed: ${callbackError}`
-          : failed
-            ? (killedByTimeout ? "Local agent run timed out." : error ?? `Local agent exited with code ${exitCode}.`)
-            : null,
+        error: failure?.message ?? null,
+        failure,
         durationMs: Date.now() - startedAt,
       });
     }
 
     child.stdout?.on("data", (chunk) => {
-      const parsed = collectLineBufferedEvents(chunk, stdoutBuffer, built.parser);
+      const parsed = collectLineBufferedEvents(chunk, stdoutBuffer, adapter);
       for (const event of parsed) emitEvent(event);
-      outputText = mergeOutputText(outputText, parsed, built.parser);
+      outputText = mergeOutputText(outputText, parsed);
     });
     child.stderr?.on("data", (chunk) => {
-      const parsed = collectLineBufferedEvents(chunk, stderrBuffer, built.parser);
+      const parsed = collectLineBufferedEvents(chunk, stderrBuffer, adapter);
       for (const event of parsed) emitEvent(event.type === "agent.raw" ? { ...event, type: "agent.stderr" } : event);
     });
     child.on("error", (err) => void finish(null, err instanceof Error ? err.message : String(err)));
     child.on("close", (code) => void finish(code));
-    child.stdin?.end(built.stdin);
+    child.stdin?.end(invocation.stdin);
   });
 }

@@ -1,12 +1,23 @@
-import { mkdtempSync } from "node:fs";
+import { EventEmitter } from "node:events";
+import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { PassThrough } from "node:stream";
 
 import { describe, expect, it, vi } from "vitest";
 
 import { createJsonFileStore } from "@core/store";
 import type { DecompositionOutput } from "@core/types";
-import type { LocalAgentRunResult } from "@core/local-agent";
+import {
+  createLocalAgentRegistry,
+  isRecord,
+  listLocalAgents,
+  runLocalAgent,
+  safeJsonParse,
+  type LocalAgentAdapter,
+  type LocalAgentProcessRunner,
+  type LocalAgentRunResult,
+} from "@core/local-agent";
 
 import { runAimAgent } from "./agent-run";
 
@@ -71,6 +82,77 @@ const PLAN: DecompositionOutput = {
   edges: [{ from: "first", to: "second" }],
 };
 
+/**
+ * A community-style third runtime: one adapter module, no core dispatch edits.
+ * It is registered in an isolated registry so the built-ins stay untouched.
+ */
+const GEMINI_FAKE_ADAPTER: LocalAgentAdapter = {
+  id: "gemini-fake",
+  name: "Fake Gemini",
+  bin: "gemini-fake",
+  envVar: "GEMINI_FAKE_BIN",
+  versionArgs: ["--version"],
+  authProbe: { args: ["auth", "print"] },
+  fallbackModels: [{ id: "default", label: "Default" }],
+  buildInvocation: (request) => ({
+    args: ["generate", "--jsonl", "--sandbox", request.permission?.sandbox ?? "read-only"],
+    stdin: request.prompt,
+  }),
+  parseLine(line) {
+    const parsed = safeJsonParse(line);
+    if (!isRecord(parsed)) return null;
+    if (parsed.event === "start") {
+      return [{ type: "agent.run.started", summary: "Fake Gemini session started.", sessionId: String(parsed.id ?? ""), raw: parsed }];
+    }
+    if (parsed.event === "tool") {
+      const name = String(parsed.name ?? "tool");
+      return [{
+        type: parsed.phase === "end" ? "agent.tool.finished" : "agent.tool.started",
+        summary: name,
+        toolName: name,
+        raw: parsed,
+      }];
+    }
+    if (parsed.event === "text") return [{ type: "agent.message.delta", summary: String(parsed.chunk ?? ""), raw: parsed }];
+    return null;
+  },
+};
+
+function fakeExecutable(name: string): string {
+  const dir = mkdtempSync(join(tmpdir(), "aimcub-cli-agent-bin-"));
+  const path = join(dir, name);
+  writeFileSync(path, "#!/bin/sh\nexit 0\n", "utf8");
+  chmodSync(path, 0o755);
+  return path;
+}
+
+/** Probes succeed; the run streams the adapter's own JSONL dialect. */
+function fakeGeminiRunner(
+  lines: readonly Record<string, unknown>[],
+  onSpawn: (file: string, args: readonly string[]) => void,
+): LocalAgentProcessRunner {
+  return {
+    async execFile() {
+      return { exitCode: 0, stdout: "gemini-fake 1.0.0", stderr: "" };
+    },
+    spawn(file, args) {
+      onSpawn(file, args);
+      const child = new EventEmitter() as ReturnType<LocalAgentProcessRunner["spawn"]>;
+      const stdout = new PassThrough();
+      child.stdout = stdout;
+      child.stderr = new PassThrough();
+      child.stdin = new PassThrough();
+      child.kill = (() => true) as typeof child.kill;
+      queueMicrotask(() => {
+        for (const line of lines) stdout.write(`${JSON.stringify(line)}\n`);
+        stdout.end();
+        child.emit("close", 0);
+      });
+      return child;
+    },
+  };
+}
+
 describe("CLI local-agent run orchestration", () => {
   it("runs one ready agent milestone and persists streamed events plus low-trust evidence", async () => {
     const dataDir = mkdtempSync(join(tmpdir(), "aimcub-cli-agent-run-"));
@@ -92,6 +174,7 @@ describe("CLI local-agent run orchestration", () => {
       outputText: "Created artifact.txt and ran verification.",
       exitCode: 0,
       error: null,
+      failure: null,
       durationMs: 10,
     };
 
@@ -159,5 +242,66 @@ describe("CLI local-agent run orchestration", () => {
       run_id: result.orchestrationRun.id,
     });
     expect(snapshot.completions).toEqual([]);
+  });
+
+  it("runs a fake third adapter end-to-end through agent-run", async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), "aimcub-cli-gemini-run-"));
+    const workspace = mkdtempSync(join(tmpdir(), "aimcub-cli-gemini-workspace-"));
+    const store = createJsonFileStore(dataDir);
+    const plan: DecompositionOutput = {
+      ...PLAN,
+      nodes: PLAN.nodes.map((node, index) => index === 0
+        ? {
+            ...node,
+            routing_override: {
+              owner: "agent" as const,
+              agent_id: "gemini-fake",
+              agent_label: "Fake Gemini",
+              run_mode: "local_cli" as const,
+              model: "g-test",
+              model_label: "Gemini Test",
+              reason: "Use the fake community runtime.",
+            },
+          }
+        : node),
+    };
+    const { goal, milestones } = await store.createGoal({ title: "Ship an artifact", plan });
+
+    // An isolated registry holding only the community adapter: nothing in the
+    // engine, the CLI or @core/types knows this runtime exists.
+    const registry = createLocalAgentRegistry([GEMINI_FAKE_ADAPTER]);
+    const env = { GEMINI_FAKE_BIN: fakeExecutable("gemini-fake"), PATH: "" };
+    let spawnedArgs: readonly string[] = [];
+    const runner = fakeGeminiRunner([
+      { event: "start", id: "session-9" },
+      { event: "tool", phase: "start", name: "shell" },
+      { event: "tool", phase: "end", name: "shell" },
+      { event: "text", chunk: "Created artifact.txt." },
+    ], (_file, args) => {
+      spawnedArgs = args;
+    });
+
+    const result = await runAimAgent(store, { goalId: goal.id, workspace }, {
+      listLocalAgents: () => listLocalAgents({ registry, runner, env }),
+      runLocalAgent: (request, options) => runLocalAgent(request, { ...options, registry, runner, env }),
+    });
+
+    expect(result.agent.id).toBe("gemini-fake");
+    expect(result.agent.name).toBe("Fake Gemini");
+    expect(result.model).toBe("g-test");
+    expect(spawnedArgs).toEqual(["generate", "--jsonl", "--sandbox", "workspace-write"]);
+    expect(result.run.ok).toBe(true);
+    expect(result.run.outputText).toBe("Created artifact.txt.");
+    expect(result.evidence.payload).toMatchObject({ agent_id: "gemini-fake", model: "g-test" });
+
+    const snapshot = await store.exportData();
+    expect(snapshot.runs).toHaveLength(1);
+    expect(snapshot.runs[0]).toMatchObject({ milestone_id: milestones[0]!.id, status: "completed", model: "g-test" });
+    expect(snapshot.runEvents.map((event) => event.type)).toEqual(expect.arrayContaining([
+      "run.started",
+      "tool.started",
+      "tool.finished",
+      "run.completed",
+    ]));
   });
 });
