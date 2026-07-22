@@ -12,7 +12,9 @@
     "dist": "electron-vite build && node scripts/verify-bundled-core.mjs && electron-builder --mac dmg zip",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "icon:generate": "node scripts/generate-icon.mjs",
+    "notarize:check": "node scripts/check-notarize-env.mjs"
   },
   "dependencies": {
     "@core/domain": "workspace:*",
@@ -36,12 +38,18 @@
     "vitest": "^4.1.9"
   },
   "build": {
-    "appId": "com.aimcub.desktop",
+    "appId": "com.jensonchow.aimcub",
     "productName": "Aimcub",
     "npmRebuild": false,
     "directories": { "output": "dist" },
     "artifactName": "${productName}-${version}-${arch}.${ext}",
     "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "build/icon.icns",
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.inherit.plist",
+      "notarize": true,
       "target": [
         { "target": "dmg", "arch": ["arm64"] },
         { "target": "zip", "arch": ["arm64"] }

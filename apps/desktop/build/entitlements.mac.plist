@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <!-- Electron/Chromium's V8 engine JIT-compiles JavaScript. Under hardened
+         runtime, without this entitlement the OS blocks the executable-memory
+         mapping V8 needs and the signed app crashes immediately on launch.
+         https://www.electronjs.org/docs/latest/tutorial/code-signing -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <!-- Outbound HTTPS calls to LLM providers and Supabase. Hardened runtime by
+         itself does not gate networking (that's an App Sandbox concept, not
+         used here), but this keeps the entitlement set forward-compatible if a
+         future build adds com.apple.security.app-sandbox (e.g. a Mac App Store
+         submission reusing the existing ASC registration, App ID 6785268817). -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+  </dict>
+</plist>
