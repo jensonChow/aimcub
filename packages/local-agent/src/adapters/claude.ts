@@ -1,10 +1,13 @@
 import type {
   LocalAgentAdapter,
+  LocalAgentArtifact,
+  LocalAgentArtifactKind,
   LocalAgentEvent,
   LocalAgentInvocation,
   LocalAgentRunRequest,
 } from "../types";
 import {
+  artifactPathFromToolInput,
   DEFAULT_MODEL,
   DEFAULT_PROBE_TIMEOUT_MS,
   isRecord,
@@ -32,6 +35,55 @@ function buildClaudeInvocation(request: LocalAgentRunRequest): LocalAgentInvocat
   return { args, stdin: request.prompt };
 }
 
+/** Claude's file tools, mapped to what each one does to the file it names. */
+const CLAUDE_TOOL_ARTIFACT_KIND: Readonly<Record<string, LocalAgentArtifactKind>> = {
+  write: "file_write",
+  notebookwrite: "file_write",
+  edit: "file_edit",
+  multiedit: "file_edit",
+  notebookedit: "file_edit",
+  update: "file_edit",
+};
+
+/** A tool call's file artifacts. Read/search/shell tools name no work product and yield none. */
+function claudeToolArtifacts(name: string, input: unknown): LocalAgentArtifact[] {
+  const kind = CLAUDE_TOOL_ARTIFACT_KIND[name.trim().toLowerCase()];
+  if (!kind) return [];
+  const path = artifactPathFromToolInput(input);
+  return path ? [{ path, kind }] : [];
+}
+
+/** Claude nests its tool calls in message content, so blocks are where the work shows up. */
+function contentBlocks(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value) ? value.filter(isRecord) : [];
+}
+
+/**
+ * One tool call. `raw` is the block rather than the whole message: the block is the exact
+ * payload this event was normalized from, and a message may carry several of them.
+ */
+function toolUseEvent(block: Record<string, unknown>): LocalAgentEvent {
+  const name = typeof block.name === "string" ? block.name : "tool";
+  const artifacts = claudeToolArtifacts(name, block.input);
+  return {
+    type: "agent.tool.started",
+    summary: name,
+    toolId: typeof block.id === "string" ? block.id : undefined,
+    toolName: name,
+    raw: block,
+    ...(artifacts.length > 0 ? { artifacts } : {}),
+  };
+}
+
+function toolResultEvent(block: Record<string, unknown>): LocalAgentEvent {
+  return {
+    type: "agent.tool.finished",
+    summary: "tool result",
+    toolId: typeof block.tool_use_id === "string" ? block.tool_use_id : undefined,
+    raw: block,
+  };
+}
+
 function parseClaudeEvent(raw: Record<string, unknown>): LocalAgentEvent[] {
   const type = typeof raw.type === "string" ? raw.type : "";
   if (type === "system") {
@@ -39,8 +91,19 @@ function parseClaudeEvent(raw: Record<string, unknown>): LocalAgentEvent[] {
     return [{ type: "agent.run.started", summary: "Claude session started.", sessionId, raw }];
   }
   if (type === "assistant" && isRecord(raw.message)) {
+    const events: LocalAgentEvent[] = [];
     const text = textFromContent(raw.message.content);
-    return text ? [{ type: "agent.message.delta", summary: text, raw }] : [{ type: "agent.raw", summary: "assistant", raw }];
+    if (text) events.push({ type: "agent.message.delta", summary: text, raw });
+    for (const block of contentBlocks(raw.message.content)) {
+      if (block.type === "tool_use") events.push(toolUseEvent(block));
+    }
+    return events.length > 0 ? events : [{ type: "agent.raw", summary: "assistant", raw }];
+  }
+  if (type === "user" && isRecord(raw.message)) {
+    const events = contentBlocks(raw.message.content)
+      .filter((block) => block.type === "tool_result")
+      .map(toolResultEvent);
+    if (events.length > 0) return events;
   }
   if (type === "result") {
     const events: LocalAgentEvent[] = [];
@@ -57,15 +120,9 @@ function parseClaudeEvent(raw: Record<string, unknown>): LocalAgentEvent[] {
     });
     return events;
   }
-  if (type.includes("tool_use")) {
-    const id = typeof raw.id === "string" ? raw.id : undefined;
-    const name = typeof raw.name === "string" ? raw.name : "tool";
-    return [{ type: "agent.tool.started", summary: name, toolId: id, toolName: name, raw }];
-  }
-  if (type.includes("tool_result")) {
-    const id = typeof raw.tool_use_id === "string" ? raw.tool_use_id : undefined;
-    return [{ type: "agent.tool.finished", summary: "tool result", toolId: id, raw }];
-  }
+  // The same blocks also arrive unwrapped on some stream shapes; `raw` is the block either way.
+  if (type.includes("tool_use")) return [toolUseEvent(raw)];
+  if (type.includes("tool_result")) return [toolResultEvent(raw)];
   if (type === "error") {
     return [{ type: "agent.run.failed", summary: stringifyValue(raw.error ?? raw.message ?? "Claude error"), raw }];
   }

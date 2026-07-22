@@ -44,6 +44,20 @@ export interface LocalAgentRunRequest {
   };
 }
 
+/**
+ * What a runtime did to one concrete file. The kinds name the OPERATION, not the
+ * file's resulting state: a runtime that overwrites a path usually cannot say
+ * whether it existed beforehand, so "file_write" covers create-or-overwrite.
+ */
+export type LocalAgentArtifactKind = "file_write" | "file_edit" | "file_delete";
+
+/** One file a run touched, as the runtime reported it. */
+export interface LocalAgentArtifact {
+  /** Path exactly as the runtime named it — absolute, or relative to the run cwd. */
+  path: string;
+  kind: LocalAgentArtifactKind;
+}
+
 export interface LocalAgentEvent {
   type:
     | "agent.run.started"
@@ -61,6 +75,13 @@ export interface LocalAgentEvent {
   toolName?: string;
   usage?: Record<string, number>;
   raw?: unknown;
+  /**
+   * Files this event touched, when the runtime's tool payload names concrete
+   * paths. Optional and additive: an adapter that never sets it keeps working,
+   * and the orchestrator turns each entry into a durable `artifact.created` run
+   * event plus an artifacts summary on the run's evidence.
+   */
+  artifacts?: LocalAgentArtifact[];
   /**
    * Only meaningful on "agent.message.delta": when true this summary is the
    * runtime's authoritative final output and REPLACES the accumulated output

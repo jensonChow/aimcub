@@ -12,6 +12,7 @@ import type {
 import {
   DEFAULT_MODEL,
   DEFAULT_PROBE_TIMEOUT_MS,
+  fileArtifactsFromChanges,
   isRecord,
   safeJsonParse,
   stringifyValue,
@@ -118,6 +119,23 @@ function parseCodexEvent(raw: Record<string, unknown>): LocalAgentEvent[] {
     return text
       ? [{ type: "agent.message.delta", summary: text, raw }]
       : [{ type: "agent.raw", summary: `${type}:${itemType}`, raw }];
+  }
+  // Codex names the files it wrote in a `file_change` item (and in `patch_apply_*` on the flat
+  // protocol). Those paths are the run's actual work product, so they travel as artifacts.
+  const fileChange = ["file_change", "patch"].some((marker) => itemType.includes(marker) || type.includes(marker));
+  if (fileChange) {
+    const artifacts = fileArtifactsFromChanges(item?.changes ?? raw.changes);
+    const id = typeof item?.id === "string" ? item.id : typeof raw.call_id === "string" ? raw.call_id : undefined;
+    const name = itemType || (type.includes("patch") ? "apply_patch" : "file_change");
+    const finished = type.includes("completed") || type.includes("finished") || type.includes("end");
+    return [{
+      type: finished ? "agent.tool.finished" : "agent.tool.started",
+      summary: name,
+      toolId: id,
+      toolName: name,
+      raw,
+      ...(artifacts.length > 0 ? { artifacts } : {}),
+    }];
   }
   if (type.startsWith("item.") && (itemType.includes("command") || itemType.includes("tool"))) {
     const id = typeof item?.id === "string" ? item.id : undefined;

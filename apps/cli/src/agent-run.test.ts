@@ -1,10 +1,13 @@
+import { spawnSync } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { PassThrough } from "node:stream";
+import { fileURLToPath } from "node:url";
 
-import { describe, expect, it, vi } from "vitest";
+import { build } from "esbuild";
+import { afterAll, describe, expect, it, vi } from "vitest";
 
 import { createJsonFileStore } from "@core/store";
 import type { DecompositionOutput } from "@core/types";
@@ -152,6 +155,73 @@ function fakeGeminiRunner(
     },
   };
 }
+
+const CLI_DIR = join(dirname(fileURLToPath(import.meta.url)), "..");
+/** Built into `dist/` (gitignored) so `@anthropic-ai/sdk` stays resolvable, exactly as it is in `aimcub`. */
+const CLI_BUNDLE = join(CLI_DIR, "dist", "agent-run.test-cli.mjs");
+let bundled: Promise<void> | null = null;
+
+/**
+ * The real CLI binary. `main()` runs on import, so how an error renders can only be observed the
+ * way a user observes it: build the bundle the `aimcub` bin ships and run it.
+ */
+function cliBundle(): Promise<void> {
+  bundled ??= build({
+    entryPoints: [join(CLI_DIR, "src", "index.ts")],
+    bundle: true,
+    platform: "node",
+    format: "esm",
+    target: "node22",
+    outfile: CLI_BUNDLE,
+    external: ["@anthropic-ai/sdk"],
+    logLevel: "silent",
+  }).then(() => undefined);
+  return bundled;
+}
+
+/** A runtime that is installed and answers `--version`, but fails its auth probe. */
+function unauthenticatedClaude(): string {
+  const dir = mkdtempSync(join(tmpdir(), "aimcub-cli-claude-"));
+  const path = join(dir, "claude");
+  writeFileSync(path, '#!/bin/sh\nif [ "$1" = "--version" ]; then echo "claude 1.0.0"; exit 0; fi\necho "Not authenticated." >&2\nexit 1\n', "utf8");
+  chmodSync(path, 0o755);
+  return path;
+}
+
+describe("aimcub run error rendering", () => {
+  afterAll(() => {
+    rmSync(CLI_BUNDLE, { force: true });
+  });
+
+  it("renders an unauthenticated runtime as a user error, not an unexpected one", async () => {
+    await cliBundle();
+    const dataDir = mkdtempSync(join(tmpdir(), "aimcub-cli-error-home-"));
+    const workspace = mkdtempSync(join(tmpdir(), "aimcub-cli-error-workspace-"));
+    const { goal } = await createJsonFileStore(dataDir).createGoal({ title: "Ship an artifact", plan: PLAN });
+    const env = {
+      HOME: process.env.HOME ?? tmpdir(),
+      PATH: "",
+      AIMCUB_HOME: dataDir,
+      CLAUDE_BIN: unauthenticatedClaude(),
+      // Nothing to find, so detection cannot wander onto a real runtime on this machine.
+      CODEX_BIN: join(dataDir, "no-such-codex"),
+    };
+
+    const selection = spawnSync(
+      process.execPath,
+      [CLI_BUNDLE, "run", goal.id, "--workspace", workspace, "--agent", "claude"],
+      { env, encoding: "utf8" },
+    );
+    // The same shape as any other user error: message only, exit 1.
+    const missingWorkspace = spawnSync(process.execPath, [CLI_BUNDLE, "run", goal.id], { env, encoding: "utf8" });
+
+    expect(selection.stderr.trim()).toBe("Claude Code is not authenticated.");
+    expect(selection.stderr).not.toContain("Unexpected error:");
+    expect(selection.status).toBe(1);
+    expect(missingWorkspace.stderr.trim()).toBe("--workspace <absolute-path> is required for agent runs.");
+    expect(missingWorkspace.status).toBe(selection.status);
+  }, 60_000);
+});
 
 describe("CLI local-agent run orchestration", () => {
   it("runs one ready agent milestone and persists streamed events plus low-trust evidence", async () => {

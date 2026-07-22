@@ -9,7 +9,14 @@
  * writes completion: evidence is append-only and `evaluate()` remains the only completion
  * authority.
  */
+import {
+  AgentSelectionError,
+  MilestoneSelectionError,
+  NoRunnableMilestoneError,
+} from "./errors";
 import type {
+  LocalAgentArtifact,
+  LocalAgentArtifactKind,
   LocalAgentDetection,
   LocalAgentEvent,
   LocalAgentId,
@@ -78,7 +85,12 @@ export interface OrchestratorRunEvent {
 }
 
 /** The run-event types the orchestrator itself writes — a subset of `RunEventType`. */
-export type OrchestratorRunEventType = "run.log" | "tool.started" | "tool.finished";
+export type OrchestratorRunEventType =
+  | "run.log"
+  | "tool.started"
+  | "tool.finished"
+  | "artifact.created"
+  | "evidence.reported";
 
 export interface OrchestratorRunEventInput {
   runId: string;
@@ -208,18 +220,6 @@ function selectableRow(
 }
 
 /**
- * Thrown when no sub-aim qualifies for an automatic pick. Typed rather than string-matched so a
- * draining caller can tell "the aim is done or waiting on a human" (stop calmly) from a real
- * failure (surface it).
- */
-export class NoRunnableMilestoneError extends Error {
-  constructor(message = "No dependency-ready, agent-owned, incomplete sub-aim is available.") {
-    super(message);
-    this.name = "NoRunnableMilestoneError";
-  }
-}
-
-/**
  * The next sub-aim to run: the caller's explicit reference if given, otherwise the first
  * dependency-ready, agent-owned, unblocked, incomplete one in plan order. Throws with a
  * user-facing reason when nothing qualifies — a selection error is a config error, not a run
@@ -233,19 +233,24 @@ export function chooseMilestone(
   const rows = [...progress.milestones].sort((a, b) => a.milestone.order_index - b.milestone.order_index);
   if (requestedRef) {
     const milestone = resolveMilestoneRef(requestedRef, rows.map((row) => row.milestone));
-    if (!milestone) throw new Error(`No unique sub-aim matches "${requestedRef}".`);
+    if (!milestone) {
+      throw new MilestoneSelectionError("milestone_not_found", `No unique sub-aim matches "${requestedRef}".`);
+    }
     const row = rows.find((candidate) => candidate.milestone.id === milestone.id)!;
     if (row.completed || row.milestone.status === "completed" || row.milestone.status === "skipped") {
-      throw new Error("The selected sub-aim is already complete or skipped.");
+      throw new MilestoneSelectionError("milestone_already_done", "The selected sub-aim is already complete or skipped.");
     }
     if (row.assignment?.actor_kind !== "agent") {
-      throw new Error("The selected sub-aim is routed to a human, not a local agent.");
+      throw new MilestoneSelectionError("milestone_human_owned", "The selected sub-aim is routed to a human, not a local agent.");
     }
     if (!dependencyReady(row, rows)) {
-      throw new Error("The selected sub-aim is waiting for a prerequisite to complete.");
+      throw new MilestoneSelectionError(
+        "milestone_dependency_pending",
+        "The selected sub-aim is waiting for a prerequisite to complete.",
+      );
     }
     if (row.latest_run?.status === "queued" || row.latest_run?.status === "running") {
-      throw new Error("The selected sub-aim already has an active run.");
+      throw new MilestoneSelectionError("milestone_active_run", "The selected sub-aim already has an active run.");
     }
     return row;
   }
@@ -291,15 +296,23 @@ export function chooseAgent(
   const selectedId = requested ?? routed;
   if (!selectedId) {
     const ready = detections.find((agent) => agent.available && agent.authStatus === "ok");
-    if (!ready) throw new Error("No authenticated local agent CLI is available.");
+    if (!ready) throw new AgentSelectionError("no_ready_agent", "No authenticated local agent CLI is available.");
     return ready;
   }
   const selected = detections.find((agent) => agent.id === selectedId);
   if (!selected) {
-    throw new Error(`Unknown local agent "${selectedId}". Registered agents: ${detections.map((agent) => agent.id).join(", ")}.`);
+    throw new AgentSelectionError(
+      "unknown_agent",
+      `Unknown local agent "${selectedId}". Registered agents: ${detections.map((agent) => agent.id).join(", ")}.`,
+      selectedId,
+    );
   }
-  if (!selected.available) throw new Error(`${selected.name} is not installed or executable.`);
-  if (selected.authStatus !== "ok") throw new Error(`${selected.name} is not authenticated.`);
+  if (!selected.available) {
+    throw new AgentSelectionError("agent_not_installed", `${selected.name} is not installed or executable.`, selected.id);
+  }
+  if (selected.authStatus !== "ok") {
+    throw new AgentSelectionError("agent_not_authenticated", `${selected.name} is not authenticated.`, selected.id);
+  }
   return selected;
 }
 
@@ -331,8 +344,66 @@ export function milestonePrompt(
   ].filter(Boolean).join("\n");
 }
 
-/** Normalize one engine event into the persisted run-event shape. */
-export function persistedRunEvent(event: LocalAgentEvent): {
+// ─────────────────────────────────────────────────────────────────────────────
+// Raw retention
+//
+// The runtime's own payload is the only record of what actually happened inside a tool call, so
+// it is worth keeping — but a chatty runtime can emit megabytes of it, and the store is one JSON
+// file. Retention is therefore capped twice: per event, and per run. Summaries are never capped;
+// a capped event still persists, it just loses (part of) its raw payload and says so.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Per-event cap on retained raw payload, in serialized-JSON characters (~8 KB). */
+export const RUN_EVENT_RAW_CHAR_CAP = 8_192;
+/** Per-run budget for retained raw payloads, in serialized-JSON characters (~256 KB). */
+export const RUN_RAW_CHAR_BUDGET = 262_144;
+
+function serializeRaw(raw: unknown): string | null {
+  try {
+    const json = JSON.stringify(raw);
+    return typeof json === "string" ? json : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * One run's raw-retention budget. Stateful by design: the per-run cap can only be enforced across
+ * events, so the same instance travels with a run from its first event to its last.
+ */
+export class RunRawRetention {
+  private used = 0;
+
+  /** Add `raw` to `payload` if the caps allow it; otherwise mark why it is not there. */
+  apply(raw: unknown, payload: Record<string, unknown>): void {
+    if (raw === undefined) return;
+    const json = serializeRaw(raw);
+    if (json === null) {
+      payload.raw_omitted = "unserializable";
+      return;
+    }
+    const retained = Math.min(json.length, RUN_EVENT_RAW_CHAR_CAP);
+    if (this.used + retained > RUN_RAW_CHAR_BUDGET) {
+      payload.raw_omitted = "run_budget";
+      return;
+    }
+    this.used += retained;
+    if (json.length > RUN_EVENT_RAW_CHAR_CAP) {
+      payload.raw_truncated = true;
+      payload.raw_chars = json.length;
+      payload.raw_preview = json.slice(0, RUN_EVENT_RAW_CHAR_CAP);
+      return;
+    }
+    payload.raw = raw;
+  }
+}
+
+/**
+ * Normalize one engine event into the persisted run-event shape. Pass the run's
+ * {@link RunRawRetention} to enforce the per-run raw budget across its events; called without
+ * one, each event gets a fresh budget and only the per-event cap applies.
+ */
+export function persistedRunEvent(event: LocalAgentEvent, retention: RunRawRetention = new RunRawRetention()): {
   type: OrchestratorRunEventType;
   summary: string;
   payload: Record<string, unknown>;
@@ -342,12 +413,85 @@ export function persistedRunEvent(event: LocalAgentEvent): {
   if (event.toolId) payload.tool_id = event.toolId;
   if (event.toolName) payload.tool_name = event.toolName;
   if (event.usage) payload.usage = event.usage;
+  retention.apply(event.raw, payload);
   const summary = event.type === "agent.message.delta"
     ? "Agent response updated."
     : event.summary.slice(0, 1_000);
   if (event.type === "agent.tool.started") return { type: "tool.started", summary, payload };
   if (event.type === "agent.tool.finished") return { type: "tool.finished", summary, payload };
   return { type: "run.log", summary, payload: { ...payload, agent_event_type: event.type } };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Artifacts
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ARTIFACT_VERB: Readonly<Record<LocalAgentArtifactKind, string>> = {
+  file_write: "Wrote",
+  file_edit: "Edited",
+  file_delete: "Deleted",
+};
+
+/** One file's work in a run: which operations touched it, and how often. */
+export interface RunArtifactSummary {
+  path: string;
+  kinds: LocalAgentArtifactKind[];
+  /** How many events touched this path, including the one that first announced it. */
+  touches: number;
+}
+
+/** Normalize one reported artifact into the persisted `artifact.created` shape. */
+export function persistedArtifactEvent(event: LocalAgentEvent, artifact: LocalAgentArtifact): {
+  type: OrchestratorRunEventType;
+  summary: string;
+  payload: Record<string, unknown>;
+} {
+  return {
+    type: "artifact.created",
+    summary: `${ARTIFACT_VERB[artifact.kind]} ${artifact.path}`.slice(0, 1_000),
+    payload: {
+      path: artifact.path,
+      kind: artifact.kind,
+      ...(event.toolId ? { tool_id: event.toolId } : {}),
+      ...(event.toolName ? { tool_name: event.toolName } : {}),
+      source_event_type: event.type,
+    },
+  };
+}
+
+/**
+ * Tracks the files one run touched. A run event is append-only history, so a path touched thirty
+ * times gets ONE `artifact.created` (the first touch) rather than thirty events or a rewritten
+ * one; the repeat count survives on the run's evidence through {@link RunArtifactLedger.summary}.
+ */
+export class RunArtifactLedger {
+  private readonly announced = new Set<string>();
+  private readonly touched = new Map<string, RunArtifactSummary>();
+
+  /** Record the event's artifacts; returns only the ones not yet announced for this run. */
+  record(event: LocalAgentEvent): LocalAgentArtifact[] {
+    const fresh: LocalAgentArtifact[] = [];
+    for (const artifact of event.artifacts ?? []) {
+      if (!artifact.path) continue;
+      const entry = this.touched.get(artifact.path);
+      if (!entry) {
+        this.touched.set(artifact.path, { path: artifact.path, kinds: [artifact.kind], touches: 1 });
+      } else {
+        entry.touches += 1;
+        if (!entry.kinds.includes(artifact.kind)) entry.kinds.push(artifact.kind);
+      }
+      const key = `${artifact.path} ${artifact.kind}`;
+      if (this.announced.has(key)) continue;
+      this.announced.add(key);
+      fresh.push(artifact);
+    }
+    return fresh;
+  }
+
+  /** Every path this run touched, in first-touch order. */
+  summary(): RunArtifactSummary[] {
+    return [...this.touched.values()].map((entry) => ({ ...entry, kinds: [...entry.kinds] }));
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -375,6 +519,8 @@ class RunEventBuffer {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private chain: Promise<void> = Promise.resolve();
   private failure: Error | null = null;
+  private readonly retention = new RunRawRetention();
+  private readonly ledger = new RunArtifactLedger();
 
   constructor(private readonly store: RunOrchestratorStore, private readonly runId: string) {}
 
@@ -382,12 +528,21 @@ class RunEventBuffer {
     // Surface a previous flush failure on the engine's own callback path, so a broken store
     // still classifies as `event_callback_error` mid-run instead of silently dropping events.
     if (this.failure) throw this.failure;
-    this.pending.push({ runId: this.runId, ...persistedRunEvent(event) });
+    this.pending.push({ runId: this.runId, ...persistedRunEvent(event, this.retention) });
+    // An artifact event follows the event that produced it, so the journal reads in causal order.
+    for (const artifact of this.ledger.record(event)) {
+      this.pending.push({ runId: this.runId, ...persistedArtifactEvent(event, artifact) });
+    }
     if (FLUSH_AT.has(event.type)) {
       await this.flush();
       return;
     }
     this.arm();
+  }
+
+  /** Every file this run touched, for the evidence payload. */
+  artifacts(): RunArtifactSummary[] {
+    return this.ledger.summary();
   }
 
   private arm(): void {
@@ -625,6 +780,7 @@ export async function executeQueuedRun<TStore extends RunOrchestratorStore>(
   }
 
   try {
+    const artifacts = buffer.artifacts();
     const evidenceResult = await store.addEvidence({
       goalId: progress.goal.id,
       milestoneId: row.milestone.id,
@@ -643,6 +799,8 @@ export async function executeQueuedRun<TStore extends RunOrchestratorStore>(
         ok: result.ok,
         output: result.outputText,
         events: result.events.map((event) => ({ type: event.type, summary: event.summary })),
+        // The run's file-level work product, so eval can weigh claims against what was touched.
+        artifacts,
         error: result.error,
         plan_key: milestonePlanKey(row.milestone),
       },
@@ -650,6 +808,21 @@ export async function executeQueuedRun<TStore extends RunOrchestratorStore>(
       runId: run.id,
       assignmentId: row.assignment?.id ?? run.assignment_id ?? null,
     });
+    // Evidence creation belongs in the run's own timeline; the evidence row stays the record of
+    // record, this event is the pointer to it.
+    await store.appendRunEvents([{
+      runId: run.id,
+      type: "evidence.reported",
+      summary: `${agent.name} reported evidence for: ${row.milestone.title}`,
+      payload: {
+        evidence_id: evidenceResult.evidence.id,
+        kind: "mcp_report",
+        trust_score: 0.6,
+        milestone_id: row.milestone.id,
+        artifact_count: artifacts.length,
+        completion_count: evidenceResult.completions.length,
+      },
+    }]);
     await store.finishRun({
       runId: run.id,
       status: result.ok ? "completed" : "failed",

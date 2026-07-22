@@ -12,10 +12,13 @@ import type { DecompositionOutput } from "@core/types";
 import {
   createLocalAgentRegistry,
   createRunQueue,
+  fileArtifactsFromChanges,
   isRecord,
   listLocalAgents,
   runLocalAgent,
   safeJsonParse,
+  RUN_EVENT_RAW_CHAR_CAP,
+  RUN_RAW_CHAR_BUDGET,
   type LocalAgentAdapter,
   type LocalAgentProcessRunner,
 } from "@core/local-agent";
@@ -112,13 +115,24 @@ const FAKE_ADAPTER: LocalAgentAdapter = {
     if (!isRecord(parsed)) return null;
     if (parsed.event === "tool") {
       const name = String(parsed.name ?? "tool");
+      // `files` and `raw` are optional in the fake dialect, exactly as they are for a real
+      // adapter: a tool step that names no file simply leaves the artifact fields unset.
+      const artifacts = fileArtifactsFromChanges(parsed.files);
       return [{
         type: parsed.phase === "end" ? "agent.tool.finished" : "agent.tool.started",
         summary: name,
         toolName: name,
+        ...(parsed.raw === undefined ? {} : { raw: parsed.raw }),
+        ...(artifacts.length > 0 ? { artifacts } : {}),
       }];
     }
-    if (parsed.event === "text") return [{ type: "agent.message.delta", summary: String(parsed.chunk ?? "") }];
+    if (parsed.event === "text") {
+      return [{
+        type: "agent.message.delta",
+        summary: String(parsed.chunk ?? ""),
+        ...(parsed.raw === undefined ? {} : { raw: parsed.raw }),
+      }];
+    }
     return null;
   },
 };
@@ -207,6 +221,17 @@ const OK_RUN: ScriptedRun = {
   ],
 };
 
+/** One file written, then edited, then a second file deleted — the same path touched twice. */
+const ARTIFACT_RUN: ScriptedRun = {
+  lines: [
+    { event: "tool", phase: "start", name: "write_file", files: [{ path: "src/queue.ts", kind: "add" }], raw: { call: "write_file" } },
+    { event: "tool", phase: "end", name: "write_file", files: [{ path: "src/queue.ts", kind: "add" }] },
+    { event: "tool", phase: "start", name: "edit_file", files: [{ path: "src/queue.ts", kind: "update" }] },
+    { event: "tool", phase: "end", name: "remove_file", files: [{ path: "docs/old.md", kind: "delete" }] },
+    { event: "text", chunk: "Rewrote the queue." },
+  ],
+};
+
 describe("local agent run queue", () => {
   it("drains queued sub-aims serially in plan order and persists every event", async () => {
     const { store, goal, milestones, workspace } = await seedAim();
@@ -231,7 +256,7 @@ describe("local agent run queue", () => {
     expect(runs).toHaveLength(2);
     expect(runs.every((run) => run.status === "completed")).toBe(true);
 
-    // Each run walked queued → running → completed, and nothing was dropped on the way.
+    // Each run walked queued → running → evidence → completed, and nothing was dropped on the way.
     const events = await store.listRunEvents(goal.id);
     const firstRunEvents = events.filter((event) => event.run_id === first.run.id).map((event) => event.type);
     expect(firstRunEvents).toEqual([
@@ -242,6 +267,7 @@ describe("local agent run queue", () => {
       "tool.finished",
       "run.log",
       "run.log",
+      "evidence.reported",
       "run.completed",
     ]);
     expect(events.filter((event) => event.run_id === second.run.id)).toHaveLength(firstRunEvents.length);
@@ -355,6 +381,120 @@ describe("local agent run queue", () => {
 
     await expect(queue.enqueue({ goalId: goal.id, workspace, sandbox: "read-only", network: false }))
       .rejects.toThrow(/No dependency-ready, agent-owned, incomplete sub-aim/u);
+  });
+
+  it("persists file artifacts as durable events and folds them into the run's evidence", async () => {
+    const { store, goal, workspace } = await seedAim();
+    const queue = createRunQueue(store, queueDependencies([ARTIFACT_RUN]));
+    const enqueued = await queue.enqueue({ goalId: goal.id, workspace, sandbox: "workspace-write", network: false });
+
+    const drained = await queue.drain({ runId: enqueued.run.id });
+    expect(drained[0]!.executed.result.ok).toBe(true);
+
+    // Each artifact event sits directly after the tool event that produced it, and the second
+    // touch of an already-announced path+kind does NOT repeat the event.
+    const events = (await store.listRunEvents(goal.id)).filter((event) => event.run_id === enqueued.run.id);
+    expect(events.map((event) => event.type)).toEqual([
+      "run.queued",
+      "run.started",
+      "run.log",
+      "tool.started",
+      "artifact.created",
+      "tool.finished",
+      "tool.started",
+      "artifact.created",
+      "tool.finished",
+      "artifact.created",
+      "run.log",
+      "run.log",
+      "evidence.reported",
+      "run.completed",
+    ]);
+    const artifacts = events.filter((event) => event.type === "artifact.created");
+    expect(artifacts.map((event) => event.summary)).toEqual([
+      "Wrote src/queue.ts",
+      "Edited src/queue.ts",
+      "Deleted docs/old.md",
+    ]);
+    expect(artifacts[0]!.payload).toMatchObject({
+      path: "src/queue.ts",
+      kind: "file_write",
+      tool_name: "write_file",
+      source_event_type: "agent.tool.started",
+    });
+
+    // The evidence keeps the deduped tally, including the repeat touch the journal does not repeat.
+    const evidence = await store.listEvidence(goal.id);
+    expect(evidence[0]!.payload.artifacts).toEqual([
+      { path: "src/queue.ts", kinds: ["file_write", "file_edit"], touches: 3 },
+      { path: "docs/old.md", kinds: ["file_delete"], touches: 1 },
+    ]);
+
+    // ...and the run timeline points at the evidence row it produced.
+    const reported = events.find((event) => event.type === "evidence.reported");
+    expect(reported?.payload).toMatchObject({
+      evidence_id: evidence[0]!.id,
+      kind: "mcp_report",
+      trust_score: 0.6,
+      artifact_count: 2,
+      completion_count: 0,
+    });
+    expect(reported?.summary).toBe("Fake Runtime reported evidence for: First step");
+  });
+
+  it("keeps a run with no artifacts free of artifact events and reports an empty summary", async () => {
+    const { store, goal, workspace } = await seedAim();
+    const queue = createRunQueue(store, queueDependencies([OK_RUN]));
+    const enqueued = await queue.enqueue({ goalId: goal.id, workspace, sandbox: "read-only", network: false });
+    await queue.drain({ runId: enqueued.run.id });
+
+    const events = await store.listRunEvents(goal.id);
+    expect(events.some((event) => event.type === "artifact.created")).toBe(false);
+    expect((await store.listEvidence(goal.id))[0]!.payload.artifacts).toEqual([]);
+  });
+
+  it("retains runtime raw payloads under the per-event cap and the per-run budget", async () => {
+    const { store, goal, workspace } = await seedAim();
+    // 8 KB retained per event means the 256 KB run budget covers exactly 32 oversized events.
+    const retainedPerEvent = RUN_EVENT_RAW_CHAR_CAP;
+    const budgetedEvents = Math.floor(RUN_RAW_CHAR_BUDGET / retainedPerEvent);
+    const oversized = { blob: "x".repeat(RUN_EVENT_RAW_CHAR_CAP * 2) };
+    const queue = createRunQueue(store, queueDependencies([{
+      lines: [
+        { event: "tool", phase: "start", name: "shell", raw: { call: "shell", argv: ["pnpm", "test"] } },
+        { event: "tool", phase: "end", name: "shell", raw: oversized },
+        ...Array.from({ length: budgetedEvents }, (_unused, index) => ({
+          event: "text",
+          chunk: `chunk ${index}`,
+          raw: oversized,
+        })),
+      ],
+    }]));
+    const enqueued = await queue.enqueue({ goalId: goal.id, workspace, sandbox: "read-only", network: false });
+    await queue.drain({ runId: enqueued.run.id });
+
+    const events = (await store.listRunEvents(goal.id)).filter((event) => event.run_id === enqueued.run.id);
+    // A small payload is kept verbatim.
+    expect(events.find((event) => event.type === "tool.started")?.payload.raw)
+      .toEqual({ call: "shell", argv: ["pnpm", "test"] });
+
+    // An oversized one is truncated, and says so.
+    const truncated = events.find((event) => event.type === "tool.finished")!;
+    expect(truncated.payload).toMatchObject({ raw_truncated: true });
+    expect(truncated.payload.raw).toBeUndefined();
+    expect(String(truncated.payload.raw_preview)).toHaveLength(RUN_EVENT_RAW_CHAR_CAP);
+    expect(Number(truncated.payload.raw_chars)).toBeGreaterThan(RUN_EVENT_RAW_CHAR_CAP);
+
+    // Past the run budget raw stops being retained — but the events themselves still persist.
+    const overBudget = events.filter((event) => event.payload.raw_omitted === "run_budget");
+    expect(overBudget.length).toBeGreaterThan(0);
+    expect(overBudget.every((event) => event.summary === "Agent response updated.")).toBe(true);
+    const retainedChars = events.reduce((total, event) => {
+      if (typeof event.payload.raw_preview === "string") return total + event.payload.raw_preview.length;
+      return event.payload.raw === undefined ? total : total + JSON.stringify(event.payload.raw).length;
+    }, 0);
+    expect(retainedChars).toBeLessThanOrEqual(RUN_RAW_CHAR_BUDGET);
+    expect(retainedChars).toBeGreaterThan(RUN_RAW_CHAR_BUDGET - retainedPerEvent);
   });
 
   it("executes a run enqueued by another process from the queued row alone", async () => {

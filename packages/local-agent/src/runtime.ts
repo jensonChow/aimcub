@@ -14,6 +14,7 @@ import type {
   LocalAgentRunRequest,
   LocalAgentRunResult,
 } from "./types";
+import { AgentSelectionError } from "./errors";
 import { defaultLocalAgentRegistry } from "./registry";
 
 export type {
@@ -275,7 +276,13 @@ function resolveAdapter(agentId: string, registry: LocalAgentRegistry): LocalAge
   const adapter = registry.get(agentId);
   // A misconfigured id is a programming/config error, not a runtime failure a
   // queue could retry — so it throws instead of returning a failed result.
-  if (!adapter) throw new Error(`Unknown local agent "${agentId}". Registered agents: ${registry.ids().join(", ")}.`);
+  if (!adapter) {
+    throw new AgentSelectionError(
+      "unknown_agent",
+      `Unknown local agent "${agentId}". Registered agents: ${registry.ids().join(", ")}.`,
+      agentId,
+    );
+  }
   return adapter;
 }
 

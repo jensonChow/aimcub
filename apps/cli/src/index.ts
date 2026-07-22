@@ -73,6 +73,7 @@ import { getDefaultModel, getLlmProviderDefinition } from "@core/llm/providers";
 import {
   listLocalAgents,
   listRegisteredLocalAgentIds,
+  RunSelectionError,
   type LocalAgentEvent,
   type LocalAgentId,
 } from "@core/local-agent";
@@ -1863,7 +1864,9 @@ async function main(): Promise<number> {
         return 2;
     }
   } catch (e) {
-    if (e instanceof UserError) {
+    // A selection failure ("Claude Code is not authenticated.", "nothing is ready") is something
+    // the user fixes, not a crash: it reads exactly like a UserError and exits the same way.
+    if (e instanceof UserError || e instanceof RunSelectionError) {
       err(e.message);
       return 1;
     }

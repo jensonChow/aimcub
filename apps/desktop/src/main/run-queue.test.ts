@@ -155,6 +155,7 @@ describe("desktop run queue", () => {
       "tool.started",
       "tool.finished",
       "run.log",
+      "evidence.reported",
       "run.completed",
     ]);
     expect(await store.listEvidence(goal.id)).toHaveLength(1);

@@ -10,19 +10,32 @@ export {
 export { claudeAdapter } from "./adapters/claude";
 export { codexAdapter } from "./adapters/codex";
 export {
+  AgentSelectionError,
+  MilestoneSelectionError,
+  NoRunnableMilestoneError,
+  RunSelectionError,
+} from "./errors";
+export {
   chooseAgent,
   chooseMilestone,
-  NoRunnableMilestoneError,
   enqueueMilestoneRun,
   executeQueuedRun,
   milestonePrompt,
+  persistedArtifactEvent,
   persistedRunEvent,
   queuedRunRequest,
+  RunArtifactLedger,
+  RunRawRetention,
+  RUN_EVENT_RAW_CHAR_CAP,
+  RUN_RAW_CHAR_BUDGET,
 } from "./orchestrator";
 export { createRunQueue, DEFAULT_MAX_ATTEMPTS } from "./run-queue";
 export {
+  artifactKindFromWord,
+  artifactPathFromToolInput,
   DEFAULT_MODEL,
   DEFAULT_PROBE_TIMEOUT_MS,
+  fileArtifactsFromChanges,
   isRecord,
   safeJsonParse,
   stringifyValue,
@@ -31,12 +44,19 @@ export {
 } from "./adapters/helpers";
 
 export type {
+  AgentSelectionErrorCode,
+  MilestoneSelectionErrorCode,
+  RunSelectionErrorCode,
+} from "./errors";
+export type {
   EnqueuedRun,
   EnqueueMilestoneRunInput,
   ExecutedRun,
   ExecuteQueuedRunOptions,
   OrchestratorRoutingOverride,
+  OrchestratorRunEventType,
   QueuedRunRequest,
+  RunArtifactSummary,
   RunOrchestratorDependencies,
   RunOrchestratorStore,
   StoreEvidenceResult,
@@ -54,6 +74,8 @@ export type {
 
 export type {
   LocalAgentAdapter,
+  LocalAgentArtifact,
+  LocalAgentArtifactKind,
   LocalAgentDetection,
   LocalAgentEvent,
   LocalAgentFailure,
