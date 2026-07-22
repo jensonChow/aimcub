@@ -1,6 +1,7 @@
 import type { LlmGateway, LlmRequest, LlmResponse, LlmUsage } from "@core/llm";
 
-import type { LocalAgentId, LocalAgentRunResult } from "./types";
+import type { LocalAgentId, LocalAgentRegistry, LocalAgentRunResult } from "./types";
+import { defaultLocalAgentRegistry } from "./registry";
 import { listLocalAgents, runLocalAgent } from "./runtime";
 
 const DEFAULT_CLI_TIMEOUT_MS = 180_000;
@@ -68,6 +69,7 @@ export class LocalCliLlmGateway implements LlmGateway {
       cwd?: string;
       timeoutMs?: number;
       network?: boolean;
+      registry?: LocalAgentRegistry;
     } = {},
   ) {}
 
@@ -96,19 +98,28 @@ export class LocalCliLlmGateway implements LlmGateway {
     agentId: LocalAgentId;
     model?: string;
   }> {
-    const agentIds: readonly LocalAgentId[] = this.options.agentIds?.length ? this.options.agentIds : ["codex", "claude"];
+    const registry = this.options.registry ?? defaultLocalAgentRegistry;
+    // No explicit chain: fall back across every registered agent in
+    // registration order.
+    const agentIds: readonly LocalAgentId[] = this.options.agentIds?.length ? this.options.agentIds : registry.ids();
     const errors: string[] = [];
     for (const agentId of agentIds) {
       const model = req.model || this.options.model || await this.preferredModel(agentId);
-      const result = await runLocalAgent({
-        agentId,
-        prompt,
-        cwd: this.options.cwd ?? process.cwd(),
-        model,
-        reasoning: this.options.reasoning,
-        timeoutMs: this.options.timeoutMs ?? DEFAULT_CLI_TIMEOUT_MS,
-        permission: { sandbox: "read-only", network: this.options.network ?? false },
-      });
+      let result: LocalAgentRunResult;
+      try {
+        result = await runLocalAgent({
+          agentId,
+          prompt,
+          cwd: this.options.cwd ?? process.cwd(),
+          model,
+          reasoning: this.options.reasoning,
+          timeoutMs: this.options.timeoutMs ?? DEFAULT_CLI_TIMEOUT_MS,
+          permission: { sandbox: "read-only", network: this.options.network ?? false },
+        }, { registry: this.options.registry });
+      } catch (error) {
+        errors.push(`${agentId}: ${error instanceof Error ? error.message : String(error)}`);
+        continue;
+      }
       if (result.ok) return { result, agentId, model };
       errors.push(`${agentId}: ${bestError(result)}`);
     }
@@ -116,7 +127,7 @@ export class LocalCliLlmGateway implements LlmGateway {
   }
 
   private async preferredModel(agentId: LocalAgentId): Promise<string | undefined> {
-    this.detectedModels ??= listLocalAgents().then((agents) => Object.fromEntries(
+    this.detectedModels ??= listLocalAgents({ registry: this.options.registry }).then((agents) => Object.fromEntries(
       agents.flatMap((agent) => {
         const model = agent.models.find((candidate) => candidate.id !== "default")?.id;
         return model ? [[agent.id, model]] : [];

@@ -62,7 +62,6 @@ import {
   type ContextSourceStatus,
   type LocalContextPickResult,
   type LocalAgentDetection,
-  type LocalAgentId,
   type LocalAgentRunRequest,
   type LocalAgentRunResult,
   type PlanningDebugTraceStage,
@@ -161,10 +160,6 @@ function milestoneAgentPrompt(goal: Goal, milestone: Milestone, extra?: string):
   ].filter(Boolean).join("\n");
 }
 
-function isLocalAgentId(value: string | null | undefined): value is LocalAgentId {
-  return value === "codex" || value === "claude";
-}
-
 function routingAgentOptions(detections: readonly LocalAgentDetection[]): RoutingRuntimeAgentOption[] {
   return detections.map((agent) => ({
     id: agent.id,
@@ -191,12 +186,14 @@ async function runMilestoneAgent(req: RunMilestoneAgentRequest): Promise<RunMile
     };
   }
   const detections = await listLocalAgents();
-  const overrideAgentId = override?.owner === "agent" && isLocalAgentId(override.agent_id) ? override.agent_id : undefined;
+  const routedAgentId = override?.owner === "agent" ? override.agent_id : null;
+  // An override naming an unregistered agent falls through to the default pick.
+  const overrideAgentId = routedAgentId && detections.some((agent) => agent.id === routedAgentId) ? routedAgentId : undefined;
   const requestedAgentId = req.agentId ?? overrideAgentId;
   const selected = requestedAgentId
     ? detections.find((agent) => agent.id === requestedAgentId)
-    : detections.find((agent) => agent.id === "codex" && agent.available && agent.authStatus !== "missing")
-      ?? detections.find((agent) => agent.available && agent.authStatus !== "missing");
+    // Detections arrive in adapter registration order, which is the preference order.
+    : detections.find((agent) => agent.available && agent.authStatus !== "missing");
   if (!selected || !selected.available || selected.authStatus === "missing") {
     return { ok: false, run: null, detail, error: "No authenticated local CLI agent is available." };
   }

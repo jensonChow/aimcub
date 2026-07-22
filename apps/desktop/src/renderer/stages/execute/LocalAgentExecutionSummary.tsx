@@ -100,6 +100,9 @@ function latestAgentEvidence(row: ProgressMilestoneRow): ProgressEvidenceReviewI
   return selected;
 }
 
+// Legacy display fallback for historical evidence rows only. New adapters need
+// no entry here: their name flows adapter.name -> LocalAgentDetection.name ->
+// routing agent_label. Do not extend this map.
 function localAgentName(agentId: string | null): string | null {
   if (!agentId) return null;
   if (agentId === "codex") return "Codex CLI";
