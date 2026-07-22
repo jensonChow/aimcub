@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <!-- Same justification as entitlements.mac.plist: nested helper
+         executables/frameworks bundled inside the app inherit these two from
+         the parent under hardened runtime. -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.network.client</key>
+    <true/>
+    <!-- Marks this file as an "inherit" entitlements set, applied to nested
+         helper executables/frameworks per electron-builder's
+         entitlementsInherit convention (see @electron/osx-sign). This key is
+         the inheritance marker itself, not an extra capability grant. -->
+    <key>com.apple.security.inherit</key>
+    <true/>
+  </dict>
+</plist>
