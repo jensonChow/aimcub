@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import type { DecompositionOutput } from "@core/types";
+import type { DecompositionContract, DecompositionOutput } from "@core/types";
 
 import { createJsonFileStore } from "./index";
 
@@ -15,7 +15,7 @@ import { createJsonFileStore } from "./index";
  * ordered durable event batches, and a claim that cannot hand the same run to two workers.
  */
 
-const CONTRACT = {
+const CONTRACT: DecompositionContract = {
   why: "A local agent can do this step.",
   definition_of_done: "The step is verifiably done.",
   required_evidence: ["A trusted commit."],
