@@ -6,9 +6,9 @@ import { PassThrough } from "node:stream";
 
 import { describe, expect, it } from "vitest";
 
-import { routingOverrideForMilestone } from "@core/domain";
-import { createJsonFileStore } from "@core/store";
-import type { DecompositionOutput } from "@core/types";
+import { routingOverrideForMilestone } from "@aimcub/core";
+import { createJsonFileStore } from "@aimcub/store";
+import type { DecompositionOutput } from "@aimcub/types";
 import {
   createLocalAgentRegistry,
   createRunQueue,
@@ -21,7 +21,7 @@ import {
   RUN_RAW_CHAR_BUDGET,
   type LocalAgentAdapter,
   type LocalAgentProcessRunner,
-} from "@core/local-agent";
+} from "@aimcub/local-agent";
 
 import { runAimAgent, runAimAgentUntilBlocked, type AimAgentRunDependencies } from "./agent-run";
 
@@ -31,7 +31,7 @@ import { runAimAgent, runAimAgentUntilBlocked, type AimAgentRunDependencies } fr
  * are never really spawned.
  *
  * These live in the CLI package because it is the one place that has both halves — the persistence
- * layer (`@core/store`) and the runtime (`@core/local-agent`, which must not depend on it).
+ * layer (`@aimcub/store`) and the runtime (`@aimcub/local-agent`, which must not depend on it).
  */
 
 const CONTRACT = {

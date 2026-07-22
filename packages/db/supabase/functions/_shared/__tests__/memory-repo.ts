@@ -2,7 +2,7 @@
  * In-memory fake repo for the evidence-ingest / jobs-worker unit tests.
  *
  * Decoupling note: this implements the LOCAL `IngestRepo` + `WorkerRepo` ports
- * (defined in `../ports.ts`) — it deliberately does NOT import `@core/api-client`.
+ * (defined in `../ports.ts`) — it deliberately does NOT import `@aimcub/api-client`.
  *
  * It enforces the same idempotency invariants the Postgres schema does, so the
  * tests exercise the real behaviour:
@@ -12,7 +12,7 @@
  * Side effects mirror the live repo too: inserting a completion flips the
  * milestone to status 'completed' (the UI reads milestones.status).
  */
-import type { Evidence, Job, Milestone, MilestoneCompletion } from "@core/types";
+import type { Evidence, Job, Milestone, MilestoneCompletion } from "@aimcub/types";
 import type {
   CompletionWrite,
   EvidenceWrite,

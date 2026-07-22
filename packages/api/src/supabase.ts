@@ -23,7 +23,7 @@ import type {
   Evidence,
   Goal,
   Milestone,
-} from "@core/types";
+} from "@aimcub/types";
 
 import type {
   CreateGoalInput,

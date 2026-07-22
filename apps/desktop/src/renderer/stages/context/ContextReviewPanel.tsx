@@ -1,4 +1,4 @@
-import type { ContextCategory } from "@core/types";
+import type { ContextCategory } from "@aimcub/types";
 
 import type { ContextBundleReview, ContextReviewItem } from "../../contextReview";
 import { useI18n, type I18n } from "../../i18n";

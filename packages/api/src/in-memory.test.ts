@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { MilestoneCompletion } from "@core/types";
+import type { MilestoneCompletion } from "@aimcub/types";
 
 import { InMemoryAimcubRepo, InvariantError } from "./in-memory.js";
 import type { AimcubRepo } from "./contract.js";

@@ -1,7 +1,7 @@
 /**
  * Desktop-only preferences (`desktop-settings.json`, beside the shared store).
  *
- * These are NOT in `@core/store`'s settings family on purpose: provider / web-research / context
+ * These are NOT in `@aimcub/store`'s settings family on purpose: provider / web-research / context
  * sources are shared with the CLI, while these describe how this app renders itself. Nothing here
  * is a secret and nothing here changes what a run may do — developer mode reveals debug surfaces,
  * it never widens a permission.
@@ -9,7 +9,7 @@
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { defaultDataDir } from "@core/store";
+import { defaultDataDir } from "@aimcub/store";
 
 import type { DesktopPreferences } from "../shared/ipc";
 

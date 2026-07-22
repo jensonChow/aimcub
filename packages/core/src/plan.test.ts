@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DecompositionOutput } from "@core/types";
+import { DecompositionOutput } from "@aimcub/types";
 import {
   mergePlanNodes,
   movePlanNode,

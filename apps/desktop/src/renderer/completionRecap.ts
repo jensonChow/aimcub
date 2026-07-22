@@ -1,4 +1,4 @@
-import type { AimProgressReadModel } from "@core/domain";
+import type { AimProgressReadModel } from "@aimcub/core";
 
 import type { CockpitStage } from "./CockpitShell";
 

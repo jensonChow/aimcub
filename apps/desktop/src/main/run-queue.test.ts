@@ -5,9 +5,9 @@ import { join } from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { createJsonFileStore } from "@core/store";
-import type { DecompositionOutput } from "@core/types";
-import { queuedRunRequest, type LocalAgentEvent, type LocalAgentRunRequest, type LocalAgentRunResult } from "@core/local-agent";
+import { createJsonFileStore } from "@aimcub/store";
+import type { DecompositionOutput } from "@aimcub/types";
+import { queuedRunRequest, type LocalAgentEvent, type LocalAgentRunRequest, type LocalAgentRunResult } from "@aimcub/local-agent";
 
 import type { RunLiveEvent } from "../shared/ipc";
 import {

@@ -15,8 +15,8 @@ keys, no account — in about five minutes:
 
 ```bash
 corepack enable pnpm && pnpm install
-pnpm --filter @app/cli build
-pnpm --filter @app/cli exec esbuild ../../examples/local-alpha/seed-local-alpha-demo.ts \
+pnpm --filter @aimcub/cli build
+pnpm --filter @aimcub/cli exec esbuild ../../examples/local-alpha/seed-local-alpha-demo.ts \
   --bundle --platform=node --format=esm --target=node22 --outfile=~/aimcub-quickstart-seed.mjs && \
   node ~/aimcub-quickstart-seed.mjs --target ~/aimcub-quickstart
 AIMCUB_HOME=~/aimcub-quickstart pnpm desktop
@@ -42,7 +42,7 @@ Today this means:
 - CLI is the scriptable and debuggable companion over the same local store. It
   can detect authenticated Codex/Claude runtimes and run one ready agent-owned
   sub-aim at a time.
-- `@core/*` packages own the domain logic. App shells perform I/O, rendering,
+- `@aimcub/*` packages own the domain logic. App shells perform I/O, rendering,
   and platform bridging.
 - Local state is local-store first. By default it lives under `~/.aimcub`; use
   `AIMCUB_HOME` to isolate a development or demo store.
@@ -150,7 +150,7 @@ or run the local alpha path.
 
 ## Roadmap Boundary
 
-- v0 is complete: monorepo foundation, `@core` kernel, and Supabase evidence
+- v0 is complete: monorepo foundation, `@aimcub/core` kernel, and Supabase evidence
   spine.
 - v1 is current: local Aim OS agent harness with Desktop-first aim intake,
   context, decomposition, routing, evidence, eval, and context reuse.

@@ -14,7 +14,7 @@ interface CliOptions {
 function usage(): string {
   return [
     "Usage:",
-    "  pnpm --filter @app/cli exec esbuild ../../examples/local-alpha/seed-local-alpha-demo.ts --bundle --platform=node --format=esm --target=node22 --outfile=/tmp/aimcub-local-alpha-demo-seed.mjs",
+    "  pnpm --filter @aimcub/cli exec esbuild ../../examples/local-alpha/seed-local-alpha-demo.ts --bundle --platform=node --format=esm --target=node22 --outfile=/tmp/aimcub-local-alpha-demo-seed.mjs",
     "  node /tmp/aimcub-local-alpha-demo-seed.mjs --target /tmp/aimcub-local-alpha-demo",
     "  AIMCUB_HOME=/tmp/aimcub-local-alpha-demo node /tmp/aimcub-local-alpha-demo-seed.mjs",
     "",

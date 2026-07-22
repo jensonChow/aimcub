@@ -15,7 +15,7 @@ import {
   type CommitPatternMatch,
   type Evidence,
   GitCommitPayload,
-} from "@core/types";
+} from "@aimcub/types";
 import { globToRegExp, matchesPattern } from "./glob";
 
 /** Minimum source trust score required by an auto_verifiable clause. */

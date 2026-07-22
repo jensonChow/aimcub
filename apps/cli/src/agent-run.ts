@@ -1,17 +1,17 @@
 /**
  * The CLI's face on the shared run queue. Selection, execution, event persistence, evidence and
- * completion all live in `@core/local-agent`'s orchestrator — this module only translates CLI
+ * completion all live in `@aimcub/local-agent`'s orchestrator — this module only translates CLI
  * input into a queue request and the queue's outcome back into the CLI's result shape.
  */
-import type { AimStore } from "@core/store";
+import type { AimStore } from "@aimcub/store";
 import type {
   AimProgressReadModel,
   Evidence,
   Milestone,
   MilestoneCompletion,
   Run,
-} from "@core/types";
-import { routingOverrideForMilestone } from "@core/domain";
+} from "@aimcub/types";
+import { routingOverrideForMilestone } from "@aimcub/core";
 import {
   createRunQueue,
   listLocalAgents,
@@ -25,7 +25,7 @@ import {
   type LocalAgentRunResult,
   type RunOrchestratorDependencies,
   type RunQueue,
-} from "@core/local-agent";
+} from "@aimcub/local-agent";
 
 export interface AimAgentRunInput {
   goalId: string;

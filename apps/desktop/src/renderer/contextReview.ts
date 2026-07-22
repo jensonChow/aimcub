@@ -1,6 +1,6 @@
-import type { AimIntakeReport, PlanReviewReport } from "@core/domain";
-import type { AimcubToolSource, PlanningContextSelectionReport } from "@core/llm";
-import type { ContextCategory, DecompositionOutput } from "@core/types";
+import type { AimIntakeReport, PlanReviewReport } from "@aimcub/core";
+import type { AimcubToolSource, PlanningContextSelectionReport } from "@aimcub/llm";
+import type { ContextCategory, DecompositionOutput } from "@aimcub/types";
 
 import type { PlanningToolIpcTrace } from "../shared/ipc";
 

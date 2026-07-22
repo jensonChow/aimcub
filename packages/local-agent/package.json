@@ -1,5 +1,5 @@
 {
-  "name": "@core/local-agent",
+  "name": "@aimcub/local-agent",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -31,7 +31,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@core/llm": "workspace:*"
+    "@aimcub/llm": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.20.0",

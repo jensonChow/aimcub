@@ -1,4 +1,4 @@
-import { CHOICE_SELECTION_REASONS } from "@core/domain";
+import { CHOICE_SELECTION_REASONS } from "@aimcub/core";
 
 /**
  * JSON Schema for the clarifying-questions Structured Output (the feedback step).

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
-import { routingOverrideForMilestone } from "@core/domain";
-import type { AimProgressReadModel, RunStatus } from "@core/types";
+import { routingOverrideForMilestone } from "@aimcub/core";
+import type { AimProgressReadModel, RunStatus } from "@aimcub/types";
 
 import { useI18n, type I18n } from "../../i18n";
 

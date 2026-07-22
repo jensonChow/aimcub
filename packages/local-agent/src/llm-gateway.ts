@@ -1,4 +1,4 @@
-import type { LlmGateway, LlmRequest, LlmResponse, LlmUsage } from "@core/llm";
+import type { LlmGateway, LlmRequest, LlmResponse, LlmUsage } from "@aimcub/llm";
 
 import type { LocalAgentId, LocalAgentRegistry, LocalAgentRunResult } from "./types";
 import { defaultLocalAgentRegistry } from "./registry";

@@ -17,7 +17,7 @@ if it looks wrong it goes in `result.blockers`, it is never edited.
 
 ## Deliverables
 
-1. `SupabaseAimcubRepo` — implements `AimcubRepo` (from `@core/api-client`) on top of
+1. `SupabaseAimcubRepo` — implements `AimcubRepo` (from `@aimcub/api-client`) on top of
    `@supabase/supabase-js`. The **user path** (RLS-bound, anon/user JWT client) is separated
    from the **machine write path** (service_role client) exactly as the interface doc and the
    RLS security groups in `0001_init.sql` describe:
@@ -45,8 +45,8 @@ if it looks wrong it goes in `result.blockers`, it is never edited.
 
 ## Acceptance criteria
 
-- `pnpm --filter @core/api-client --filter @core/db run typecheck` is green.
-- `pnpm --filter @core/api-client --filter @core/db run test` is green.
+- `pnpm --filter @aimcub/api-client --filter @aimcub/db run typecheck` is green.
+- `pnpm --filter @aimcub/api-client --filter @aimcub/db run test` is green.
 - `SupabaseAimcubRepo` and `InMemoryAimcubRepo` both structurally satisfy `AimcubRepo`
   (asserted by a `satisfies`/typed-construction test).
 - InMemory invariant tests cover: evidence idempotency dedup, RLS-scoped reads

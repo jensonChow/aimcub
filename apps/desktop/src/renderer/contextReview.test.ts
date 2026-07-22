@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import type { AimIntakeReport, PlanReviewReport } from "@core/domain";
-import type { PlanningContextSelectionReport } from "@core/llm";
-import { localDecompose } from "@core/llm";
+import type { AimIntakeReport, PlanReviewReport } from "@aimcub/core";
+import type { PlanningContextSelectionReport } from "@aimcub/llm";
+import { localDecompose } from "@aimcub/llm";
 
 import type { PlanningToolIpcTrace } from "../shared/ipc";
 import { buildContextBundleReview } from "./contextReview";

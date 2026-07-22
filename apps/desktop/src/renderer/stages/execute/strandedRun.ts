@@ -9,7 +9,7 @@
  * about to claim — without it, the brief window between enqueue and the first live event would
  * flash the run this session just started as "stranded".
  */
-import type { Run } from "@core/types";
+import type { Run } from "@aimcub/types";
 
 /** The permission floor every Desktop run starts at; anything else is an explicit grant. */
 const BACKGROUND_FLOOR_SANDBOX = "read-only";

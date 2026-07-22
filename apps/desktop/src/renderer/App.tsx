@@ -5,8 +5,8 @@ import {
   validatePlanRouting,
   type AimProgressReadModel,
   type AimProgressSummary,
-} from "@core/domain";
-import type { ClarifyAnswer, ClarifyOutput } from "@core/llm";
+} from "@aimcub/core";
+import type { ClarifyAnswer, ClarifyOutput } from "@aimcub/llm";
 import type {
   AimDraft,
   AimDraftSaveBlock,
@@ -15,7 +15,7 @@ import type {
   Memory,
   Milestone,
   RunEvent,
-} from "@core/types";
+} from "@aimcub/types";
 import type {
   AppInfo,
   ClarifyIpcResult,

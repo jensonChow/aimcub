@@ -28,7 +28,7 @@ The seed replaces `store.json` in the target directory so repeated runs produce 
 From the repository root, first bundle the runnable seed script with the existing CLI toolchain:
 
 ```bash
-pnpm --filter @app/cli exec esbuild ../../examples/local-alpha/seed-local-alpha-demo.ts --bundle --platform=node --format=esm --target=node22 --outfile=~/aimcub-quickstart-seed.mjs
+pnpm --filter @aimcub/cli exec esbuild ../../examples/local-alpha/seed-local-alpha-demo.ts --bundle --platform=node --format=esm --target=node22 --outfile=~/aimcub-quickstart-seed.mjs
 ```
 
 Then seed an isolated directory:

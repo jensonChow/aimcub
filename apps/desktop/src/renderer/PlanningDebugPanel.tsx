@@ -1,8 +1,8 @@
 import type { CSSProperties, ReactNode } from "react";
 
-import { decideChoiceSelection } from "@core/domain";
-import type { ClarifyAnswer, ClarifyOutput } from "@core/llm";
-import type { DecompositionOutput, Goal } from "@core/types";
+import { decideChoiceSelection } from "@aimcub/core";
+import type { ClarifyAnswer, ClarifyOutput } from "@aimcub/llm";
+import type { DecompositionOutput, Goal } from "@aimcub/types";
 
 import type {
   GoalDetail,

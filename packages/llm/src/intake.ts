@@ -2,13 +2,13 @@ import type {
   AimIntakeQuestion,
   AimIntakeQuestionOption,
   AimIntakeReport,
-} from "@core/domain";
+} from "@aimcub/core";
 import {
   CHOICE_SELECTION_REASONS,
   decideChoiceSelection,
   type ChoiceSelectionMode,
   type ChoiceSelectionReason,
-} from "@core/domain";
+} from "@aimcub/core";
 
 import type { LlmGateway, LlmResponse, LlmUsage } from "./index";
 import { renderPlanningContext, type PlanningMemory } from "./planning-context";

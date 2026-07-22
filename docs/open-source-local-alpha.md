@@ -113,7 +113,7 @@ Files under that directory include:
 Use `AIMCUB_HOME` for isolated development and demos:
 
 ```bash
-AIMCUB_HOME=/tmp/aimcub-local-alpha pnpm --filter @app/cli exec aimcub config
+AIMCUB_HOME=/tmp/aimcub-local-alpha pnpm --filter @aimcub/cli exec aimcub config
 ```
 
 Privacy expectations for the local alpha:
@@ -157,7 +157,7 @@ states, Eval trust states, and pending/accepted context rows.
 Build the seed script and run it against an isolated directory:
 
 ```bash
-pnpm --filter @app/cli exec esbuild ../../examples/local-alpha/seed-local-alpha-demo.ts --bundle --platform=node --format=esm --target=node22 --outfile=/tmp/aimcub-local-alpha-demo-seed.mjs
+pnpm --filter @aimcub/cli exec esbuild ../../examples/local-alpha/seed-local-alpha-demo.ts --bundle --platform=node --format=esm --target=node22 --outfile=/tmp/aimcub-local-alpha-demo-seed.mjs
 node /tmp/aimcub-local-alpha-demo-seed.mjs --target /tmp/aimcub-local-alpha-demo
 ```
 

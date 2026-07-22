@@ -19,7 +19,7 @@ import type {
   Goal,
   Milestone,
   MilestoneCompletion,
-} from "@core/types";
+} from "@aimcub/types";
 
 import type {
   CreateGoalInput,

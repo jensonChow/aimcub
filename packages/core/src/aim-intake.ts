@@ -1,4 +1,4 @@
-import type { ContextCategory, Memory, MemoryKind } from "@core/types";
+import type { ContextCategory, Memory, MemoryKind } from "@aimcub/types";
 import {
   inferContextCategory,
   reviewContextProfile,

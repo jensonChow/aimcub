@@ -3,8 +3,8 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { routingRecommendationForPlanNode, type RoutingRuntimeAgentOption } from "@core/domain";
-import type { AimDraft, AimProgressReadModel, DecompositionOutput, Goal, Milestone } from "@core/types";
+import { routingRecommendationForPlanNode, type RoutingRuntimeAgentOption } from "@aimcub/core";
+import type { AimDraft, AimProgressReadModel, DecompositionOutput, Goal, Milestone } from "@aimcub/types";
 import type { ContextSourceStatus, GoalDetail, ProviderStatus, WebResearchStatus } from "../shared/ipc";
 
 import { App, SettingsPanel, SettingsSidebarNav } from "./App";

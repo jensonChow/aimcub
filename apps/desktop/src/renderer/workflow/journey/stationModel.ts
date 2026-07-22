@@ -4,11 +4,11 @@
  *
  * Honest-data notes:
  * - Aim is "done" whenever a saved goal exists (the strip only renders for goals).
- * - Research is derived from a real `@core` signal (`summarizeAimResearch`) over the
+ * - Research is derived from a real `@aimcub/core` signal (`summarizeAimResearch`) over the
  *   aim's gathered context memories + pending candidates, not a synthetic plan proxy.
  * - The remaining stations are derived from real milestone/run counts.
  */
-import { summarizeAimResearch, type AimProgressReadModel, type Memory } from "@core/domain";
+import { summarizeAimResearch, type AimProgressReadModel, type Memory } from "@aimcub/core";
 
 import type { JourneyStation, JourneyStationKind } from "./types";
 

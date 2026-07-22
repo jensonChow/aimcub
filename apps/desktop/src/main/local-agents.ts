@@ -1,6 +1,6 @@
-export { listLocalAgents, runLocalAgent } from "@core/local-agent";
+export { listLocalAgents, runLocalAgent } from "@aimcub/local-agent";
 
 export type {
   LocalAgentProcessRunner,
   LocalAgentRunOptions,
-} from "@core/local-agent";
+} from "@aimcub/local-agent";

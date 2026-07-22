@@ -1,4 +1,4 @@
-import type { ManualEvidenceRequiredItem, Milestone } from "@core/types";
+import type { ManualEvidenceRequiredItem, Milestone } from "@aimcub/types";
 import type { ConfirmMilestoneRequest } from "../../shared/ipc";
 
 export type EvidenceSubmissionDraft = {

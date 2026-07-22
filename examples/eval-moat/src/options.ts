@@ -41,7 +41,7 @@ function defaultOutDir(env: Record<string, string | undefined>): string {
 export function usage(): string {
   return [
     "Usage:",
-    "  pnpm --filter @app/cli exec esbuild ../../examples/eval-moat/run-benchmark.ts --bundle --platform=node --format=esm --target=node22 --outfile=/tmp/eval-moat.mjs",
+    "  pnpm --filter @aimcub/cli exec esbuild ../../examples/eval-moat/run-benchmark.ts --bundle --platform=node --format=esm --target=node22 --outfile=/tmp/eval-moat.mjs",
     "  node /tmp/eval-moat.mjs --out /tmp/eval-moat-run",
     "  node /tmp/eval-moat.mjs --out /tmp/eval-moat-run --live",
     "",

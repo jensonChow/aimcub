@@ -1,4 +1,4 @@
-# @core/db — Hosted Supabase Schema
+# @aimcub/db — Hosted Supabase Schema
 
 `supabase/migrations/` contains the SQL migrations named by sequence number for
 the hosted MCP evidence spine and future online platform. The local Aim OS
@@ -22,7 +22,7 @@ Or apply them directly to the remote project via the Supabase MCP tool `apply_mi
 ## Generating shared types
 
 After applying migrations, use `generate_typescript_types` to emit DB types, and check them for drift
-against `@core/types` (the single source of truth in zod) in CI.
+against `@aimcub/types` (the single source of truth in zod) in CI.
 
 ## Security groups (RLS)
 

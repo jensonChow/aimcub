@@ -20,7 +20,7 @@ first for the verification gate every change must pass, and
 
 **What & why:** Today exactly two local agent runtimes are wired in: Codex and
 Claude Code. The adapter interface is explicitly designed so a third runtime is a
-self-contained module, not a change to engine dispatch, `@core/types`, the CLI, or
+self-contained module, not a change to engine dispatch, `@aimcub/types`, the CLI, or
 the desktop app. Gemini CLI or Aider would be the highest-value next adapter —
 both are widely used local coding agents with scriptable, parseable output. This is
 the flagship contribution: it proves the adapter boundary actually holds for code

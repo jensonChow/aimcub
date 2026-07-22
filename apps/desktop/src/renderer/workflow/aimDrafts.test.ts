@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { ClarifyOutput } from "@core/llm";
-import type { DecompositionOutput } from "@core/types";
+import type { ClarifyOutput } from "@aimcub/llm";
+import type { DecompositionOutput } from "@aimcub/types";
 
 import {
   buildAimDraftUpsertRequest,

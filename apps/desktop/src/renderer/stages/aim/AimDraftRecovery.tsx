@@ -1,4 +1,4 @@
-import type { AimDraft, AimDraftStatus } from "@core/types";
+import type { AimDraft, AimDraftStatus } from "@aimcub/types";
 import { useRef, useState } from "react";
 
 import { useI18n, type I18n } from "../../i18n";

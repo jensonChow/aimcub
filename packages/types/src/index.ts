@@ -1,5 +1,5 @@
 /**
- * @core/types — the single source of truth for the Aimcub domain model.
+ * @aimcub/types — the single source of truth for the Aimcub domain model.
  *
  * Pure zod schemas + the TS types inferred from them. Zero platform dependencies
  * (depends only on zod, a pure validation library). Desktop, CLI, MCP, and the
@@ -788,7 +788,7 @@ export type AimProgressSummaryStatus = z.infer<typeof AimProgressSummaryStatus>;
  * A coarse per-aim progress rollup for list surfaces (sidebar rows, Home cards).
  * Cheap to compute in one pass so a batch endpoint can summarize every aim without
  * running the full `evaluate()` pipeline per milestone — the derivation lives in
- * `@core` (`summarizeAimProgress`), never in the app shell.
+ * `@aimcub/core` (`summarizeAimProgress`), never in the app shell.
  */
 export const AimProgressSummary = z.object({
   goal_id: DbId,

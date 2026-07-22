@@ -5,8 +5,8 @@
  * providers use catalog-backed endpoints/model defaults; custom endpoints go through the
  * OpenAI-compatible gateway. There is no offline/template path — no config ⇒ no gateway.
  */
-import { AnthropicLlmGateway, OpenAiCompatibleLlmGateway, type LlmGateway } from "@core/llm";
-import { getDefaultBaseURL, getDefaultModel, getLlmProviderDefinition } from "@core/llm/providers";
+import { AnthropicLlmGateway, OpenAiCompatibleLlmGateway, type LlmGateway } from "@aimcub/llm";
+import { getDefaultBaseURL, getDefaultModel, getLlmProviderDefinition } from "@aimcub/llm/providers";
 
 import { LOCAL_OWNER, loadSettings, saveSettings } from "./store";
 import type { ProviderConfig, ProviderStatus, ProviderTestResult } from "../shared/ipc";

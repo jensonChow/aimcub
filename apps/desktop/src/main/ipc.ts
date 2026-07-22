@@ -1,6 +1,6 @@
 /**
  * Registers the IPC handlers the renderer calls through the preload bridge.
- * Goal persistence is delegated to the shared `@core/store` (so the CLI sees the same
+ * Goal persistence is delegated to the shared `@aimcub/store` (so the CLI sees the same
  * aims). Clarifying answers are folded into dimension-aware `user_stated` memories — the
  * first concrete writes toward the memory pillar.
  */
@@ -8,8 +8,8 @@ import { homedir } from "node:os";
 
 import { app, BrowserWindow, ipcMain, nativeTheme, shell, type IpcMainInvokeEvent } from "electron";
 
-import type { Goal } from "@core/types";
-import { defaultDataDir, type NewMemory } from "@core/store";
+import type { Goal } from "@aimcub/types";
+import { defaultDataDir, type NewMemory } from "@aimcub/store";
 import {
   buildLocalHandoffManifest,
   critiquePlan,
@@ -24,7 +24,7 @@ import {
   type ContextIntakeProgressSignal,
   type DecompositionLearningReport,
   type RoutingRuntimeAgentOption,
-} from "@core/domain";
+} from "@aimcub/core";
 import {
   buildAimIntakeReport,
   planQualityMetadata,
@@ -41,7 +41,7 @@ import {
   summarizeContextLineageLearningForStore,
   summarizeDecompositionLearningForStore,
   traceClarifyAnswerImpact,
-} from "@core/llm";
+} from "@aimcub/llm";
 
 import {
   IPC,
@@ -364,7 +364,7 @@ type SavedGoalSynthesisInput = Pick<
  * context intake progress + sedimentation, local handoff manifest, planning context/tools, clarify
  * answer impact, capture fulfillment) plus the `user_stated` memories folded from clarify answers.
  * Shared by `saveGoal` (create) and `updateGoalPlan` (land/re-plan) so both persist the same context
- * regardless of which path created the goal. Pure derivation over `@core` + the local store; no
+ * regardless of which path created the goal. Pure derivation over `@aimcub/core` + the local store; no
  * mutation (the caller persists).
  */
 async function synthesizeSavedGoalMetadata(input: SavedGoalSynthesisInput) {

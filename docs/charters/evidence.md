@@ -8,10 +8,10 @@
 The server spine that turns raw evidence into milestone completions:
 
 1. **Evidence ingest Edge Function** — receives a normalized-ish raw event (commit / CI run)
-   from an authenticated emitter, dedupes it, normalizes it via `@core/domain`, persists it as
+   from an authenticated emitter, dedupes it, normalizes it via `@aimcub/core`, persists it as
    append-only evidence, and enqueues a `judge_evidence` job.
 2. **Jobs worker** — claims `judge_evidence` jobs, loads the target milestone's `acceptance_rule`
-   plus its evidence, runs the pure `@core` `evaluate()` kernel, and (when the rule passes AND the
+   plus its evidence, runs the pure `@aimcub/core` `evaluate()` kernel, and (when the rule passes AND the
    `completion_mode` allows auto) writes an **idempotent** `milestone_completion`
    (`decided_by = 'rule_auto'`). A milestone completion is the end of the pipeline — no follow-up
    jobs are enqueued.
@@ -31,21 +31,21 @@ I do **not** touch `packages/types` (frozen contract), `packages/core`, `package
 migrations, or any other worktree's package.
 
 ## Contract anchors (read, never modified)
-- `@core/domain` `evaluate(rule, evidence)` → `{ passed, matchedEvidenceIds, trustScore, clauseSatisfied }`,
+- `@aimcub/core` `evaluate(rule, evidence)` → `{ passed, matchedEvidenceIds, trustScore, clauseSatisfied }`,
   with `AUTO_VERIFY_MIN_TRUST = 0.8`. A clause marked `auto_verifiable` rejects evidence whose
   `trust_score < 0.8` (anti-spoofing).
-- `@core/domain` `normalizeCommitEvidence` / `normalizeCiEvidence` → `NormalizedEvidence`
+- `@aimcub/core` `normalizeCommitEvidence` / `normalizeCiEvidence` → `NormalizedEvidence`
   (`kind`, `source_event_id`, `occurred_at`, `summary`, `payload`, `trust_score`). Verified commit
   trust = 1.0, unverified commit trust = 0.7, CI trust = 1.0.
-- `@core/types`: `AcceptanceRule`, `CompletionMode` (`auto` | `manual` | `auto_then_confirm`),
+- `@aimcub/types`: `AcceptanceRule`, `CompletionMode` (`auto` | `manual` | `auto_then_confirm`),
   `Evidence`, `Milestone`, `MilestoneCompletion`, `Job`, `JobType`.
-- `IngestEvidenceInput` (`@core/api-client` shape) — the ingest write payload.
+- `IngestEvidenceInput` (`@aimcub/api-client` shape) — the ingest write payload.
 - Migration `0001_init.sql`: `evidence` idempotency = unique `(emitter_id, source_event_id)`;
   `milestone_completions.milestone_id` is UNIQUE (a milestone completes once);
   `jobs.dedup_key` is unique-when-present; `claim_jobs(batch)` atomically claims queued jobs.
 
 > NOTE on decoupling: tests define a **local** minimal repo interface inline and do **not** import
-> `@core/api-client`. The shared functions are generic over a small `IngestRepo` / `WorkerRepo`
+> `@aimcub/api-client`. The shared functions are generic over a small `IngestRepo` / `WorkerRepo`
 > port defined in `_shared/ports.ts`, so they stay independent of the full `AimcubRepo`.
 
 ## Mock strategy

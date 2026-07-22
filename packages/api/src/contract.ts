@@ -1,5 +1,5 @@
 /**
- * @core/api-client — data-access contract (implementation-agnostic).
+ * @aimcub/api-client — data-access contract (implementation-agnostic).
  * No client may build its own queries — all access goes through this contract, ensuring consistent query shapes and error handling.
  * v0: defines the AimcubRepo interface (using domain types); the concrete supabase-js implementation lands in v1a.
  */
@@ -8,7 +8,7 @@ import type {
   Goal,
   GoalDomain,
   Milestone,
-} from "@core/types";
+} from "@aimcub/types";
 
 export interface CreateGoalInput {
   ownerId: string;

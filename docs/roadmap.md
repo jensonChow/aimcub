@@ -24,8 +24,8 @@ stage actually stands.
 
 The alpha golden path — new aim, context intake, plan with sub-aims and acceptance
 rules, human/agent routing, run or manual proof, evidence, eval, context candidate
-review, and reuse in later aims — is implemented and covered by tests in `@core/domain`
-and `@core/store`. You can walk it yourself: [`docs/quickstart.md`](quickstart.md)
+review, and reuse in later aims — is implemented and covered by tests in `@aimcub/core`
+and `@aimcub/store`. You can walk it yourself: [`docs/quickstart.md`](quickstart.md)
 seeds a deterministic, provider-free demo store and opens it in Desktop in about five
 minutes.
 

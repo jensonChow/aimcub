@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { AUTO_VERIFY_MIN_TRUST, type Evidence, type Goal, type Milestone } from "@core/domain";
-import type { IngestEvidenceInput } from "@core/api-client";
+import { AUTO_VERIFY_MIN_TRUST, type Evidence, type Goal, type Milestone } from "@aimcub/core";
+import type { IngestEvidenceInput } from "@aimcub/api-client";
 import { buildServer } from "./server";
 import type { EvidenceIngestPort, AimcubReadPort, ToolDeps } from "./ports";
 import {
@@ -159,7 +159,7 @@ describe("normalizeReport / toIngestInput (pure)", () => {
       occurredAt: T,
       report: { type: "commit", sha: "fff", message: "wip" },
     });
-    // @core gives unverified commits 0.7 — still above the MCP ceiling (0.6).
+    // @aimcub/core gives unverified commits 0.7 — still above the MCP ceiling (0.6).
     expect(normalized.trust_score).toBe(MCP_TRUST_CEILING);
   });
 
@@ -171,9 +171,9 @@ describe("normalizeReport / toIngestInput (pure)", () => {
 
     const base: Omit<ReportEvidenceInput, "report"> = { goalId: GOAL, occurredAt: T };
     const fabricated: ReportEvidenceInput["report"][] = [
-      // A "verified" commit that was never pushed anywhere (@core would score it 1.0).
+      // A "verified" commit that was never pushed anywhere (@aimcub/core would score it 1.0).
       { type: "commit", sha: "anything", message: "feat: x", files: ["src/auth.ts"], verified: true },
-      // A "green CI run" that never ran (@core scores webhook CI 1.0).
+      // A "green CI run" that never ran (@aimcub/core scores webhook CI 1.0).
       { type: "ci", conclusion: "success", runId: "r-fake" },
       { type: "note", summary: "I totally did it" },
     ];

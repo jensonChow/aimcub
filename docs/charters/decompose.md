@@ -1,4 +1,4 @@
-# CHARTER — `@core/llm` (worktree: decompose)
+# CHARTER — `@aimcub/llm` (worktree: decompose)
 
 > Status: archived historical memory. This charter describes the completed v1a/H1
 > hosted evidence-spine worktree. It is not the active roadmap. Current v1 work is
@@ -22,9 +22,9 @@ LLM gateway + goal-decomposition pipeline for Aimcub v1a.
 
 ## Boundaries (hard constraints)
 - NEVER modify `packages/types` (frozen domain contract) or any package owned by another worktree.
-- `validatePlan` + `DecompositionOutput` come from `@core/*`; this package only consumes them.
-  - `DecompositionOutput` (zod) is re-exported by `@core/types` and `@core/domain`.
-  - `validatePlan` lives in `@core/domain` (`packages/core`) → added as a workspace dependency.
+- `validatePlan` + `DecompositionOutput` come from `@aimcub/*`; this package only consumes them.
+  - `DecompositionOutput` (zod) is re-exported by `@aimcub/types` and `@aimcub/core`.
+  - `validatePlan` lives in `@aimcub/core` (`packages/core`) → added as a workspace dependency.
 - English only (code, comments, identifiers, prompts, UI copy).
 
 ## Mock strategy
@@ -43,8 +43,8 @@ LLM gateway + goal-decomposition pipeline for Aimcub v1a.
 `decompose` therefore runs on Sonnet.
 
 ## Acceptance criteria
-- `pnpm --filter @core/llm run typecheck` passes.
-- `pnpm --filter @core/llm run test` passes:
+- `pnpm --filter @aimcub/llm run typecheck` passes.
+- `pnpm --filter @aimcub/llm run test` passes:
   - decompose maps + validates a canned structured output (commit_pattern + ci_status clauses);
   - decompose rejects cyclic, duplicate-key, and out-of-range (>15 / <1 node) plans via `validatePlan`;
   - decompose surfaces zod parse failures as `{ ok: false, errors }` without throwing;

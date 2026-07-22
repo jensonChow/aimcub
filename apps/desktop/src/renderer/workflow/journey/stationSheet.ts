@@ -5,7 +5,7 @@
  * localizes). The sheet is an overlay: opening it must never touch the workspace/surface
  * navigation epochs.
  */
-import type { AimProgressReadModel, Memory } from "@core/domain";
+import type { AimProgressReadModel, Memory } from "@aimcub/core";
 
 import { executeRowNeedsEval, isHumanExecuteRoute, type ExecuteMilestoneRow } from "../../stages/execute/executePrimaryAction";
 import type { CockpitStage } from "../workspaceNavigation";

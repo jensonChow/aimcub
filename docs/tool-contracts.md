@@ -2,7 +2,7 @@
 
 Aimcub's built-in planning tools are owned by the Aimcub runtime and permission model. They are not MCP tools. MCP remains the external connector/plugin boundary; these contracts define the local substrate that the planning engine can ask the Desktop runtime to execute.
 
-The first contract surface lives in `packages/llm/src/tool-contract.ts` and is exported from `@core/llm`.
+The first contract surface lives in `packages/llm/src/tool-contract.ts` and is exported from `@aimcub/llm`.
 
 ## What A Contract Defines
 

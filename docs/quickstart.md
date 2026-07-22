@@ -29,10 +29,10 @@ connection.
 This quickstart only needs the CLI built, not the full monorepo:
 
 ```bash
-pnpm --filter @app/cli build
+pnpm --filter @aimcub/cli build
 ```
 
-`@core/*` packages ship as plain TypeScript (`exports` points straight at
+`@aimcub/*` packages ship as plain TypeScript (`exports` points straight at
 `src/index.ts`) — esbuild bundles them from source for the CLI, and Vite does
 the same for Desktop in dev mode. Neither needs a separate build step here.
 The full `pnpm build && pnpm test && pnpm typecheck && pnpm lint &&
@@ -52,7 +52,7 @@ Bundle the seed script, then run it against an isolated data directory —
 never your real `~/.aimcub` store:
 
 ```bash
-pnpm --filter @app/cli exec esbuild ../../examples/local-alpha/seed-local-alpha-demo.ts \
+pnpm --filter @aimcub/cli exec esbuild ../../examples/local-alpha/seed-local-alpha-demo.ts \
   --bundle --platform=node --format=esm --target=node22 \
   --outfile=~/aimcub-quickstart-seed.mjs
 
@@ -97,7 +97,7 @@ Desktop and the CLI read and write the same local JSON store, so everything
 above is also inspectable headlessly:
 
 ```bash
-AIMCUB_HOME=~/aimcub-quickstart pnpm --filter @app/cli exec aimcub ls
+AIMCUB_HOME=~/aimcub-quickstart pnpm --filter @aimcub/cli exec aimcub ls
 ```
 
 ```text
@@ -105,7 +105,7 @@ AIMCUB_HOME=~/aimcub-quickstart pnpm --filter @app/cli exec aimcub ls
 ```
 
 ```bash
-AIMCUB_HOME=~/aimcub-quickstart pnpm --filter @app/cli exec aimcub board 00000000
+AIMCUB_HOME=~/aimcub-quickstart pnpm --filter @aimcub/cli exec aimcub board 00000000
 ```
 
 ```text
@@ -129,7 +129,7 @@ evidence: 2 events
 ```
 
 ```bash
-AIMCUB_HOME=~/aimcub-quickstart pnpm --filter @app/cli exec aimcub context review
+AIMCUB_HOME=~/aimcub-quickstart pnpm --filter @aimcub/cli exec aimcub context review
 ```
 
 ```text
@@ -158,7 +158,7 @@ directory above — drop the `AIMCUB_HOME` override. Check what Aimcub can see
 on your machine:
 
 ```bash
-pnpm --filter @app/cli exec aimcub agents
+pnpm --filter @aimcub/cli exec aimcub agents
 ```
 
 ```text
@@ -171,17 +171,17 @@ Claude Code: authentication required · 2.1.191 (Claude Code)
 "ready" means the CLI is installed and already authenticated (`codex login` /
 `claude login`, outside Aimcub) — nothing provider-specific to configure in
 Aimcub itself. If neither shows "ready", either authenticate one of those
-CLIs or run `pnpm --filter @app/cli exec aimcub setup` to configure an API
+CLIs or run `pnpm --filter @aimcub/cli exec aimcub setup` to configure an API
 provider instead.
 
 Once one agent is ready, run one dependency-ready, agent-owned sub-aim on a
-saved aim of your own (`pnpm --filter @app/cli exec aimcub new "<title>"`
+saved aim of your own (`pnpm --filter @aimcub/cli exec aimcub new "<title>"`
 first if you don't have one — see `aimcub --help` for the full verb list).
 Point `--workspace` at an absolute path you're fine with an agent touching —
 a scratch checkout, not your real project, until you trust the loop:
 
 ```bash
-pnpm --filter @app/cli exec aimcub run <id> --workspace ~/some/scratch/workspace --read-only
+pnpm --filter @aimcub/cli exec aimcub run <id> --workspace ~/some/scratch/workspace --read-only
 ```
 
 Omit `--milestone` and Aimcub picks the first dependency-ready sub-aim routed

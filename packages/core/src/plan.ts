@@ -10,7 +10,7 @@ import {
   type MilestoneStatus,
   type PlanEdge,
   type PlanNode,
-} from "@core/types";
+} from "@aimcub/types";
 
 export interface PlanValidation {
   ok: boolean;

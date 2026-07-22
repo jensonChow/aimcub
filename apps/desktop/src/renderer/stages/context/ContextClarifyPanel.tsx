@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
-import { decideChoiceSelection } from "@core/domain";
-import type { ClarifyOutput } from "@core/llm";
+import { decideChoiceSelection } from "@aimcub/core";
+import type { ClarifyOutput } from "@aimcub/llm";
 
 import { useI18n } from "../../i18n";
 import { Button, Panel, Pill, TextArea, TextField } from "../../ui";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AcceptanceRule, type Evidence } from "@core/types";
+import { AcceptanceRule, type Evidence } from "@aimcub/types";
 import { evaluate } from "./evaluate";
 
 function ev(o: Partial<Evidence> & Pick<Evidence, "kind">): Evidence {

@@ -1,5 +1,5 @@
-import type { AimIntakeReport } from "@core/domain";
-import type { PlanningContextSelectionReport } from "@core/llm";
+import type { AimIntakeReport } from "@aimcub/core";
+import type { PlanningContextSelectionReport } from "@aimcub/llm";
 
 import type { ContextSourceStatus, PlanningLiveEvent, PlanningToolIpcTrace } from "../../../shared/ipc";
 import type { ContextBundleReview } from "../../contextReview";

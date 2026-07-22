@@ -1,4 +1,4 @@
-import type { Milestone } from "@core/types";
+import type { Milestone } from "@aimcub/types";
 
 import { useI18n } from "../../i18n";
 import {

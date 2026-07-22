@@ -39,24 +39,24 @@ importers:
 
   apps/cli:
     dependencies:
+      '@aimcub/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@aimcub/llm':
+        specifier: workspace:*
+        version: link:../../packages/llm
+      '@aimcub/local-agent':
+        specifier: workspace:*
+        version: link:../../packages/local-agent
+      '@aimcub/store':
+        specifier: workspace:*
+        version: link:../../packages/store
+      '@aimcub/types':
+        specifier: workspace:*
+        version: link:../../packages/types
       '@anthropic-ai/sdk':
         specifier: ^0.110.0
         version: 0.110.0(zod@4.4.3)
-      '@core/domain':
-        specifier: workspace:*
-        version: link:../../packages/core
-      '@core/llm':
-        specifier: workspace:*
-        version: link:../../packages/llm
-      '@core/local-agent':
-        specifier: workspace:*
-        version: link:../../packages/local-agent
-      '@core/store':
-        specifier: workspace:*
-        version: link:../../packages/store
-      '@core/types':
-        specifier: workspace:*
-        version: link:../../packages/types
     devDependencies:
       '@types/node':
         specifier: ^22.20.0
@@ -73,19 +73,19 @@ importers:
 
   apps/desktop:
     dependencies:
-      '@core/domain':
+      '@aimcub/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@core/llm':
+      '@aimcub/llm':
         specifier: workspace:*
         version: link:../../packages/llm
-      '@core/local-agent':
+      '@aimcub/local-agent':
         specifier: workspace:*
         version: link:../../packages/local-agent
-      '@core/store':
+      '@aimcub/store':
         specifier: workspace:*
         version: link:../../packages/store
-      '@core/types':
+      '@aimcub/types':
         specifier: workspace:*
         version: link:../../packages/types
       react:
@@ -128,10 +128,10 @@ importers:
 
   apps/mcp:
     dependencies:
-      '@core/api-client':
+      '@aimcub/api-client':
         specifier: workspace:*
         version: link:../../packages/api
-      '@core/domain':
+      '@aimcub/core':
         specifier: workspace:*
         version: link:../../packages/core
       '@modelcontextprotocol/sdk':
@@ -171,7 +171,7 @@ importers:
 
   packages/api:
     dependencies:
-      '@core/types':
+      '@aimcub/types':
         specifier: workspace:*
         version: link:../types
       '@supabase/supabase-js':
@@ -180,7 +180,7 @@ importers:
 
   packages/core:
     dependencies:
-      '@core/types':
+      '@aimcub/types':
         specifier: workspace:*
         version: link:../types
     devDependencies:
@@ -190,10 +190,10 @@ importers:
 
   packages/db:
     dependencies:
-      '@core/domain':
+      '@aimcub/core':
         specifier: workspace:*
         version: link:../core
-      '@core/types':
+      '@aimcub/types':
         specifier: workspace:*
         version: link:../types
     devDependencies:
@@ -203,15 +203,15 @@ importers:
 
   packages/llm:
     dependencies:
+      '@aimcub/core':
+        specifier: workspace:*
+        version: link:../core
+      '@aimcub/types':
+        specifier: workspace:*
+        version: link:../types
       '@anthropic-ai/sdk':
         specifier: ^0.110.0
         version: 0.110.0(zod@4.4.3)
-      '@core/domain':
-        specifier: workspace:*
-        version: link:../core
-      '@core/types':
-        specifier: workspace:*
-        version: link:../types
     devDependencies:
       vitest:
         specifier: ^4.1.9
@@ -219,7 +219,7 @@ importers:
 
   packages/local-agent:
     dependencies:
-      '@core/llm':
+      '@aimcub/llm':
         specifier: workspace:*
         version: link:../llm
     devDependencies:
@@ -232,10 +232,10 @@ importers:
 
   packages/store:
     dependencies:
-      '@core/domain':
+      '@aimcub/core':
         specifier: workspace:*
         version: link:../core
-      '@core/types':
+      '@aimcub/types':
         specifier: workspace:*
         version: link:../types
     devDependencies:

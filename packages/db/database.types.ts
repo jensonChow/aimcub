@@ -3,7 +3,7 @@
  * aimcub project (ref gtasruxwmcsxicyujlfu, us-west-1) — regenerated after
  * migration 0011 dropped the emotional shell (pets / collectibles / notifications,
  * the rarity / minted_collectible_id columns, and the upsert_pet_monotonic RPC).
- * Reference artifact: the source of truth for union values stays @core/types
+ * Reference artifact: the source of truth for union values stays @aimcub/types
  * (zod); DB enums are text + CHECK by design.
  */
 export type Json =

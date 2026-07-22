@@ -6,7 +6,7 @@
  * the local substrate the planning engine may ask the runtime to execute.
  */
 
-import { CHOICE_SELECTION_REASONS, type ChoiceSelectionReason } from "@core/domain";
+import { CHOICE_SELECTION_REASONS, type ChoiceSelectionReason } from "@aimcub/core";
 
 export type AimcubToolName =
   | "local.read"

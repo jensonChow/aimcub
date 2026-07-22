@@ -25,7 +25,7 @@ signals are derived, how provider keys are handled, and how agents connect.
 
 The hosted Supabase-backed product can add sync, teams, sharing, and managed
 infrastructure, but the local desktop loop must not become a thin client to a
-closed service. Keep `@core/*` portable and platform-neutral so contributors can
+closed service. Keep `@aimcub/*` portable and platform-neutral so contributors can
 build new shells, agent adapters, and local workflows without rewriting the aim
 logic.
 
@@ -109,7 +109,7 @@ harness is now the active product surface. The old emotional shell was removed.
   replans.
 - **Evidence ingestion.** Append-only, idempotent on `(emitter_id, source_event_id)`.
   Emitters: MCP (a coding agent reports work), GitHub/CI webhooks (HMAC-verified).
-- **Eval / judging.** `evaluate()` (pure `@core` kernel) decides whether evidence
+- **Eval / judging.** `evaluate()` (pure `@aimcub/core` kernel) decides whether evidence
   satisfies a milestone's `acceptance_rule`; trusted evidence auto-completes the
   milestone (anti-spoofing trust floor). Milestone completion is **derived state**,
   recomputable from the evidence stream — never written directly.

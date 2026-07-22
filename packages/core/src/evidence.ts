@@ -4,7 +4,7 @@
  * Pure function — occurred_at is supplied by the caller to keep it deterministic and testable.
  * id / owner_id / emitter_id are filled in by the caller (Edge Function).
  */
-import { type EvidenceKind } from "@core/types";
+import { type EvidenceKind } from "@aimcub/types";
 
 export interface NormalizedEvidence {
   kind: EvidenceKind;

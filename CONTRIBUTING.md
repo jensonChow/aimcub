@@ -35,8 +35,8 @@ pnpm lint
 pnpm core:purity
 ```
 
-`pnpm lint` includes the `@core/*` purity `no-restricted-imports` rule, and
-`pnpm core:purity` separately compiles `@core/domain` and `@core/types` with no
+`pnpm lint` includes the `@aimcub/*` purity `no-restricted-imports` rule, and
+`pnpm core:purity` separately compiles `@aimcub/core` and `@aimcub/types` with no
 DOM and no Node types available, so any platform dependency that leaks into the
 kernel fails loudly. Run the full gate locally before opening a PR — do not
 rely on CI alone to catch a red gate.
@@ -49,12 +49,12 @@ the full gate whenever a change touches code.
 See the [Architecture Map](README.md#architecture-map) in the README for the
 full package/app table. The core contract that shapes where a change belongs:
 
-- Business logic lives only in `@core/*` pure TypeScript packages
+- Business logic lives only in `@aimcub/*` pure TypeScript packages
   (`packages/types`, `packages/core`) — zero platform dependencies, unit-tested,
   and purity-guarded by `pnpm core:purity`.
 - Everything under `apps/*` (`apps/desktop`, `apps/cli`, `apps/mcp`) is a shell:
   I/O, rendering, and platform bridging only. If you find yourself adding
-  business logic to an app shell, it likely belongs in `@core/*` instead.
+  business logic to an app shell, it likely belongs in `@aimcub/*` instead.
 - `packages/store`, `packages/llm`, `packages/local-agent`, and `packages/api`
   sit between the core and the app shells; see the Architecture Map for what
   each owns.
@@ -72,7 +72,7 @@ full package/app table. The core contract that shapes where a change belongs:
   directory instead of touching your real `~/.aimcub` store:
 
   ```bash
-  AIMCUB_HOME=/tmp/aimcub-local-alpha pnpm --filter @app/cli exec aimcub config
+  AIMCUB_HOME=/tmp/aimcub-local-alpha pnpm --filter @aimcub/cli exec aimcub config
   ```
 
 ## Where Project Memory Lives

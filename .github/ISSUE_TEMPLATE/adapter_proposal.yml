@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Aimcub runs local coding/research agents through adapters in `@core/local-agent`.
+        Aimcub runs local coding/research agents through adapters in `@aimcub/local-agent`.
         Read `docs/local-agent-adapters.md` before filling this in — it defines the adapter
         contract, the contribution recipe, and why `buildInvocation` (mapping Aimcub's
         sandbox/network grant onto the runtime's own flags) is a security contract, not just

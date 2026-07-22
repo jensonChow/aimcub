@@ -1,5 +1,5 @@
 {
-  "name": "@app/mcp",
+  "name": "@aimcub/mcp",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -12,8 +12,8 @@
     "deploy": "wrangler deploy"
   },
   "dependencies": {
-    "@core/api-client": "workspace:*",
-    "@core/domain": "workspace:*",
+    "@aimcub/api-client": "workspace:*",
+    "@aimcub/core": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@supabase/supabase-js": "^2.110.0",
     "fetch-to-node": "^2.1.0",

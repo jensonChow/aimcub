@@ -1,5 +1,5 @@
-import { inferContextCategory } from "@core/domain";
-import type { ContextCategory, MemoryKind } from "@core/types";
+import { inferContextCategory } from "@aimcub/core";
+import type { ContextCategory, MemoryKind } from "@aimcub/types";
 
 export interface PlanningMemory {
   id?: string;

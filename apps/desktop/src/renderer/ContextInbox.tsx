@@ -1,7 +1,7 @@
 import { useState } from "react";
 
-import { isPromptLikeContextCandidate, recommendContextScope } from "@core/domain";
-import type { Memory } from "@core/types";
+import { isPromptLikeContextCandidate, recommendContextScope } from "@aimcub/core";
+import type { Memory } from "@aimcub/types";
 import type { AcceptContextCandidateRequest } from "../shared/ipc";
 
 import { useI18n, type StringKey } from "./i18n";

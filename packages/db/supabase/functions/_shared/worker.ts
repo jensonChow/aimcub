@@ -17,9 +17,9 @@
  * No I/O of its own: `deps` carries the repo and a `now()` clock. Handlers are
  * total: every expected state maps to a JobOutcome variant.
  */
-import { AcceptanceRule } from "@core/types";
-import { evaluate } from "@core/domain";
-import type { Job, MilestoneCompletion } from "@core/types";
+import { AcceptanceRule } from "@aimcub/types";
+import { evaluate } from "@aimcub/core";
+import type { Job, MilestoneCompletion } from "@aimcub/types";
 import type { WorkerRepo } from "./ports.ts";
 
 export interface WorkerDeps {
@@ -93,7 +93,7 @@ async function judgeOneMilestone(deps: WorkerDeps, milestoneId: string): Promise
     return { kind: "skipped", reason: "milestone already completed" };
   }
 
-  // The acceptance_rule is stored as jsonb; parse it through the @core schema so
+  // The acceptance_rule is stored as jsonb; parse it through the @aimcub/core schema so
   // defaults (logic, threshold, completion_mode, clause defaults) are applied.
   const parsedRule = AcceptanceRule.safeParse(milestone.acceptance_rule);
   if (!parsedRule.success) {

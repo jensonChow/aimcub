@@ -22,20 +22,20 @@ The MCP server is Aimcub's differentiated evidence emitter for coding agents
 2. **MCP tools wired through injected ports** so every external touchpoint is
    mockable:
    - `report_evidence` — an agent reports progress. Input is validated with
-     `@core/types` zod schemas, normalized into an Evidence envelope via
-     `@core/domain` (`normalizeCommitEvidence` / `normalizeCiEvidence` / a
+     `@aimcub/types` zod schemas, normalized into an Evidence envelope via
+     `@aimcub/core` (`normalizeCommitEvidence` / `normalizeCiEvidence` / a
      generic `mcp_report` normalizer), then handed to the injected
      `EvidenceIngestPort`. Returns an ack `{ accepted, evidenceId, kind }`.
    - `goal_status` / `list_milestones` — read milestones for a goal through the
-     injected `AimcubRepo` (`@core/api-client`).
+     injected `AimcubRepo` (`@aimcub/api-client`).
 3. **No real network / credentials.** All I/O is behind injected ports. Secrets
    are read from `process.env` only and never required for tests.
 
 ## Boundaries
 
 - Modify only files under `apps/mcp/**` and this `CHARTER.md`.
-- `packages/types` is the frozen domain contract — never edited. `@core/domain`
-  re-exports it; `@core/api-client` defines the data-access contract (`AimcubRepo`,
+- `packages/types` is the frozen domain contract — never edited. `@aimcub/core`
+  re-exports it; `@aimcub/api-client` defines the data-access contract (`AimcubRepo`,
   `IngestEvidenceInput`). Both are consumed as-is.
 - All identifiers / comments / docs are English.
 
@@ -56,15 +56,15 @@ The MCP server is Aimcub's differentiated evidence emitter for coding agents
 
 ## Acceptance criteria
 
-- `pnpm --filter @app/mcp run typecheck` passes.
-- `pnpm --filter @app/mcp run test` passes:
+- `pnpm --filter @aimcub/mcp run typecheck` passes.
+- `pnpm --filter @aimcub/mcp run test` passes:
   - auth: accepts a JWT with valid signature + correct `aud`; rejects a JWT
     with the wrong `aud`; rejects a JWT with a tampered/invalid signature; rejects
     an expired token and a malformed token.
   - `report_evidence`: maps a commit report → normalized `git_commit` evidence and
     calls the ingest port with the right owner/goal/kind/payload; likewise for a
     CI report and a free-form note (`mcp_report`); rejects input that fails the
-    `@core/types` validation.
+    `@aimcub/types` validation.
 
 ## Live-integration TODOs (`// TODO(v1a-live)`)
 

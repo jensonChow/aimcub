@@ -3,8 +3,8 @@ import type {
   WebSearchClient,
   WebSearchInput,
   WebSearchOutput,
-} from "@core/llm";
-import { LocalCliLlmGateway } from "@core/local-agent";
+} from "@aimcub/llm";
+import { LocalCliLlmGateway } from "@aimcub/local-agent";
 
 type ResearchLane =
   | "aim_facts"

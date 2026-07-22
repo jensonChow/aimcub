@@ -2,8 +2,8 @@ import {
   createWebResearchRuntime,
   type AimcubToolHandlerContext,
   type WebResearchRuntime,
-} from "@core/llm";
-import type { WebResearchSettings } from "@core/store";
+} from "@aimcub/llm";
+import type { WebResearchSettings } from "@aimcub/store";
 
 import type { WebResearchConfig, WebResearchStatus, WebResearchTestResult } from "../shared/ipc";
 import { LocalCliWebSearchClient } from "./local-cli-web-search";

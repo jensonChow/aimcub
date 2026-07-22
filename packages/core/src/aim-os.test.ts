@@ -11,7 +11,7 @@ import {
   type Run,
   type SubAimRelation,
   type ToolTrace,
-} from "@core/types";
+} from "@aimcub/types";
 import {
   buildAimCompletionRecap,
   buildAimProgressReadModel,

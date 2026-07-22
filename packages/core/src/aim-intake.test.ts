@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { DecompositionOutput, Memory } from "@core/types";
+import type { DecompositionOutput, Memory } from "@aimcub/types";
 import { reviewAimIntake } from "./aim-intake";
 import { reviewPlan } from "./plan-quality";
 

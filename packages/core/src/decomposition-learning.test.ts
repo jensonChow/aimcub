@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { Evidence, Goal, Milestone, MilestoneCompletion } from "@core/types";
+import type { Evidence, Goal, Milestone, MilestoneCompletion } from "@aimcub/types";
 import type { ContextLineageReport } from "./context-lineage";
 import { reviewDecompositionStrategy, summarizeDecompositionLearning } from "./decomposition-learning";
 

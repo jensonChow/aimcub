@@ -17,7 +17,7 @@
  */
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { Milestone } from "@core/domain";
+import type { Milestone } from "@aimcub/core";
 import type { ToolDeps } from "./ports.js";
 import { ReportEvidenceInput, normalizeReport, toIngestInput } from "./evidence-input.js";
 

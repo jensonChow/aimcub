@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { AcceptanceRule, DecompositionOutput, DecompositionOwner, PlanNode } from "@core/types";
+import type { AcceptanceRule, DecompositionOutput, DecompositionOwner, PlanNode } from "@aimcub/types";
 
 import { buildLocalHandoffManifest, buildPlanHandoffReport } from "./plan-handoff";
 

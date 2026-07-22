@@ -17,7 +17,7 @@
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { toReqRes, toFetchResponse } from "fetch-to-node";
 import { createClient } from "@supabase/supabase-js";
-import type { SupabaseLike } from "@core/api-client";
+import type { SupabaseLike } from "@aimcub/api-client";
 import {
   AuthError,
   bearerFromHeader,
@@ -114,7 +114,7 @@ export function productionDeps(env: Env): LiveDeps {
   }
   if (!liveDepsCache || liveDepsCache.url !== url) {
     // The real supabase-js client is a structural superset of SupabaseLike (see
-    // @core/api-client); no sessions — every call carries the service key.
+    // @aimcub/api-client); no sessions — every call carries the service key.
     const client = createClient(url, key, {
       auth: { persistSession: false, autoRefreshToken: false },
     }) as unknown as SupabaseLike;

@@ -4,8 +4,8 @@ import type {
   PlanNode,
   PlanRoutingOverride,
   PlanRoutingOwner,
-} from "@core/types";
-import type { RoutingRuntimeAgentOption } from "@core/domain";
+} from "@aimcub/types";
+import type { RoutingRuntimeAgentOption } from "@aimcub/core";
 
 export function formatAcceptanceRule(rule: AcceptanceRuleType): string {
   return JSON.stringify(rule, null, 2);

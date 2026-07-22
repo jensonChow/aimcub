@@ -6,7 +6,7 @@
  * `listMemories` IPC and "Forget" reuses the existing `archiveContextMemory` path;
  * both are threaded in from App as props so this view stays render-only.
  */
-import type { ContextCategory, Goal, Memory } from "@core/types";
+import type { ContextCategory, Goal, Memory } from "@aimcub/types";
 
 import { useI18n, type StringKey } from "../../i18n";
 

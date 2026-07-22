@@ -3,17 +3,17 @@
  * planner + store expect. `parseAnswers` / `answersToMemories` are pure (unit-tested);
  * `promptAnswers` is the interactive readline path, reached only on a TTY.
  *
- * Answers fold into the refined plan via `@core/llm`'s `buildRefinedDescription`, and into
+ * Answers fold into the refined plan via `@aimcub/llm`'s `buildRefinedDescription`, and into
  * `user_stated` memories the same way the desktop save path does (question text → answer) —
  * one shared shape so a CLI-created aim and a desktop-created aim look identical in the store.
  */
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 
-import { decideChoiceSelection, type ContextIntakeProgressSignal } from "@core/domain";
-import { clarifyAnswersToMemories } from "@core/llm";
-import type { ClarifyAnswer, ClarifyQuestion } from "@core/llm";
-import type { NewMemory } from "@core/store";
+import { decideChoiceSelection, type ContextIntakeProgressSignal } from "@aimcub/core";
+import { clarifyAnswersToMemories } from "@aimcub/llm";
+import type { ClarifyAnswer, ClarifyQuestion } from "@aimcub/llm";
+import type { NewMemory } from "@aimcub/store";
 
 /**
  * Parse a JSON array of clarify answers (from `--answers`). Lenient: rows missing a

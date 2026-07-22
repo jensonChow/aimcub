@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
-import type { AimProgressReadModel } from "@core/domain";
-import type { Milestone, RunEvent } from "@core/types";
+import type { AimProgressReadModel } from "@aimcub/core";
+import type { Milestone, RunEvent } from "@aimcub/types";
 import type { ConfirmMilestoneRequest, GoalDetail, RunPermissionConsent } from "../../../shared/ipc";
 
 import { useI18n } from "../../i18n";

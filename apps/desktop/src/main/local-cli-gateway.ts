@@ -1,1 +1,1 @@
-export { LocalCliLlmGateway } from "@core/local-agent";
+export { LocalCliLlmGateway } from "@aimcub/local-agent";

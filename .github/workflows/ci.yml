@@ -27,7 +27,7 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: "Lint (includes @core/* purity: no-restricted-imports)"
+      - name: "Lint (includes @aimcub/* purity: no-restricted-imports)"
         run: pnpm lint
 
       - name: Test
@@ -36,7 +36,7 @@ jobs:
       - name: Build
         run: pnpm build
 
-      # Core purity guard: @core/domain and @core/types must compile cleanly with no DOM and no node types.
+      # Core purity guard: @aimcub/core and @aimcub/types must compile cleanly with no DOM and no node types.
       # Any platform dependency that sneaks into the kernel turns this red — the safeguard that keeps "one shared core across all four clients" from being an empty slogan.
       - name: Core purity guard
         run: pnpm core:purity

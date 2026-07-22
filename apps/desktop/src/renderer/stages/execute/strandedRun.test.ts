@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { Run } from "@core/types";
+import type { Run } from "@aimcub/types";
 
 import { strandedRunFor } from "./strandedRun";
 

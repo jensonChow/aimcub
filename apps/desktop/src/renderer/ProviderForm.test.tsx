@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { LLM_PROVIDER_CATALOG, type LlmProvider } from "@core/llm/providers";
+import { LLM_PROVIDER_CATALOG, type LlmProvider } from "@aimcub/llm/providers";
 import type { ProviderStatus } from "../shared/ipc";
 
 import { I18nProvider } from "./i18n";

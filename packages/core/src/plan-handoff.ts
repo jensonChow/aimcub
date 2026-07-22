@@ -6,7 +6,7 @@ import type {
   DecompositionOutput,
   DecompositionOwner,
   PlanNode,
-} from "@core/types";
+} from "@aimcub/types";
 import type {
   ContextSedimentationAimContext,
   ContextSedimentationMemoryCandidate,

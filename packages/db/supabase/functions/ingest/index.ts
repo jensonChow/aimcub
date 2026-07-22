@@ -15,7 +15,7 @@
  * function (Step 6) — this endpoint stays token-only.
  *
  * Deploy note: at deploy time `../_shared/*` is bundled as `./_shared/*` and
- * `@core/*` resolves via the function's deno.json import map to vendored sources
+ * `@aimcub/*` resolves via the function's deno.json import map to vendored sources
  * (pure TS, zero platform deps). This file MUST NOT be imported by the Vitest
  * suite — the pure handler is what tests drive.
  *

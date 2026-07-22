@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { Goal, Memory } from "@core/types";
+import type { Goal, Memory } from "@aimcub/types";
 import { reviewAimLearning } from "./aim-learning";
 
 const goal = {

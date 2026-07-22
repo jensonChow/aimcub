@@ -2,7 +2,7 @@
  * JSON Schema for the goal-decomposition Structured Output.
  *
  * This is the schema we hand to Claude via `output_config.format` so the model is
- * constrained to emit a plan that normalizes into {@link import("@core/types").DecompositionOutput}.
+ * constrained to emit a plan that normalizes into {@link import("@aimcub/types").DecompositionOutput}.
  *
  * Shape rules — found empirically against the live API (2026-06):
  *  - NO optional properties. The structured-output grammar compiler's cost explodes

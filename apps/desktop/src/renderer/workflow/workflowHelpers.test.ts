@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { AimIntakeReport } from "@core/domain";
-import type { DecompositionOutput, Goal, Milestone } from "@core/types";
+import type { AimIntakeReport } from "@aimcub/core";
+import type { DecompositionOutput, Goal, Milestone } from "@aimcub/types";
 import type { ContextSourceStatus, GoalDetail, LocalAgentDetection } from "../../shared/ipc";
 import { translate, type I18n } from "../i18n";
 

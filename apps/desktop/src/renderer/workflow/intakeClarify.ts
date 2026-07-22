@@ -1,6 +1,6 @@
-import { decideChoiceSelection, type AimIntakeReport } from "@core/domain";
-import type { ClarifyAnswer, ClarifyOutput, ClarifyQuestion } from "@core/llm";
-import type { ContextCategory } from "@core/types";
+import { decideChoiceSelection, type AimIntakeReport } from "@aimcub/core";
+import type { ClarifyAnswer, ClarifyOutput, ClarifyQuestion } from "@aimcub/llm";
+import type { ContextCategory } from "@aimcub/types";
 
 import type { ContextAnswerMap } from "../stages/context/types";
 

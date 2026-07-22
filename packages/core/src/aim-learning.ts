@@ -1,4 +1,4 @@
-import type { ContextCategory, Goal, Memory } from "@core/types";
+import type { ContextCategory, Goal, Memory } from "@aimcub/types";
 import type { AimIntakeReadiness } from "./aim-intake";
 import { inferContextCategory } from "./context";
 import type { PlanContextGapPriority } from "./plan-quality";

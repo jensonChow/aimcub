@@ -1,7 +1,7 @@
 /**
  * The single audit point for everything this example borrows from the repo.
  *
- * `examples/` is not a workspace package, so it cannot resolve `@core/*` specifiers. Like
+ * `examples/` is not a workspace package, so it cannot resolve `@aimcub/*` specifiers. Like
  * `examples/local-alpha/seed-local-alpha-demo.ts`, the harness reaches into the package sources by
  * relative path. Keeping every such import here means one file answers "what does the benchmark
  * touch?" — and the benchmark never re-implements planning logic it is supposed to be measuring.
