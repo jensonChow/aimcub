@@ -146,4 +146,20 @@ or run the local alpha path.
 - v2 is the online multiplayer Aim platform.
 - v3 is Aim Share.
 
-License choice is intentionally undecided before public release.
+License choice is intentionally undecided before public release — see
+[Contributing & Community](#contributing--community).
+
+## Contributing & Community
+
+Aimcub is source-available in this repository during pre-release. An
+open-source license has not yet been chosen; until a `LICENSE` file lands, all
+rights are reserved and external contributions may be held until the license
+decision is made.
+
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) covers setup, the verification gate, and
+  contribution conventions.
+- [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) is our community standard
+  (Contributor Covenant v2.1).
+- [`SECURITY.md`](SECURITY.md) explains how to report a vulnerability.
+- Issue and pull request templates live under [`.github/`](.github/PULL_REQUEST_TEMPLATE.md)
+  for bug reports, feature requests, and PRs.

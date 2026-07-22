@@ -1,0 +1,51 @@
+name: Feature Request
+description: Propose a new capability or change in behavior for Aimcub.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Aimcub manages aims across humans and agents through a plan / route /
+        evidence / eval / memory loop. See `docs/vision.md` and
+        `docs/v1-spec.md` for current direction before proposing scope changes.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the gap or friction you're running into.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-behavior
+    attributes:
+      label: Proposed behavior
+      description: What should Aimcub do instead?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: layer
+    attributes:
+      label: Which layer does this affect?
+      options:
+        - Aim intake
+        - Planning
+        - Routing
+        - Execution
+        - Evidence
+        - Eval
+        - Memory
+        - Desktop UI
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any workarounds you're using today, or other approaches you considered.
+    validations:
+      required: false
