@@ -8,6 +8,24 @@ useful context become reusable memory.
 The current project is the open-source local Aim OS agent harness. It is a local
 alpha, not the hosted multiplayer platform.
 
+## Quickstart
+
+New here? Go from a clone to an explorable, seeded aim in Desktop — no API
+keys, no account — in about five minutes:
+
+```bash
+corepack enable pnpm && pnpm install
+pnpm --filter @app/cli build
+pnpm --filter @app/cli exec esbuild ../../examples/local-alpha/seed-local-alpha-demo.ts \
+  --bundle --platform=node --format=esm --target=node22 --outfile=~/aimcub-quickstart-seed.mjs && \
+  node ~/aimcub-quickstart-seed.mjs --target ~/aimcub-quickstart
+AIMCUB_HOME=~/aimcub-quickstart pnpm desktop
+```
+
+See [`docs/quickstart.md`](docs/quickstart.md) — the canonical walkthrough —
+for what you should see, the same store from the CLI, and how to point
+Aimcub at a real local coding agent next.
+
 ## Local Alpha
 
 The local alpha is the inspectable single-user loop that runs on one machine:
@@ -34,8 +52,8 @@ Today this means:
 
 See [`docs/open-source-local-alpha.md`](docs/open-source-local-alpha.md) for the
 developer/contributor guide and [`docs/local-alpha.md`](docs/local-alpha.md) for
-the narrower alpha contract. For a provider-free deterministic walkthrough, see
-[`examples/local-alpha/README.md`](examples/local-alpha/README.md).
+the narrower alpha contract. For the provider-free deterministic walkthrough,
+see [`docs/quickstart.md`](docs/quickstart.md).
 
 ## Not In The Local Alpha
 
@@ -62,6 +80,8 @@ For product direction:
 
 For contributor context:
 
+- [`docs/quickstart.md`](docs/quickstart.md) is the fastest way to see the
+  product loop running, provider-free.
 - [`AGENTS.md`](AGENTS.md) is the root project contract.
 - [`docs/handoff.md`](docs/handoff.md) is the latest session transfer.
 - [`docs/memory/README.md`](docs/memory/README.md) maps durable module memory.
@@ -106,21 +126,8 @@ pnpm desktop:build  # build the desktop app
 pnpm desktop:pack   # produce a local macOS app directory
 ```
 
-CLI commands use the shared local store:
-
-```bash
-pnpm --filter @app/cli build
-AIMCUB_HOME=/tmp/aimcub-local-alpha pnpm --filter @app/cli exec aimcub config
-AIMCUB_HOME=/tmp/aimcub-local-alpha pnpm --filter @app/cli exec aimcub new "Ship a small local tool"
-AIMCUB_HOME=/tmp/aimcub-local-alpha pnpm --filter @app/cli exec aimcub board <aim-id>
-AIMCUB_HOME=/tmp/aimcub-local-alpha pnpm --filter @app/cli exec aimcub context review
-```
-
-For isolated local data during development:
-
-```bash
-AIMCUB_HOME=/tmp/aimcub-local-alpha pnpm --filter @app/cli exec aimcub config
-```
+For CLI usage and an isolated `AIMCUB_HOME` during development, see
+[Quickstart](#quickstart) above and [`docs/quickstart.md`](docs/quickstart.md).
 
 Do not commit secrets. Provider keys are read from environment variables or saved
 local settings files under the selected Aimcub data directory.
