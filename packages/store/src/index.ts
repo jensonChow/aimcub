@@ -14,7 +14,7 @@
  * so it may do node fs/os/path/crypto I/O. @core/domain must never import this.
  */
 import { randomUUID } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -73,6 +73,25 @@ import type {
   ToolTrace,
   ToolTraceStatus,
 } from "@core/types";
+
+import {
+  acquireStoreLock,
+  readJsonFileSafe,
+  writeFileAtomic,
+  writeJsonFileWithBackup,
+  type StoreDiagnostic,
+  type StoreLockOptions,
+} from "./safe-fs";
+
+export {
+  backupPathFor,
+  quarantinePathFor,
+  storeLockPath,
+  type StoreDiagnostic,
+  type StoreDiagnosticKind,
+  type StoreLockOptions,
+  type StoreLockPayload,
+} from "./safe-fs";
 
 /** Fixed local owner for the single-user local app (matches the web demo owner). */
 export const DEFAULT_OWNER = "00000000-0000-4000-8000-000000000001";
@@ -402,6 +421,12 @@ export interface AimStore {
   listAimProgressSummaries(): Promise<AimProgressSummary[]>;
   exportData(): Promise<LocalStore>;
   importData(snapshot: LocalStore, mode?: "merge" | "replace"): Promise<ImportStoreResult>;
+  /**
+   * Corruption/recovery events this store instance noticed while loading, oldest first. A store
+   * that quarantines a corrupt file and falls back to a backup (or to empty) must be able to SAY
+   * so — silence is how the old implementation turned corruption into invisible data loss.
+   */
+  getDiagnostics(): Promise<StoreDiagnostic[]>;
 }
 
 export interface JsonFileStoreOptions {
@@ -409,6 +434,8 @@ export interface JsonFileStoreOptions {
   idFactory?: () => string;
   /** Optional deterministic clock for tests and seed builders. Defaults to the current time. */
   now?: () => string;
+  /** Cross-process write-lock tuning (timeout / stale reclaim / backoff). Defaults are fine. */
+  lock?: StoreLockOptions;
 }
 
 /** Default data dir: `$AIMCUB_HOME` or `~/.aimcub` (shared by desktop + CLI). */
@@ -590,17 +617,13 @@ export function loadSettings(dataDir: string = defaultDataDir()): ProviderSettin
   }
 }
 
-/** Persist provider settings to settings.json with owner-only (0600) perms — it holds a key. */
+/**
+ * Persist provider settings to settings.json with owner-only (0600) perms — it holds a key.
+ * Written atomically (temp + fsync + rename) so a crash can never leave a truncated key file;
+ * `writeFileAtomic` re-applies the mode after `open`, since umask filters the create mode.
+ */
 export function saveSettings(config: ProviderSettings, dataDir: string = defaultDataDir()): void {
-  mkdirSync(dataDir, { recursive: true });
-  const p = settingsPath(dataDir);
-  writeFileSync(p, JSON.stringify(config, null, 2), { encoding: "utf8", mode: 0o600 });
-  // mode on writeFileSync only applies on create; enforce it on overwrite too.
-  try {
-    chmodSync(p, 0o600);
-  } catch {
-    /* best-effort (e.g. Windows) */
-  }
+  writeFileAtomic(settingsPath(dataDir), JSON.stringify(config, null, 2), { mode: 0o600 });
 }
 
 export function loadWebResearchSettings(dataDir: string = defaultDataDir()): WebResearchSettings | null {
@@ -621,14 +644,7 @@ export function loadWebResearchSettings(dataDir: string = defaultDataDir()): Web
 }
 
 export function saveWebResearchSettings(config: WebResearchSettings, dataDir: string = defaultDataDir()): void {
-  mkdirSync(dataDir, { recursive: true });
-  const p = webResearchSettingsPath(dataDir);
-  writeFileSync(p, JSON.stringify(config, null, 2), { encoding: "utf8", mode: 0o600 });
-  try {
-    chmodSync(p, 0o600);
-  } catch {
-    /* best-effort (e.g. Windows) */
-  }
+  writeFileAtomic(webResearchSettingsPath(dataDir), JSON.stringify(config, null, 2), { mode: 0o600 });
 }
 
 function cleanOptionalPath(value: unknown): string | undefined {
@@ -730,14 +746,7 @@ export function loadContextSourceSettings(dataDir: string = defaultDataDir()): C
 
 export function saveContextSourceSettings(config: ContextSourceSettings, dataDir: string = defaultDataDir()): ContextSourceSettings {
   const normalized = normalizeContextSourceSettings(config);
-  mkdirSync(dataDir, { recursive: true });
-  const p = contextSourceSettingsPath(dataDir);
-  writeFileSync(p, JSON.stringify(normalized, null, 2), { encoding: "utf8", mode: 0o600 });
-  try {
-    chmodSync(p, 0o600);
-  } catch {
-    /* best-effort (e.g. Windows) */
-  }
+  writeFileAtomic(contextSourceSettingsPath(dataDir), JSON.stringify(normalized, null, 2), { mode: 0o600 });
   return normalized;
 }
 
@@ -1220,45 +1229,105 @@ function sortAimDraftsNewestFirst(rows: AimDraftRow[]): AimDraftRow[] {
   return rows.slice().sort((a, b) => (b.updated_at ?? b.created_at ?? "").localeCompare(a.updated_at ?? a.created_at ?? ""));
 }
 
+/** A present-but-wrong-typed collection is corruption, not an empty collection — say so loudly. */
+function requireRows<T>(value: unknown, field: string): T[] {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) throw new Error(`store.json field "${field}" is not an array`);
+  return value as T[];
+}
+
+/**
+ * Turn raw parsed JSON into a {@link LocalStore}, THROWING when the content cannot be a store.
+ * Throwing is the point: it routes "parses as JSON but is not our shape" into the same
+ * quarantine + backup-recovery path as unparsable bytes, instead of an invisible empty store.
+ */
+function normalizeLocalStore(raw: unknown): LocalStore {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error("store.json does not contain a JSON object");
+  }
+  const parsed = raw as Partial<LocalStore>;
+  if (parsed.milestonesByGoal !== undefined && parsed.milestonesByGoal !== null) {
+    if (typeof parsed.milestonesByGoal !== "object" || Array.isArray(parsed.milestonesByGoal)) {
+      throw new Error('store.json field "milestonesByGoal" is not an object');
+    }
+  }
+  return {
+    ownerId: parsed.ownerId ?? DEFAULT_OWNER,
+    goals: requireRows<Goal>(parsed.goals, "goals"),
+    aimDrafts: requireRows<unknown>(parsed.aimDrafts, "aimDrafts")
+      .map(normalizeAimDraftRow)
+      .filter((row): row is AimDraftRow => row !== null),
+    milestonesByGoal: parsed.milestonesByGoal ?? {},
+    memories: requireRows<Memory>(parsed.memories, "memories").map(normalizeMemoryRow),
+    evidence: requireRows<Evidence>(parsed.evidence, "evidence"),
+    completions: requireRows<MilestoneCompletion>(parsed.completions, "completions"),
+    actors: requireRows<Actor>(parsed.actors, "actors"),
+    subAimRelations: requireRows<SubAimRelation>(parsed.subAimRelations, "subAimRelations"),
+    assignments: requireRows<Assignment>(parsed.assignments, "assignments"),
+    runs: requireRows<Run>(parsed.runs, "runs"),
+    runEvents: requireRows<RunEvent>(parsed.runEvents, "runEvents"),
+    toolTraces: requireRows<ToolTrace>(parsed.toolTraces, "toolTraces"),
+    evidenceAttributions: requireRows<EvidenceAttribution>(parsed.evidenceAttributions, "evidenceAttributions"),
+    contextIntakeSessions: requireRows<ContextIntakeSession>(parsed.contextIntakeSessions, "contextIntakeSessions"),
+  };
+}
+
+/** Keep the diagnostics ring small: this is an incident log, not a journal. */
+const MAX_DIAGNOSTICS = 50;
+
 /**
  * A JSON-file-backed {@link AimStore} rooted at `dataDir` (default {@link defaultDataDir}).
- * Each operation loads → mutates → saves; fine for a single user. (If concurrent desktop +
- * CLI writes ever become real, move to SQLite — last-writer-wins is the known limitation.)
+ *
+ * Each MUTATION is one `load → mutate → save` cycle held under a cross-process advisory lock
+ * (`store.lock` beside the data), so Desktop and the CLI serialize at operation granularity
+ * instead of clobbering each other's whole-file writes. The fresh load inside the lock is what
+ * makes that true — a lost update needs a stale snapshot, and there is none.
+ *
+ * Reads stay lock-free on purpose: every write lands via temp + fsync + rename, so a reader
+ * always sees one whole consistent file and never blocks the writer (or waits on a stale lock).
  */
 export function createJsonFileStore(dataDir: string = defaultDataDir(), options: JsonFileStoreOptions = {}): AimStore {
   const file = join(dataDir, "store.json");
   const nextId = options.idFactory ?? randomUUID;
   const nowIso = options.now ?? (() => new Date().toISOString());
+  const diagnostics: StoreDiagnostic[] = [];
 
   function load(): LocalStore {
-    try {
-      if (!existsSync(file)) return emptyStore();
-      const parsed = JSON.parse(readFileSync(file, "utf8")) as Partial<LocalStore>;
-      return {
-        ownerId: parsed.ownerId ?? DEFAULT_OWNER,
-        goals: parsed.goals ?? [],
-        aimDrafts: (parsed.aimDrafts ?? []).map(normalizeAimDraftRow).filter((row): row is AimDraftRow => row !== null),
-        milestonesByGoal: parsed.milestonesByGoal ?? {},
-        memories: (parsed.memories ?? []).map(normalizeMemoryRow),
-        evidence: parsed.evidence ?? [],
-        completions: parsed.completions ?? [],
-        actors: parsed.actors ?? [],
-        subAimRelations: parsed.subAimRelations ?? [],
-        assignments: parsed.assignments ?? [],
-        runs: parsed.runs ?? [],
-        runEvents: parsed.runEvents ?? [],
-        toolTraces: parsed.toolTraces ?? [],
-        evidenceAttributions: parsed.evidenceAttributions ?? [],
-        contextIntakeSessions: parsed.contextIntakeSessions ?? [],
-      };
-    } catch {
-      return emptyStore();
+    const result = readJsonFileSafe(file, normalizeLocalStore);
+    if (result.diagnostics.length > 0) {
+      diagnostics.push(...result.diagnostics);
+      if (diagnostics.length > MAX_DIAGNOSTICS) diagnostics.splice(0, diagnostics.length - MAX_DIAGNOSTICS);
     }
+    // `null` means "nothing usable on disk": a clean first run, or a quarantine with no backup.
+    return result.value ?? emptyStore();
   }
 
   function save(store: LocalStore): void {
-    mkdirSync(dataDir, { recursive: true });
-    writeFileSync(file, JSON.stringify(store, null, 2), "utf8");
+    writeJsonFileWithBackup(file, JSON.stringify(store, null, 2));
+  }
+
+  // Reentrancy guard: a nested mutation inside an already-locked cycle must NOT try to take the
+  // lock again (that would deadlock against ourselves — the holder pid is alive and fresh).
+  let lockDepth = 0;
+
+  /** Run one mutating cycle under the cross-process lock. The lock always spans load → save. */
+  function withWriteLock<T>(run: () => T): T {
+    if (lockDepth > 0) {
+      lockDepth += 1;
+      try {
+        return run();
+      } finally {
+        lockDepth -= 1;
+      }
+    }
+    const lock = acquireStoreLock(dataDir, options.lock);
+    lockDepth = 1;
+    try {
+      return run();
+    } finally {
+      lockDepth = 0;
+      lock.release();
+    }
   }
 
   return {
@@ -1282,233 +1351,247 @@ export function createJsonFileStore(dataDir: string = defaultDataDir(), options:
     },
 
     async upsertAimDraft(input: UpsertAimDraftInput): Promise<AimDraftRow> {
-      const store = load();
-      const now = nowIso();
-      const existing = input.id ? store.aimDrafts.find((draft) => draft.id === input.id) : undefined;
-      const draft = AimDraft.parse({
-        id: existing?.id ?? input.id ?? nextId(),
-        owner_id: input.ownerId ?? existing?.owner_id ?? store.ownerId ?? DEFAULT_OWNER,
-        title: input.title ?? existing?.title ?? "",
-        description: input.description ?? existing?.description ?? "",
-        parent_goal_id: input.parentGoalId === undefined ? existing?.parent_goal_id ?? null : input.parentGoalId,
-        parent_milestone_id: input.parentMilestoneId === undefined ? existing?.parent_milestone_id ?? null : input.parentMilestoneId,
-        current_stage: input.currentStage ?? existing?.current_stage ?? "aim",
-        phase: input.phase === undefined ? existing?.phase ?? null : input.phase,
-        status: input.status ?? existing?.status ?? "draft",
-        aim_surface: input.aimSurface === undefined ? existing?.aim_surface ?? null : input.aimSurface,
-        context_note: input.contextNote ?? existing?.context_note ?? "",
-        intake_questions: input.intakeQuestions ?? existing?.intake_questions ?? [],
-        intake_answers: input.intakeAnswers ?? existing?.intake_answers ?? [],
-        clarify_questions: input.clarifyQuestions ?? existing?.clarify_questions ?? [],
-        clarify_answers: input.clarifyAnswers ?? existing?.clarify_answers ?? [],
-        clarify_assumptions: input.clarifyAssumptions ?? existing?.clarify_assumptions ?? [],
-        draft_plan: input.draftPlan === undefined ? existing?.draft_plan ?? null : input.draftPlan,
-        final_plan: input.finalPlan === undefined ? existing?.final_plan ?? null : input.finalPlan,
-        save_block: input.saveBlock === undefined ? existing?.save_block ?? null : input.saveBlock,
-        created_at: existing?.created_at ?? now,
-        updated_at: now,
+      return withWriteLock(() => {
+        const store = load();
+        const now = nowIso();
+        const existing = input.id ? store.aimDrafts.find((draft) => draft.id === input.id) : undefined;
+        const draft = AimDraft.parse({
+          id: existing?.id ?? input.id ?? nextId(),
+          owner_id: input.ownerId ?? existing?.owner_id ?? store.ownerId ?? DEFAULT_OWNER,
+          title: input.title ?? existing?.title ?? "",
+          description: input.description ?? existing?.description ?? "",
+          parent_goal_id: input.parentGoalId === undefined ? existing?.parent_goal_id ?? null : input.parentGoalId,
+          parent_milestone_id: input.parentMilestoneId === undefined ? existing?.parent_milestone_id ?? null : input.parentMilestoneId,
+          current_stage: input.currentStage ?? existing?.current_stage ?? "aim",
+          phase: input.phase === undefined ? existing?.phase ?? null : input.phase,
+          status: input.status ?? existing?.status ?? "draft",
+          aim_surface: input.aimSurface === undefined ? existing?.aim_surface ?? null : input.aimSurface,
+          context_note: input.contextNote ?? existing?.context_note ?? "",
+          intake_questions: input.intakeQuestions ?? existing?.intake_questions ?? [],
+          intake_answers: input.intakeAnswers ?? existing?.intake_answers ?? [],
+          clarify_questions: input.clarifyQuestions ?? existing?.clarify_questions ?? [],
+          clarify_answers: input.clarifyAnswers ?? existing?.clarify_answers ?? [],
+          clarify_assumptions: input.clarifyAssumptions ?? existing?.clarify_assumptions ?? [],
+          draft_plan: input.draftPlan === undefined ? existing?.draft_plan ?? null : input.draftPlan,
+          final_plan: input.finalPlan === undefined ? existing?.final_plan ?? null : input.finalPlan,
+          save_block: input.saveBlock === undefined ? existing?.save_block ?? null : input.saveBlock,
+          created_at: existing?.created_at ?? now,
+          updated_at: now,
+        });
+        if (existing) {
+          store.aimDrafts = store.aimDrafts.map((row) => row.id === draft.id ? draft : row);
+        } else {
+          store.aimDrafts.push(draft);
+        }
+        save(store);
+        return draft;
       });
-      if (existing) {
-        store.aimDrafts = store.aimDrafts.map((row) => row.id === draft.id ? draft : row);
-      } else {
-        store.aimDrafts.push(draft);
-      }
-      save(store);
-      return draft;
     },
 
     async discardAimDraft(id: string): Promise<void> {
-      const store = load();
-      store.aimDrafts = store.aimDrafts.filter((draft) => draft.id !== id);
-      save(store);
+      return withWriteLock(() => {
+        const store = load();
+        store.aimDrafts = store.aimDrafts.filter((draft) => draft.id !== id);
+        save(store);
+      });
     },
 
     async createGoal(input: CreateGoalInput): Promise<{ goal: Goal; milestones: Milestone[] }> {
-      const store = load();
-      const now = nowIso();
-      const ownerId = input.ownerId ?? store.ownerId ?? DEFAULT_OWNER;
-      const goalId = nextId();
+      return withWriteLock(() => {
+        const store = load();
+        const now = nowIso();
+        const ownerId = input.ownerId ?? store.ownerId ?? DEFAULT_OWNER;
+        const goalId = nextId();
 
-      const goal: Goal = {
-        id: goalId,
-        owner_id: ownerId,
-        title: input.title,
-        description: input.description ?? "",
-        domain: input.domain ?? "software",
-        status: "active",
-        target_date: null,
-        plan_json: input.plan,
-        metadata: input.metadata ?? {},
-        created_at: now,
-      };
+        const goal: Goal = {
+          id: goalId,
+          owner_id: ownerId,
+          title: input.title,
+          description: input.description ?? "",
+          domain: input.domain ?? "software",
+          status: "active",
+          target_date: null,
+          plan_json: input.plan,
+          metadata: input.metadata ?? {},
+          created_at: now,
+        };
 
-      const milestones = materialize(input.plan, goalId, ownerId, [], nextId);
-      const routedAssignments: Assignment[] = routeMilestones({
-        milestones,
-        actors: store.actors,
-      }).map((assignment) => ({
-        id: nextId(),
-        owner_id: ownerId,
-        goal_id: assignment.goalId,
-        milestone_id: assignment.milestoneId,
-        actor_kind: assignment.actorKind,
-        actor_id: assignment.actorId,
-        status: assignment.status,
-        source: assignment.source,
-        reason: assignment.reason,
-        capability_tags: assignment.capabilityTags,
-        created_at: now,
-        updated_at: now,
-      }));
-
-      const memories: Memory[] = (input.memories ?? [])
-        .filter((m) => m.content.trim().length > 0)
-        .map((m) => ({
+        const milestones = materialize(input.plan, goalId, ownerId, [], nextId);
+        const routedAssignments: Assignment[] = routeMilestones({
+          milestones,
+          actors: store.actors,
+        }).map((assignment) => ({
           id: nextId(),
           owner_id: ownerId,
-          goal_id: goalId,
-          kind: m.kind ?? "semantic",
-          category: m.category ?? defaultCategoryForMemory(m.content, m.kind ?? "semantic"),
-          content: m.content,
-          confidence: m.confidence ?? 1,
-          source: m.source ?? "user_stated",
-          status: "active",
-          superseded_by: null,
+          goal_id: assignment.goalId,
+          milestone_id: assignment.milestoneId,
+          actor_kind: assignment.actorKind,
+          actor_id: assignment.actorId,
+          status: assignment.status,
+          source: assignment.source,
+          reason: assignment.reason,
+          capability_tags: assignment.capabilityTags,
           created_at: now,
-        } satisfies Memory));
+          updated_at: now,
+        }));
 
-      store.goals.push(goal);
-      store.milestonesByGoal[goalId] = milestones;
-      store.memories.push(...memories);
-      store.assignments.push(...routedAssignments);
+        const memories: Memory[] = (input.memories ?? [])
+          .filter((m) => m.content.trim().length > 0)
+          .map((m) => ({
+            id: nextId(),
+            owner_id: ownerId,
+            goal_id: goalId,
+            kind: m.kind ?? "semantic",
+            category: m.category ?? defaultCategoryForMemory(m.content, m.kind ?? "semantic"),
+            content: m.content,
+            confidence: m.confidence ?? 1,
+            source: m.source ?? "user_stated",
+            status: "active",
+            superseded_by: null,
+            created_at: now,
+          } satisfies Memory));
 
-      const metadataParentGoalId = typeof input.metadata?.parent_goal_id === "string" ? input.metadata.parent_goal_id : undefined;
-      const metadataParentMilestoneId = typeof input.metadata?.parent_milestone_id === "string" ? input.metadata.parent_milestone_id : undefined;
-      linkParentSubAim(store, {
-        childGoalId: goalId,
-        ownerId,
-        parentGoalId: input.parentGoalId ?? metadataParentGoalId,
-        parentMilestoneId: input.parentMilestoneId ?? metadataParentMilestoneId,
-        now,
-        nextId,
+        store.goals.push(goal);
+        store.milestonesByGoal[goalId] = milestones;
+        store.memories.push(...memories);
+        store.assignments.push(...routedAssignments);
+
+        const metadataParentGoalId = typeof input.metadata?.parent_goal_id === "string" ? input.metadata.parent_goal_id : undefined;
+        const metadataParentMilestoneId = typeof input.metadata?.parent_milestone_id === "string" ? input.metadata.parent_milestone_id : undefined;
+        linkParentSubAim(store, {
+          childGoalId: goalId,
+          ownerId,
+          parentGoalId: input.parentGoalId ?? metadataParentGoalId,
+          parentMilestoneId: input.parentMilestoneId ?? metadataParentMilestoneId,
+          now,
+          nextId,
+        });
+        save(store);
+
+        return { goal, milestones };
       });
-      save(store);
-
-      return { goal, milestones };
     },
 
     async createAimShell(input: CreateAimShellInput): Promise<{ goal: Goal; milestones: Milestone[] }> {
-      const store = load();
-      const now = nowIso();
-      const ownerId = input.ownerId ?? store.ownerId ?? DEFAULT_OWNER;
-      const goalId = nextId();
+      return withWriteLock(() => {
+        const store = load();
+        const now = nowIso();
+        const ownerId = input.ownerId ?? store.ownerId ?? DEFAULT_OWNER;
+        const goalId = nextId();
 
-      // A plan-less shell: no plan, no milestones, no assignments. The first plan lands later via
-      // `updateGoal` (which materializes + routes then). `status` stays "active" like a planned goal
-      // — the read models derive the "planning" state from `total_milestones === 0`, not status.
-      const goal: Goal = {
-        id: goalId,
-        owner_id: ownerId,
-        title: input.title,
-        description: input.description ?? "",
-        domain: input.domain ?? "software",
-        status: "active",
-        target_date: null,
-        plan_json: null,
-        metadata: input.metadata ?? {},
-        created_at: now,
-      };
+        // A plan-less shell: no plan, no milestones, no assignments. The first plan lands later via
+        // `updateGoal` (which materializes + routes then). `status` stays "active" like a planned goal
+        // — the read models derive the "planning" state from `total_milestones === 0`, not status.
+        const goal: Goal = {
+          id: goalId,
+          owner_id: ownerId,
+          title: input.title,
+          description: input.description ?? "",
+          domain: input.domain ?? "software",
+          status: "active",
+          target_date: null,
+          plan_json: null,
+          metadata: input.metadata ?? {},
+          created_at: now,
+        };
 
-      store.goals.push(goal);
-      store.milestonesByGoal[goalId] = [];
+        store.goals.push(goal);
+        store.milestonesByGoal[goalId] = [];
 
-      const metadataParentGoalId = typeof input.metadata?.parent_goal_id === "string" ? input.metadata.parent_goal_id : undefined;
-      const metadataParentMilestoneId = typeof input.metadata?.parent_milestone_id === "string" ? input.metadata.parent_milestone_id : undefined;
-      linkParentSubAim(store, {
-        childGoalId: goalId,
-        ownerId,
-        parentGoalId: input.parentGoalId ?? metadataParentGoalId,
-        parentMilestoneId: input.parentMilestoneId ?? metadataParentMilestoneId,
-        now,
-        nextId,
+        const metadataParentGoalId = typeof input.metadata?.parent_goal_id === "string" ? input.metadata.parent_goal_id : undefined;
+        const metadataParentMilestoneId = typeof input.metadata?.parent_milestone_id === "string" ? input.metadata.parent_milestone_id : undefined;
+        linkParentSubAim(store, {
+          childGoalId: goalId,
+          ownerId,
+          parentGoalId: input.parentGoalId ?? metadataParentGoalId,
+          parentMilestoneId: input.parentMilestoneId ?? metadataParentMilestoneId,
+          now,
+          nextId,
+        });
+        save(store);
+
+        return { goal, milestones: [] };
       });
-      save(store);
-
-      return { goal, milestones: [] };
     },
 
     async updateGoal(input: UpdateGoalInput): Promise<{ goal: Goal; milestones: Milestone[] } | null> {
-      const store = load();
-      const goal = store.goals.find((g) => g.id === input.id);
-      if (!goal) return null;
+      return withWriteLock(() => {
+        const store = load();
+        const goal = store.goals.find((g) => g.id === input.id);
+        if (!goal) return null;
 
-      const existing = store.milestonesByGoal[input.id] ?? [];
-      const milestones = mergeMilestones(existing, goal.id, goal.owner_id, input.plan, nextId);
+        const existing = store.milestonesByGoal[input.id] ?? [];
+        const milestones = mergeMilestones(existing, goal.id, goal.owner_id, input.plan, nextId);
 
-      const title = input.title?.trim();
-      if (title) goal.title = title;
-      if (input.description !== undefined) goal.description = input.description;
-      goal.plan_json = input.plan;
-      if (input.metadata) goal.metadata = { ...goal.metadata, ...input.metadata };
+        const title = input.title?.trim();
+        if (title) goal.title = title;
+        if (input.description !== undefined) goal.description = input.description;
+        goal.plan_json = input.plan;
+        if (input.metadata) goal.metadata = { ...goal.metadata, ...input.metadata };
 
-      store.milestonesByGoal[goal.id] = milestones;
-      const assignmentNow = nowIso();
-      const existingAssignmentMilestoneIds = new Set(
-        store.assignments.filter((assignment) => assignment.goal_id === goal.id).map((assignment) => assignment.milestone_id),
-      );
-      const missingAssignments = routeMilestones({
-        milestones: milestones.filter((milestone) => !existingAssignmentMilestoneIds.has(milestone.id) && milestone.status !== "skipped"),
-        actors: store.actors,
-      }).map((assignment) => ({
-        id: nextId(),
-        owner_id: goal.owner_id,
-        goal_id: assignment.goalId,
-        milestone_id: assignment.milestoneId,
-        actor_kind: assignment.actorKind,
-        actor_id: assignment.actorId,
-        status: assignment.status,
-        source: assignment.source,
-        reason: assignment.reason,
-        capability_tags: assignment.capabilityTags,
-        created_at: assignmentNow,
-        updated_at: assignmentNow,
-      } satisfies Assignment));
-      store.assignments.push(...missingAssignments);
-      save(store);
-      return { goal, milestones };
+        store.milestonesByGoal[goal.id] = milestones;
+        const assignmentNow = nowIso();
+        const existingAssignmentMilestoneIds = new Set(
+          store.assignments.filter((assignment) => assignment.goal_id === goal.id).map((assignment) => assignment.milestone_id),
+        );
+        const missingAssignments = routeMilestones({
+          milestones: milestones.filter((milestone) => !existingAssignmentMilestoneIds.has(milestone.id) && milestone.status !== "skipped"),
+          actors: store.actors,
+        }).map((assignment) => ({
+          id: nextId(),
+          owner_id: goal.owner_id,
+          goal_id: assignment.goalId,
+          milestone_id: assignment.milestoneId,
+          actor_kind: assignment.actorKind,
+          actor_id: assignment.actorId,
+          status: assignment.status,
+          source: assignment.source,
+          reason: assignment.reason,
+          capability_tags: assignment.capabilityTags,
+          created_at: assignmentNow,
+          updated_at: assignmentNow,
+        } satisfies Assignment));
+        store.assignments.push(...missingAssignments);
+        save(store);
+        return { goal, milestones };
+      });
     },
 
     async renameGoal(input: RenameGoalInput): Promise<{ goal: Goal } | null> {
-      const store = load();
-      const goal = store.goals.find((g) => g.id === input.id);
-      if (!goal) return null;
-      const title = input.title?.trim();
-      if (title) goal.title = title;
-      if (input.description !== undefined) goal.description = input.description;
-      save(store);
-      return { goal };
+      return withWriteLock(() => {
+        const store = load();
+        const goal = store.goals.find((g) => g.id === input.id);
+        if (!goal) return null;
+        const title = input.title?.trim();
+        if (title) goal.title = title;
+        if (input.description !== undefined) goal.description = input.description;
+        save(store);
+        return { goal };
+      });
     },
 
     async deleteGoal(id: string): Promise<void> {
-      const store = load();
-      const milestoneIds = new Set((store.milestonesByGoal[id] ?? []).map((m) => m.id));
-      const runIds = new Set(store.runs.filter((run) => run.goal_id === id).map((run) => run.id));
-      const evidenceIds = new Set(store.evidence.filter((ev) => ev.goal_id === id).map((ev) => ev.id));
-      store.goals = store.goals.filter((g) => g.id !== id);
-      store.aimDrafts = store.aimDrafts.filter((draft) => draft.parent_goal_id !== id);
-      delete store.milestonesByGoal[id];
-      store.memories = store.memories.filter((m) => m.goal_id !== id);
-      store.evidence = store.evidence.filter((ev) => ev.goal_id !== id);
-      store.completions = store.completions.filter((c) => !milestoneIds.has(c.milestone_id));
-      store.subAimRelations = store.subAimRelations.filter((relation) => relation.parent_goal_id !== id && relation.child_goal_id !== id);
-      store.assignments = store.assignments.filter((assignment) => assignment.goal_id !== id);
-      store.runs = store.runs.filter((run) => run.goal_id !== id);
-      store.runEvents = store.runEvents.filter((event) => !runIds.has(event.run_id));
-      store.evidenceAttributions = store.evidenceAttributions.filter(
-        (attribution) => attribution.goal_id !== id && !evidenceIds.has(attribution.evidence_id),
-      );
-      store.contextIntakeSessions = store.contextIntakeSessions.filter((session) => session.goal_id !== id);
-      save(store);
+      return withWriteLock(() => {
+        const store = load();
+        const milestoneIds = new Set((store.milestonesByGoal[id] ?? []).map((m) => m.id));
+        const runIds = new Set(store.runs.filter((run) => run.goal_id === id).map((run) => run.id));
+        const evidenceIds = new Set(store.evidence.filter((ev) => ev.goal_id === id).map((ev) => ev.id));
+        store.goals = store.goals.filter((g) => g.id !== id);
+        store.aimDrafts = store.aimDrafts.filter((draft) => draft.parent_goal_id !== id);
+        delete store.milestonesByGoal[id];
+        store.memories = store.memories.filter((m) => m.goal_id !== id);
+        store.evidence = store.evidence.filter((ev) => ev.goal_id !== id);
+        store.completions = store.completions.filter((c) => !milestoneIds.has(c.milestone_id));
+        store.subAimRelations = store.subAimRelations.filter((relation) => relation.parent_goal_id !== id && relation.child_goal_id !== id);
+        store.assignments = store.assignments.filter((assignment) => assignment.goal_id !== id);
+        store.runs = store.runs.filter((run) => run.goal_id !== id);
+        store.runEvents = store.runEvents.filter((event) => !runIds.has(event.run_id));
+        store.evidenceAttributions = store.evidenceAttributions.filter(
+          (attribution) => attribution.goal_id !== id && !evidenceIds.has(attribution.evidence_id),
+        );
+        store.contextIntakeSessions = store.contextIntakeSessions.filter((session) => session.goal_id !== id);
+        save(store);
+      });
     },
 
     async listEvidence(goalId: string): Promise<Evidence[]> {
@@ -1518,106 +1601,110 @@ export function createJsonFileStore(dataDir: string = defaultDataDir(), options:
     },
 
     async addEvidence(input: AddEvidenceInput): Promise<AddEvidenceResult> {
-      const store = load();
-      const goal = store.goals.find((g) => g.id === input.goalId);
-      if (!goal) throw new Error(`Aim ${input.goalId} not found.`);
-      if (input.milestoneId) {
-        const milestone = (store.milestonesByGoal[input.goalId] ?? []).find((m) => m.id === input.milestoneId);
-        if (!milestone) throw new Error(`Milestone ${input.milestoneId} not found on aim ${input.goalId}.`);
-      }
-
-      const emitterId = input.emitterId ?? null;
-      const sourceEventId = input.sourceEventId ?? null;
-      if (emitterId !== null && sourceEventId !== null) {
-        const existing = store.evidence.find(
-          (ev) => ev.emitter_id === emitterId && ev.source_event_id === sourceEventId,
-        );
-        if (existing) {
-          return { evidence: existing, deduped: true, completions: [] };
+      return withWriteLock(() => {
+        const store = load();
+        const goal = store.goals.find((g) => g.id === input.goalId);
+        if (!goal) throw new Error(`Aim ${input.goalId} not found.`);
+        if (input.milestoneId) {
+          const milestone = (store.milestonesByGoal[input.goalId] ?? []).find((m) => m.id === input.milestoneId);
+          if (!milestone) throw new Error(`Milestone ${input.milestoneId} not found on aim ${input.goalId}.`);
         }
-      }
 
-      const now = nowIso();
-      const evidence: Evidence = {
-        id: nextId(),
-        owner_id: input.ownerId ?? goal.owner_id ?? store.ownerId,
-        goal_id: input.goalId,
-        milestone_id: input.milestoneId ?? null,
-        emitter_id: emitterId,
-        kind: input.kind,
-        source_event_id: sourceEventId,
-        occurred_at: input.occurredAt ?? now,
-        summary: input.summary ?? "",
-        payload: input.payload ?? {},
-        trust_score: input.trustScore ?? 1,
-        created_at: now,
-      };
+        const emitterId = input.emitterId ?? null;
+        const sourceEventId = input.sourceEventId ?? null;
+        if (emitterId !== null && sourceEventId !== null) {
+          const existing = store.evidence.find(
+            (ev) => ev.emitter_id === emitterId && ev.source_event_id === sourceEventId,
+          );
+          if (existing) {
+            return { evidence: existing, deduped: true, completions: [] };
+          }
+        }
 
-      store.evidence.push(evidence);
-      const run = input.runId ? store.runs.find((row) => row.id === input.runId) ?? null : null;
-      const assignment = input.assignmentId
-        ? store.assignments.find((row) => row.id === input.assignmentId) ?? null
-        : run?.assignment_id
-          ? store.assignments.find((row) => row.id === run.assignment_id) ?? null
-          : input.milestoneId
-            ? store.assignments.find((row) => row.milestone_id === input.milestoneId) ?? null
-            : null;
-      store.evidenceAttributions.push({
-        id: nextId(),
-        ...attributeEvidence({ evidence, assignment, run }),
-        created_at: now,
+        const now = nowIso();
+        const evidence: Evidence = {
+          id: nextId(),
+          owner_id: input.ownerId ?? goal.owner_id ?? store.ownerId,
+          goal_id: input.goalId,
+          milestone_id: input.milestoneId ?? null,
+          emitter_id: emitterId,
+          kind: input.kind,
+          source_event_id: sourceEventId,
+          occurred_at: input.occurredAt ?? now,
+          summary: input.summary ?? "",
+          payload: input.payload ?? {},
+          trust_score: input.trustScore ?? 1,
+          created_at: now,
+        };
+
+        store.evidence.push(evidence);
+        const run = input.runId ? store.runs.find((row) => row.id === input.runId) ?? null : null;
+        const assignment = input.assignmentId
+          ? store.assignments.find((row) => row.id === input.assignmentId) ?? null
+          : run?.assignment_id
+            ? store.assignments.find((row) => row.id === run.assignment_id) ?? null
+            : input.milestoneId
+              ? store.assignments.find((row) => row.milestone_id === input.milestoneId) ?? null
+              : null;
+        store.evidenceAttributions.push({
+          id: nextId(),
+          ...attributeEvidence({ evidence, assignment, run }),
+          created_at: now,
+        });
+        const completions = evaluateGoal(store, input.goalId, now, nextId);
+        save(store);
+        return { evidence, deduped: false, completions };
       });
-      const completions = evaluateGoal(store, input.goalId, now, nextId);
-      save(store);
-      return { evidence, deduped: false, completions };
     },
 
     async confirmMilestone(input: ConfirmMilestoneInput): Promise<ConfirmMilestoneResult | null> {
-      const store = load();
-      const goal = store.goals.find((g) => g.id === input.goalId);
-      if (!goal) return null;
-      const milestone = (store.milestonesByGoal[input.goalId] ?? []).find((m) => m.id === input.milestoneId);
-      if (!milestone) return null;
-      const existing = store.completions.find((c) => c.milestone_id === milestone.id) ?? null;
-      if (existing) {
-        return {
-          evidence: store.evidence.find((ev) => existing.triggering_evidence_ids.includes(ev.id)) ?? null,
-          completion: existing,
-          alreadyCompleted: true,
-        };
-      }
+      return withWriteLock(() => {
+        const store = load();
+        const goal = store.goals.find((g) => g.id === input.goalId);
+        if (!goal) return null;
+        const milestone = (store.milestonesByGoal[input.goalId] ?? []).find((m) => m.id === input.milestoneId);
+        if (!milestone) return null;
+        const existing = store.completions.find((c) => c.milestone_id === milestone.id) ?? null;
+        if (existing) {
+          return {
+            evidence: store.evidence.find((ev) => existing.triggering_evidence_ids.includes(ev.id)) ?? null,
+            completion: existing,
+            alreadyCompleted: true,
+          };
+        }
 
-      const now = nowIso();
-      const manualEvidence = normalizeManualEvidence(input, milestone);
-      const evidence: Evidence = {
-        id: nextId(),
-        owner_id: input.ownerId ?? milestone.owner_id,
-        goal_id: input.goalId,
-        milestone_id: milestone.id,
-        emitter_id: null,
-        kind: "manual_check",
-        source_event_id: null,
-        occurred_at: now,
-        summary: manualEvidence.summary,
-        payload: manualEvidence.payload,
-        trust_score: 1,
-        created_at: now,
-      };
-      store.evidence.push(evidence);
-      const assignment = store.assignments.find((row) => row.milestone_id === milestone.id) ?? null;
-      store.evidenceAttributions.push({
-        id: nextId(),
-        ...attributeEvidence({
-          evidence,
-          assignment,
-          reason: "Human manual proof confirmed this sub-aim.",
-        }),
-        created_at: now,
+        const now = nowIso();
+        const manualEvidence = normalizeManualEvidence(input, milestone);
+        const evidence: Evidence = {
+          id: nextId(),
+          owner_id: input.ownerId ?? milestone.owner_id,
+          goal_id: input.goalId,
+          milestone_id: milestone.id,
+          emitter_id: null,
+          kind: "manual_check",
+          source_event_id: null,
+          occurred_at: now,
+          summary: manualEvidence.summary,
+          payload: manualEvidence.payload,
+          trust_score: 1,
+          created_at: now,
+        };
+        store.evidence.push(evidence);
+        const assignment = store.assignments.find((row) => row.milestone_id === milestone.id) ?? null;
+        store.evidenceAttributions.push({
+          id: nextId(),
+          ...attributeEvidence({
+            evidence,
+            assignment,
+            reason: "Human manual proof confirmed this sub-aim.",
+          }),
+          created_at: now,
+        });
+        const completions = evaluateGoal(store, input.goalId, now, nextId);
+        const completion = completions.find((c) => c.milestone_id === milestone.id) ?? null;
+        save(store);
+        return { evidence, completion, alreadyCompleted: false };
       });
-      const completions = evaluateGoal(store, input.goalId, now, nextId);
-      const completion = completions.find((c) => c.milestone_id === milestone.id) ?? null;
-      save(store);
-      return { evidence, completion, alreadyCompleted: false };
     },
 
     async listMemories(goalId: string | null = null): Promise<Memory[]> {
@@ -1634,43 +1721,45 @@ export function createJsonFileStore(dataDir: string = defaultDataDir(), options:
     },
 
     async addMemory(input: AddMemoryInput): Promise<Memory> {
-      const store = load();
-      const content = normalizeMemoryContent(input.content);
-      if (!content) throw new Error("Memory content is required.");
-      if (input.goalId) {
-        const goal = store.goals.find((g) => g.id === input.goalId);
-        if (!goal) throw new Error(`Aim ${input.goalId} not found.`);
-      }
-      const goalId = input.goalId ?? null;
-      const duplicate = findDuplicateMemory(store, content, goalId);
-      if (duplicate) {
-        if (duplicate.status === "pending" || duplicate.status === "deprioritized") {
-          duplicate.kind = input.kind ?? duplicate.kind;
-          duplicate.category = input.category ?? defaultCategoryForMemory(content, duplicate.kind);
-          duplicate.confidence = input.confidence ?? 1;
-          duplicate.source = input.source ?? "user_stated";
-          duplicate.status = "active";
-          save(store);
+      return withWriteLock(() => {
+        const store = load();
+        const content = normalizeMemoryContent(input.content);
+        if (!content) throw new Error("Memory content is required.");
+        if (input.goalId) {
+          const goal = store.goals.find((g) => g.id === input.goalId);
+          if (!goal) throw new Error(`Aim ${input.goalId} not found.`);
         }
-        return duplicate;
-      }
-      const now = nowIso();
-      const memory: Memory = {
-        id: nextId(),
-        owner_id: input.ownerId ?? store.ownerId,
-        goal_id: goalId,
-        kind: input.kind ?? "semantic",
-        category: input.category ?? defaultCategoryForMemory(content, input.kind ?? "semantic"),
-        content,
-        confidence: input.confidence ?? 1,
-        source: input.source ?? "user_stated",
-        status: "active",
-        superseded_by: null,
-        created_at: now,
-      };
-      store.memories.push(memory);
-      save(store);
-      return memory;
+        const goalId = input.goalId ?? null;
+        const duplicate = findDuplicateMemory(store, content, goalId);
+        if (duplicate) {
+          if (duplicate.status === "pending" || duplicate.status === "deprioritized") {
+            duplicate.kind = input.kind ?? duplicate.kind;
+            duplicate.category = input.category ?? defaultCategoryForMemory(content, duplicate.kind);
+            duplicate.confidence = input.confidence ?? 1;
+            duplicate.source = input.source ?? "user_stated";
+            duplicate.status = "active";
+            save(store);
+          }
+          return duplicate;
+        }
+        const now = nowIso();
+        const memory: Memory = {
+          id: nextId(),
+          owner_id: input.ownerId ?? store.ownerId,
+          goal_id: goalId,
+          kind: input.kind ?? "semantic",
+          category: input.category ?? defaultCategoryForMemory(content, input.kind ?? "semantic"),
+          content,
+          confidence: input.confidence ?? 1,
+          source: input.source ?? "user_stated",
+          status: "active",
+          superseded_by: null,
+          created_at: now,
+        };
+        store.memories.push(memory);
+        save(store);
+        return memory;
+      });
     },
 
     async listMemoryCandidates(goalId: string | null = null): Promise<Memory[]> {
@@ -1682,111 +1771,121 @@ export function createJsonFileStore(dataDir: string = defaultDataDir(), options:
     },
 
     async addMemoryCandidate(input: AddMemoryCandidateInput): Promise<Memory> {
-      const store = load();
-      const content = normalizeMemoryContent(input.content);
-      if (!content) throw new Error("Memory content is required.");
-      if (input.goalId) {
-        const goal = store.goals.find((g) => g.id === input.goalId);
-        if (!goal) throw new Error(`Aim ${input.goalId} not found.`);
-      }
-      const goalId = input.goalId ?? null;
-      const duplicate = findDuplicateMemory(store, content, goalId);
-      if (duplicate) return duplicate;
-      const now = nowIso();
-      const memory: Memory = {
-        id: nextId(),
-        owner_id: input.ownerId ?? store.ownerId,
-        goal_id: goalId,
-        kind: input.kind ?? "semantic",
-        category: input.category ?? defaultCategoryForMemory(content, input.kind ?? "semantic"),
-        content,
-        confidence: input.confidence ?? 0.7,
-        source: input.source ?? "agent_inferred",
-        status: "pending",
-        superseded_by: null,
-        created_at: now,
-      };
-      store.memories.push(memory);
-      save(store);
-      return memory;
+      return withWriteLock(() => {
+        const store = load();
+        const content = normalizeMemoryContent(input.content);
+        if (!content) throw new Error("Memory content is required.");
+        if (input.goalId) {
+          const goal = store.goals.find((g) => g.id === input.goalId);
+          if (!goal) throw new Error(`Aim ${input.goalId} not found.`);
+        }
+        const goalId = input.goalId ?? null;
+        const duplicate = findDuplicateMemory(store, content, goalId);
+        if (duplicate) return duplicate;
+        const now = nowIso();
+        const memory: Memory = {
+          id: nextId(),
+          owner_id: input.ownerId ?? store.ownerId,
+          goal_id: goalId,
+          kind: input.kind ?? "semantic",
+          category: input.category ?? defaultCategoryForMemory(content, input.kind ?? "semantic"),
+          content,
+          confidence: input.confidence ?? 0.7,
+          source: input.source ?? "agent_inferred",
+          status: "pending",
+          superseded_by: null,
+          created_at: now,
+        };
+        store.memories.push(memory);
+        save(store);
+        return memory;
+      });
     },
 
     async acceptMemoryCandidate(input: AcceptMemoryCandidateInput): Promise<Memory | null> {
-      const store = load();
-      const memory = store.memories.find((m) => m.id === input.id && m.status === "pending");
-      if (!memory) return null;
-      const content = input.content !== undefined ? normalizeMemoryContent(input.content) : memory.content;
-      if (!content) throw new Error("Memory content is required.");
-      if (isPromptLikeContextCandidate(content)) {
-        throw new Error("Context candidate must be edited into an actual answer before it can be accepted.");
-      }
-      if (input.goalId) {
-        const goal = store.goals.find((g) => g.id === input.goalId);
-        if (!goal) throw new Error(`Aim ${input.goalId} not found.`);
-      }
-      const goalId = input.goalId !== undefined ? input.goalId : memory.goal_id;
-      const confidence = input.confidence ?? Math.max(memory.confidence, 0.9);
-      const duplicate = findDuplicateMemory(store, content, goalId, memory.id);
-      if (duplicate) {
-        if (duplicate.status === "pending" || duplicate.status === "deprioritized") {
-          duplicate.content = content;
-          duplicate.kind = input.kind ?? duplicate.kind;
-          duplicate.category = input.category ?? defaultCategoryForMemory(content, duplicate.kind);
-          duplicate.confidence = confidence;
-          if (input.source) duplicate.source = input.source;
-          duplicate.status = "active";
-        } else if (duplicate.status === "active") {
-          if (input.kind) duplicate.kind = input.kind;
-          if (input.category) duplicate.category = input.category;
-          duplicate.confidence = Math.max(duplicate.confidence, confidence);
-          if (input.source) duplicate.source = input.source;
+      return withWriteLock(() => {
+        const store = load();
+        const memory = store.memories.find((m) => m.id === input.id && m.status === "pending");
+        if (!memory) return null;
+        const content = input.content !== undefined ? normalizeMemoryContent(input.content) : memory.content;
+        if (!content) throw new Error("Memory content is required.");
+        if (isPromptLikeContextCandidate(content)) {
+          throw new Error("Context candidate must be edited into an actual answer before it can be accepted.");
         }
-        memory.status = "deleted";
-        memory.superseded_by = duplicate.id;
+        if (input.goalId) {
+          const goal = store.goals.find((g) => g.id === input.goalId);
+          if (!goal) throw new Error(`Aim ${input.goalId} not found.`);
+        }
+        const goalId = input.goalId !== undefined ? input.goalId : memory.goal_id;
+        const confidence = input.confidence ?? Math.max(memory.confidence, 0.9);
+        const duplicate = findDuplicateMemory(store, content, goalId, memory.id);
+        if (duplicate) {
+          if (duplicate.status === "pending" || duplicate.status === "deprioritized") {
+            duplicate.content = content;
+            duplicate.kind = input.kind ?? duplicate.kind;
+            duplicate.category = input.category ?? defaultCategoryForMemory(content, duplicate.kind);
+            duplicate.confidence = confidence;
+            if (input.source) duplicate.source = input.source;
+            duplicate.status = "active";
+          } else if (duplicate.status === "active") {
+            if (input.kind) duplicate.kind = input.kind;
+            if (input.category) duplicate.category = input.category;
+            duplicate.confidence = Math.max(duplicate.confidence, confidence);
+            if (input.source) duplicate.source = input.source;
+          }
+          memory.status = "deleted";
+          memory.superseded_by = duplicate.id;
+          save(store);
+          return duplicate;
+        }
+        memory.content = content;
+        memory.goal_id = goalId;
+        if (input.kind) memory.kind = input.kind;
+        memory.category = input.category ?? defaultCategoryForMemory(content, memory.kind);
+        memory.confidence = confidence;
+        if (input.source) memory.source = input.source;
+        memory.status = "active";
         save(store);
-        return duplicate;
-      }
-      memory.content = content;
-      memory.goal_id = goalId;
-      if (input.kind) memory.kind = input.kind;
-      memory.category = input.category ?? defaultCategoryForMemory(content, memory.kind);
-      memory.confidence = confidence;
-      if (input.source) memory.source = input.source;
-      memory.status = "active";
-      save(store);
-      return memory;
+        return memory;
+      });
     },
 
     async rejectMemoryCandidate(id: string): Promise<Memory | null> {
-      const store = load();
-      const memory = store.memories.find((m) => m.id === id && m.status === "pending");
-      if (!memory) return null;
-      memory.status = "deleted";
-      save(store);
-      return memory;
+      return withWriteLock(() => {
+        const store = load();
+        const memory = store.memories.find((m) => m.id === id && m.status === "pending");
+        if (!memory) return null;
+        memory.status = "deleted";
+        save(store);
+        return memory;
+      });
     },
 
     async archiveMemory(id: string): Promise<Memory | null> {
-      const store = load();
-      const memory = store.memories.find((m) => m.id === id && m.status === "active");
-      if (!memory) return null;
-      memory.status = "deleted";
-      save(store);
-      return memory;
+      return withWriteLock(() => {
+        const store = load();
+        const memory = store.memories.find((m) => m.id === id && m.status === "active");
+        if (!memory) return null;
+        memory.status = "deleted";
+        save(store);
+        return memory;
+      });
     },
 
     async deprioritizeMemory(input: DeprioritizeMemoryInput): Promise<Memory | null> {
-      const store = load();
-      const memory = store.memories.find((m) => m.id === input.id && m.status === "active");
-      if (!memory) return null;
-      const confidence = input.confidence ?? 0.5;
-      if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1) {
-        throw new Error("Memory confidence must be a number from 0 to 1.");
-      }
-      memory.confidence = Math.min(memory.confidence, confidence);
-      memory.status = "deprioritized";
-      save(store);
-      return memory;
+      return withWriteLock(() => {
+        const store = load();
+        const memory = store.memories.find((m) => m.id === input.id && m.status === "active");
+        if (!memory) return null;
+        const confidence = input.confidence ?? 0.5;
+        if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1) {
+          throw new Error("Memory confidence must be a number from 0 to 1.");
+        }
+        memory.confidence = Math.min(memory.confidence, confidence);
+        memory.status = "deprioritized";
+        save(store);
+        return memory;
+      });
     },
 
     async listActors(): Promise<Actor[]> {
@@ -1794,36 +1893,38 @@ export function createJsonFileStore(dataDir: string = defaultDataDir(), options:
     },
 
     async addActor(input: AddActorInput): Promise<Actor> {
-      const store = load();
-      const now = nowIso();
-      const ownerId = input.ownerId ?? store.ownerId;
-      const actor: Actor = input.kind === "human"
-        ? {
-            id: nextId(),
-            owner_id: ownerId,
-            kind: "human",
-            display_name: input.displayName,
-            capabilities: input.capabilities ?? [],
-            status: "active",
-            user_id: input.userId ?? null,
-            created_at: now,
-          }
-        : {
-            id: nextId(),
-            owner_id: ownerId,
-            kind: "agent",
-            display_name: input.displayName,
-            capabilities: input.capabilities ?? [],
-            status: "active",
-            agent_kind: input.agentKind ?? "local_cli",
-            run_mode: input.runMode ?? "local_cli",
-            model: input.model ?? null,
-            connection_ref: input.connectionRef ?? null,
-            created_at: now,
-          };
-      store.actors.push(actor);
-      save(store);
-      return actor;
+      return withWriteLock(() => {
+        const store = load();
+        const now = nowIso();
+        const ownerId = input.ownerId ?? store.ownerId;
+        const actor: Actor = input.kind === "human"
+          ? {
+              id: nextId(),
+              owner_id: ownerId,
+              kind: "human",
+              display_name: input.displayName,
+              capabilities: input.capabilities ?? [],
+              status: "active",
+              user_id: input.userId ?? null,
+              created_at: now,
+            }
+          : {
+              id: nextId(),
+              owner_id: ownerId,
+              kind: "agent",
+              display_name: input.displayName,
+              capabilities: input.capabilities ?? [],
+              status: "active",
+              agent_kind: input.agentKind ?? "local_cli",
+              run_mode: input.runMode ?? "local_cli",
+              model: input.model ?? null,
+              connection_ref: input.connectionRef ?? null,
+              created_at: now,
+            };
+        store.actors.push(actor);
+        save(store);
+        return actor;
+      });
     },
 
     async listAssignments(goalId: string | null = null): Promise<Assignment[]> {
@@ -1832,44 +1933,46 @@ export function createJsonFileStore(dataDir: string = defaultDataDir(), options:
     },
 
     async assignMilestone(input: AssignMilestoneInput): Promise<Assignment> {
-      const store = load();
-      const goal = store.goals.find((g) => g.id === input.goalId);
-      if (!goal) throw new Error(`Aim ${input.goalId} not found.`);
-      const milestone = (store.milestonesByGoal[input.goalId] ?? []).find((m) => m.id === input.milestoneId);
-      if (!milestone) throw new Error(`Milestone ${input.milestoneId} not found on aim ${input.goalId}.`);
-      if (input.actorId && !store.actors.some((actor) => actor.id === input.actorId && actor.kind === input.actorKind)) {
-        throw new Error(`Actor ${input.actorId} not found.`);
-      }
-      const now = nowIso();
-      const existing = store.assignments.find((assignment) => assignment.milestone_id === milestone.id);
-      if (existing) {
-        existing.actor_kind = input.actorKind;
-        existing.actor_id = input.actorId ?? null;
-        existing.status = input.status ?? "assigned";
-        existing.source = input.source ?? "user_override";
-        existing.reason = input.reason ?? "Assignment updated by the user.";
-        existing.capability_tags = input.capabilityTags ?? existing.capability_tags;
-        existing.updated_at = now;
+      return withWriteLock(() => {
+        const store = load();
+        const goal = store.goals.find((g) => g.id === input.goalId);
+        if (!goal) throw new Error(`Aim ${input.goalId} not found.`);
+        const milestone = (store.milestonesByGoal[input.goalId] ?? []).find((m) => m.id === input.milestoneId);
+        if (!milestone) throw new Error(`Milestone ${input.milestoneId} not found on aim ${input.goalId}.`);
+        if (input.actorId && !store.actors.some((actor) => actor.id === input.actorId && actor.kind === input.actorKind)) {
+          throw new Error(`Actor ${input.actorId} not found.`);
+        }
+        const now = nowIso();
+        const existing = store.assignments.find((assignment) => assignment.milestone_id === milestone.id);
+        if (existing) {
+          existing.actor_kind = input.actorKind;
+          existing.actor_id = input.actorId ?? null;
+          existing.status = input.status ?? "assigned";
+          existing.source = input.source ?? "user_override";
+          existing.reason = input.reason ?? "Assignment updated by the user.";
+          existing.capability_tags = input.capabilityTags ?? existing.capability_tags;
+          existing.updated_at = now;
+          save(store);
+          return existing;
+        }
+        const assignment: Assignment = {
+          id: nextId(),
+          owner_id: input.ownerId ?? goal.owner_id,
+          goal_id: goal.id,
+          milestone_id: milestone.id,
+          actor_kind: input.actorKind,
+          actor_id: input.actorId ?? null,
+          status: input.status ?? "assigned",
+          source: input.source ?? "user_override",
+          reason: input.reason ?? "Assignment created by the user.",
+          capability_tags: input.capabilityTags ?? [],
+          created_at: now,
+          updated_at: now,
+        };
+        store.assignments.push(assignment);
         save(store);
-        return existing;
-      }
-      const assignment: Assignment = {
-        id: nextId(),
-        owner_id: input.ownerId ?? goal.owner_id,
-        goal_id: goal.id,
-        milestone_id: milestone.id,
-        actor_kind: input.actorKind,
-        actor_id: input.actorId ?? null,
-        status: input.status ?? "assigned",
-        source: input.source ?? "user_override",
-        reason: input.reason ?? "Assignment created by the user.",
-        capability_tags: input.capabilityTags ?? [],
-        created_at: now,
-        updated_at: now,
-      };
-      store.assignments.push(assignment);
-      save(store);
-      return assignment;
+        return assignment;
+      });
     },
 
     async listSubAimRelations(goalId: string | null = null): Promise<SubAimRelation[]> {
@@ -1885,102 +1988,108 @@ export function createJsonFileStore(dataDir: string = defaultDataDir(), options:
     },
 
     async createRun(input: CreateRunInput): Promise<Run> {
-      const store = load();
-      const goal = store.goals.find((g) => g.id === input.goalId);
-      if (!goal) throw new Error(`Aim ${input.goalId} not found.`);
-      const milestone = (store.milestonesByGoal[input.goalId] ?? []).find((m) => m.id === input.milestoneId);
-      if (!milestone) throw new Error(`Milestone ${input.milestoneId} not found on aim ${input.goalId}.`);
-      const assignment = input.assignmentId
-        ? store.assignments.find((row) => row.id === input.assignmentId)
-        : store.assignments.find((row) => row.milestone_id === milestone.id);
-      const now = nowIso();
-      const attempt = store.runs.filter((run) => run.milestone_id === milestone.id).length + 1;
-      const status = input.status ?? "queued";
-      const run: Run = {
-        id: nextId(),
-        owner_id: input.ownerId ?? goal.owner_id,
-        goal_id: goal.id,
-        milestone_id: milestone.id,
-        assignment_id: assignment?.id ?? input.assignmentId ?? null,
-        actor_kind: input.actorKind,
-        actor_id: input.actorId ?? assignment?.actor_id ?? null,
-        kind: input.actorKind === "agent" ? "agent" : "human",
-        status,
-        attempt,
-        workspace_root: input.workspaceRoot ?? null,
-        sandbox: input.sandbox ?? null,
-        network_enabled: input.networkEnabled ?? false,
-        model: input.model ?? null,
-        reasoning: input.reasoning ?? null,
-        summary: input.summary ?? "",
-        error: null,
-        queued_at: now,
-        started_at: status === "running" ? now : null,
-        finished_at: null,
-        created_at: now,
-      };
-      store.runs.push(run);
-      if (assignment && assignment.status !== "cancelled") {
-        assignment.status = status === "queued" ? "assigned" : status === "running" ? "running" : assignment.status;
-        assignment.updated_at = now;
-      }
-      store.runEvents.push({
-        id: nextId(),
-        owner_id: run.owner_id,
-        run_id: run.id,
-        type: status === "running" ? "run.started" : "run.queued",
-        summary: input.summary ?? "",
-        payload: {},
-        created_at: now,
+      return withWriteLock(() => {
+        const store = load();
+        const goal = store.goals.find((g) => g.id === input.goalId);
+        if (!goal) throw new Error(`Aim ${input.goalId} not found.`);
+        const milestone = (store.milestonesByGoal[input.goalId] ?? []).find((m) => m.id === input.milestoneId);
+        if (!milestone) throw new Error(`Milestone ${input.milestoneId} not found on aim ${input.goalId}.`);
+        const assignment = input.assignmentId
+          ? store.assignments.find((row) => row.id === input.assignmentId)
+          : store.assignments.find((row) => row.milestone_id === milestone.id);
+        const now = nowIso();
+        const attempt = store.runs.filter((run) => run.milestone_id === milestone.id).length + 1;
+        const status = input.status ?? "queued";
+        const run: Run = {
+          id: nextId(),
+          owner_id: input.ownerId ?? goal.owner_id,
+          goal_id: goal.id,
+          milestone_id: milestone.id,
+          assignment_id: assignment?.id ?? input.assignmentId ?? null,
+          actor_kind: input.actorKind,
+          actor_id: input.actorId ?? assignment?.actor_id ?? null,
+          kind: input.actorKind === "agent" ? "agent" : "human",
+          status,
+          attempt,
+          workspace_root: input.workspaceRoot ?? null,
+          sandbox: input.sandbox ?? null,
+          network_enabled: input.networkEnabled ?? false,
+          model: input.model ?? null,
+          reasoning: input.reasoning ?? null,
+          summary: input.summary ?? "",
+          error: null,
+          queued_at: now,
+          started_at: status === "running" ? now : null,
+          finished_at: null,
+          created_at: now,
+        };
+        store.runs.push(run);
+        if (assignment && assignment.status !== "cancelled") {
+          assignment.status = status === "queued" ? "assigned" : status === "running" ? "running" : assignment.status;
+          assignment.updated_at = now;
+        }
+        store.runEvents.push({
+          id: nextId(),
+          owner_id: run.owner_id,
+          run_id: run.id,
+          type: status === "running" ? "run.started" : "run.queued",
+          summary: input.summary ?? "",
+          payload: {},
+          created_at: now,
+        });
+        save(store);
+        return run;
       });
-      save(store);
-      return run;
     },
 
     async appendRunEvent(input: AppendRunEventInput): Promise<RunEvent | null> {
-      const store = load();
-      const run = store.runs.find((row) => row.id === input.runId);
-      if (!run) return null;
-      const event: RunEvent = {
-        id: nextId(),
-        owner_id: input.ownerId ?? run.owner_id,
-        run_id: run.id,
-        type: input.type,
-        summary: input.summary ?? "",
-        payload: input.payload ?? {},
-        created_at: nowIso(),
-      };
-      store.runEvents.push(event);
-      save(store);
-      return event;
+      return withWriteLock(() => {
+        const store = load();
+        const run = store.runs.find((row) => row.id === input.runId);
+        if (!run) return null;
+        const event: RunEvent = {
+          id: nextId(),
+          owner_id: input.ownerId ?? run.owner_id,
+          run_id: run.id,
+          type: input.type,
+          summary: input.summary ?? "",
+          payload: input.payload ?? {},
+          created_at: nowIso(),
+        };
+        store.runEvents.push(event);
+        save(store);
+        return event;
+      });
     },
 
     async finishRun(input: FinishRunInput): Promise<Run | null> {
-      const store = load();
-      const run = store.runs.find((row) => row.id === input.runId);
-      if (!run) return null;
-      const now = nowIso();
-      run.status = input.status;
-      run.summary = input.summary ?? run.summary;
-      run.error = input.error ?? null;
-      run.finished_at = now;
-      if (!run.started_at) run.started_at = run.queued_at ?? now;
-      const assignment = run.assignment_id ? store.assignments.find((row) => row.id === run.assignment_id) : null;
-      if (assignment && assignment.status !== "completed" && assignment.status !== "cancelled") {
-        assignment.status = input.status === "completed" ? "assigned" : input.status === "failed" ? "blocked" : input.status;
-        assignment.updated_at = now;
-      }
-      store.runEvents.push({
-        id: nextId(),
-        owner_id: run.owner_id,
-        run_id: run.id,
-        type: input.status === "completed" ? "run.completed" : input.status === "cancelled" ? "run.cancelled" : "run.failed",
-        summary: input.summary ?? input.error ?? "",
-        payload: {},
-        created_at: now,
+      return withWriteLock(() => {
+        const store = load();
+        const run = store.runs.find((row) => row.id === input.runId);
+        if (!run) return null;
+        const now = nowIso();
+        run.status = input.status;
+        run.summary = input.summary ?? run.summary;
+        run.error = input.error ?? null;
+        run.finished_at = now;
+        if (!run.started_at) run.started_at = run.queued_at ?? now;
+        const assignment = run.assignment_id ? store.assignments.find((row) => row.id === run.assignment_id) : null;
+        if (assignment && assignment.status !== "completed" && assignment.status !== "cancelled") {
+          assignment.status = input.status === "completed" ? "assigned" : input.status === "failed" ? "blocked" : input.status;
+          assignment.updated_at = now;
+        }
+        store.runEvents.push({
+          id: nextId(),
+          owner_id: run.owner_id,
+          run_id: run.id,
+          type: input.status === "completed" ? "run.completed" : input.status === "cancelled" ? "run.cancelled" : "run.failed",
+          summary: input.summary ?? input.error ?? "",
+          payload: {},
+          created_at: now,
+        });
+        save(store);
+        return run;
       });
-      save(store);
-      return run;
     },
 
     async listRunEvents(goalId: string): Promise<RunEvent[]> {
@@ -1993,92 +2102,98 @@ export function createJsonFileStore(dataDir: string = defaultDataDir(), options:
     },
 
     async recordToolTrace(input: RecordToolTraceInput): Promise<ToolTrace> {
-      const store = load();
-      const now = nowIso();
-      const trace: ToolTrace = {
-        id: nextId(),
-        owner_id: input.ownerId ?? store.ownerId,
-        session_id: input.sessionId ?? null,
-        tool_name: input.toolName,
-        status: input.status,
-        summary: input.summary ?? "",
-        sources: input.sources ?? [],
-        error: input.error ?? null,
-        started_at: input.startedAt ?? null,
-        finished_at: input.finishedAt ?? (input.status === "succeeded" || input.status === "failed" || input.status === "blocked" ? now : null),
-        created_at: now,
-      };
-      store.toolTraces.push(trace);
-      save(store);
-      return trace;
+      return withWriteLock(() => {
+        const store = load();
+        const now = nowIso();
+        const trace: ToolTrace = {
+          id: nextId(),
+          owner_id: input.ownerId ?? store.ownerId,
+          session_id: input.sessionId ?? null,
+          tool_name: input.toolName,
+          status: input.status,
+          summary: input.summary ?? "",
+          sources: input.sources ?? [],
+          error: input.error ?? null,
+          started_at: input.startedAt ?? null,
+          finished_at: input.finishedAt ?? (input.status === "succeeded" || input.status === "failed" || input.status === "blocked" ? now : null),
+          created_at: now,
+        };
+        store.toolTraces.push(trace);
+        save(store);
+        return trace;
+      });
     },
 
     async createContextIntakeSession(input: CreateContextIntakeSessionInput): Promise<ContextIntakeSession> {
-      const store = load();
-      const now = nowIso();
-      const traceIds = new Set(input.toolTraceIds ?? []);
-      const decision = decideContextIntakeSession({
-        aimTitle: input.aimTitle,
-        aimDescription: input.aimDescription,
-        goalId: input.goalId,
-        readiness: input.readiness,
-        missingQuestions: input.missingQuestions,
-        blockedReasons: input.blockedReasons,
-        toolTraces: store.toolTraces.filter((trace) => traceIds.has(trace.id)),
+      return withWriteLock(() => {
+        const store = load();
+        const now = nowIso();
+        const traceIds = new Set(input.toolTraceIds ?? []);
+        const decision = decideContextIntakeSession({
+          aimTitle: input.aimTitle,
+          aimDescription: input.aimDescription,
+          goalId: input.goalId,
+          readiness: input.readiness,
+          missingQuestions: input.missingQuestions,
+          blockedReasons: input.blockedReasons,
+          toolTraces: store.toolTraces.filter((trace) => traceIds.has(trace.id)),
+        });
+        const session: ContextIntakeSession = {
+          id: nextId(),
+          owner_id: input.ownerId ?? store.ownerId,
+          ...decision,
+          started_at: now,
+          closed_at: decision.status === "ready" ? now : null,
+          created_at: now,
+        };
+        store.contextIntakeSessions.push(session);
+        save(store);
+        return session;
       });
-      const session: ContextIntakeSession = {
-        id: nextId(),
-        owner_id: input.ownerId ?? store.ownerId,
-        ...decision,
-        started_at: now,
-        closed_at: decision.status === "ready" ? now : null,
-        created_at: now,
-      };
-      store.contextIntakeSessions.push(session);
-      save(store);
-      return session;
     },
 
     async sedimentContextFromGoal(goalId: string): Promise<Memory[]> {
-      const store = load();
-      const goal = store.goals.find((row) => row.id === goalId);
-      if (!goal) throw new Error(`Aim ${goalId} not found.`);
-      const milestones = store.milestonesByGoal[goalId] ?? [];
-      const candidates = deriveContextCandidatesFromWork({
-        goal,
-        milestones,
-        evidence: store.evidence.filter((row) => row.goal_id === goalId),
-        runs: store.runs.filter((row) => row.goal_id === goalId),
-        completions: store.completions.filter((completion) => milestones.some((milestone) => milestone.id === completion.milestone_id)),
-      });
-      const created: Memory[] = [];
-      for (const candidate of candidates) {
-        const content = normalizeMemoryContent(candidate.content);
-        if (!content) continue;
-        const scopedGoalId = candidate.scope === "aim" ? goalId : null;
-        const duplicate = findDuplicateMemory(store, content, scopedGoalId);
-        if (duplicate) {
-          created.push(duplicate);
-          continue;
+      return withWriteLock(() => {
+        const store = load();
+        const goal = store.goals.find((row) => row.id === goalId);
+        if (!goal) throw new Error(`Aim ${goalId} not found.`);
+        const milestones = store.milestonesByGoal[goalId] ?? [];
+        const candidates = deriveContextCandidatesFromWork({
+          goal,
+          milestones,
+          evidence: store.evidence.filter((row) => row.goal_id === goalId),
+          runs: store.runs.filter((row) => row.goal_id === goalId),
+          completions: store.completions.filter((completion) => milestones.some((milestone) => milestone.id === completion.milestone_id)),
+        });
+        const created: Memory[] = [];
+        for (const candidate of candidates) {
+          const content = normalizeMemoryContent(candidate.content);
+          if (!content) continue;
+          const scopedGoalId = candidate.scope === "aim" ? goalId : null;
+          const duplicate = findDuplicateMemory(store, content, scopedGoalId);
+          if (duplicate) {
+            created.push(duplicate);
+            continue;
+          }
+          const memory: Memory = {
+            id: nextId(),
+            owner_id: goal.owner_id,
+            goal_id: scopedGoalId,
+            kind: candidate.category === "procedure" ? "procedural" : "semantic",
+            category: candidate.category,
+            content,
+            confidence: candidate.confidence ?? 0.7,
+            source: "evidence_derived",
+            status: "pending",
+            superseded_by: null,
+            created_at: nowIso(),
+          };
+          store.memories.push(memory);
+          created.push(memory);
         }
-        const memory: Memory = {
-          id: nextId(),
-          owner_id: goal.owner_id,
-          goal_id: scopedGoalId,
-          kind: candidate.category === "procedure" ? "procedural" : "semantic",
-          category: candidate.category,
-          content,
-          confidence: candidate.confidence ?? 0.7,
-          source: "evidence_derived",
-          status: "pending",
-          superseded_by: null,
-          created_at: nowIso(),
-        };
-        store.memories.push(memory);
-        created.push(memory);
-      }
-      save(store);
-      return created;
+        save(store);
+        return created;
+      });
     },
 
     async getAimProgress(goalId: string): Promise<AimProgressReadModel | null> {
@@ -2128,91 +2243,100 @@ export function createJsonFileStore(dataDir: string = defaultDataDir(), options:
     },
 
     async importData(snapshot: LocalStore, mode: "merge" | "replace" = "merge"): Promise<ImportStoreResult> {
-      const incoming: LocalStore = {
-        ownerId: snapshot.ownerId ?? DEFAULT_OWNER,
-        goals: snapshot.goals ?? [],
-        aimDrafts: (snapshot.aimDrafts ?? []).map(normalizeAimDraftRow).filter((row): row is AimDraftRow => row !== null),
-        milestonesByGoal: snapshot.milestonesByGoal ?? {},
-        memories: (snapshot.memories ?? []).map(normalizeMemoryRow),
-        evidence: snapshot.evidence ?? [],
-        completions: snapshot.completions ?? [],
-        actors: snapshot.actors ?? [],
-        subAimRelations: snapshot.subAimRelations ?? [],
-        assignments: snapshot.assignments ?? [],
-        runs: snapshot.runs ?? [],
-        runEvents: snapshot.runEvents ?? [],
-        toolTraces: snapshot.toolTraces ?? [],
-        evidenceAttributions: snapshot.evidenceAttributions ?? [],
-        contextIntakeSessions: snapshot.contextIntakeSessions ?? [],
-      };
-      if (mode === "replace") {
-        save(incoming);
-        return {
-          goals: incoming.goals.length,
-          aimDrafts: incoming.aimDrafts.length,
-          milestones: allMilestones(incoming).length,
-          memories: incoming.memories.length,
-          evidence: incoming.evidence.length,
-          completions: incoming.completions.length,
-          actors: incoming.actors.length,
-          subAimRelations: incoming.subAimRelations.length,
-          assignments: incoming.assignments.length,
-          runs: incoming.runs.length,
-          runEvents: incoming.runEvents.length,
-          toolTraces: incoming.toolTraces.length,
-          evidenceAttributions: incoming.evidenceAttributions.length,
-          contextIntakeSessions: incoming.contextIntakeSessions.length,
+      return withWriteLock(() => {
+        const incoming: LocalStore = {
+          ownerId: snapshot.ownerId ?? DEFAULT_OWNER,
+          goals: snapshot.goals ?? [],
+          aimDrafts: (snapshot.aimDrafts ?? []).map(normalizeAimDraftRow).filter((row): row is AimDraftRow => row !== null),
+          milestonesByGoal: snapshot.milestonesByGoal ?? {},
+          memories: (snapshot.memories ?? []).map(normalizeMemoryRow),
+          evidence: snapshot.evidence ?? [],
+          completions: snapshot.completions ?? [],
+          actors: snapshot.actors ?? [],
+          subAimRelations: snapshot.subAimRelations ?? [],
+          assignments: snapshot.assignments ?? [],
+          runs: snapshot.runs ?? [],
+          runEvents: snapshot.runEvents ?? [],
+          toolTraces: snapshot.toolTraces ?? [],
+          evidenceAttributions: snapshot.evidenceAttributions ?? [],
+          contextIntakeSessions: snapshot.contextIntakeSessions ?? [],
         };
-      }
-
-      const store = load();
-      const mergeRows = <T extends { id: string }>(current: T[], next: T[]): number => {
-        let added = 0;
-        const byId = new Map(current.map((row) => [row.id, row]));
-        for (const row of next) {
-          if (!byId.has(row.id)) {
-            current.push(row);
-            added += 1;
-          }
+        if (mode === "replace") {
+          // Load first even though the snapshot replaces everything: an unusable file must be
+          // quarantined (kept for forensics), never silently overwritten by the import.
+          load();
+          save(incoming);
+          return {
+            goals: incoming.goals.length,
+            aimDrafts: incoming.aimDrafts.length,
+            milestones: allMilestones(incoming).length,
+            memories: incoming.memories.length,
+            evidence: incoming.evidence.length,
+            completions: incoming.completions.length,
+            actors: incoming.actors.length,
+            subAimRelations: incoming.subAimRelations.length,
+            assignments: incoming.assignments.length,
+            runs: incoming.runs.length,
+            runEvents: incoming.runEvents.length,
+            toolTraces: incoming.toolTraces.length,
+            evidenceAttributions: incoming.evidenceAttributions.length,
+            contextIntakeSessions: incoming.contextIntakeSessions.length,
+          };
         }
-        return added;
-      };
 
-      const goals = mergeRows(store.goals, incoming.goals);
-      const aimDrafts = mergeRows(store.aimDrafts, incoming.aimDrafts);
-      const memories = mergeRows(store.memories, incoming.memories);
-      const evidence = mergeRows(store.evidence, incoming.evidence);
-      const completions = mergeRows(store.completions, incoming.completions);
-      const actors = mergeRows(store.actors, incoming.actors);
-      const subAimRelations = mergeRows(store.subAimRelations, incoming.subAimRelations);
-      const assignments = mergeRows(store.assignments, incoming.assignments);
-      const runs = mergeRows(store.runs, incoming.runs);
-      const runEvents = mergeRows(store.runEvents, incoming.runEvents);
-      const toolTraces = mergeRows(store.toolTraces, incoming.toolTraces);
-      const evidenceAttributions = mergeRows(store.evidenceAttributions, incoming.evidenceAttributions);
-      const contextIntakeSessions = mergeRows(store.contextIntakeSessions, incoming.contextIntakeSessions);
-      let milestones = 0;
-      for (const [goalId, nextRows] of Object.entries(incoming.milestonesByGoal)) {
-        store.milestonesByGoal[goalId] ??= [];
-        milestones += mergeRows(store.milestonesByGoal[goalId], nextRows);
-      }
-      save(store);
-      return {
-        goals,
-        aimDrafts,
-        milestones,
-        memories,
-        evidence,
-        completions,
-        actors,
-        subAimRelations,
-        assignments,
-        runs,
-        runEvents,
-        toolTraces,
-        evidenceAttributions,
-        contextIntakeSessions,
-      };
+        const store = load();
+        const mergeRows = <T extends { id: string }>(current: T[], next: T[]): number => {
+          let added = 0;
+          const byId = new Map(current.map((row) => [row.id, row]));
+          for (const row of next) {
+            if (!byId.has(row.id)) {
+              current.push(row);
+              added += 1;
+            }
+          }
+          return added;
+        };
+
+        const goals = mergeRows(store.goals, incoming.goals);
+        const aimDrafts = mergeRows(store.aimDrafts, incoming.aimDrafts);
+        const memories = mergeRows(store.memories, incoming.memories);
+        const evidence = mergeRows(store.evidence, incoming.evidence);
+        const completions = mergeRows(store.completions, incoming.completions);
+        const actors = mergeRows(store.actors, incoming.actors);
+        const subAimRelations = mergeRows(store.subAimRelations, incoming.subAimRelations);
+        const assignments = mergeRows(store.assignments, incoming.assignments);
+        const runs = mergeRows(store.runs, incoming.runs);
+        const runEvents = mergeRows(store.runEvents, incoming.runEvents);
+        const toolTraces = mergeRows(store.toolTraces, incoming.toolTraces);
+        const evidenceAttributions = mergeRows(store.evidenceAttributions, incoming.evidenceAttributions);
+        const contextIntakeSessions = mergeRows(store.contextIntakeSessions, incoming.contextIntakeSessions);
+        let milestones = 0;
+        for (const [goalId, nextRows] of Object.entries(incoming.milestonesByGoal)) {
+          store.milestonesByGoal[goalId] ??= [];
+          milestones += mergeRows(store.milestonesByGoal[goalId], nextRows);
+        }
+        save(store);
+        return {
+          goals,
+          aimDrafts,
+          milestones,
+          memories,
+          evidence,
+          completions,
+          actors,
+          subAimRelations,
+          assignments,
+          runs,
+          runEvents,
+          toolTraces,
+          evidenceAttributions,
+          contextIntakeSessions,
+        };
+      });
+    },
+
+    async getDiagnostics(): Promise<StoreDiagnostic[]> {
+      return diagnostics.slice();
     },
   };
 }
