@@ -48,6 +48,7 @@ function node(
       context_gaps: [],
       eval_signal: `${key} meets the aim-specific standard.`,
     },
+    routing_override: null,
     ...overrides,
   };
 }

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { decompose, decomposeWithQuality, planQualityMetadata, type DecomposeInput } from "./decompose";
 import type { LlmGateway, LlmRequest, LlmResponse, LlmUsage } from "./index";
+import type { CommitPatternMatch, DecompositionOutput } from "@core/types";
 
 // ──────────────────────────────────────────────────────────────────────────
 // Mock gateway: no network. `completeStructured` returns whatever canned JSON
@@ -65,7 +66,7 @@ const INPUT: DecomposeInput = {
 };
 
 /** A canned, valid two-node plan exercising both v1 evaluators + a dependency edge. */
-function validPlan() {
+function validPlan(): DecompositionOutput {
   return {
     goal_summary: "Build the v1a evidence ingester.",
     domain: "software",
@@ -97,6 +98,7 @@ function validPlan() {
           threshold: 1,
           completion_mode: "auto_then_confirm",
         },
+        routing_override: null,
       },
       {
         key: "m2",
@@ -124,6 +126,7 @@ function validPlan() {
           threshold: 1,
           completion_mode: "auto",
         },
+        routing_override: null,
       },
     ],
     edges: [{ from: "m1", to: "m2" }],
@@ -394,7 +397,7 @@ describe("decompose · happy path", () => {
 
   it("repairs numeric string min_files values from structured providers", async () => {
     const plan = validPlan();
-    plan.nodes[0]!.acceptance_rule.clauses[0]!.match.min_files = "2" as unknown as number;
+    (plan.nodes[0]!.acceptance_rule.clauses[0]!.match as CommitPatternMatch).min_files = "2" as unknown as number;
     const result = await decompose(mockGateway(plan), INPUT);
 
     expect(result.validation.ok).toBe(true);

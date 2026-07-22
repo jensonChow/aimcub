@@ -13,26 +13,26 @@ function fakeFetch(content: string, opts?: { ok?: boolean; status?: number; usag
     choices: [{ message: { content } }],
     usage: { prompt_tokens: 11, completion_tokens: 22, ...opts?.usage },
   });
-  const impl = vi.fn(async (): Promise<OpenAiFetchResponse> => ({
+  const impl = vi.fn<OpenAiFetchPort>(async () => ({
     ok: opts?.ok ?? true,
     status: opts?.status ?? 200,
     async text() {
       return opts?.ok === false ? content : payload;
     },
   }));
-  return { client: impl as unknown as OpenAiFetchPort, impl };
+  return { client: impl, impl };
 }
 
 /** A fetch returning an arbitrary raw body (for edge cases: non-JSON, empty choices, …). */
 function rawFetch(body: string, opts?: { ok?: boolean; status?: number }) {
-  const impl = vi.fn(async (): Promise<OpenAiFetchResponse> => ({
+  const impl = vi.fn<OpenAiFetchPort>(async () => ({
     ok: opts?.ok ?? true,
     status: opts?.status ?? 200,
     async text() {
       return body;
     },
   }));
-  return { client: impl as unknown as OpenAiFetchPort, impl };
+  return { client: impl, impl };
 }
 
 function recordingMeter() {

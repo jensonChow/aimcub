@@ -93,7 +93,6 @@ describe("reviewContextProfile", () => {
     const report = reviewContextProfile({
       memories: [
         {
-          id: "11111111-0000-4000-8000-000000000001",
           content: "Eval signal: Done means smoke tests pass.",
           category: "eval_signal",
           confidence: 0.9,
@@ -101,7 +100,6 @@ describe("reviewContextProfile", () => {
           status: "active",
         },
         {
-          id: "11111111-0000-4000-8000-000000000002",
           content: "Procedure: Run pnpm build before shipping.",
           category: "procedure",
           confidence: 0.65,
@@ -109,7 +107,6 @@ describe("reviewContextProfile", () => {
           status: "active",
         },
         {
-          id: "11111111-0000-4000-8000-000000000003",
           content: "Capability: Codex can implement CLI tasks.",
           category: "capability",
           confidence: 0.8,

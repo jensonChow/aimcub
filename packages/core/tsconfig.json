@@ -4,8 +4,7 @@
     "outDir": "dist",
     "rootDir": "src",
     "types": [],
-    "lib": ["ES2022"]
+    "lib": ["ES2022", "WebWorker"]
   },
-  "include": ["src"],
-  "exclude": ["**/*.test.ts"]
+  "include": ["src"]
 }
