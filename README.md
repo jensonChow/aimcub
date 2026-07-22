@@ -77,11 +77,15 @@ For product direction:
 - [`docs/vision.md`](docs/vision.md) explains the long-term product thesis.
 - [`docs/v1-spec.md`](docs/v1-spec.md) explains the active local harness scope.
 - [`docs/local-alpha.md`](docs/local-alpha.md) defines the local alpha contract.
+- [`docs/roadmap.md`](docs/roadmap.md) is the public, gate-by-gate status of
+  where the project actually stands today.
 
 For contributor context:
 
 - [`docs/quickstart.md`](docs/quickstart.md) is the fastest way to see the
   product loop running, provider-free.
+- [`docs/good-first-contributions.md`](docs/good-first-contributions.md) is a
+  curated list of real, currently-open items to work on.
 - [`AGENTS.md`](AGENTS.md) is the root project contract.
 - [`docs/handoff.md`](docs/handoff.md) is the latest session transfer.
 - [`docs/memory/README.md`](docs/memory/README.md) maps durable module memory.
@@ -165,8 +169,12 @@ decision is made.
 
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) covers setup, the verification gate, and
   contribution conventions.
+- [`docs/good-first-contributions.md`](docs/good-first-contributions.md) is a
+  curated list of real, currently-open items if you're looking for where to start.
+- [`docs/roadmap.md`](docs/roadmap.md) covers where the project stands today and
+  what comes next.
 - [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) is our community standard
   (Contributor Covenant v2.1).
 - [`SECURITY.md`](SECURITY.md) explains how to report a vulnerability.
 - Issue and pull request templates live under [`.github/`](.github/PULL_REQUEST_TEMPLATE.md)
-  for bug reports, feature requests, and PRs.
+  for bug reports, feature requests, adapter proposals, and PRs.

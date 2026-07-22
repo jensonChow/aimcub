@@ -1,0 +1,135 @@
+name: Local Agent Adapter Proposal
+description: Propose a new local agent runtime for Aimcub to support (e.g. Gemini CLI, Aider).
+labels: ["adapter-proposal"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Aimcub runs local coding/research agents through adapters in `@core/local-agent`.
+        Read `docs/local-agent-adapters.md` before filling this in — it defines the adapter
+        contract, the contribution recipe, and why `buildInvocation` (mapping Aimcub's
+        sandbox/network grant onto the runtime's own flags) is a security contract, not just
+        plumbing. This form captures what a reviewer needs to judge feasibility before any
+        code is written. See `docs/good-first-contributions.md` if you're looking for the
+        current flagship adapter suggestions.
+
+  - type: input
+    id: runtime-name
+    attributes:
+      label: Runtime name
+      description: The CLI tool/product name, exactly as its own docs refer to it.
+      placeholder: e.g. Gemini CLI
+    validations:
+      required: true
+
+  - type: input
+    id: homepage
+    attributes:
+      label: Homepage / repository URL
+      description: Official docs or source repository for the runtime.
+      placeholder: https://...
+    validations:
+      required: true
+
+  - type: input
+    id: cli-binary
+    attributes:
+      label: CLI binary name
+      description: The executable name Aimcub would search for on PATH (the adapter's `bin`).
+      placeholder: e.g. gemini
+    validations:
+      required: true
+
+  - type: textarea
+    id: install-path
+    attributes:
+      label: Install path(s)
+      description: >-
+        How is this runtime normally installed, and where does the binary end up? List common
+        install methods (npm global, Homebrew, curl script, etc.) and the resulting binary
+        locations an adapter's `fallbackPaths` would need to search.
+    validations:
+      required: true
+
+  - type: textarea
+    id: auth-model
+    attributes:
+      label: Authentication model
+      description: >-
+        How does the runtime authenticate (API key, OAuth login, subscription session, none)?
+        Critically: how can a non-interactive `authProbe` command distinguish "authenticated"
+        from "installed but not logged in" by exit code alone?
+    validations:
+      required: true
+
+  - type: textarea
+    id: output-format
+    attributes:
+      label: Output format
+      description: >-
+        What does the runtime emit on stdout/stderr for a scripted, non-interactive run? Is
+        there a streaming structured mode (JSONL, stream-json, SSE)? Paste a real sample if you
+        can — `parseLine` has to be written against the actual shape.
+      placeholder: |
+        e.g. JSONL, one JSON object per line, with a `type` field distinguishing
+        message / tool-call / result events...
+    validations:
+      required: true
+
+  - type: textarea
+    id: sandbox-flags
+    attributes:
+      label: Sandbox / permission flags
+      description: >-
+        What flags does the runtime expose to restrict what it can do? Aimcub grants a run
+        exactly one of read-only or workspace-write, plus network on/off, and the adapter must
+        map each onto the runtime's own flags — list the closest equivalent for each, or state
+        "not supported" (in which case the adapter must fail closed to the most restrictive
+        option). See `docs/agent-permissions.md` for how the two built-in adapters do this.
+      placeholder: |
+        read-only:
+        workspace-write:
+        network off:
+        network on:
+    validations:
+      required: true
+
+  - type: dropdown
+    id: model-listing
+    attributes:
+      label: Model listing support
+      description: Can the runtime list available models programmatically (for live `listModels`), or only via a fixed/offline list?
+      options:
+        - Live listing via a CLI command or flag
+        - Fixed list only (models are effectively hardcoded per runtime version)
+        - Not sure / needs investigation
+    validations:
+      required: true
+
+  - type: textarea
+    id: model-listing-detail
+    attributes:
+      label: Model listing detail
+      description: If live listing exists, what's the command/flag and output shape? If fixed, what models should ship as `fallbackModels`?
+    validations:
+      required: false
+
+  - type: dropdown
+    id: willingness
+    attributes:
+      label: Are you willing to implement this adapter yourself?
+      description: Proposals are welcome either way, but say so up front — it changes how the issue gets triaged.
+      options:
+        - "Yes — I intend to open a PR following docs/local-agent-adapters.md"
+        - "No — I'm proposing it for someone else to pick up"
+        - Not sure yet
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Anything else a reviewer should know — known limitations, how it differs from the Codex/Claude Code adapters, links to similar integrations in other tools, etc.
+    validations:
+      required: false
