@@ -2,11 +2,11 @@
 
 ## What changed
 
-1. **Adapter contract** (`packages/local-agent/src/types.ts`, `adapters/*`): `LocalAgentEvent`
-   gains optional `artifacts: { path, kind }[]` with `kind` ∈ `file_write | file_edit |
-   file_delete`. Codex reads `file_change` items and `patch_apply_*` changes (both the list and
-   the path-keyed map shapes, via the new `fileArtifactsFromChanges` helper); Claude reads
-   `tool_use` blocks (`Write`/`Edit`/`MultiEdit`/`NotebookEdit` → path + kind). Unset otherwise.
+1. **Adapter contract** (`types.ts`, `adapters/*`): `LocalAgentEvent` gains optional
+   `artifacts: { path, kind }[]`, `kind` ∈ `file_write | file_edit | file_delete`. Codex reads
+   `file_change` items and `patch_apply_*` changes (list and path-keyed map shapes, via the new
+   `fileArtifactsFromChanges` helper); Claude reads `tool_use` blocks
+   (`Write`/`Edit`/`MultiEdit`/`NotebookEdit`). Unset otherwise.
 2. **Orchestrator emission**: each newly seen `path`+`kind` becomes a durable `artifact.created`
    run event written right after the event that produced it, payload `{ path, kind, tool_id,
    tool_name, source_event_type }`, through the same batched `appendRunEvents`.
@@ -32,19 +32,17 @@
 
 ## Decisions
 
-- **Dedupe: first touch wins, count travels on evidence.** Run events are append-only history, so
-  an "updated count" would mean rewriting a persisted event, and per-touch events would flood the
-  journal for a file edited thirty times. One `artifact.created` per (path, kind); repeat touches
-  are tallied into the evidence `artifacts` summary (`touches`).
+- **Dedupe: first touch wins, count travels on evidence.** Run events are append-only, so an
+  "updated count" would mean rewriting history and per-touch events would flood the journal for a
+  file edited thirty times. One event per (path, kind); repeats are tallied as `touches`.
 - **Kinds name the operation, not the resulting state.** A runtime that overwrites a path cannot
-  say whether it existed, so `file_write` covers create-or-overwrite rather than lying about
-  "created". Reads are deliberately not artifacts — `artifact.created` claims work product.
-- **Claude block-level `raw`.** Tool events normalized out of a nested block carry that block as
-  `raw`, not the whole message: precise provenance, and no N× duplication under the cap.
+  know whether it existed, so `file_write` covers create-or-overwrite instead of lying about
+  "created". Reads are not artifacts — `artifact.created` claims work product.
+- **Claude block-level `raw`**: a tool event normalized out of a nested block carries that block,
+  not the whole message — precise provenance, no N× duplication under the cap.
 - **Claude tool normalization improved as a side effect** (worth knowing at merge): real Claude
-  stream-json nests `tool_use`/`tool_result` inside `assistant`/`user` messages, which previously
-  normalized to `agent.raw`. They now become `agent.tool.started`/`finished`, so the cockpit shows
-  real Claude tool steps for the first time.
+  nests `tool_use`/`tool_result` inside `assistant`/`user` messages, which previously normalized
+  to `agent.raw`. They now become `agent.tool.*`, so the cockpit shows real Claude tool steps.
 
 ## Out of scope / handoff
 
@@ -55,13 +53,12 @@
 - `streamedAgentEvent` in `apps/cli/src/index.ts` whitelists fields, so `--jsonl` does not stream
   `artifacts` yet — one line (`...(event.artifacts ? { artifacts: event.artifacts } : {})`), left
   out because my index.ts footprint was error mapping only.
-- `@core/types` has an unused `RunArtifactKind` (`file`/`url`/`diff`/`commit`/…). local-agent
-  cannot depend on `@core/types`, so it keeps its own operation-shaped vocabulary; converging the
-  two is a future call for whoever adds non-file artifacts (URLs, commits, CI).
-- Verified read-only: the desktop journal already maps `artifact.created` → "artifact" and filters
-  `evidence.reported`, and renders `entry.what` (our summary) before any i18n key — so no desktop
-  string is missing. Desktop error rendering is message-only (`{ok:false, error}`), so nothing
-  there depended on error identity.
+- `@core/types` has an unused `RunArtifactKind` (`file`/`url`/`diff`/…). local-agent cannot depend
+  on `@core/types`, so it keeps its own operation-shaped vocabulary; converging them is a future
+  call for whoever adds non-file artifacts (URLs, commits, CI).
+- Verified read-only: the desktop journal already maps `artifact.created` → "artifact", filters
+  `evidence.reported`, and renders `entry.what` (our summary) before any i18n key — no desktop
+  string is missing. Its error rendering is message-only, so nothing depended on error identity.
 
 ## Verification
 
