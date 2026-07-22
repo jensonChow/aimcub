@@ -95,6 +95,8 @@ function RunTimelineBlock(props: { entry: RunTimelineEntry; label: string; open:
     t("runTimeline.stepCount", { n: entry.rows.length }),
   ];
   if (entry.attempt > 1) meta.push(t("runTimeline.attempt", { n: entry.attempt }));
+  // Provenance only — a run queued before this field existed just omits the tag, honestly.
+  if (entry.surface) meta.push(t(entry.surface === "cli" ? "runTimeline.surface.cli" : "runTimeline.surface.desktop"));
 
   return (
     <details className="od-run-timeline-run" open={props.open}>

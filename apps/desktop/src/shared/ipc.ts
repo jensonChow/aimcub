@@ -528,8 +528,18 @@ export interface AimcubApi {
   listLocalAgents(): Promise<LocalAgentDetection[]>;
   runLocalAgent(req: LocalAgentRunRequest): Promise<LocalAgentRunResult>;
   runMilestoneAgent(req: RunMilestoneAgentRequest): Promise<RunMilestoneAgentResult>;
-  /** Abort an executing run. Resolves false when the run is not executing in this process. */
+  /**
+   * Abort a run: aborts it in-process if it is actively executing, otherwise cancels it in place
+   * if it is still queued (e.g. a stranded run nobody re-granted). Resolves false when neither
+   * applies — the run already settled, or is executing in a different process.
+   */
   cancelRun(runId: string): Promise<boolean>;
+  /**
+   * Execute a run this session did not enqueue but the user just re-confirmed — the re-grant path
+   * for a `workspace-write` run a previous session left queued. Claims by id only: the permission
+   * was fixed at enqueue time and is never re-negotiated here (`docs/agent-permissions.md`).
+   */
+  claimQueuedRun(runId: string): Promise<void>;
   confirmMilestone(req: ConfirmMilestoneRequest): Promise<GoalDetail | null>;
   getWindowChromeState(): Promise<WindowChromeState>;
   /** Drive the native window appearance (titlebar/background/traffic-light context) from the in-app theme toggle. */
@@ -596,6 +606,7 @@ export const IPC = {
   runLocalAgent: "aimcub:runLocalAgent",
   runMilestoneAgent: "aimcub:runMilestoneAgent",
   cancelRun: "aimcub:cancelRun",
+  claimQueuedRun: "aimcub:claimQueuedRun",
   confirmMilestone: "aimcub:confirmMilestone",
   getWindowChromeState: "aimcub:getWindowChromeState",
   setThemeSource: "aimcub:setThemeSource",

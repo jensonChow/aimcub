@@ -76,9 +76,22 @@ is what makes the scoping rule load-bearing rather than cosmetic.
 
 The consequence, stated plainly: **a `workspace-write` run that is still queued when its window
 closes stays queued.** The next launch will not pick it up, because the consent that justified it
-belonged to a person who is no longer there to be asked. Re-run the sub-aim to grant it again. This
-is deliberate — the alternative is an app that silently executes a write it was told about
-yesterday.
+belonged to a person who is no longer there to be asked.
+
+It does not stay invisible, though. Open that sub-aim's Execute stage and the cockpit shows the
+queued run plainly — "queued with workspace access from an earlier session" — together with the
+folder and network setting it was granted, and offers two explicit choices:
+
+- **Re-grant** re-shows that same folder and requires a fresh click before the run executes. The
+  permission itself is never re-negotiated here, only re-confirmed — claiming happens by the run's
+  existing id (`claimConsentedRun`, the same move a brand-new grant uses), so nothing about what it
+  may do changes from what was recorded when it was first queued.
+- **Cancel** drops the run without ever executing it (`cancelQueuedRun` settles the row directly,
+  since nothing ever claimed it to abort).
+
+Nothing claims a stranded run on your behalf just because you opened the app or selected the
+sub-aim — both actions require your click. This is deliberate — the alternative is an app that
+silently executes a write it was told about yesterday.
 
 Consent is per run and per sub-aim. It is never written to disk as a preference, so nothing
 persists a widened grant into the future.

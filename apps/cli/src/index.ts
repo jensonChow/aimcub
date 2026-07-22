@@ -99,6 +99,7 @@ import { formatFirstRun, formatHome, formatPostSetupNextSteps, providerSetupComp
 import {
   runAimAgent,
   runAimAgentUntilBlocked,
+  streamedAgentEvent,
   type AimAgentRunResult,
   type AimAgentSweepStopReason,
 } from "./agent-run";
@@ -1218,18 +1219,6 @@ function absoluteWorkspace(raw: string | undefined, readOnly: boolean): string {
     throw new UserError(`Cannot access workspace: ${workspace}`);
   }
   return workspace;
-}
-
-function streamedAgentEvent(event: LocalAgentEvent): Record<string, unknown> {
-  return {
-    type: "agent.event",
-    event: event.type,
-    summary: event.summary,
-    ...(event.sessionId ? { sessionId: event.sessionId } : {}),
-    ...(event.toolId ? { toolId: event.toolId } : {}),
-    ...(event.toolName ? { toolName: event.toolName } : {}),
-    ...(event.usage ? { usage: event.usage } : {}),
-  };
 }
 
 function agentRunSummary(result: AimAgentRunResult): Record<string, unknown> {

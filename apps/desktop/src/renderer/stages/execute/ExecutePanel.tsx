@@ -34,6 +34,8 @@ import {
   runPermissionRequest,
   type RunPermissionDraft,
 } from "./runPermissions";
+import { StrandedRunNotice } from "./StrandedRunNotice";
+import { strandedRunFor } from "./strandedRun";
 
 export function ExecutePanel(props: {
   detail: GoalDetail;
@@ -44,6 +46,14 @@ export function ExecutePanel(props: {
   /** The run currently streaming from the main-process worker, if any. */
   liveRun?: LiveRunState | null;
   onCancelRun?: (runId: string) => void;
+  /**
+   * Run ids this session itself enqueued (fresh or re-granted) — how the stranded-run affordance
+   * tells "queued a second ago by me" from "left behind by a session that closed". Without this a
+   * run this session just started would flash as stranded in the gap before it starts streaming.
+   */
+  sessionRunIds: ReadonlySet<string>;
+  /** Re-confirm and execute a run a previous session left queued, by its existing id. */
+  onRegrantRun?: (runId: string) => void;
   /** Open the native folder picker behind a `workspace-write` grant. */
   onPickRunWorkspace?: () => Promise<string | null>;
   onRunAgent: (milestone: Milestone, permission: RunPermissionConsent) => void;
@@ -165,6 +175,13 @@ export function ExecutePanel(props: {
   }
 
   const selectedLiveRun = selectedRow ? liveRunForMilestone(props.liveRun ?? null, selectedRow.milestone.id) : null;
+  const selectedStrandedRun = selectedRow
+    ? strandedRunFor({
+        runs: props.progress?.runs ?? [],
+        milestoneId: selectedRow.milestone.id,
+        sessionRunIds: props.sessionRunIds,
+      })
+    : null;
   const primaryAction = selectedRow ? executePrimaryAction(selectedRow, t) : null;
   const selectedHumanRoute = selectedRow ? isHumanExecuteRoute(selectedRow) : false;
   const selectedPermission = selectedRow ? permissionDraftFor(selectedRow.milestone) : DEFAULT_RUN_PERMISSION_DRAFT;
@@ -269,6 +286,15 @@ export function ExecutePanel(props: {
                       live={selectedLiveRun}
                       onCancel={props.onCancelRun}
                       t={t}
+                    />
+                  ) : null}
+
+                  {selectedStrandedRun ? (
+                    <StrandedRunNotice
+                      run={selectedStrandedRun}
+                      disabled={props.disabled}
+                      onRegrant={() => props.onRegrantRun?.(selectedStrandedRun.runId)}
+                      onCancel={() => props.onCancelRun?.(selectedStrandedRun.runId)}
                     />
                   ) : null}
 

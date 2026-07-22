@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import type { ContextSourceStatus } from "../../../shared/ipc";
 import { ContextSourcesPanel } from "../../ContextSourcesPanel";
 import type { ContextBundleReview } from "../../contextReview";
+import { useDeveloperMode } from "../../developerMode";
 import { useI18n } from "../../i18n";
 import { Button } from "../../ui";
 import { ContextAimSummaryPanel } from "./ContextAimSummaryPanel";
@@ -27,6 +28,8 @@ interface ContextStageProps {
   onOpenSettings: () => void;
   onContextSources: (status: ContextSourceStatus) => void;
   onContinueToPlan?: () => void;
+  /** Raw trace view; only shown in developer mode ("product-first, debug-second"). */
+  debugPanel: ReactNode;
 }
 
 export function ContextStage({
@@ -45,8 +48,10 @@ export function ContextStage({
   onOpenSettings,
   onContextSources,
   onContinueToPlan,
+  debugPanel,
 }: ContextStageProps) {
   const { t } = useI18n();
+  const developerMode = useDeveloperMode();
   const hasBlockingQuestion = clarifyPhase === "intake";
   const hasClarifyPanel = Boolean(clarifyPanel);
   const hasFocusedQuestion = hasClarifyPanel
@@ -58,6 +63,7 @@ export function ContextStage({
     return (
       <section className="od-context-focus" data-od-id="context-focus">
         {clarifyPanel}
+        {developerMode ? debugPanel : null}
       </section>
     );
   }
@@ -92,6 +98,7 @@ export function ContextStage({
           </Button>
         </div>
       ) : null}
+      {developerMode ? debugPanel : null}
     </>
   );
 }

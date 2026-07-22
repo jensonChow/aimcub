@@ -56,7 +56,7 @@ import {
 } from "./labels";
 import { LocalAgentForm } from "./LocalAgentForm";
 import { Notice } from "./Notice";
-import { mergePlanningDebugTraces } from "./PlanningDebugPanel";
+import { mergePlanningDebugTraces, PlanningDebugPanel } from "./PlanningDebugPanel";
 import { ProviderForm } from "./ProviderForm";
 import { ContextClarifyPanel } from "./stages/context/ContextClarifyPanel";
 import { buildContextLoopModel } from "./stages/context/contextLoop";
@@ -220,6 +220,11 @@ function AimOsApp() {
   const selectedGoalRef = useRef<Goal | null>(null);
   const draftActivationTrackerRef = useRef(createDraftActivationTracker());
   const sideEffectOperationRef = useRef<{ id: string; busy: string } | null>(null);
+  // Run ids this session itself enqueued or re-granted, so the stranded-run affordance never
+  // flashes for a run this window just started while the claim is still landing (see
+  // `strandedRunFor`). A ref, not state: it only needs to be current at the next render a real
+  // state update already triggers, never a render of its own.
+  const sessionRunIdsRef = useRef<Set<string>>(new Set());
   const pendingTargetNavigationRef = useRef<{
     transition: number;
     busy: string;
@@ -1362,8 +1367,41 @@ function AimOsApp() {
         milestoneId: milestone.id,
         permission: permission ?? runPermissionRequest(DEFAULT_RUN_PERMISSION_DRAFT),
       });
+      // Recorded even on failure — a null runId is simply not added. Recording it here (not after
+      // the refresh below) closes the gap between the row landing as `queued` and this session
+      // knowing it owns it, which is exactly the gap the stranded-run affordance watches for.
+      if (result.runId) sessionRunIdsRef.current.add(result.runId);
       const resultTargetIsCurrent = isCurrentWorkspaceTransition(transition) || selectedGoalRef.current?.id === goal.id;
       if (resultTargetIsCurrent && !result.ok && result.error) setError(result.error);
+      await refreshGoalAfterSideEffect(goal, transition, surfaceTransition);
+    } catch (err) {
+      if (!isCurrentWorkspaceTransition(transition) && selectedGoalRef.current?.id !== goal.id) return;
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      finishSideEffectOperation(operationId);
+    }
+  }
+
+  /**
+   * Re-grant path for a `workspace-write` run a previous session left queued: the Execute stage has
+   * already re-shown that run's recorded permission and gotten an explicit click, so this claims the
+   * SAME run id rather than enqueuing a new one — the permission was fixed when it was first queued
+   * and is never re-negotiated here (`docs/agent-permissions.md`).
+   */
+  async function regrantQueuedRun(runId: string) {
+    if (workflowMutationIsLocked()) return;
+    if (!selected) return;
+    const goal = selected;
+    const operationId = `regrant:${goal.id}:${runId}`;
+    if (!beginSideEffectOperation(operationId, t("os.busy.agent"))) return;
+    const transition = navigationConcurrencyRef.current.workspace;
+    const surfaceTransition = navigationConcurrencyRef.current.surface;
+    setError(null);
+    // Recorded before the IPC round-trip so the affordance cannot flash again for the very run the
+    // user just re-granted while the claim is still landing.
+    sessionRunIdsRef.current.add(runId);
+    try {
+      await window.aimcub.claimQueuedRun(runId);
       await refreshGoalAfterSideEffect(goal, transition, surfaceTransition);
     } catch (err) {
       if (!isCurrentWorkspaceTransition(transition) && selectedGoalRef.current?.id !== goal.id) return;
@@ -1786,6 +1824,8 @@ function AimOsApp() {
       disabled={Boolean(busy)}
       liveRun={liveRun && liveRun.goalId === selected.id ? liveRun : null}
       onCancelRun={(runId) => void window.aimcub.cancelRun(runId)}
+      sessionRunIds={sessionRunIdsRef.current}
+      onRegrantRun={(runId) => void regrantQueuedRun(runId)}
       onPickRunWorkspace={async () => {
         const result = await window.aimcub.pickRunWorkspace();
         return result.canceled ? null : result.paths[0] ?? null;
@@ -1808,6 +1848,26 @@ function AimOsApp() {
       progress={progress}
     />
   ) : null;
+
+  // Developer-mode-only raw trace view; ContextStage decides whether to actually render it
+  // (via useDeveloperMode), so this is safe to build unconditionally like the other stage panels.
+  const debugPanel = (
+    <PlanningDebugPanel
+      mode={mode}
+      busy={busy}
+      provider={provider}
+      planResult={planResult}
+      debugTraces={planningDebugTraces}
+      liveEvents={planningLiveEvents}
+      intakeClarify={intakeClarify}
+      intakeAnswers={builtIntakeAnswers}
+      clarify={clarifyPhase === "postDraft" ? clarify : null}
+      clarifyAnswers={builtAnswers}
+      contextNote={contextNote}
+      plan={activePlan}
+      detail={detail}
+    />
+  );
 
   const settingsPanel = (
     <SettingsPanel
@@ -1936,6 +1996,7 @@ function AimOsApp() {
           onOpenSettings={openContextSettings}
           onContextSources={setContextSources}
           onContinueToPlan={continueContextToPlan}
+          debugPanel={debugPanel}
         />
       );
     }

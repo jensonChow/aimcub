@@ -229,6 +229,8 @@ function executeRow(input: {
   owner: "agent" | "human";
   completed?: boolean;
   lowTrust?: boolean;
+  /** The agent run's recorded sandbox — defaults to the desktop background-drain floor. */
+  runSandbox?: string;
 }): AimProgressReadModel["milestones"][number] {
   const completed = input.completed ?? false;
   const lowTrust = input.lowTrust ?? false;
@@ -261,7 +263,7 @@ function executeRow(input: {
       status: completed || lowTrust ? "completed" : "queued",
       attempt: 1,
       workspace_root: "/Users/jenson/project",
-      sandbox: "read-only",
+      sandbox: input.runSandbox ?? "read-only",
       network_enabled: false,
       model: "gpt-5",
       reasoning: "high",
@@ -345,7 +347,10 @@ function executeProgress(rows: AimProgressReadModel["milestones"]): AimProgressR
   };
 }
 
-function renderExecute(rows: AimProgressReadModel["milestones"]): string {
+function renderExecute(
+  rows: AimProgressReadModel["milestones"],
+  options: { sessionRunIds?: ReadonlySet<string> } = {},
+): string {
   const detail: GoalDetail = {
     goal: savedGoal,
     milestones: rows.map((row) => row.milestone),
@@ -356,6 +361,7 @@ function renderExecute(rows: AimProgressReadModel["milestones"]): string {
         detail={detail}
         progress={executeProgress(rows)}
         disabled={false}
+        sessionRunIds={options.sessionRunIds ?? new Set()}
         onRunAgent={noop}
         onConfirm={asyncTrue}
         onPickFiles={async () => []}
@@ -518,6 +524,34 @@ describe("ExecutePanel", () => {
     expect(panel).not.toMatch(/className="od-work-note" role="status"/);
     expect(css).toMatch(/\.od-live-run\s*{[^}]*background:\s*var\(--field\);/s);
     expect(css).toMatch(/\.od-live-run\[data-running="true"\] \.od-live-run-dot\s*{[^}]*animation:\s*od-journey-pulse/s);
+  });
+
+  it("surfaces a queued workspace-write run left behind by an earlier session, with re-grant and cancel", () => {
+    const html = renderExecute([
+      executeRow({ id: AGENT_MILESTONE, title: "Run implementation agent", owner: "agent", runSandbox: "workspace-write" }),
+    ]);
+
+    expect(html).toContain('data-od-id="stranded-run-notice"');
+    expect(html).toContain("Waiting on access granted in an earlier session");
+    expect(html).toContain("/Users/jenson/project");
+    expect(html).toContain("Re-grant and run");
+    expect(html).toContain("Cancel run");
+  });
+
+  it("never shows the stranded-run notice for a run this session itself just queued", () => {
+    const row = executeRow({ id: AGENT_MILESTONE, title: "Run implementation agent", owner: "agent", runSandbox: "workspace-write" });
+    const html = renderExecute([row], { sessionRunIds: new Set([row.latest_run!.id]) });
+
+    expect(html).not.toContain('data-od-id="stranded-run-notice"');
+    expect(html).not.toContain("Waiting on access granted in an earlier session");
+  });
+
+  it("never treats a queued read-only run as stranded — the background drain already covers it", () => {
+    const html = renderExecute([
+      executeRow({ id: AGENT_MILESTONE, title: "Run implementation agent", owner: "agent" }),
+    ]);
+
+    expect(html).not.toContain('data-od-id="stranded-run-notice"');
   });
 });
 

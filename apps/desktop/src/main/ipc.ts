@@ -94,11 +94,13 @@ import { getWebResearchStatus, setWebResearchConfig, testWebResearchConfig } fro
 import { listLocalAgents, runLocalAgent } from "./local-agents";
 import { loadDesktopPreferences, saveDesktopPreferences } from "./app-settings";
 import {
+  cancelQueuedRun,
   claimConsentedRun,
   createDesktopRunQueue,
   enqueueDesktopRun,
   isConsentedEscalation,
   kickRunQueue,
+  logStrandedQueuedRuns,
   resolveDesktopRunPermission,
 } from "./run-queue";
 
@@ -869,11 +871,24 @@ export function registerIpc(): void {
     runMilestoneAgent(req),
   );
 
-  ipcMain.handle(IPC.cancelRun, (_e, runId: string): boolean => runQueue.cancel(runId));
+  ipcMain.handle(IPC.cancelRun, async (_e, runId: string): Promise<boolean> =>
+    runQueue.cancel(runId) || (await cancelQueuedRun(aimStore, runId)),
+  );
+
+  // The re-grant path for a `workspace-write` run a previous session left queued: the renderer has
+  // already re-shown that row's recorded permission and gotten an explicit click, so this only
+  // executes the row that consent already lives on — the same claim-by-id path a fresh grant uses.
+  ipcMain.handle(IPC.claimQueuedRun, (_e, runId: string): void => {
+    claimConsentedRun(runQueue, runId);
+  });
 
   // Anything left queued by a previous session (or by a CLI invocation that exited) resumes as
   // soon as the handlers are live.
   kickRunQueue(runQueue);
+  // Diagnostic only — reports what stays queued above the floor and why; claims nothing.
+  void logStrandedQueuedRuns(aimStore).catch((error: unknown) => {
+    console.error("[aimcub] stranded-run diagnostic failed:", error);
+  });
 
   ipcMain.handle(IPC.confirmMilestone, async (_e, req: ConfirmMilestoneRequest): Promise<GoalDetail | null> => {
     await aimStore.confirmMilestone({

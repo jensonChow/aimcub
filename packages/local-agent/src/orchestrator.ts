@@ -584,6 +584,9 @@ class RunEventBuffer {
 // Enqueue
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** The surface that queued a run — provenance only, never a claim gate (sandbox is). */
+export type RunSurface = "desktop" | "cli";
+
 /** What a queued run carries on its `run.queued` event so any worker can execute it later. */
 export interface QueuedRunRequest {
   agent_id: LocalAgentId;
@@ -591,6 +594,12 @@ export interface QueuedRunRequest {
   /** 1 for the first try; a retry re-enqueues with the next number and `retry_of` set. */
   attempt: number;
   retry_of?: string;
+  /**
+   * Which surface created this run. Additive and optional: a row queued before this field existed
+   * simply reads back without one — {@link queuedRunRequest} degrades it to absent, not an error,
+   * and nothing that claims or executes a run may require it.
+   */
+  surface?: RunSurface;
 }
 
 export interface EnqueueMilestoneRunInput {
@@ -609,6 +618,8 @@ export interface EnqueueMilestoneRunInput {
   /** Set by the retry path; never by a caller. */
   attempt?: number;
   retryOf?: string;
+  /** Which surface is enqueuing this run — provenance for diagnostics/timeline, not a permission. */
+  surface?: RunSurface;
 }
 
 export interface EnqueuedRun<TStore extends RunOrchestratorStore> {
@@ -648,6 +659,7 @@ export async function enqueueMilestoneRun<TStore extends RunOrchestratorStore>(
     ...(input.instruction?.trim() ? { instruction: input.instruction.trim() } : {}),
     attempt: input.attempt ?? 1,
     ...(input.retryOf ? { retry_of: input.retryOf } : {}),
+    ...(input.surface ? { surface: input.surface } : {}),
   };
   const run = await store.createRun({
     goalId: progress.goal.id,
@@ -686,6 +698,7 @@ export async function queuedRunRequest(
     ...(typeof payload.instruction === "string" ? { instruction: payload.instruction } : {}),
     ...(typeof payload.attempt === "number" ? { attempt: payload.attempt } : {}),
     ...(typeof payload.retry_of === "string" ? { retry_of: payload.retry_of } : {}),
+    ...(payload.surface === "desktop" || payload.surface === "cli" ? { surface: payload.surface } : {}),
   };
 }
 

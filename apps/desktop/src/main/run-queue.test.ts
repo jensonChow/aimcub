@@ -7,16 +7,18 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createJsonFileStore } from "@core/store";
 import type { DecompositionOutput } from "@core/types";
-import type { LocalAgentEvent, LocalAgentRunRequest, LocalAgentRunResult } from "@core/local-agent";
+import { queuedRunRequest, type LocalAgentEvent, type LocalAgentRunRequest, type LocalAgentRunResult } from "@core/local-agent";
 
 import type { RunLiveEvent } from "../shared/ipc";
 import {
+  cancelQueuedRun,
   claimConsentedRun,
   createDesktopRunQueue,
   DESKTOP_RUN_PERMISSION,
   enqueueDesktopRun,
   isConsentedEscalation,
   kickRunQueue,
+  logStrandedQueuedRuns,
   resolveDesktopRunPermission,
 } from "./run-queue";
 
@@ -271,6 +273,41 @@ describe("desktop run queue", () => {
     });
   });
 
+  it("records desktop as the surface that queued the run, for provenance", async () => {
+    const { store, goal, milestone } = await seedAim();
+    const queue = createDesktopRunQueue(store, () => {});
+
+    const runId = await enqueueDesktopRun(queue, { goalId: goal.id, milestoneId: milestone.id });
+
+    const request = await queuedRunRequest(store, (await store.listRuns(goal.id)).find((run) => run.id === runId)!);
+    expect(request.surface).toBe("desktop");
+  });
+
+  it("still claims and executes a run queued before the surface field existed", async () => {
+    spawnedRequests.length = 0;
+    const { store, goal, milestone } = await seedAim();
+    // A legacy row: exactly what `enqueueDesktopRun` wrote before this field, no `surface` key at all.
+    const legacyRun = await store.createRun({
+      goalId: goal.id,
+      milestoneId: milestone.id,
+      actorKind: "agent",
+      status: "queued",
+      sandbox: "read-only",
+      model: "fake-model",
+      requestPayload: { agent_id: "fake", attempt: 1 },
+    });
+
+    const request = await queuedRunRequest(store, legacyRun);
+    expect(request.surface).toBeUndefined();
+
+    const queue = createDesktopRunQueue(store, () => {});
+    claimConsentedRun(queue, legacyRun.id);
+    await queue.drain({ runId: legacyRun.id });
+
+    expect((await store.listRuns(goal.id)).find((run) => run.id === legacyRun.id)?.status).toBe("completed");
+    expect(spawnedRequests).toHaveLength(1);
+  });
+
   it("resolves renderer consent into what main is willing to record", () => {
     const workspace = mkdtempSync(join(tmpdir(), "aimcub-desktop-resolve-"));
 
@@ -316,11 +353,98 @@ describe("desktop run queue", () => {
     expect(source).toContain("const runId = await enqueueDesktopRun(runQueue, {");
     expect(source).toContain("kickRunQueue(runQueue);");
     expect(source).toContain("return { ok: true, runId, error: null, permission };");
-    expect(source).toContain("ipcMain.handle(IPC.cancelRun, (_e, runId: string): boolean => runQueue.cancel(runId));");
+    // Cancel first tries the in-process abort; a merely-queued (stranded) run has no controller to
+    // abort, so it falls back to settling the row directly.
+    expect(source).toContain("runQueue.cancel(runId) || (await cancelQueuedRun(aimStore, runId))");
     // Live events reach every window: a background drain has no originating sender.
     expect(source).toContain("window.webContents.send(IPC.runLiveEvent, payload);");
     // The old inline pipeline is gone from the handler.
     expect(source).not.toContain("aimStore.finishRun");
+  });
+
+  it("wires the re-grant path to claim-by-id only — never a new permission over IPC", () => {
+    const source = readFileSync(new URL("./ipc.ts", import.meta.url), "utf8");
+
+    expect(source).toContain("ipcMain.handle(IPC.claimQueuedRun, (_e, runId: string): void => {");
+    expect(source).toContain("claimConsentedRun(runQueue, runId);");
+    // The handler takes a bare run id, never a permission — the grant was already fixed at enqueue.
+    expect(source).not.toMatch(/claimQueuedRun[\s\S]{0,200}permission/);
+  });
+
+  it("cancels a queued run that was never claimed", async () => {
+    const { store, goal, milestone } = await seedAim();
+    const workspace = mkdtempSync(join(tmpdir(), "aimcub-desktop-cancel-queued-"));
+    const queue = createDesktopRunQueue(store, () => {});
+    const runId = await enqueueDesktopRun(queue, {
+      goalId: goal.id,
+      milestoneId: milestone.id,
+      permission: { sandbox: "workspace-write", network: false, workspace },
+    });
+
+    await expect(cancelQueuedRun(store, runId)).resolves.toBe(true);
+
+    const run = (await store.listRuns(goal.id)).find((row) => row.id === runId);
+    expect(run?.status).toBe("cancelled");
+    expect((await store.listRunEvents(goal.id)).map((event) => event.type)).toEqual([
+      "run.queued",
+      "run.started",
+      "run.cancelled",
+    ]);
+  });
+
+  it("leaves an already-settled or unknown run alone when asked to cancel it", async () => {
+    const { store, goal, milestone } = await seedAim();
+    const queue = createDesktopRunQueue(store, () => {});
+    const runId = await enqueueDesktopRun(queue, { goalId: goal.id, milestoneId: milestone.id });
+    await queue.drain();
+    expect((await store.listRuns(goal.id))[0]?.status).toBe("completed");
+
+    // Already completed: nothing to cancel.
+    await expect(cancelQueuedRun(store, runId)).resolves.toBe(false);
+    expect((await store.listRuns(goal.id))[0]?.status).toBe("completed");
+
+    // Never existed at all.
+    await expect(cancelQueuedRun(store, "no-such-run")).resolves.toBe(false);
+  });
+
+  it("logs a stranded queued run with the surface that queued it, claiming nothing", async () => {
+    const { store, goal, milestone } = await seedAim();
+    const workspace = mkdtempSync(join(tmpdir(), "aimcub-desktop-stranded-log-"));
+    // A CLI-queued run left behind — exactly what a crashed `aimcub run --workspace` invocation
+    // would leave: `workspace-write`, never claimed by anything in this store.
+    const cliRun = await store.createRun({
+      goalId: goal.id,
+      milestoneId: milestone.id,
+      actorKind: "agent",
+      status: "queued",
+      workspaceRoot: workspace,
+      sandbox: "workspace-write",
+      model: "fake-model",
+      requestPayload: { agent_id: "fake", attempt: 1, surface: "cli" },
+    });
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    await logStrandedQueuedRuns(store);
+
+    expect(log).toHaveBeenCalledTimes(1);
+    const [line] = log.mock.calls[0]!;
+    log.mockRestore();
+    expect(String(line)).toContain(cliRun.id);
+    expect(String(line)).toContain("queued by cli");
+    // Diagnostic only: the row is exactly as it was, still queued.
+    expect((await store.listRuns(goal.id)).find((run) => run.id === cliRun.id)?.status).toBe("queued");
+  });
+
+  it("logs nothing when every queued run is at the read-only floor", async () => {
+    const { store, goal, milestone } = await seedAim();
+    const queue = createDesktopRunQueue(store, () => {});
+    await enqueueDesktopRun(queue, { goalId: goal.id, milestoneId: milestone.id });
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    await logStrandedQueuedRuns(store);
+
+    expect(log).not.toHaveBeenCalled();
+    log.mockRestore();
   });
 
   it("routes a consented escalation through claim-by-id and everything else through the floor drain", () => {

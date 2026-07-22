@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import type { ClarifyOutput } from "@core/llm";
 import type { ContextSourceStatus } from "../../../shared/ipc";
 import type { ContextBundleReview } from "../../contextReview";
+import { DeveloperModeProvider } from "../../developerMode";
 import { I18nProvider } from "../../i18n";
 import {
   ContextClarifyPanel,
@@ -75,6 +76,8 @@ const blockingClarify: ClarifyOutput = {
   assumptions: [],
 };
 
+const debugPanelSentinel = <div data-od-id="context-debug-panel">DEBUG PANEL</div>;
+
 function renderStage(options: {
   clarifyPhase: "intake" | "postDraft" | null;
   clarifyPanel?: ReactNode;
@@ -82,26 +85,34 @@ function renderStage(options: {
   showReview?: boolean;
   disabled?: boolean;
   onContinueToPlan?: () => void;
+  debugPanel?: ReactNode;
+  developerMode?: boolean;
 }): string {
+  const stage = (
+    <ContextStage
+      title="Ship context flow"
+      description="Make the Context stage stepwise."
+      saved={false}
+      disabled={options.disabled ?? false}
+      clarifyPhase={options.clarifyPhase}
+      clarifyPanel={options.clarifyPanel ?? null}
+      contextSources={contextSources}
+      review={emptyReview}
+      loop={options.loop ?? buildContextLoopModel({ contextSources, review: emptyReview })}
+      showReview={options.showReview ?? false}
+      reviewRunning={false}
+      onEditAim={noop}
+      onOpenSettings={noop}
+      onContextSources={noop}
+      onContinueToPlan={options.onContinueToPlan}
+      debugPanel={options.debugPanel ?? debugPanelSentinel}
+    />
+  );
   return renderToStaticMarkup(
     <I18nProvider>
-      <ContextStage
-        title="Ship context flow"
-        description="Make the Context stage stepwise."
-        saved={false}
-        disabled={options.disabled ?? false}
-        clarifyPhase={options.clarifyPhase}
-        clarifyPanel={options.clarifyPanel ?? null}
-        contextSources={contextSources}
-        review={emptyReview}
-        loop={options.loop ?? buildContextLoopModel({ contextSources, review: emptyReview })}
-        showReview={options.showReview ?? false}
-        reviewRunning={false}
-        onEditAim={noop}
-        onOpenSettings={noop}
-        onContextSources={noop}
-        onContinueToPlan={options.onContinueToPlan}
-      />
+      {options.developerMode !== undefined ? (
+        <DeveloperModeProvider enabled={options.developerMode}>{stage}</DeveloperModeProvider>
+      ) : stage}
     </I18nProvider>,
   );
 }
@@ -425,6 +436,59 @@ describe("ContextStage", () => {
     expect(html).not.toContain('data-od-id="context-workbench-sources"');
     expect(html).not.toContain("Continue to Plan");
     expect(html).not.toContain('class="od-context-continue"');
+  });
+
+  it("hides the raw debug panel by default and in the focused-question view", () => {
+    const idleHtml = renderStage({ clarifyPhase: null, onContinueToPlan: noop });
+    expect(idleHtml).not.toContain('data-od-id="context-debug-panel"');
+
+    const offHtml = renderStage({ clarifyPhase: null, onContinueToPlan: noop, developerMode: false });
+    expect(offHtml).not.toContain('data-od-id="context-debug-panel"');
+
+    const focusedHtml = renderStage({
+      clarifyPhase: "intake",
+      clarifyPanel: (
+        <ContextClarifyPanel
+          clarify={blockingClarify}
+          phase="intake"
+          answers={{}}
+          contextNote=""
+          conversationEnabled
+          questionnaireEnabled
+          disabled={false}
+          onAnswer={noop}
+          onContextNote={noop}
+          onRefine={noop}
+        />
+      ),
+    });
+    expect(focusedHtml).not.toContain('data-od-id="context-debug-panel"');
+  });
+
+  it("shows the raw debug panel only once developer mode is on", () => {
+    const html = renderStage({ clarifyPhase: null, onContinueToPlan: noop, developerMode: true });
+    expect(html).toContain('data-od-id="context-debug-panel"');
+
+    const focusedHtml = renderStage({
+      clarifyPhase: "intake",
+      developerMode: true,
+      clarifyPanel: (
+        <ContextClarifyPanel
+          clarify={blockingClarify}
+          phase="intake"
+          answers={{}}
+          contextNote=""
+          conversationEnabled
+          questionnaireEnabled
+          disabled={false}
+          onAnswer={noop}
+          onContextNote={noop}
+          onRefine={noop}
+        />
+      ),
+    });
+    expect(focusedHtml).toContain('data-od-id="context-focus"');
+    expect(focusedHtml).toContain('data-od-id="context-debug-panel"');
   });
 
   it("keeps context polish on shared primitives instead of inline style helpers", () => {

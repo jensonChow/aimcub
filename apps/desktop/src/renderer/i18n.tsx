@@ -365,6 +365,24 @@ export const STRINGS = {
   "execute.liveRunTool": { en: "Using {tool}", zh: "正在使用 {tool}" },
   "execute.liveRunWaiting": { en: "Waiting for the runtime to report.", zh: "正在等待运行时回报。" },
   "execute.cancelRun": { en: "Stop run", zh: "停止运行" },
+  "execute.stranded.title": {
+    en: "Waiting on access granted in an earlier session",
+    zh: "等待此前会话授予的访问权限",
+  },
+  "execute.stranded.body": {
+    en: "This sub-aim was queued with wider access, but the window that granted it closed before it could run. Re-grant it to run now, or cancel to drop it.",
+    zh: "这个子目标在排队时被授予了更宽的权限，但授权它的窗口在运行前就已关闭。重新授权即可运行，或者取消以放弃这次运行。",
+  },
+  "execute.stranded.sandbox.workspaceWrite": {
+    en: "It may create and change files inside this folder — and only there.",
+    zh: "它可以在这个文件夹内创建和修改文件——仅限该文件夹。",
+  },
+  "execute.stranded.sandbox.other": {
+    en: "It was granted access beyond the read-only default.",
+    zh: "它被授予了超出只读默认值的权限。",
+  },
+  "execute.stranded.regrant": { en: "Re-grant and run", zh: "重新授权并运行" },
+  "execute.stranded.cancel": { en: "Cancel run", zh: "取消运行" },
 
   // Per-run permission consent (deliverable 1)
   "runPermission.title": { en: "What this run may do", zh: "本次运行的权限" },
@@ -413,6 +431,8 @@ export const STRINGS = {
   "runTimeline.attempt": { en: "Attempt {n}", zh: "第 {n} 次尝试" },
   "runTimeline.retryOf": { en: "Retry of an earlier attempt", zh: "重试此前的尝试" },
   "runTimeline.stepCount": { en: "{n} step(s)", zh: "{n} 个步骤" },
+  "runTimeline.surface.desktop": { en: "Queued by Desktop", zh: "由桌面端排队" },
+  "runTimeline.surface.cli": { en: "Queued by CLI", zh: "由命令行排队" },
   "runTimeline.live": { en: "Live", zh: "进行中" },
   "runTimeline.duration": { en: "{ms} ms", zh: "{ms} 毫秒" },
   "runTimeline.pending": { en: "still running", zh: "仍在进行" },
