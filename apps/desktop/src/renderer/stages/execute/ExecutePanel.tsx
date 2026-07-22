@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import type { AimProgressReadModel } from "@core/domain";
-import type { Milestone } from "@core/types";
-import type { ConfirmMilestoneRequest, GoalDetail } from "../../../shared/ipc";
+import type { Milestone, RunEvent } from "@core/types";
+import type { ConfirmMilestoneRequest, GoalDetail, RunPermissionConsent } from "../../../shared/ipc";
 
 import { useI18n } from "../../i18n";
 import {
@@ -26,15 +26,27 @@ import {
 } from "./executePrimaryAction";
 import { LocalAgentExecutionSummary } from "./LocalAgentExecutionSummary";
 import { liveRunForMilestone, type LiveRunState } from "./liveRun";
+import { RunPermissionControl } from "./RunPermissionControl";
+import { RunTimelinePanel } from "./RunTimelinePanel";
+import {
+  DEFAULT_RUN_PERMISSION_DRAFT,
+  isRunPermissionReady,
+  runPermissionRequest,
+  type RunPermissionDraft,
+} from "./runPermissions";
 
 export function ExecutePanel(props: {
   detail: GoalDetail;
   progress: AimProgressReadModel | null;
+  /** The aim's persisted run-event stream, for the per-run timeline. */
+  runEvents?: readonly RunEvent[];
   disabled: boolean;
   /** The run currently streaming from the main-process worker, if any. */
   liveRun?: LiveRunState | null;
   onCancelRun?: (runId: string) => void;
-  onRunAgent: (milestone: Milestone) => void;
+  /** Open the native folder picker behind a `workspace-write` grant. */
+  onPickRunWorkspace?: () => Promise<string | null>;
+  onRunAgent: (milestone: Milestone, permission: RunPermissionConsent) => void;
   onConfirm: (milestone: Milestone, submission: Omit<ConfirmMilestoneRequest, "goalId" | "milestoneId">) => Promise<boolean>;
   onPickFiles: () => Promise<string[]>;
   onBreakDown: (milestone: Milestone) => void;
@@ -51,6 +63,10 @@ export function ExecutePanel(props: {
   const [activeProofId, setActiveProofId] = useState<string | null>(null);
   const [proofDrafts, setProofDrafts] = useState<Record<string, EvidenceSubmissionDraft>>({});
   const [pickingFilesFor, setPickingFilesFor] = useState<string | null>(null);
+  // Consent is per sub-aim and per session: it is deliberately NOT persisted, so a wider grant
+  // never silently outlives the moment the user chose it.
+  const [permissionDrafts, setPermissionDrafts] = useState<Record<string, RunPermissionDraft>>({});
+  const [pickingWorkspaceFor, setPickingWorkspaceFor] = useState<string | null>(null);
   const proofTriggerRef = useRef<HTMLButtonElement>(null);
   const restoreProofFocusRef = useRef(false);
   const proofDraftActiveChangeRef = useRef(props.onProofDraftActiveChange);
@@ -107,9 +123,36 @@ export function ExecutePanel(props: {
     });
   }
 
+  function permissionDraftFor(milestone: Milestone): RunPermissionDraft {
+    return permissionDrafts[milestone.id] ?? DEFAULT_RUN_PERMISSION_DRAFT;
+  }
+
+  function setPermissionDraft(milestone: Milestone, next: RunPermissionDraft): void {
+    setPermissionDrafts((current) => ({ ...current, [milestone.id]: next }));
+  }
+
+  async function pickRunWorkspace(milestone: Milestone): Promise<void> {
+    if (!props.onPickRunWorkspace) return;
+    setPickingWorkspaceFor(milestone.id);
+    try {
+      const path = await props.onPickRunWorkspace();
+      if (!path) return;
+      setPermissionDraft(milestone, { ...permissionDraftFor(milestone), workspace: path });
+    } finally {
+      setPickingWorkspaceFor(null);
+    }
+  }
+
+  /** Never start a run whose grant is incomplete — an unfinished consent is not a consent. */
+  function startRun(milestone: Milestone): void {
+    const draft = permissionDraftFor(milestone);
+    if (!isRunPermissionReady(draft)) return;
+    props.onRunAgent(milestone, runPermissionRequest(draft));
+  }
+
   function runPrimaryAction(row: ExecuteMilestoneRow, kind: ExecutePrimaryActionKind): void {
     if (kind === "run_agent") {
-      props.onRunAgent(row.milestone);
+      startRun(row.milestone);
       return;
     }
     if (kind === "submit_proof") {
@@ -124,6 +167,8 @@ export function ExecutePanel(props: {
   const selectedLiveRun = selectedRow ? liveRunForMilestone(props.liveRun ?? null, selectedRow.milestone.id) : null;
   const primaryAction = selectedRow ? executePrimaryAction(selectedRow, t) : null;
   const selectedHumanRoute = selectedRow ? isHumanExecuteRoute(selectedRow) : false;
+  const selectedPermission = selectedRow ? permissionDraftFor(selectedRow.milestone) : DEFAULT_RUN_PERMISSION_DRAFT;
+  const permissionReady = isRunPermissionReady(selectedPermission);
   const showSecondaryRun = Boolean(
     selectedRow
     && primaryAction?.kind !== "run_agent"
@@ -227,6 +272,16 @@ export function ExecutePanel(props: {
                     />
                   ) : null}
 
+                  {!selectedHumanRoute && !selectedRow.completed ? (
+                    <RunPermissionControl
+                      draft={selectedPermission}
+                      disabled={props.disabled}
+                      pickingWorkspace={pickingWorkspaceFor === selectedRow.milestone.id}
+                      onChange={(next) => setPermissionDraft(selectedRow.milestone, next)}
+                      onPickWorkspace={() => void pickRunWorkspace(selectedRow.milestone)}
+                    />
+                  ) : null}
+
                   <div className="od-execute-primary-action">
                     <div>
                       <span>{t("execute.primaryActionLabel")}</span>
@@ -236,7 +291,11 @@ export function ExecutePanel(props: {
                       className="od-aim-primary od-execute-primary-button"
                       type="button"
                       ref={primaryAction.kind === "submit_proof" ? proofTriggerRef : undefined}
-                      disabled={props.disabled || primaryAction.kind === "blocked"}
+                      disabled={
+                        props.disabled
+                        || primaryAction.kind === "blocked"
+                        || (primaryAction.kind === "run_agent" && !permissionReady)
+                      }
                       onClick={() => runPrimaryAction(selectedRow, primaryAction.kind)}
                     >
                       {primaryAction.label}
@@ -245,7 +304,12 @@ export function ExecutePanel(props: {
 
                   <div className="od-execute-secondary-actions" aria-label={t("execute.secondaryActionsLabel")}>
                     {showSecondaryRun ? (
-                      <button className="od-aim-secondary" type="button" disabled={props.disabled} onClick={() => props.onRunAgent(selectedRow.milestone)}>
+                      <button
+                        className="od-aim-secondary"
+                        type="button"
+                        disabled={props.disabled || !permissionReady}
+                        onClick={() => startRun(selectedRow.milestone)}
+                      >
                         {t("os.runAgent")}
                       </button>
                     ) : null}
@@ -275,6 +339,17 @@ export function ExecutePanel(props: {
                       <span>{selectedRow.child_relations.map((item) => item.status).join(", ")}</span>
                     </div>
                   ) : null}
+
+                  <RunTimelinePanel
+                    milestoneId={selectedRow.milestone.id}
+                    runEvents={props.runEvents ?? []}
+                    runs={props.progress?.runs ?? []}
+                    liveEvents={selectedLiveRun?.events ?? []}
+                    liveRunId={selectedLiveRun?.runId ?? null}
+                    liveEventsDropped={
+                      selectedLiveRun ? selectedLiveRun.eventCount - selectedLiveRun.events.length : 0
+                    }
+                  />
                 </>
               ))}
             />
@@ -293,7 +368,9 @@ export function executeTaskContent(proofTask: ReactNode | null, normalTask: Reac
 
 /**
  * The live face of a queued run: what the agent is doing right now, and the way to stop it. The
- * durable record is the run journal — this is the part that is only true while it is happening.
+ * durable record is the run timeline below it — this is the part that is only true while it is
+ * happening, so it gets its own Glass row (a running dot, the status line, Stop) rather than
+ * borrowing the generic work-note style.
  */
 function LiveRunLine(props: {
   live: LiveRunState;
@@ -302,12 +379,18 @@ function LiveRunLine(props: {
 }) {
   const { live, t } = props;
   const running = live.status === "running";
+  const detail = live.toolName
+    ? t("execute.liveRunTool", { tool: live.toolName })
+    : shortText(live.summary, 160) || t("execute.liveRunWaiting");
   return (
-    <div className="od-work-note" role="status" aria-live="polite">
-      <strong>{running ? t("execute.liveRunTitle") : t("execute.liveRunFinished")}</strong>
-      <span>{live.toolName ? t("execute.liveRunTool", { tool: live.toolName }) : shortText(live.summary, 160)}</span>
+    <div className="od-live-run" data-running={running ? "true" : "false"} role="status" aria-live="polite">
+      <i className="od-live-run-dot" aria-hidden="true" />
+      <div className="od-live-run-copy">
+        <strong>{running ? t("execute.liveRunTitle") : t("execute.liveRunFinished")}</strong>
+        <span>{detail}</span>
+      </div>
       {running && props.onCancel ? (
-        <button className="od-aim-secondary" type="button" onClick={() => props.onCancel?.(live.runId)}>
+        <button className="od-aim-secondary od-live-run-stop" type="button" onClick={() => props.onCancel?.(live.runId)}>
           {t("execute.cancelRun")}
         </button>
       ) : null}

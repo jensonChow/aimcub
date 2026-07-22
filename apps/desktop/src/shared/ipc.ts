@@ -6,7 +6,7 @@
 import type { AimDraft, DecompositionOutput, Goal, ManualEvidenceRequiredItem, Memory, Milestone, RunEvent } from "@core/types";
 import type { AimIntakeReport, AimProgressReadModel, AimProgressSummary, ContextHealthRow, ContextLineageLearningReport, ContextProfileReport, DecompositionLearningReport, DecompositionStrategyReport, PlanQualityReport, PlanReviewReport } from "@core/domain";
 import type { LlmProvider } from "@core/llm/providers";
-import type { ContextSourceSettings, UpsertAimDraftInput } from "@core/store";
+import type { ContextSourceSettings, StoreDiagnostic, UpsertAimDraftInput } from "@core/store";
 import type {
   LocalAgentDetection,
   LocalAgentEvent,
@@ -398,12 +398,29 @@ export type {
   LocalAgentSandboxMode,
 } from "@core/local-agent";
 
+/**
+ * The sandbox levels the cockpit will ask a user to consent to. `danger-full-access` is
+ * deliberately absent — no Desktop control can grant it, and the main process rejects it even
+ * if a compromised renderer asks. See `docs/agent-permissions.md`.
+ */
+export type DesktopRunSandbox = "read-only" | "workspace-write";
+
+/** What the user explicitly granted one run, captured before it is queued. */
+export interface RunPermissionConsent {
+  sandbox: DesktopRunSandbox;
+  network: boolean;
+  /** The folder a `workspace-write` run may write in. Required for it; ignored when read-only. */
+  workspace?: string | null;
+}
+
 export interface RunMilestoneAgentRequest {
   goalId: string;
   milestoneId: string;
   agentId?: LocalAgentId;
   model?: string;
   prompt?: string;
+  /** Omitted ⇒ the read-only, network-off floor. Anything else is an explicit user grant. */
+  permission?: RunPermissionConsent;
 }
 
 /**
@@ -415,6 +432,23 @@ export interface RunMilestoneAgentResult {
   ok: boolean;
   runId: string | null;
   error: string | null;
+  /** The permission the main process actually recorded on the run — never wider than requested. */
+  permission: RunPermissionConsent | null;
+}
+
+/**
+ * Corruption/recovery events the shared store noticed while loading. Surfaced honestly instead of
+ * letting a quarantined file look like an empty workspace.
+ */
+export type { StoreDiagnostic, StoreDiagnosticKind } from "@core/store";
+
+/** Desktop-only preferences (not shared with the CLI), persisted beside the store. */
+export interface DesktopPreferences {
+  /**
+   * Developer mode. Off is the product: no debug, trace, or raw-payload surface renders anywhere
+   * in the cockpit. On reveals them for people debugging Aimcub itself.
+   */
+  developerMode: boolean;
 }
 
 /** One normalized event of a worker-executed run, pushed live as it happens. */
@@ -504,6 +538,12 @@ export interface AimcubApi {
   getAppInfo(): Promise<AppInfo>;
   /** Reveal the local workspace directory (~/.aimcub or $AIMCUB_HOME) in the OS file manager. */
   revealWorkspace(): Promise<void>;
+  /** Store corruption/recovery reports, so the cockpit can say what happened to the data. */
+  getStoreDiagnostics(): Promise<StoreDiagnostic[]>;
+  getDesktopPreferences(): Promise<DesktopPreferences>;
+  setDesktopPreferences(prefs: DesktopPreferences): Promise<DesktopPreferences>;
+  /** Pick the folder a `workspace-write` run may write in. Cancelling grants nothing. */
+  pickRunWorkspace(): Promise<LocalContextPickResult>;
   onWindowChromeState(handler: (state: WindowChromeState) => void): () => void;
   onPlanningLiveEvent(handler: (event: PlanningLiveEvent) => void): () => void;
   onRunLiveEvent(handler: (event: RunLiveEvent) => void): () => void;
@@ -561,6 +601,10 @@ export const IPC = {
   setThemeSource: "aimcub:setThemeSource",
   getAppInfo: "aimcub:getAppInfo",
   revealWorkspace: "aimcub:revealWorkspace",
+  getStoreDiagnostics: "aimcub:getStoreDiagnostics",
+  getDesktopPreferences: "aimcub:getDesktopPreferences",
+  setDesktopPreferences: "aimcub:setDesktopPreferences",
+  pickRunWorkspace: "aimcub:pickRunWorkspace",
   windowChromeState: "aimcub:windowChromeState",
   planningLiveEvent: "aimcub:planningLiveEvent",
   runLiveEvent: "aimcub:runLiveEvent",

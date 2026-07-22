@@ -53,6 +53,10 @@ const api: AimcubApi = {
   setThemeSource: (source) => ipcRenderer.invoke(IPC.setThemeSource, source),
   getAppInfo: () => ipcRenderer.invoke(IPC.getAppInfo),
   revealWorkspace: () => ipcRenderer.invoke(IPC.revealWorkspace),
+  getStoreDiagnostics: () => ipcRenderer.invoke(IPC.getStoreDiagnostics),
+  getDesktopPreferences: () => ipcRenderer.invoke(IPC.getDesktopPreferences),
+  setDesktopPreferences: (prefs) => ipcRenderer.invoke(IPC.setDesktopPreferences, prefs),
+  pickRunWorkspace: () => ipcRenderer.invoke(IPC.pickRunWorkspace),
   onWindowChromeState: (handler) => {
     const listener = (_event: IpcRendererEvent, payload: unknown) => {
       handler(payload as Parameters<typeof handler>[0]);

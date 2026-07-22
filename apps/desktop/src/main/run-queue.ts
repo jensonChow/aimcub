@@ -9,17 +9,20 @@
  * Deliberately free of Electron imports: the transport is injected, so this module is testable
  * against a real store with no window in sight.
  */
+import { statSync } from "node:fs";
+import { isAbsolute } from "node:path";
+
 import { routingOverrideForMilestone } from "@core/domain";
 import type { AimStore } from "@core/store";
 import { createRunQueue, type EnqueueMilestoneRunInput, type RunQueue } from "@core/local-agent";
 
-import type { RunLiveEvent } from "../shared/ipc";
+import type { RunLiveEvent, RunPermissionConsent } from "../shared/ipc";
 import { listLocalAgents, runLocalAgent } from "./local-agents";
 
 /**
- * Desktop runs are read-only with no network: the cockpit is an observation surface, and a user
- * who has not granted a workspace must not get one implicitly. The CLI, which takes an explicit
- * `--workspace`, is where a writing run is opted into.
+ * The permission floor of the *background* drain: the cockpit is an observation surface, so a run
+ * nobody consented to in this session may only look, never touch, and never reach the network.
+ * A user who has not granted a workspace must not get one implicitly.
  */
 export const DESKTOP_RUN_PERMISSION = {
   sandbox: "read-only",
@@ -32,6 +35,43 @@ export interface EnqueueDesktopRunInput {
   agentId?: string;
   model?: string;
   instruction?: string;
+  /** The consent this run carries. Omitted ⇒ the read-only, network-off floor. */
+  permission?: RunPermissionConsent;
+}
+
+/** A permission that only the enqueuing session may execute, because only it holds the consent. */
+export function isConsentedEscalation(permission: RunPermissionConsent): boolean {
+  return permission.sandbox !== DESKTOP_RUN_PERMISSION.sandbox
+    || permission.network !== DESKTOP_RUN_PERMISSION.network;
+}
+
+/**
+ * Turn the renderer's (untrusted) consent into a permission the main process is willing to record.
+ * Throws a user-facing reason rather than silently narrowing: a run that does less than the user
+ * was told it would do is its own kind of lie.
+ *
+ * `danger-full-access` is rejected here as well as being absent from the UI — the renderer is not
+ * the security boundary.
+ */
+export function resolveDesktopRunPermission(input: RunPermissionConsent | undefined): RunPermissionConsent {
+  if (!input) return { ...DESKTOP_RUN_PERMISSION, workspace: null };
+  const network = input.network === true;
+  if (input.sandbox === "read-only") return { sandbox: "read-only", network, workspace: null };
+  if (input.sandbox !== "workspace-write") {
+    throw new Error(`Aimcub does not grant the "${String(input.sandbox)}" sandbox from the desktop app.`);
+  }
+
+  const workspace = input.workspace?.trim() ?? "";
+  if (!workspace) throw new Error("Choose the folder this run may write in before starting it.");
+  if (!isAbsolute(workspace)) throw new Error("A run workspace must be an absolute folder path.");
+  let isDirectory: boolean;
+  try {
+    isDirectory = statSync(workspace).isDirectory();
+  } catch {
+    isDirectory = false;
+  }
+  if (!isDirectory) throw new Error(`That run workspace is not a folder on this machine: ${workspace}`);
+  return { sandbox: "workspace-write", network, workspace };
 }
 
 export function createDesktopRunQueue(
@@ -60,11 +100,13 @@ export async function enqueueDesktopRun(
   queue: RunQueue<AimStore>,
   input: EnqueueDesktopRunInput,
 ): Promise<string> {
+  const permission = resolveDesktopRunPermission(input.permission);
   const enqueued = await queue.enqueue({
     goalId: input.goalId,
     milestoneRef: input.milestoneId,
-    workspace: null,
-    ...DESKTOP_RUN_PERMISSION,
+    workspace: permission.workspace ?? null,
+    sandbox: permission.sandbox,
+    network: permission.network,
     ...(input.agentId ? { agentId: input.agentId } : {}),
     ...(input.model ? { model: input.model } : {}),
     ...(input.instruction ? { instruction: input.instruction } : {}),
@@ -73,15 +115,28 @@ export async function enqueueDesktopRun(
 }
 
 /**
- * Nudge the worker. Deliberately not awaited by callers: the IPC handler returns as soon as the
- * run is durably queued, and the drain reports through the live channel and the store. A
- * drain-level throw is a broken store or a misconfigured runtime, not a failed run (those finish
- * as `failed` rows), so nothing above can act on it — record it and let the next kick try.
+ * Nudge the background worker. Deliberately not awaited by callers: the IPC handler returns as soon
+ * as the run is durably queued, and the drain reports through the live channel and the store. A
+ * drain-level throw is a broken store or a misconfigured runtime, not a failed run (those finish as
+ * `failed` rows), so nothing above can act on it — record it and let the next kick try.
  */
 export function kickRunQueue(queue: RunQueue<AimStore>): void {
   // Scoped to the desktop permission floor: this worker will pick up a run left queued by a
-  // previous session, but never a `workspace-write` run the CLI queued against a real workspace.
+  // previous session, but never a `workspace-write` run the CLI queued against a real workspace,
+  // and never one a previous desktop session queued under a consent that died with that session.
   void queue.drain({ sandbox: DESKTOP_RUN_PERMISSION.sandbox }).catch((error: unknown) => {
     console.error("[aimcub] run queue drain failed:", error);
+  });
+}
+
+/**
+ * Execute exactly the run this session just enqueued, by id — the only way a run above the
+ * background floor ever runs here. Claiming by id (the same move the CLI makes for its own
+ * `--workspace` run) keeps the grant tied to the consent that produced it: the broad drain stays
+ * read-only-scoped, so nothing else can promote a `workspace-write` row into execution.
+ */
+export function claimConsentedRun(queue: RunQueue<AimStore>, runId: string): void {
+  void queue.drain({ runId }).catch((error: unknown) => {
+    console.error("[aimcub] consented run drain failed:", error);
   });
 }

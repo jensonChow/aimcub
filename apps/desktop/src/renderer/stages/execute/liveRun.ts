@@ -1,12 +1,16 @@
 /**
  * Renderer-side state for the run the cockpit is watching right now.
  *
- * Runs are durable in the store and streamed over `IPC.runLiveEvent`; this reduces that stream to
- * the little the Execute stage shows — which sub-aim, what the agent is doing, and whether it is
- * still going. It is deliberately last-event-wins rather than a transcript: the run journal
- * already holds the full history, read from persisted events.
+ * Runs are durable in the store and streamed over `IPC.runLiveEvent`. The headline (which sub-aim,
+ * what the agent is doing, whether it is still going) is last-event-wins; alongside it a BOUNDED
+ * tail of the raw stream is kept so the run timeline can grow while the run happens, before the
+ * batched writer has put those events on disk. The store stays the full history — this buffer is
+ * only the part that is not persisted yet, and it is safe to lose on navigation.
  */
 import type { LocalAgentEvent, RunLiveEvent } from "../../../shared/ipc";
+
+/** Long enough to cover a chatty run's un-flushed tail; short enough to never grow unbounded. */
+export const LIVE_RUN_EVENT_LIMIT = 400;
 
 export interface LiveRunState {
   goalId: string;
@@ -18,6 +22,10 @@ export interface LiveRunState {
   /** The tool the runtime is inside, when it is inside one. */
   toolName: string | null;
   at: string;
+  /** The streamed events of this run so far, oldest first, capped at {@link LIVE_RUN_EVENT_LIMIT}. */
+  events: readonly RunLiveEvent[];
+  /** Every event ever streamed for this run, including any the cap dropped off the front. */
+  eventCount: number;
 }
 
 /** A run has settled once the engine reports completion or failure. */
@@ -44,6 +52,7 @@ function toolFor(event: LocalAgentEvent, previous: string | null): string | null
  */
 export function applyRunLiveEvent(current: LiveRunState | null, live: RunLiveEvent): LiveRunState {
   const previous = current?.runId === live.runId ? current : null;
+  const events = [...(previous?.events ?? []), live];
   return {
     goalId: live.goalId,
     runId: live.runId,
@@ -52,6 +61,8 @@ export function applyRunLiveEvent(current: LiveRunState | null, live: RunLiveEve
     summary: summaryFor(live.event, previous?.summary ?? ""),
     toolName: toolFor(live.event, previous?.toolName ?? null),
     at: live.at,
+    events: events.length > LIVE_RUN_EVENT_LIMIT ? events.slice(-LIVE_RUN_EVENT_LIMIT) : events,
+    eventCount: (previous?.eventCount ?? 0) + 1,
   };
 }
 
