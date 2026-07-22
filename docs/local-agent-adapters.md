@@ -1,10 +1,10 @@
 # Local agent adapters
 
-`@core/local-agent` runs authenticated local CLI runtimes (Codex, Claude Code, ...) and
+`@aimcub/local-agent` runs authenticated local CLI runtimes (Codex, Claude Code, ...) and
 normalizes their output into Aimcub run events. A **local agent adapter** is the plug-in
 unit of that layer: one module that describes how to find a runtime, how to invoke it, and
 how to read its stream. Adding a runtime needs a new adapter module plus tests — no edits to
-engine dispatch, `@core/types`, the CLI, or the desktop app.
+engine dispatch, `@aimcub/types`, the CLI, or the desktop app.
 
 The engine keeps everything a runtime must not own: process spawning, timeouts, cancellation,
 serialized event delivery, output accumulation, and failure classification. An adapter is pure

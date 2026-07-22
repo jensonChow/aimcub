@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { Evidence, Goal } from "@core/types";
+import type { Evidence, Goal } from "@aimcub/types";
 
 import type { AimcubRepo } from "./contract.js";
 import {

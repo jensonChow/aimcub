@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { LlmGateway, LlmRequest, LlmResponse } from "@core/llm";
+import type { LlmGateway, LlmRequest, LlmResponse } from "@aimcub/llm";
 
 import { LocalCliWebSearchClient } from "./local-cli-web-search";
 

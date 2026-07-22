@@ -1,9 +1,9 @@
 /**
  * Aimcub Glass — pure view helpers for the batch per-aim progress summary
- * (`AimProgressSummary`, derived in `@core`). Used by the sidebar aim rows and the
+ * (`AimProgressSummary`, derived in `@aimcub/core`). Used by the sidebar aim rows and the
  * Home aim cards to render a real status dot + progress fraction. No React, no i18n.
  */
-import type { AimProgressSummary, AimProgressSummaryStatus } from "@core/types";
+import type { AimProgressSummary, AimProgressSummaryStatus } from "@aimcub/types";
 
 import type { StringKey } from "../i18n";
 

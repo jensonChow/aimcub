@@ -14,7 +14,7 @@
  *     or terminally fails them at the cap.
  *
  * Deploy note: at deploy time `../_shared/*` is bundled as `./_shared/*` and
- * `@core/*` resolves via the function's deno.json import map to vendored sources.
+ * `@aimcub/*` resolves via the function's deno.json import map to vendored sources.
  * This file MUST NOT be imported by the Vitest suite.
  *
  * deno-lint-ignore-file
@@ -22,7 +22,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { runJob, type WorkerDeps } from "../_shared/worker.ts";
 import type { CompletionWrite, WorkerRepo } from "../_shared/ports.ts";
-import type { Job } from "@core/types";
+import type { Job } from "@aimcub/types";
 
 declare const Deno: {
   env: { get(key: string): string | undefined };

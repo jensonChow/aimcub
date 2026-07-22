@@ -7,14 +7,14 @@
  * never printed or returned for display — `formatConfig` redacts it. `buildSettingsFromInput`
  * is the pure validator behind `aimcub setup` (no I/O).
  */
-import type { ProviderSettings } from "@core/store";
+import type { ProviderSettings } from "@aimcub/store";
 import {
   getDefaultBaseURL,
   getDefaultModel,
   getLlmProviderDefinition,
   isLlmProvider,
   type LlmProvider,
-} from "@core/llm/providers";
+} from "@aimcub/llm/providers";
 
 export type ProviderName = LlmProvider;
 

@@ -1,5 +1,5 @@
 /**
- * @core/api-client — data-access layer.
+ * @aimcub/api-client — data-access layer.
  *
  * The contract ({@link AimcubRepo}) is the single seam every client and edge function
  * goes through; no consumer builds its own queries. Two implementations ship:

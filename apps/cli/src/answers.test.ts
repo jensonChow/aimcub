@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { ClarifyQuestion } from "@core/llm";
+import type { ClarifyQuestion } from "@aimcub/llm";
 
 import { parseAnswers, parseChoiceReply, answersToIntakeSignals, answersToMemories } from "./answers";
 

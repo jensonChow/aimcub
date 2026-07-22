@@ -1,4 +1,4 @@
-import type { ContextCategory } from "@core/types";
+import type { ContextCategory } from "@aimcub/types";
 import type { ContextCaptureContract, ContextCaptureOrigin } from "./aim-intake";
 
 export type ContextCaptureFulfillmentStatus =

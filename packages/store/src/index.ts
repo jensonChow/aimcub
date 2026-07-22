@@ -1,17 +1,17 @@
 /**
- * @core/store — platform-neutral local persistence for aims/milestones/memories.
+ * @aimcub/store — platform-neutral local persistence for aims/milestones/memories.
  *
  * One JSON file under a data directory that BOTH the desktop app and the CLI point at
  * (default ~/.aimcub), so a person's aims are one set of rows with two faces. Shapes reuse
- * @core/types 1:1 so a later Supabase sync is transform-free.
+ * @aimcub/types 1:1 so a later Supabase sync is transform-free.
  *
  * The {@link AimStore} interface is ASYNC on purpose: the current implementation
  * ({@link createJsonFileStore}) does synchronous fs under the hood, but a future Supabase
  * adapter is genuinely async — coding to the async interface now means swapping adapters
  * later is a one-line change at call sites, not a rewrite (the "design for C" decision).
  *
- * This package is NOT in the purity-guarded kernel (that is only @core/domain + @core/types),
- * so it may do node fs/os/path/crypto I/O. @core/domain must never import this.
+ * This package is NOT in the purity-guarded kernel (that is only @aimcub/core + @aimcub/types),
+ * so it may do node fs/os/path/crypto I/O. @aimcub/core must never import this.
  */
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
@@ -30,10 +30,10 @@ import {
   routeMilestones,
   summarizeAimProgress,
   validatePlan,
-} from "@core/domain";
+} from "@aimcub/core";
 // DecompositionOutput is imported as a VALUE (the Zod schema) so the store can re-validate
 // the SHAPE of any plan it is asked to persist — the gatekeeper for untrusted input.
-import { AcceptanceRule, AimDraft, DecompositionOutput, ManualEvidencePayload } from "@core/types";
+import { AcceptanceRule, AimDraft, DecompositionOutput, ManualEvidencePayload } from "@aimcub/types";
 import type {
   ContextCategory,
   Actor,
@@ -72,7 +72,7 @@ import type {
   SubAimRelation,
   ToolTrace,
   ToolTraceStatus,
-} from "@core/types";
+} from "@aimcub/types";
 
 import {
   acquireStoreLock,
@@ -485,7 +485,7 @@ export function defaultDataDir(): string {
 // Persisted to `settings.json` SIBLING to the aim store, so the desktop app and the CLI
 // (`aim setup` / `aim config`) read+write ONE provider config — the same "two faces over one
 // store" idea as the aims. Lives here (not in a shell) because it is local fs persistence,
-// the same class of thing `createJsonFileStore` does; `@core/domain` must never import it.
+// the same class of thing `createJsonFileStore` does; `@aimcub/core` must never import it.
 // ──────────────────────────────────────────────────────────────────────────
 
 /** Persisted LLM provider config. Structurally the desktop's `ProviderConfig`. */
@@ -897,7 +897,7 @@ export function materialize(
 
 /**
  * Re-plan: merge a new decomposition into a goal's existing milestones, preserving
- * finished work. Delegates the freeze/update/add/skip decision to `@core/domain`'s
+ * finished work. Delegates the freeze/update/add/skip decision to `@aimcub/core`'s
  * `planMerge` (the single source of the re-plan invariant) and materializes the result
  * into Milestone rows:
  *  - freeze  → keep the completed row verbatim (its id, status, content, completed_at).

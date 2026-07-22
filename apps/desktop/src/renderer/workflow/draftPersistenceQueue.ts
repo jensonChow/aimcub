@@ -1,4 +1,4 @@
-import type { AimDraft } from "@core/types";
+import type { AimDraft } from "@aimcub/types";
 
 import type { UpsertAimDraftRequest } from "../../shared/ipc";
 

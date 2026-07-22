@@ -93,7 +93,7 @@ const fakeAgentAdapter: LocalAgentAdapter = {
   },
 };
 
-describe("@core/local-agent runtime", () => {
+describe("@aimcub/local-agent runtime", () => {
   it("streams normalized events through an awaited callback", async () => {
     const codex = executable("codex");
     const delivered: string[] = [];

@@ -3,17 +3,17 @@
  * Renderer imports these as `import type` only, so this module is erased from the
  * renderer bundle — only main/preload pull in the channel constants at runtime.
  */
-import type { AimDraft, DecompositionOutput, Goal, ManualEvidenceRequiredItem, Memory, Milestone, RunEvent } from "@core/types";
-import type { AimIntakeReport, AimProgressReadModel, AimProgressSummary, ContextHealthRow, ContextLineageLearningReport, ContextProfileReport, DecompositionLearningReport, DecompositionStrategyReport, PlanQualityReport, PlanReviewReport } from "@core/domain";
-import type { LlmProvider } from "@core/llm/providers";
-import type { ContextSourceSettings, StoreDiagnostic, UpsertAimDraftInput } from "@core/store";
+import type { AimDraft, DecompositionOutput, Goal, ManualEvidenceRequiredItem, Memory, Milestone, RunEvent } from "@aimcub/types";
+import type { AimIntakeReport, AimProgressReadModel, AimProgressSummary, ContextHealthRow, ContextLineageLearningReport, ContextProfileReport, DecompositionLearningReport, DecompositionStrategyReport, PlanQualityReport, PlanReviewReport } from "@aimcub/core";
+import type { LlmProvider } from "@aimcub/llm/providers";
+import type { ContextSourceSettings, StoreDiagnostic, UpsertAimDraftInput } from "@aimcub/store";
 import type {
   LocalAgentDetection,
   LocalAgentEvent,
   LocalAgentId,
   LocalAgentRunRequest,
   LocalAgentRunResult,
-} from "@core/local-agent";
+} from "@aimcub/local-agent";
 import type {
   ClarifyOutput,
   ClarifyQuestion,
@@ -28,7 +28,7 @@ import type {
   PlanningToolObservationEvent,
   PlanningContextSelectionReport,
   PlanningToolFailure,
-} from "@core/llm";
+} from "@aimcub/llm";
 
 export interface DraftRequest {
   title: string;
@@ -396,7 +396,7 @@ export type {
   LocalAgentRunRequest,
   LocalAgentRunResult,
   LocalAgentSandboxMode,
-} from "@core/local-agent";
+} from "@aimcub/local-agent";
 
 /**
  * The sandbox levels the cockpit will ask a user to consent to. `danger-full-access` is
@@ -440,7 +440,7 @@ export interface RunMilestoneAgentResult {
  * Corruption/recovery events the shared store noticed while loading. Surfaced honestly instead of
  * letting a quarantined file look like an empty workspace.
  */
-export type { StoreDiagnostic, StoreDiagnosticKind } from "@core/store";
+export type { StoreDiagnostic, StoreDiagnosticKind } from "@aimcub/store";
 
 /** Desktop-only preferences (not shared with the CLI), persisted beside the store. */
 export interface DesktopPreferences {

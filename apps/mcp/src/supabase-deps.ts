@@ -1,7 +1,7 @@
 /**
  * Live Supabase wiring for the MCP server (service_role).
  *
- * Read path: {@link SupabaseAimcubRepo} from `@core/api-client` with the
+ * Read path: {@link SupabaseAimcubRepo} from `@aimcub/api-client` with the
  * service-role client on both seats — the Worker never holds a user JWT (the
  * OAuth access token is verified, not forwarded), so RLS cannot scope reads;
  * the tool layer scopes every read by the verified `CallerIdentity` instead.
@@ -14,15 +14,15 @@
  *   → enqueue `judge_evidence` with dedup_key `judge:<evidenceId>`.
  *
  * Everything is written against the structural `SupabaseLike` port so tests
- * inject a fake at the same seam the `@core/api-client` suite uses.
+ * inject a fake at the same seam the `@aimcub/api-client` suite uses.
  */
-import type { Evidence } from "@core/domain";
+import type { Evidence } from "@aimcub/core";
 import {
   RepoError,
   SupabaseAimcubRepo,
   type IngestEvidenceInput,
   type SupabaseLike,
-} from "@core/api-client";
+} from "@aimcub/api-client";
 import type { AimcubReadPort, EvidenceIngestPort } from "./ports.js";
 
 /** PostgREST unique-violation SQLSTATE — the idempotency backstop signal. */

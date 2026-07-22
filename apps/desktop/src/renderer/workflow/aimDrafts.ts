@@ -1,5 +1,5 @@
-import { decideChoiceSelection } from "@core/domain";
-import type { ClarifyAnswer, ClarifyAssumption, ClarifyOutput, ClarifyQuestion } from "@core/llm";
+import { decideChoiceSelection } from "@aimcub/core";
+import type { ClarifyAnswer, ClarifyAssumption, ClarifyOutput, ClarifyQuestion } from "@aimcub/llm";
 import type {
   AimDraft,
   AimDraftAnswer,
@@ -9,7 +9,7 @@ import type {
   AimDraftStatus,
   AimDraftSurface,
   DecompositionOutput,
-} from "@core/types";
+} from "@aimcub/types";
 
 import type { UpsertAimDraftRequest } from "../../shared/ipc";
 import type { CockpitStage } from "../CockpitShell";

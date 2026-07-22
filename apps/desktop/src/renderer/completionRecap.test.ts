@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AimProgressReadModel } from "@core/domain";
+import type { AimProgressReadModel } from "@aimcub/core";
 
 import { hasCompletionRecap, stageForOpenedAim } from "./completionRecap";
 

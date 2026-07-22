@@ -17,7 +17,7 @@
  * every station change; the confirm is membership-gated so a background progress refresh
  * can't dispatch a milestone that dropped out of the option set.
  */
-import type { AimProgressReadModel, DecompositionOutput, Goal, Memory, Milestone, RunEvent } from "@core/domain";
+import type { AimProgressReadModel, DecompositionOutput, Goal, Memory, Milestone, RunEvent } from "@aimcub/core";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import type { ConfirmMilestoneRequest } from "../../../shared/ipc";

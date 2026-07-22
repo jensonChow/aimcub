@@ -11,7 +11,7 @@ import {
   type ClarifyAnswer,
   type ClarifyOutput,
 } from "./clarify";
-import type { DecompositionOutput } from "@core/types";
+import type { DecompositionOutput } from "@aimcub/types";
 import type { LlmGateway, LlmRequest, LlmResponse, LlmUsage } from "./index";
 
 const FIXED_USAGE: LlmUsage = {

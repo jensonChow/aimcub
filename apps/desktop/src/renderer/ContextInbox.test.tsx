@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import type { Memory } from "@core/types";
+import type { Memory } from "@aimcub/types";
 
 import {
   buildContextCandidateAcceptRequest,

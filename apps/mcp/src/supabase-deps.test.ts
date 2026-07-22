@@ -5,7 +5,7 @@ import type {
   PostgrestResult,
   SupabaseLike,
   TableBuilder,
-} from "@core/api-client";
+} from "@aimcub/api-client";
 import {
   EMITTER_REVOKED_MESSAGE,
   SupabaseEvidenceIngest,
@@ -23,7 +23,7 @@ type Row = Record<string, unknown>;
 
 /**
  * A behavioral in-memory fake of the {@link SupabaseLike} seam (the same seam
- * the @core/api-client suite mocks): it stores rows per table and enforces the
+ * the @aimcub/api-client suite mocks): it stores rows per table and enforces the
  * unique indexes the live adapter's idempotency relies on —
  *   emitters: pk(id) · evidence: (emitter_id, source_event_id) · jobs: dedup_key
  * — answering duplicates with SQLSTATE 23505 exactly like PostgREST. It also

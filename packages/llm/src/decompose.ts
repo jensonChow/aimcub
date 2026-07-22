@@ -11,7 +11,7 @@
  * fails validation is returned as `{ ok: false, errors }` so the caller (an Edge Function)
  * can decide whether to re-prompt, surface the error, or fall back.
  */
-import { DecompositionOutput, type GoalDomain } from "@core/types";
+import { DecompositionOutput, type GoalDomain } from "@aimcub/types";
 import {
   buildLocalHandoffManifest,
   buildPlanHandoffReport,
@@ -31,7 +31,7 @@ import {
   type PlanQualityResearchEvidence,
   type PlanReviewReport,
   type PlanValidation,
-} from "@core/domain";
+} from "@aimcub/core";
 
 import type { LlmGateway, LlmResponse, LlmUsage } from "./index";
 import { decompositionJsonSchema } from "./decomposition-schema";

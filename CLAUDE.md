@@ -19,7 +19,7 @@ Aimcub is a universal aim-management layer: it holds the aim, routes work across
 - Hosted Supabase is the online source of truth for MCP evidence and the future platform.
 - Local Aim OS state is local-store first until sync parity is explicitly needed.
 - Evidence is append-only and idempotent; milestone completion is derived by `evaluate()`, never written directly.
-- `@core/*` is the only place business logic lives: pure TypeScript, zero platform dependencies, unit-tested.
+- `@aimcub/*` library packages under `packages/*` are the only place business logic lives: pure TypeScript, zero platform dependencies, unit-tested.
 - App shells under `apps/*` only perform I/O, rendering, and platform bridging.
 - Stay lean-first: jobs table plus pg_cron, linear milestones, single-table memory, no vectors until concrete triggers demand more.
 - Built-in local planning tools are first-party Aimcub runtime tools; MCP is the external extension boundary.

@@ -1,4 +1,4 @@
-import type { AimProgressMilestoneRead, AimProgressReadModel, Evidence, Memory, Run, RunEvent } from "@core/domain";
+import type { AimProgressMilestoneRead, AimProgressReadModel, Evidence, Memory, Run, RunEvent } from "@aimcub/core";
 import { describe, expect, it } from "vitest";
 
 import type { I18n } from "../../i18n";

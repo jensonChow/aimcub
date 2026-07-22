@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import type { ClarifyOutput } from "@core/llm";
+import type { ClarifyOutput } from "@aimcub/llm";
 import type { ContextSourceStatus } from "../../../shared/ipc";
 import type { ContextBundleReview } from "../../contextReview";
 import { I18nProvider } from "../../i18n";

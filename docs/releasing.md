@@ -1,6 +1,6 @@
 # Releasing
 
-Aimcub versions its workspace packages (`@core/*`, `@app/*`) in lockstep using
+Aimcub versions its workspace packages (`@aimcub/*`) in lockstep using
 [Changesets](https://github.com/changesets/changesets), configured in
 [.changeset/config.json](../.changeset/config.json). This is the
 founder-facing flow for cutting a release. Publishing to npm is **not** part
@@ -37,7 +37,7 @@ pnpm changeset status --verbose
    ```
 
    This runs `changeset version`, which consumes every pending
-   `.changeset/*.md` file, bumps `@core/*` and `@app/*` packages to the same
+   `.changeset/*.md` file, bumps every `@aimcub/*` package to the same
    new version, and writes the release notes into each bumped package's own
    `CHANGELOG.md` (e.g. `apps/cli/CHANGELOG.md`, `apps/desktop/CHANGELOG.md`,
    `packages/*/CHANGELOG.md`) — not the root [CHANGELOG.md](../CHANGELOG.md),
@@ -81,21 +81,18 @@ against any commit to sanity-check the build.
   them — including it in the `fixed` group errors out (`@manypkg/get-packages`
   excludes the workspace root by design). The root version is a static
   placeholder; the version that actually moves — in lockstep across every
-  `@core/*` and `@app/*` package — plus the git tag you cut, is the
+  `@aimcub/*` package — plus the git tag you cut, is the
   meaningful "current version" of the project.
 - **The macOS bundle version follows along automatically.** Electron-builder
   derives `CFBundleShortVersionString` (the version shown in Finder/About)
   from `apps/desktop/package.json`'s `"version"` field at pack/dist time, so
   once step 1 above bumps that package, the next `pnpm desktop:pack` or
-  `pnpm --filter @app/desktop run dist` picks up the new version with no
+  `pnpm --filter @aimcub/desktop run dist` picks up the new version with no
   extra step.
 - **`npm publish` is intentionally not wired up anywhere** — the release
   workflow has a clearly-commented placeholder step instead of a real publish
   call. It's blocked on choosing an OSS license for the repo and registering
   the `@aimcub` npm org.
-- **The `@aimcub/*` package rename** (packages are currently named `@core/*`
-  and `@app/*`) is a separate, later batch of work, independent of this
-  release scaffolding.
 - **First public version target is `0.1.0`.** Until then, treat `0.0.x`
   bumps as internal/dry-run traffic — nothing is published anywhere it can
   be publicly installed from.

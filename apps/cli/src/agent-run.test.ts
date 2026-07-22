@@ -9,8 +9,8 @@ import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
 import { afterAll, describe, expect, it, vi } from "vitest";
 
-import { createJsonFileStore } from "@core/store";
-import type { DecompositionOutput } from "@core/types";
+import { createJsonFileStore } from "@aimcub/store";
+import type { DecompositionOutput } from "@aimcub/types";
 import {
   createLocalAgentRegistry,
   isRecord,
@@ -20,7 +20,7 @@ import {
   type LocalAgentAdapter,
   type LocalAgentProcessRunner,
   type LocalAgentRunResult,
-} from "@core/local-agent";
+} from "@aimcub/local-agent";
 
 import { runAimAgent } from "./agent-run";
 
@@ -338,7 +338,7 @@ describe("CLI local-agent run orchestration", () => {
     const { goal, milestones } = await store.createGoal({ title: "Ship an artifact", plan });
 
     // An isolated registry holding only the community adapter: nothing in the
-    // engine, the CLI or @core/types knows this runtime exists.
+    // engine, the CLI or @aimcub/types knows this runtime exists.
     const registry = createLocalAgentRegistry([GEMINI_FAKE_ADAPTER]);
     const env = { GEMINI_FAKE_BIN: fakeExecutable("gemini-fake"), PATH: "" };
     let spawnedArgs: readonly string[] = [];

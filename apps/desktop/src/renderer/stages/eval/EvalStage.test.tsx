@@ -3,8 +3,8 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import type { AimProgressReadModel } from "@core/domain";
-import type { Evidence, Goal, Memory, Milestone } from "@core/types";
+import type { AimProgressReadModel } from "@aimcub/core";
+import type { Evidence, Goal, Memory, Milestone } from "@aimcub/types";
 
 import { I18nProvider } from "../../i18n";
 import { EvalStage } from "./EvalStage";

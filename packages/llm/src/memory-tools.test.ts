@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { createMemorySearchHandler, createMemoryWriteCandidateHandler } from "./memory-tools";
 import type { AimcubToolHandlerContext } from "./tool-contract";
-import type { Memory } from "@core/types";
+import type { Memory } from "@aimcub/types";
 
 const context: AimcubToolHandlerContext = {
   now: () => new Date("2026-07-02T00:00:00.000Z"),

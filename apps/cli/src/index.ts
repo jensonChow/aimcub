@@ -1,8 +1,8 @@
 /**
- * Aimcub CLI — the headless, scriptable face of `@core` (developers first; "humans are
+ * Aimcub CLI — the headless, scriptable face of `@aimcub/core` (developers first; "humans are
  * agents too"). It runs the same planning loop as the desktop app over the same local
  * store, exposing the planning cognitive verbs:
- *   - plan     — one-shot draft: pipe a title through `@core`, print, store nothing.
+ *   - plan     — one-shot draft: pipe a title through `@aimcub/core`, print, store nothing.
  *   - clarify  — the full loop: draft → surface high-impact questions → (answer) → refine.
  *   - new      — quick decompose AND save (no questions).
  *   - ls/show/board/rm — saved aim surfaces over the SHARED local store.
@@ -43,7 +43,7 @@ import {
   type ContextLineageLearningReport,
   type DecompositionLearningReport,
   type DecompositionStrategyReport,
-} from "@core/domain";
+} from "@aimcub/core";
 import {
   decomposeWithQuality,
   planQualityMetadata,
@@ -68,16 +68,16 @@ import {
   type ClarifyAnswer,
   type PlanningMemory,
   type DecomposeWithQualityResult,
-} from "@core/llm";
-import { getDefaultModel, getLlmProviderDefinition } from "@core/llm/providers";
+} from "@aimcub/llm";
+import { getDefaultModel, getLlmProviderDefinition } from "@aimcub/llm/providers";
 import {
   listLocalAgents,
   listRegisteredLocalAgentIds,
   RunSelectionError,
   type LocalAgentEvent,
   type LocalAgentId,
-} from "@core/local-agent";
-import { createJsonFileStore, defaultDataDir, loadSettings, saveSettings, settingsPath, type LocalStore } from "@core/store";
+} from "@aimcub/local-agent";
+import { createJsonFileStore, defaultDataDir, loadSettings, saveSettings, settingsPath, type LocalStore } from "@aimcub/store";
 import type {
   ContextCategory,
   DecompositionOutput,
@@ -88,7 +88,7 @@ import type {
   MemoryKind,
   Milestone,
   MilestoneCompletion,
-} from "@core/types";
+} from "@aimcub/types";
 
 import { resolveProvider, formatConfig, buildSettingsFromInput, type SetupInput } from "./config";
 import { parseAnswers, answersToIntakeSignals, answersToMemories, promptAnswers } from "./answers";

@@ -2,7 +2,7 @@
  * Unit tests for the pure evidence-ingest handler (`handleIngest`).
  *
  * Decoupling: a LOCAL in-memory repo (memory-repo.ts) implements the ports — no
- * import of `@core/api-client`. All I/O is injected; no network, no Supabase, no
+ * import of `@aimcub/api-client`. All I/O is injected; no network, no Supabase, no
  * Deno.
  */
 import { describe, expect, it } from "vitest";

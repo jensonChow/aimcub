@@ -6,7 +6,7 @@ import type {
   MemoryKind,
   Milestone,
   MilestoneCompletion,
-} from "@core/types";
+} from "@aimcub/types";
 import type { PlanContextUse, PlanReviewReport } from "./plan-quality";
 
 export interface ContextCandidate {

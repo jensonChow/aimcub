@@ -13,7 +13,7 @@
  * run is not (yet) in the read model fall back to the neutral "cub" actor. Lifecycle
  * events with no summary carry a `detailKey` the component localizes.
  */
-import type { AimProgressReadModel, EvidenceKind, RunEvent, RunEventType } from "@core/domain";
+import type { AimProgressReadModel, EvidenceKind, RunEvent, RunEventType } from "@aimcub/core";
 
 import type { JourneyActorKind, JourneyJournalEntry } from "./types";
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { AimIntakeReport } from "@core/domain";
-import type { PlanningContextSelectionReport } from "@core/llm";
+import type { AimIntakeReport } from "@aimcub/core";
+import type { PlanningContextSelectionReport } from "@aimcub/llm";
 
 import type { ContextSourceStatus, PlanningToolIpcTrace } from "../../../shared/ipc";
 import type { ContextBundleReview } from "../../contextReview";

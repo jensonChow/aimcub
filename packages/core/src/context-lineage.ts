@@ -1,4 +1,4 @@
-import type { ContextCategory, DecompositionContract, Goal, Memory, Milestone, MilestoneStatus } from "@core/types";
+import type { ContextCategory, DecompositionContract, Goal, Memory, Milestone, MilestoneStatus } from "@aimcub/types";
 import { contextCaptureFulfillmentFromMetadata, type ContextCaptureFulfillmentReport, type ContextCaptureFulfillmentRow } from "./context-capture";
 import type { ContextCaptureOrigin } from "./aim-intake";
 

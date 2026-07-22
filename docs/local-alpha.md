@@ -12,7 +12,7 @@ plan and eval contracts, route sub-aims to humans or local agents, record proof,
 derive progress through eval, review context candidates, and reuse accepted
 context in later work.
 
-The local alpha product is credible only if `@core/*` owns the aim logic and the
+The local alpha product is credible only if `@aimcub/*` owns the aim logic and the
 local store can replay the loop without a hosted service.
 
 ## Deterministic Demo Seed
@@ -76,7 +76,7 @@ path.
 
 ## Test Lock
 
-The golden path should stay covered in `@core/domain` and `@core/store` tests.
+The golden path should stay covered in `@aimcub/core` and `@aimcub/store` tests.
 At minimum, the tests should exercise one realistic local aim through
 decomposition contracts, routing assignment materialization, evidence or manual
 proof, derived completion, `AimProgressReadModel` next actions and evidence

@@ -26,7 +26,7 @@ import type {
 } from "./index";
 import type { MaxTokensParam, StructuredOutputMode } from "./providers";
 
-// The llm package tsconfig sets `types: []` (mirroring @core purity), so neither
+// The llm package tsconfig sets `types: []` (mirroring @aimcub/core purity), so neither
 // @types/node nor the DOM lib is pulled in. Declare the one global we use — `fetch` —
 // narrowly, the same way `anthropic-gateway.ts` declares `process`. The platform's real
 // `fetch` (Node 18+/Electron/Bun/Deno) structurally satisfies this narrow signature.

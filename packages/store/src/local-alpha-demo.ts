@@ -2,13 +2,13 @@ import { mkdtempSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { parse, resolve, sep } from "node:path";
 
-import type { DecompositionOutput } from "@core/types";
+import type { DecompositionOutput } from "@aimcub/types";
 import {
   createJsonFileStore,
   type AimStore,
   type ImportStoreResult,
   type LocalStore,
-} from "@core/store";
+} from "@aimcub/store";
 
 export const LOCAL_ALPHA_DEMO_GOAL_TITLE = "Dogfood the local alpha open-source loop";
 export const LOCAL_ALPHA_DEMO_SLUG = "local-alpha-demo";

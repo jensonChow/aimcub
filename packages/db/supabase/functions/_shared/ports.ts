@@ -2,7 +2,7 @@
  * Ports (dependency-injection boundaries) for the evidence ingest Edge Function
  * and the jobs worker.
  *
- * These are intentionally minimal interfaces — NOT the full `@core/api-client`
+ * These are intentionally minimal interfaces — NOT the full `@aimcub/api-client`
  * `AimcubRepo` — so the pure handlers (`handleIngest`, `runJob`) stay decoupled
  * from the concrete supabase-js implementation. The real Deno entry wrappers adapt
  * a service-role Supabase client to these ports; tests adapt an in-memory fake.
@@ -17,7 +17,7 @@ import type {
   JobType,
   Milestone,
   MilestoneCompletion,
-} from "@core/types";
+} from "@aimcub/types";
 
 // ──────────────────────────────────────────────────────────────────────────
 // Auth
@@ -153,5 +153,5 @@ export interface WorkerRepo {
 }
 
 // Re-export for entry wrappers / tests that want the rule type without reaching
-// into @core/types directly.
+// into @aimcub/types directly.
 export type { AcceptanceRule };

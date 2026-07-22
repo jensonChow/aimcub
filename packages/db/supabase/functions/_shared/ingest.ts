@@ -5,7 +5,7 @@
  * Pipeline:
  *   1. verify auth (injected verifier) → resolve owner + emitter
  *   2. idempotent dedup by (emitter_id, source_event_id) via the injected repo
- *   3. normalize the raw event via @core (commit / CI)
+ *   3. normalize the raw event via @aimcub/core (commit / CI)
  *   4. append the evidence row via the repo
  *   5. enqueue a `judge_evidence` job with a dedup_key so the same evidence is
  *      judged at most once
@@ -20,8 +20,8 @@ import {
   type NormalizedEvidence,
   type RawCiRun,
   type RawCommit,
-} from "@core/domain";
-import type { Evidence } from "@core/types";
+} from "@aimcub/core";
+import type { Evidence } from "@aimcub/types";
 import type {
   AuthCredential,
   IngestRepo,
@@ -70,7 +70,7 @@ export function judgeJobDedupKey(evidenceId: string): string {
 }
 
 function normalize(input: IngestInput, occurredAt: string): NormalizedEvidence {
-  // @core owns the trust-score policy (verified commit = 1.0, unverified = 0.7,
+  // @aimcub/core owns the trust-score policy (verified commit = 1.0, unverified = 0.7,
   // CI = 1.0) — we never recompute trust here.
   switch (input.source) {
     case "commit":

@@ -4,7 +4,7 @@ import type {
   DecompositionOutput,
   MemoryKind,
   PlanNode,
-} from "@core/types";
+} from "@aimcub/types";
 import { inferContextCategory } from "./context";
 
 export type PlanQualitySeverity = "info" | "warning" | "error";

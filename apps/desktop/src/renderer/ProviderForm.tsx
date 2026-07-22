@@ -6,7 +6,7 @@ import {
   getLlmProviderDefinition,
   modelBelongsToProvider,
   type LlmProvider,
-} from "@core/llm/providers";
+} from "@aimcub/llm/providers";
 
 import type { ProviderConfig, ProviderStatus } from "../shared/ipc";
 

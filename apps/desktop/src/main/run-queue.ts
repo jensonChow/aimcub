@@ -12,9 +12,9 @@
 import { statSync } from "node:fs";
 import { isAbsolute } from "node:path";
 
-import { routingOverrideForMilestone } from "@core/domain";
-import type { AimStore } from "@core/store";
-import { createRunQueue, type EnqueueMilestoneRunInput, type RunQueue } from "@core/local-agent";
+import { routingOverrideForMilestone } from "@aimcub/core";
+import type { AimStore } from "@aimcub/store";
+import { createRunQueue, type EnqueueMilestoneRunInput, type RunQueue } from "@aimcub/local-agent";
 
 import type { RunLiveEvent, RunPermissionConsent } from "../shared/ipc";
 import { listLocalAgents, runLocalAgent } from "./local-agents";

@@ -2,7 +2,7 @@
 -- Design principles:
 --  * Supabase is the single source of truth; evidence is append-only + idempotent; completions/pets/collectibles are derived state.
 --  * Every business table carries owner_id (the RLS anchor; denormalized to avoid joins inside RLS).
---  * Enums use text + CHECK (easy to evolve); the single source of truth for union types is @core/types (zod).
+--  * Enums use text + CHECK (easy to evolve); the single source of truth for union types is @aimcub/types (zod).
 --  * Complexity is intentionally minimized: a jobs table + pg_cron (not pgmq); a linear depends_on_id (not a DAG edge table).
 
 -- ── extensions ──────────────────────────────────────────────────────────────

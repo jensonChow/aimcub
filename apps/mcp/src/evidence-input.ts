@@ -3,8 +3,8 @@
  *
  * An agent reports heterogeneous progress (a commit, a CI run, or a free-form
  * note). We validate the raw input with zod schemas built on the frozen
- * `@core/types` enums, then normalize into the uniform NormalizedEvidence
- * envelope using the pure helpers in `@core/domain`. The result is handed to the
+ * `@aimcub/types` enums, then normalize into the uniform NormalizedEvidence
+ * envelope using the pure helpers in `@aimcub/core`. The result is handed to the
  * injected ingest port as an `IngestEvidenceInput`.
  */
 import { z } from "zod";
@@ -13,8 +13,8 @@ import {
   type NormalizedEvidence,
   normalizeCommitEvidence,
   normalizeCiEvidence,
-} from "@core/domain";
-import type { IngestEvidenceInput } from "@core/api-client";
+} from "@aimcub/core";
+import type { IngestEvidenceInput } from "@aimcub/api-client";
 
 const DbId = z.string().guid();
 
@@ -39,7 +39,7 @@ const BoundedPayload = z.record(z.string(), z.unknown()).superRefine((value, ctx
   }
 });
 
-/** A commit reported by the agent (mirrors `@core/domain` RawCommit). */
+/** A commit reported by the agent (mirrors `@aimcub/core` RawCommit). */
 const CommitReport = z.object({
   type: z.literal("commit"),
   sha: z.string().min(1),
@@ -52,7 +52,7 @@ const CommitReport = z.object({
   verified: z.boolean().optional(),
 });
 
-/** A CI run reported by the agent (mirrors `@core/domain` RawCiRun). */
+/** A CI run reported by the agent (mirrors `@aimcub/core` RawCiRun). */
 const CiReport = z.object({
   type: z.literal("ci"),
   workflow: z.string().optional(),
@@ -97,7 +97,7 @@ export type ReportEvidenceInput = z.infer<typeof ReportEvidenceInput>;
  * any sha, message, file list, `verified` flag or CI run id for work that was
  * never pushed or run, with no cross-check against the real source. Cap the
  * trust score STRICTLY BELOW the `auto_verifiable` floor
- * (`AUTO_VERIFY_MIN_TRUST` = 0.8 in `@core/evaluate`) so an MCP report alone can
+ * (`AUTO_VERIFY_MIN_TRUST` = 0.8 in `@aimcub/core`'s `evaluate.ts`) so an MCP report alone can
  * never auto-complete a milestone whose acceptance clause expects a stronger
  * source — anti-spoofing per the AcceptanceRule design. Only sources whose
  * content cannot be fabricated by the caller (e.g. the signature-verified GitHub

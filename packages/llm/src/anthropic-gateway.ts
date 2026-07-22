@@ -13,7 +13,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { Message, MessageCreateParamsNonStreaming } from "@anthropic-ai/sdk/resources/messages/messages";
 
 // Narrow ambient for the one Node global we use. The package tsconfig sets `types: []`
-// (mirroring @core purity), so @types/node is not pulled in — we declare just `process.env`
+// (mirroring @aimcub/core purity), so @types/node is not pulled in — we declare just `process.env`
 // rather than widening the type surface for the whole package.
 declare const process: { env: Record<string, string | undefined> };
 declare const setTimeout: (handler: () => void, timeoutMs: number) => unknown;

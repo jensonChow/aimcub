@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { DecompositionOutput, Evidence, Goal, Milestone, MilestoneCompletion } from "@core/types";
+import type { DecompositionOutput, Evidence, Goal, Milestone, MilestoneCompletion } from "@aimcub/types";
 
 import {
   extractMemoryCandidatesFromAssumptions,

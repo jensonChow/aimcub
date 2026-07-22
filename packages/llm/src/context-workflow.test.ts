@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { Goal, Memory } from "@core/types";
-import { buildContextIntakeLoop, reviewContextIntakeProgress } from "@core/domain";
+import type { Goal, Memory } from "@aimcub/types";
+import { buildContextIntakeLoop, reviewContextIntakeProgress } from "@aimcub/core";
 
 import {
   buildAimIntakeReport,

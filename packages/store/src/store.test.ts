@@ -4,8 +4,8 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { movePlanNode, splitPlanNode, updatePlanNode } from "@core/domain";
-import type { DecompositionOutput } from "@core/types";
+import { movePlanNode, splitPlanNode, updatePlanNode } from "@aimcub/core";
+import type { DecompositionOutput } from "@aimcub/types";
 
 import {
   createJsonFileStore,
@@ -1032,7 +1032,7 @@ describe("createJsonFileStore · local alpha golden loop", () => {
       runId: run.id,
       type: "tool.finished",
       summary: "Narrow alpha tests completed.",
-      payload: { command: "pnpm --filter @core/store test" },
+      payload: { command: "pnpm --filter @aimcub/store test" },
     });
     await store.finishRun({
       runId: run.id,

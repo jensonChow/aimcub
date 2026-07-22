@@ -1,17 +1,17 @@
 {
-  "name": "@core/db",
+  "name": "@aimcub/db",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Supabase schema (migrations + RLS) + Edge Functions (evidence ingest, jobs worker). Source of truth for data. Generated TS types (generate_typescript_types) are kept aligned with @core/types via CI checks.",
+  "description": "Supabase schema (migrations + RLS) + Edge Functions (evidence ingest, jobs worker). Source of truth for data. Generated TS types (generate_typescript_types) are kept aligned with @aimcub/types via CI checks.",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",
     "test": "vitest run"
   },
   "dependencies": {
-    "@core/domain": "workspace:*",
-    "@core/types": "workspace:*"
+    "@aimcub/core": "workspace:*",
+    "@aimcub/types": "workspace:*"
   },
   "devDependencies": {
     "vitest": "^4.1.9"

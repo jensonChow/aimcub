@@ -1,7 +1,7 @@
 import { defineConfig } from "vitest/config";
 
 /**
- * Vitest config for @core/db. Runs two test suites:
+ * Vitest config for @aimcub/db. Runs two test suites:
  *  - test/**            — static schema-invariant tripwires over the SQL migration.
  *  - supabase/functions — the Edge Function *shared* logic (ingest / jobs worker).
  *

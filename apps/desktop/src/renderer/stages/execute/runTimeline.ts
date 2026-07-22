@@ -8,7 +8,7 @@
  * emitted by a newer writer, anything a future adapter adds — still renders as type + summary +
  * time instead of disappearing or crashing the stage. Pure; no i18n, no React.
  */
-import type { Run, RunEvent } from "@core/types";
+import type { Run, RunEvent } from "@aimcub/types";
 
 import type { LocalAgentEvent, RunLiveEvent } from "../../../shared/ipc";
 

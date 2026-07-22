@@ -1,7 +1,7 @@
 /**
  * The planning pipeline run in the main process: draft → clarify → refine.
  *
- * Each step uses the @core/llm brain through the configured gateway. There is NO offline
+ * Each step uses the @aimcub/llm brain through the configured gateway. There is NO offline
  * template fallback ("真刀实枪"): if no provider is configured, or the LLM call fails, or
  * the model returns an invalid plan, the step returns `{ ok: false, errors }` for the UI
  * to surface honestly. The gateway is injected (built from config in the IPC layer) so
@@ -24,9 +24,9 @@ import {
   type LlmResponse,
   type PlanningMemory,
   type ResearchBrief,
-} from "@core/llm";
-import { reviewPlan, type AimIntakeReport, type ContextCaptureLearningReport, type ContextLineageLearningReport, type DecompositionLearningReport, type DecompositionStrategyReport, type PlanQualityResearchEvidence, type PlanReviewReport } from "@core/domain";
-import type { DecompositionOutput } from "@core/types";
+} from "@aimcub/llm";
+import { reviewPlan, type AimIntakeReport, type ContextCaptureLearningReport, type ContextLineageLearningReport, type DecompositionLearningReport, type DecompositionStrategyReport, type PlanQualityResearchEvidence, type PlanReviewReport } from "@aimcub/core";
+import type { DecompositionOutput } from "@aimcub/types";
 
 import type {
   ClarifyIpcResult,

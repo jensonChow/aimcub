@@ -12,7 +12,7 @@
  * task (Haiku) — cheap and high-frequency. There is no offline fallback: with no
  * provider configured the caller surfaces the error honestly (no templates).
  */
-import { type ContextCategory, type DecompositionOutput, type GoalDomain, type MemoryKind, type PlanNode } from "@core/types";
+import { type ContextCategory, type DecompositionOutput, type GoalDomain, type MemoryKind, type PlanNode } from "@aimcub/types";
 import {
   CHOICE_SELECTION_REASONS,
   decideChoiceSelection,
@@ -37,7 +37,7 @@ import {
   type PlanQualityIssueCode,
   type PlanQualityReport,
   type PlanReviewReport,
-} from "@core/domain";
+} from "@aimcub/core";
 
 import type { LlmGateway, LlmResponse, LlmUsage } from "./index";
 import { clarifyJsonSchema } from "./clarify-schema";
@@ -143,7 +143,7 @@ export interface ClarifyInput {
   outputLanguage?: AimOutputLanguage;
   /** Aim-specific intake readiness. Used to choose questions that close missing context. */
   intake?: AimIntakeReport | null;
-  /** Optional plan review from the draft. If omitted, clarify computes one from @core/domain. */
+  /** Optional plan review from the draft. If omitted, clarify computes one from @aimcub/core. */
   review?: Pick<PlanReviewReport, "quality" | "context"> | null;
   /** Cap on questions (value-of-information budget). Default 6, hard max 7. */
   maxQuestions?: number;

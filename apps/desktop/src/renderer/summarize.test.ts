@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AcceptanceRule } from "@core/types";
+import type { AcceptanceRule } from "@aimcub/types";
 
 import { summarizeRule } from "./summarize";
 

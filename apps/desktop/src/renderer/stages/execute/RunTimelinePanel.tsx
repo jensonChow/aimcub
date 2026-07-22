@@ -5,7 +5,7 @@
  * Rows are labeled from a lookup, never an exhaustive switch, so an event type this build does not
  * know still renders honestly (its type, its summary, its time) instead of vanishing.
  */
-import type { Run, RunEvent } from "@core/types";
+import type { Run, RunEvent } from "@aimcub/types";
 
 import { useI18n, type StringKey } from "../../i18n";
 import { shortText } from "../../workflow/text";

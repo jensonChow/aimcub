@@ -4,7 +4,7 @@ import type {
   ContextAskUserInput,
   ContextAskUserOutput,
 } from "./tool-contract";
-import { decideChoiceSelection } from "@core/domain";
+import { decideChoiceSelection } from "@aimcub/core";
 
 const DEFAULT_MAX_QUESTIONS = 5;
 

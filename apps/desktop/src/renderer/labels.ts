@@ -1,4 +1,4 @@
-import type { ContextCategory, DecompositionContract, DecompositionOutput, Goal, Memory } from "@core/types";
+import type { ContextCategory, DecompositionContract, DecompositionOutput, Goal, Memory } from "@aimcub/types";
 import type {
   AimIntakeReport,
   AimLearningReport,
@@ -10,9 +10,9 @@ import type {
   DecompositionLearningReport,
   DecompositionStrategyReport,
   PlanQualityDimensionReport,
-} from "@core/domain";
-import type { ClarifyAnswerImpactReport, ClarifyOutput, PlanningContextSelectionReport } from "@core/llm";
-import { getLlmProviderDefinition } from "@core/llm/providers";
+} from "@aimcub/core";
+import type { ClarifyAnswerImpactReport, ClarifyOutput, PlanningContextSelectionReport } from "@aimcub/llm";
+import { getLlmProviderDefinition } from "@aimcub/llm/providers";
 import type { PlanResult, PlanningDebugTrace, PlanningToolIpcTrace, ProviderStatus } from "../shared/ipc";
 
 import type { StringKey } from "./i18n";

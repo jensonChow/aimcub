@@ -1,4 +1,4 @@
-import { routingOverrideForMilestone, type AimProgressReadModel } from "@core/domain";
+import { routingOverrideForMilestone, type AimProgressReadModel } from "@aimcub/core";
 
 import type { I18n } from "../../i18n";
 

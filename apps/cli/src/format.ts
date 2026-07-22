@@ -2,17 +2,17 @@
  * Pure output formatters for the CLI — kept separate from I/O so they are unit-testable.
  * The CLI shell (index.ts) does argv/env/network; these functions only render strings.
  */
-import type { AcceptanceRule, DecompositionContract, DecompositionOutput, Evidence, Goal, Memory, Milestone, MilestoneCompletion } from "@core/types";
-import { isPromptLikeContextCandidate, recommendContextScope } from "@core/domain";
-import type { AimIntakeReport, AimLearningReport, ContextCaptureContract, ContextCaptureFulfillmentReport, ContextCaptureLearningReport, ContextHealthRow, ContextLineageLearningReport, ContextLineageReport, ContextProfileReport, DecompositionLearningReport, DecompositionStrategyReport, MergeAction, MergedItem, PlanQualityReport, PlanReviewReport } from "@core/domain";
-import { clarifyImpactReportFromMetadata } from "@core/llm";
+import type { AcceptanceRule, DecompositionContract, DecompositionOutput, Evidence, Goal, Memory, Milestone, MilestoneCompletion } from "@aimcub/types";
+import { isPromptLikeContextCandidate, recommendContextScope } from "@aimcub/core";
+import type { AimIntakeReport, AimLearningReport, ContextCaptureContract, ContextCaptureFulfillmentReport, ContextCaptureLearningReport, ContextHealthRow, ContextLineageLearningReport, ContextLineageReport, ContextProfileReport, DecompositionLearningReport, DecompositionStrategyReport, MergeAction, MergedItem, PlanQualityReport, PlanReviewReport } from "@aimcub/core";
+import { clarifyImpactReportFromMetadata } from "@aimcub/llm";
 import type {
   ClarifyAnswerImpactReport,
   ClarifyLearningReport,
   ClarifyOutput,
   PlanningContextSelectionReport,
   PlanningContextSelectionRow,
-} from "@core/llm";
+} from "@aimcub/llm";
 
 /** A terse one-line summary of an acceptance rule (which evaluators must fire). */
 export function ruleSummary(rule: AcceptanceRule): string {

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { localDecompose, type ClarifyOutput, type PlanningContextSelectionReport } from "@core/llm";
+import { localDecompose, type ClarifyOutput, type PlanningContextSelectionReport } from "@aimcub/llm";
 
-import type { AimLearningReport, ContextLineageReport, MergedItem } from "@core/domain";
-import type { Evidence, Goal } from "@core/types";
+import type { AimLearningReport, ContextLineageReport, MergedItem } from "@aimcub/core";
+import type { Evidence, Goal } from "@aimcub/types";
 
 import {
   formatBoard,

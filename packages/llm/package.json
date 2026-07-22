@@ -1,5 +1,5 @@
 {
-  "name": "@core/llm",
+  "name": "@aimcub/llm",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -40,8 +40,8 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
-    "@core/domain": "workspace:*",
-    "@core/types": "workspace:*"
+    "@aimcub/core": "workspace:*",
+    "@aimcub/types": "workspace:*"
   },
   "devDependencies": {
     "vitest": "^4.1.9"

@@ -15,7 +15,7 @@ import {
   type PlanningToolFailure,
   type PlanningToolObservationEvent,
   type ResearchBrief,
-} from "@core/llm";
+} from "@aimcub/llm";
 import path from "node:path";
 
 import type { DraftRequest } from "../shared/ipc";

@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import type { Run, RunEvent } from "@core/types";
+import type { Run, RunEvent } from "@aimcub/types";
 
 import type { RunLiveEvent } from "../../../shared/ipc";
 import { I18nProvider } from "../../i18n";

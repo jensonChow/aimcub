@@ -12,7 +12,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { DecompositionOutput } from "@core/types";
+import { DecompositionOutput } from "@aimcub/types";
 
 import {
   backupPathFor,

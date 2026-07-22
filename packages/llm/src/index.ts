@@ -1,5 +1,5 @@
 /**
- * @core/llm — Claude invocation gateway: model routing + metering + caching strategy (interface-first).
+ * @aimcub/llm — Claude invocation gateway: model routing + metering + caching strategy (interface-first).
  * Billing decision: always connect directly via the Anthropic API key (not the Agent SDK subscription quota), so cost is meterable, cacheable, and batchable.
  * v0: model routing + gateway interface; the concrete SDK calls are wired up in v1a (to avoid introducing a network dependency in v0).
  */

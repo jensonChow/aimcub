@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { LlmGateway } from "@core/llm";
-import type { LocalAgentDetection } from "@core/local-agent";
+import type { LlmGateway } from "@aimcub/llm";
+import type { LocalAgentDetection } from "@aimcub/local-agent";
 
 import { localPlanningGateway } from "./local-planning";
 

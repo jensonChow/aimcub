@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { decompose, decomposeWithQuality, planQualityMetadata, type DecomposeInput } from "./decompose";
 import type { LlmGateway, LlmRequest, LlmResponse, LlmUsage } from "./index";
-import type { CommitPatternMatch, DecompositionOutput } from "@core/types";
+import type { CommitPatternMatch, DecompositionOutput } from "@aimcub/types";
 
 // ──────────────────────────────────────────────────────────────────────────
 // Mock gateway: no network. `completeStructured` returns whatever canned JSON

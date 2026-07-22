@@ -1,10 +1,10 @@
-import type { LlmGateway } from "@core/llm";
+import type { LlmGateway } from "@aimcub/llm";
 import {
   LocalCliLlmGateway,
   listLocalAgents,
   type LocalAgentDetection,
   type LocalAgentId,
-} from "@core/local-agent";
+} from "@aimcub/local-agent";
 
 export interface LocalPlanningDependencies {
   listLocalAgents: () => Promise<LocalAgentDetection[]>;

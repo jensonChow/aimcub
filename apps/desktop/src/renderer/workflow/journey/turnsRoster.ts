@@ -3,7 +3,7 @@
  * from an `AimProgressReadModel`. Pure except for the injected `t` and a `now` clock
  * (passed in for deterministic tests).
  */
-import type { AimProgressReadModel } from "@core/domain";
+import type { AimProgressReadModel } from "@aimcub/core";
 
 import type { I18n } from "../../i18n";
 import { isHumanExecuteRoute } from "../../stages/execute/executePrimaryAction";

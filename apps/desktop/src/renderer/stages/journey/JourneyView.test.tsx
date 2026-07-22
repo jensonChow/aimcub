@@ -1,4 +1,4 @@
-import type { AimProgressMilestoneRead, AimProgressReadModel, DecompositionOutput, Goal, Memory } from "@core/domain";
+import type { AimProgressMilestoneRead, AimProgressReadModel, DecompositionOutput, Goal, Memory } from "@aimcub/core";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 

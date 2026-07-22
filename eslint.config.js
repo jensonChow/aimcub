@@ -3,7 +3,7 @@ import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 
 /**
- * Forbidden in the shared kernel (@core/domain, @core/types): any platform / IO
+ * Forbidden in the shared kernel (@aimcub/core, @aimcub/types): any platform / IO
  * dependency. The kernel must stay pure TS so all four channels can import it.
  * This is the CI guard that keeps "shared core" from rotting into a slogan.
  */

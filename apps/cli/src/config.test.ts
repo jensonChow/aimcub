@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { ProviderSettings } from "@core/store";
+import type { ProviderSettings } from "@aimcub/store";
 
 import { resolveProvider, redactKey, formatConfig, buildSettingsFromInput } from "./config";
 

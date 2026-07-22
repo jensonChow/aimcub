@@ -1,8 +1,8 @@
 {
-  "name": "@app/desktop",
+  "name": "@aimcub/desktop",
   "version": "0.0.0",
   "private": true,
-  "description": "Aimcub Mac desktop (Electron) — local-first Aim → decompose (with feedback step). Reuses the TS @core brain.",
+  "description": "Aimcub Mac desktop (Electron) — local-first Aim → decompose (with feedback step). Reuses the TS @aimcub/core brain.",
   "author": "Aimcub",
   "main": "out/main/index.js",
   "scripts": {
@@ -17,11 +17,11 @@
     "notarize:check": "node scripts/check-notarize-env.mjs"
   },
   "dependencies": {
-    "@core/domain": "workspace:*",
-    "@core/local-agent": "workspace:*",
-    "@core/llm": "workspace:*",
-    "@core/store": "workspace:*",
-    "@core/types": "workspace:*",
+    "@aimcub/core": "workspace:*",
+    "@aimcub/local-agent": "workspace:*",
+    "@aimcub/llm": "workspace:*",
+    "@aimcub/store": "workspace:*",
+    "@aimcub/types": "workspace:*",
     "react": "19.2.7",
     "react-dom": "19.2.7"
   },

@@ -38,7 +38,7 @@ import {
 import { basename, dirname, join } from "node:path";
 
 /** Prefix for every operator-facing warning this module emits. */
-const LOG_PREFIX = "[@core/store]";
+const LOG_PREFIX = "[@aimcub/store]";
 
 // ──────────────────────────────────────────────────────────────────────────
 // Atomic writes

@@ -6,7 +6,7 @@ const gatewayMocks = vi.hoisted(() => ({
   failWith: null as Error | null,
 }));
 
-vi.mock("@core/llm", () => ({
+vi.mock("@aimcub/llm", () => ({
   AnthropicLlmGateway: class {
     constructor(opts: Record<string, unknown>) {
       gatewayMocks.anthropicOptions.push(opts);

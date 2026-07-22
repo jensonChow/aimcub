@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import type { DecompositionContract, DecompositionOutput } from "@core/types";
+import type { DecompositionContract, DecompositionOutput } from "@aimcub/types";
 
 import { createJsonFileStore } from "./index";
 

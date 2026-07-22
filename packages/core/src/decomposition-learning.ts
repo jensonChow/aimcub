@@ -1,4 +1,4 @@
-import type { ContextCategory, DecompositionContract, Evidence, Evaluator, Goal, Milestone, MilestoneCompletion } from "@core/types";
+import type { ContextCategory, DecompositionContract, Evidence, Evaluator, Goal, Milestone, MilestoneCompletion } from "@aimcub/types";
 import { evaluate } from "./evaluate";
 import type { ContextLineageReport } from "./context-lineage";
 import type { PlanQualityDimension, PlanQualityIssue, PlanQualityIssueCode, PlanQualityReport } from "./plan-quality";

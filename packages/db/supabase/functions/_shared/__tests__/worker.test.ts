@@ -4,11 +4,11 @@
  * an idempotent completion.
  *
  * Decoupling: a LOCAL in-memory repo (memory-repo.ts) implements the ports — no
- * import of `@core/api-client`. The @core `evaluate()` kernel and
- * `AUTO_VERIFY_MIN_TRUST` are the real ones (imported from `@core/domain`).
+ * import of `@aimcub/api-client`. The @aimcub/core `evaluate()` kernel and
+ * `AUTO_VERIFY_MIN_TRUST` are the real ones (imported from `@aimcub/core`).
  */
 import { describe, expect, it } from "vitest";
-import { AUTO_VERIFY_MIN_TRUST } from "@core/domain";
+import { AUTO_VERIFY_MIN_TRUST } from "@aimcub/core";
 import type {
   AcceptanceRule,
   CompletionMode,
@@ -16,7 +16,7 @@ import type {
   Job,
   Milestone,
   MilestoneCompletion,
-} from "@core/types";
+} from "@aimcub/types";
 import { runJob, type WorkerDeps } from "../worker.ts";
 import { createMemoryRepo, type MemoryRepo } from "./memory-repo.ts";
 

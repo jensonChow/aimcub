@@ -10,7 +10,7 @@ import {
   validatePlanRouting,
   type PlanRoutingValidation,
   type RoutingRuntimeAgentOption,
-} from "@core/domain";
+} from "@aimcub/core";
 import type {
   AcceptanceRule as AcceptanceRuleType,
   DecompositionContract,
@@ -18,7 +18,7 @@ import type {
   PlanNode,
   PlanRoutingOverride,
   PlanRoutingOwner,
-} from "@core/types";
+} from "@aimcub/types";
 import type { PlanResult } from "../../../shared/ipc";
 
 import { useI18n } from "../../i18n";

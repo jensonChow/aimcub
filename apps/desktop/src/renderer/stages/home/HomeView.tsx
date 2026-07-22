@@ -10,7 +10,7 @@
  * The empty/first-run state must never auto-render the aim composer — the primary
  * action is a "Set your first aim" button that opens New Aim explicitly.
  */
-import type { AimDraft, AimProgressSummary, AimProgressSummaryStatus, Goal } from "@core/types";
+import type { AimDraft, AimProgressSummary, AimProgressSummaryStatus, Goal } from "@aimcub/types";
 
 import { useI18n, type StringKey } from "../../i18n";
 import { aimNavigationLabels } from "../../workflow/aimNavigationTitle";

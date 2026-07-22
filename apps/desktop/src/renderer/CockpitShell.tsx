@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
-import type { AimDraft, AimProgressSummary, Goal } from "@core/types";
+import type { AimDraft, AimProgressSummary, Goal } from "@aimcub/types";
 
 import type { WindowChromeState } from "../shared/ipc";
 import { useI18n, type Lang } from "./i18n";

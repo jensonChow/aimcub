@@ -4,7 +4,7 @@
  * Journey CTA stays consistent with the Execute stage (run agent / submit proof /
  * review in eval / blocked). Pure except for the injected `t`.
  */
-import type { AimProgressReadModel } from "@core/domain";
+import type { AimProgressReadModel } from "@aimcub/core";
 
 import type { I18n } from "../../i18n";
 import {

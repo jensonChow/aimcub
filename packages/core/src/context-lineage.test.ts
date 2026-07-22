@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { Goal, Memory, Milestone } from "@core/types";
+import type { Goal, Memory, Milestone } from "@aimcub/types";
 import { contextCaptureFulfillmentFromLineage, reviewContextLineage, summarizeContextLineageLearning } from "./context-lineage";
 import { summarizeContextCaptureLearning } from "./context-capture";
 

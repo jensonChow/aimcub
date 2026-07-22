@@ -30,8 +30,8 @@ import type {
   SubAimRelation,
   SubAimRelationStatus,
   ToolTrace,
-} from "@core/types";
-import { PlanRoutingOverride } from "@core/types";
+} from "@aimcub/types";
+import { PlanRoutingOverride } from "@aimcub/types";
 import { AUTO_VERIFY_MIN_TRUST, evaluate } from "./evaluate";
 import type { ContextSedimentationCandidateInput } from "./context-sedimentation";
 

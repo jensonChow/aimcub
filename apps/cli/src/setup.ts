@@ -12,8 +12,8 @@
 import { createInterface } from "node:readline/promises";
 import { stdin as procStdin, stdout as procStdout } from "node:process";
 
-import type { ProviderSettings } from "@core/store";
-import { getDefaultBaseURL, getDefaultModel, getLlmProviderDefinition } from "@core/llm/providers";
+import type { ProviderSettings } from "@aimcub/store";
+import { getDefaultBaseURL, getDefaultModel, getLlmProviderDefinition } from "@aimcub/llm/providers";
 
 import { normalizeProvider, type ProviderName, type SetupInput } from "./config";
 

@@ -17,7 +17,7 @@ function runtimeBundleFiles(root) {
 
 const bundlePaths = [...new Set(bundleRoots.flatMap(runtimeBundleFiles))];
 
-const externalCoreImport = /(?:require|import)\s*\(\s*["']@core\/|(?:from|import)\s*["']@core\//gu;
+const externalCoreImport = /(?:require|import)\s*\(\s*["']@aimcub\/|(?:from|import)\s*["']@aimcub\//gu;
 const failures = [];
 
 for (const bundlePath of bundlePaths) {
@@ -27,10 +27,10 @@ for (const bundlePath of bundlePaths) {
 }
 
 if (failures.length > 0) {
-  process.stderr.write("Electron runtime bundles contain external @core imports:\n");
+  process.stderr.write("Electron runtime bundles contain external @aimcub imports:\n");
   for (const failure of failures) process.stderr.write(`- ${failure}\n`);
-  process.stderr.write("Raw-TypeScript @core packages must be bundled through electron.vite.config.ts.\n");
+  process.stderr.write("Raw-TypeScript @aimcub packages must be bundled through electron.vite.config.ts.\n");
   process.exit(1);
 }
 
-process.stdout.write("Verified Electron runtime bundles contain no external @core imports.\n");
+process.stdout.write("Verified Electron runtime bundles contain no external @aimcub imports.\n");

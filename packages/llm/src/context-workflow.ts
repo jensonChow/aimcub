@@ -17,8 +17,8 @@ import {
   type DecompositionLearningReport,
   type DecompositionStrategyReport,
   type PlanReviewReport,
-} from "@core/domain";
-import type { ContextCategory, Evidence, Goal, Memory, MemoryKind, Milestone, MilestoneCompletion } from "@core/types";
+} from "@aimcub/core";
+import type { ContextCategory, Evidence, Goal, Memory, MemoryKind, Milestone, MilestoneCompletion } from "@aimcub/types";
 
 import { clarifyImpactReportFromMetadata, summarizeClarifyLearning, type ClarifyLearningReport } from "./clarify";
 import {

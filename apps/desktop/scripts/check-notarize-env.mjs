@@ -1,5 +1,5 @@
 // Diagnostic helper for macOS notarization credentials — run it by hand to see
-// whether `pnpm --filter @app/desktop run dist` would attempt notarization, and
+// whether `pnpm --filter @aimcub/desktop run dist` would attempt notarization, and
 // which credential path it would use, without actually invoking electron-builder.
 //
 // Desktop packaging does NOT run a custom afterSign/notarize script. Instead,

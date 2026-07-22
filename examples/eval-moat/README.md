@@ -44,7 +44,7 @@ Bundle the runner with the existing CLI toolchain (same pattern as
 [`../local-alpha`](../local-alpha/README.md)):
 
 ```bash
-pnpm --filter @app/cli exec esbuild ../../examples/eval-moat/run-benchmark.ts --bundle --platform=node --format=esm --target=node22 --outfile=/tmp/eval-moat.mjs
+pnpm --filter @aimcub/cli exec esbuild ../../examples/eval-moat/run-benchmark.ts --bundle --platform=node --format=esm --target=node22 --outfile=/tmp/eval-moat.mjs
 ```
 
 ### Dry run (default — no provider, no key, no cost)
@@ -107,7 +107,7 @@ without spending anything. It is one run of `N=1` — read it as a shape, not as
   plans — because "did this plan fit the person it was for" cannot be judged without knowing the
   person. The prompt explicitly protects the bare condition: asking a good open question is not a
   defect, and more milestones is not better.
-- **A deterministic cross-check** runs alongside it: `critiquePlan` from `@core/domain`, scored for
+- **A deterministic cross-check** runs alongside it: `critiquePlan` from `@aimcub/core`, scored for
   both plans against the *same* ground-truth context. It needs no judge model — but see below.
 
 ### Known bias in the cross-check
@@ -141,7 +141,7 @@ Then re-run the dry run and read the context diff before spending anything on a 
 them with any workspace package's vitest:
 
 ```bash
-pnpm --filter @core/store exec vitest run --root ../../examples/eval-moat
+pnpm --filter @aimcub/store exec vitest run --root ../../examples/eval-moat
 ```
 
 They cover the parts that must not rot: seeding is byte-deterministic, the bare condition really is
@@ -153,7 +153,7 @@ same budget guard, no key and no network.
 Typecheck it the same way:
 
 ```bash
-pnpm --filter @app/cli exec tsc -p ../../examples/eval-moat/tsconfig.json
+pnpm --filter @aimcub/cli exec tsc -p ../../examples/eval-moat/tsconfig.json
 ```
 
 ## Honest limitations

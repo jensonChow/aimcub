@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { AimDraft } from "@core/types";
+import type { AimDraft } from "@aimcub/types";
 import type { UpsertAimDraftRequest } from "../../shared/ipc";
 
 import { createDraftPersistenceId, createDraftPersistenceQueue } from "./draftPersistenceQueue";

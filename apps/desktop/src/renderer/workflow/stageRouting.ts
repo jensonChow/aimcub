@@ -1,5 +1,5 @@
-import type { AimProgressReadModel } from "@core/domain";
-import type { DecompositionOutput, Goal, Milestone } from "@core/types";
+import type { AimProgressReadModel } from "@aimcub/core";
+import type { DecompositionOutput, Goal, Milestone } from "@aimcub/types";
 
 import type { GoalDetail } from "../../shared/ipc";
 import type { CockpitStage } from "../CockpitShell";

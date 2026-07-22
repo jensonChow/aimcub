@@ -35,7 +35,7 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: "Lint (includes @core/* purity: no-restricted-imports)"
+      - name: "Lint (includes @aimcub/* purity: no-restricted-imports)"
         run: pnpm lint
 
       - name: Test
@@ -44,7 +44,7 @@ jobs:
       - name: Build
         run: pnpm build
 
-      # Core purity guard: @core/domain and @core/types must compile cleanly with no DOM and no node types.
+      # Core purity guard: @aimcub/core and @aimcub/types must compile cleanly with no DOM and no node types.
       # Any platform dependency that sneaks into the kernel turns this red — the safeguard that keeps "one shared core across all four clients" from being an empty slogan.
       - name: Core purity guard
         run: pnpm core:purity
@@ -68,7 +68,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build CLI bundle
-        run: pnpm --filter @app/cli build
+        run: pnpm --filter @aimcub/cli build
 
       - name: Upload CLI artifact
         uses: actions/upload-artifact@v4
@@ -83,7 +83,7 @@ jobs:
           # Point it at a runner-owned writable dir defensively; harmless
           # when the default cache is already writable.
           ELECTRON_BUILDER_CACHE: ${{ runner.temp }}/electron-builder-cache
-        run: pnpm --filter @app/desktop run dist
+        run: pnpm --filter @aimcub/desktop run dist
 
       - name: Upload desktop artifacts
         uses: actions/upload-artifact@v4
@@ -128,11 +128,9 @@ jobs:
 
       # npm publish is intentionally NOT wired up yet. Blocked on:
       #   1. Choosing an OSS license for the repo.
-      #   2. Registering the @aimcub npm org and renaming packages from
-      #      @core/* + @app/* to @aimcub/* (a separate, later batch).
+      #   2. Registering the @aimcub npm org.
       # Do not add `changeset publish` / `npm publish` here until both land.
       - name: npm publish (blocked — placeholder)
         run: |
           echo "npm publish is intentionally not run here."
-          echo "Blocked on: an OSS license decision, and @aimcub npm org registration"
-          echo "(packages are still @core/* and @app/* — the @aimcub/* rename is later)."
+          echo "Blocked on: an OSS license decision, and @aimcub npm org registration."

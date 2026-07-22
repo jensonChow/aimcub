@@ -4,8 +4,7 @@
   "commit": false,
   "fixed": [
     [
-      "@core/*",
-      "@app/*"
+      "@aimcub/*"
     ]
   ],
   "linked": [],

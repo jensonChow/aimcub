@@ -1,5 +1,5 @@
 {
-  "name": "@core/api-client",
+  "name": "@aimcub/api-client",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -30,7 +30,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@core/types": "workspace:*",
+    "@aimcub/types": "workspace:*",
     "@supabase/supabase-js": "^2.110.0"
   }
 }

@@ -1,4 +1,4 @@
-import { getLlmProviderDefinition } from "@core/llm/providers";
+import { getLlmProviderDefinition } from "@aimcub/llm/providers";
 
 import type { ResolvedProvider } from "./config";
 

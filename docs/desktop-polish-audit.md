@@ -34,7 +34,7 @@ Code and CSS inspected:
 Live visual pass:
 
 - Installed dependencies with `pnpm install --frozen-lockfile --store-dir /private/tmp/aimcub-pnpm-store`.
-- Built Desktop with `pnpm --filter @app/desktop build`.
+- Built Desktop with `pnpm --filter @aimcub/desktop build`.
 - Launched compiled Electron with an isolated temporary profile and CDP remote debugging.
 - CDP did not expose native window bounds APIs, so screenshots used viewport emulation at 960x680, 760x600, and 640x520.
 - Live inspection covered empty Aim, opened Aim composer, and generated Context intake. Plan/Execute/Eval findings below are code/CSS-backed because the seeded visual run hit the context gate before a savable plan.

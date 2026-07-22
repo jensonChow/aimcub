@@ -1,4 +1,4 @@
-import type { AcceptanceRule } from "@core/types";
+import type { AcceptanceRule } from "@aimcub/types";
 
 /** A compact, human-readable summary of a milestone's acceptance rule. */
 export function summarizeRule(rule: AcceptanceRule): string {

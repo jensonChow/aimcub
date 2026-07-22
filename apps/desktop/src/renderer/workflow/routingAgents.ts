@@ -1,4 +1,4 @@
-import type { PlanRoutingValidation, RoutingRuntimeAgentOption } from "@core/domain";
+import type { PlanRoutingValidation, RoutingRuntimeAgentOption } from "@aimcub/core";
 
 import type { LocalAgentDetection } from "../../shared/ipc";
 

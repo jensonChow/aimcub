@@ -13,7 +13,7 @@
 //   node apps/desktop/scripts/generate-icon.mjs
 //
 // This writes apps/desktop/build/icon.icns, which is committed — CI and
-// `pnpm --filter @app/desktop run pack`/`dist` consume the committed file and
+// `pnpm --filter @aimcub/desktop run pack`/`dist` consume the committed file and
 // never invoke this script.
 import { Buffer } from "node:buffer";
 import { execFileSync } from "node:child_process";

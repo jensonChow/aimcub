@@ -1,5 +1,5 @@
-import type { PlanNodePatch, PlanNodeRoutingRecommendation, RoutingRuntimeAgentOption } from "@core/domain";
-import type { DecompositionContract, PlanNode, PlanRoutingOwner } from "@core/types";
+import type { PlanNodePatch, PlanNodeRoutingRecommendation, RoutingRuntimeAgentOption } from "@aimcub/core";
+import type { DecompositionContract, PlanNode, PlanRoutingOwner } from "@aimcub/types";
 
 import { useDeveloperMode } from "../../developerMode";
 import { useI18n } from "../../i18n";

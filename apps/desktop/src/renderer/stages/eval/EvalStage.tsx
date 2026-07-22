@@ -1,5 +1,5 @@
-import type { AimProgressReadModel } from "@core/domain";
-import type { Evidence } from "@core/types";
+import type { AimProgressReadModel } from "@aimcub/core";
+import type { Evidence } from "@aimcub/types";
 
 import { useI18n, type I18n } from "../../i18n";
 import { pendingContextCandidates } from "../../labels";

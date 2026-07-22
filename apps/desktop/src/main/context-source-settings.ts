@@ -1,6 +1,6 @@
 import { dialog } from "electron";
 
-import type { ContextSourceSettings } from "@core/store";
+import type { ContextSourceSettings } from "@aimcub/store";
 import type { ContextSourceConfig, ContextSourceStatus, LocalContextPickResult } from "../shared/ipc";
 import { loadContextSourceSettings, saveContextSourceSettings } from "./store";
 

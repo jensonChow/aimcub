@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { reviewAimIntake, type AimIntakeReport } from "@core/domain";
+import { reviewAimIntake, type AimIntakeReport } from "@aimcub/core";
 import type { LlmGateway, LlmRequest, LlmResponse, LlmUsage } from "./index";
 import { generateAimIntakeQuestions } from "./intake";
 

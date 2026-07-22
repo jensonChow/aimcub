@@ -12,8 +12,8 @@ import {
   type LlmRequest,
   type LlmResponse,
   type LlmUsage,
-} from "@core/llm";
-import { reviewAimIntake } from "@core/domain";
+} from "@aimcub/llm";
+import { reviewAimIntake } from "@aimcub/core";
 
 import { runClarify, runDraft, runIntakeQuestions, runRefine, type PlanningModelRunLiveEvent } from "./planner";
 import { materialize } from "./materialize";
@@ -21,7 +21,7 @@ import { materialize } from "./materialize";
 /**
  * Exercises the desktop main-process planner end to end with a MOCK gateway (no Electron,
  * no network). The planner has no offline/template fallback: with no gateway it must fail
- * honestly; with a gateway it runs the real @core/llm decompose/clarify pipeline.
+ * honestly; with a gateway it runs the real @aimcub/llm decompose/clarify pipeline.
  */
 
 const USAGE: LlmUsage = { model: "mock-model", inputTokens: 1, outputTokens: 1 };
@@ -205,7 +205,7 @@ describe("desktop planner · intake question generation", () => {
   });
 });
 
-describe("desktop planner · with a gateway (real @core/llm pipeline)", () => {
+describe("desktop planner · with a gateway (real @aimcub/llm pipeline)", () => {
   it("drafts a valid, materializable plan", async () => {
     const d = await runDraft(mockGateway(), aim.title, aim.description);
     expect(d.ok).toBe(true);
