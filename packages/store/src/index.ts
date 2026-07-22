@@ -324,6 +324,12 @@ export interface CreateRunInput {
   model?: string | null;
   reasoning?: string | null;
   summary?: string;
+  /**
+   * Recorded on the run's opening (`run.queued` / `run.started`) event. A queued run is the
+   * queue entry, so whatever a worker needs beyond the run columns — the chosen runtime id, the
+   * retry chain — travels here and survives a restart or a claim from another process.
+   */
+  requestPayload?: Record<string, unknown>;
 }
 
 export interface AppendRunEventInput {
@@ -332,6 +338,21 @@ export interface AppendRunEventInput {
   type: RunEventType;
   summary?: string;
   payload?: Record<string, unknown>;
+}
+
+/** Which queued run {@link AimStore.claimNextQueuedRun} is allowed to claim. Empty = any. */
+export interface ClaimQueuedRunFilter {
+  /** Restrict the claim to one aim. */
+  goalId?: string | null;
+  /** Claim exactly this run — how an enqueuing caller executes the run it just created. */
+  runId?: string;
+  /**
+   * Claim only runs recorded at this sandbox level. A worker must never execute a run more
+   * permissive than the permission its own surface asked the user for: Desktop drains
+   * `read-only` runs, and a `workspace-write` run queued by `aimcub run --workspace` stays for
+   * the CLI that asked for it.
+   */
+  sandbox?: string | null;
 }
 
 export interface FinishRunInput {
@@ -410,6 +431,20 @@ export interface AimStore {
   listRuns(goalId?: string | null): Promise<Run[]>;
   createRun(input: CreateRunInput): Promise<Run>;
   appendRunEvent(input: AppendRunEventInput): Promise<RunEvent | null>;
+  /**
+   * Append a batch of run events in one lock cycle, preserving input order. A streaming agent run
+   * emits events far faster than one lock→load→save cycle each, so the orchestrator buffers and
+   * flushes through here. Inputs naming an unknown run are skipped; the result holds only what
+   * was persisted.
+   */
+  appendRunEvents(inputs: readonly AppendRunEventInput[]): Promise<RunEvent[]>;
+  /**
+   * Atomically claim the oldest queued run matching `filter` and flip it to `running` — the whole
+   * queue mechanism. The store lock spans load→mutate→save, so two workers (Desktop and the CLI,
+   * in different processes) can race here and exactly one wins. Returns `null` when nothing
+   * matches.
+   */
+  claimNextQueuedRun(filter?: ClaimQueuedRunFilter): Promise<Run | null>;
   finishRun(input: FinishRunInput): Promise<Run | null>;
   /** The full run-lifecycle event stream for one aim (run events carry no goal id, so this joins run → goal). */
   listRunEvents(goalId: string): Promise<RunEvent[]>;
@@ -2034,11 +2069,76 @@ export function createJsonFileStore(dataDir: string = defaultDataDir(), options:
           run_id: run.id,
           type: status === "running" ? "run.started" : "run.queued",
           summary: input.summary ?? "",
-          payload: {},
+          payload: input.requestPayload ?? {},
           created_at: now,
         });
         save(store);
         return run;
+      });
+    },
+
+    async claimNextQueuedRun(filter: ClaimQueuedRunFilter = {}): Promise<Run | null> {
+      return withWriteLock(() => {
+        const store = load();
+        // Oldest-first by queue time; insertion order breaks ties within the same timestamp
+        // (a deterministic test clock can stamp a whole batch identically).
+        const claimable = store.runs
+          .filter((run) => run.status === "queued")
+          .filter((run) => (filter.goalId ? run.goal_id === filter.goalId : true))
+          .filter((run) => (filter.runId ? run.id === filter.runId : true))
+          .filter((run) => (filter.sandbox === undefined ? true : run.sandbox === filter.sandbox));
+        let candidate: Run | null = null;
+        for (const run of claimable) {
+          if (!candidate || (run.queued_at ?? "") < (candidate.queued_at ?? "")) candidate = run;
+        }
+        if (!candidate) return null;
+        const claimed = candidate;
+        const now = nowIso();
+        claimed.status = "running";
+        claimed.started_at = now;
+        const assignment = claimed.assignment_id
+          ? store.assignments.find((row) => row.id === claimed.assignment_id)
+          : null;
+        if (assignment && assignment.status !== "cancelled") {
+          assignment.status = "running";
+          assignment.updated_at = now;
+        }
+        store.runEvents.push({
+          id: nextId(),
+          owner_id: claimed.owner_id,
+          run_id: claimed.id,
+          type: "run.started",
+          summary: claimed.summary ?? "",
+          payload: {},
+          created_at: now,
+        });
+        save(store);
+        return claimed;
+      });
+    },
+
+    async appendRunEvents(inputs: readonly AppendRunEventInput[]): Promise<RunEvent[]> {
+      if (inputs.length === 0) return [];
+      return withWriteLock(() => {
+        const store = load();
+        const appended: RunEvent[] = [];
+        for (const input of inputs) {
+          const run = store.runs.find((row) => row.id === input.runId);
+          if (!run) continue;
+          const event: RunEvent = {
+            id: nextId(),
+            owner_id: input.ownerId ?? run.owner_id,
+            run_id: run.id,
+            type: input.type,
+            summary: input.summary ?? "",
+            payload: input.payload ?? {},
+            created_at: nowIso(),
+          };
+          store.runEvents.push(event);
+          appended.push(event);
+        }
+        if (appended.length > 0) save(store);
+        return appended;
       });
     },
 

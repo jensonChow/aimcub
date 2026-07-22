@@ -85,6 +85,26 @@ Helpers for parsing live in `packages/local-agent/src/adapters/helpers.ts` — `
   (`executable_not_found` / `timeout` / `canceled` / `nonzero_exit` / `spawn_error` /
   `event_callback_error`); only `timeout` is currently marked retryable.
 
+## What the run queue does with your events
+
+Runs reach adapters through the shared orchestrator (`packages/local-agent/src/orchestrator.ts`)
+and its queue (`run-queue.ts`), so an adapter inherits queue behavior for free — and one adapter
+decision now has teeth beyond a single run:
+
+- **`retryable` drives a real retry.** A terminal failure marked `retryable` re-enqueues the same
+  sub-aim once as a fresh queued run, linked to the attempt it replaces by a `run.log` event. Runs
+  are immutable history, so a retry is a new row, never a rewritten one. Classify a failure
+  retryable only when running the same request again could plausibly succeed.
+- **Every event is persisted, batched.** Events are normalized (`agent.tool.*` → `tool.*`,
+  everything else → `run.log` carrying `agent_event_type`) and written in batches — on a tool
+  boundary, on a terminal event, or every 250ms. Order is preserved and the full stream is on disk
+  by the time a run finishes, so a chatty `parseLine` costs throughput, not correctness.
+- **Events stream before they persist.** The same events go live to the desktop cockpit as they
+  arrive. A `summary` is user-visible text: keep it short and human, not a raw JSON dump.
+- **Cancellation is your `AbortSignal` contract.** The queue holds one `AbortController` per
+  executing run; the engine turns an abort into SIGTERM and failure code `canceled`, which is never
+  retried.
+
 ## Future work (out of scope)
 
 - Declarative, config-driven adapters (describe a runtime in JSON instead of TypeScript).

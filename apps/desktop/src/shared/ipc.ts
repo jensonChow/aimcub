@@ -9,6 +9,7 @@ import type { LlmProvider } from "@core/llm/providers";
 import type { ContextSourceSettings, UpsertAimDraftInput } from "@core/store";
 import type {
   LocalAgentDetection,
+  LocalAgentEvent,
   LocalAgentId,
   LocalAgentRunRequest,
   LocalAgentRunResult,
@@ -405,11 +406,24 @@ export interface RunMilestoneAgentRequest {
   prompt?: string;
 }
 
+/**
+ * Enqueue-and-return: the handler puts the sub-aim on the durable run queue and answers
+ * immediately with the queued run's id. Everything after that arrives on {@link IPC.runLiveEvent}
+ * and lands in the store, so a run outlives the window that started it.
+ */
 export interface RunMilestoneAgentResult {
   ok: boolean;
-  run: LocalAgentRunResult | null;
-  detail: GoalDetail | null;
+  runId: string | null;
   error: string | null;
+}
+
+/** One normalized event of a worker-executed run, pushed live as it happens. */
+export interface RunLiveEvent {
+  goalId: string;
+  runId: string;
+  milestoneId: string;
+  at: string;
+  event: LocalAgentEvent;
 }
 
 export type SystemColorScheme = "light" | "dark";
@@ -480,6 +494,8 @@ export interface AimcubApi {
   listLocalAgents(): Promise<LocalAgentDetection[]>;
   runLocalAgent(req: LocalAgentRunRequest): Promise<LocalAgentRunResult>;
   runMilestoneAgent(req: RunMilestoneAgentRequest): Promise<RunMilestoneAgentResult>;
+  /** Abort an executing run. Resolves false when the run is not executing in this process. */
+  cancelRun(runId: string): Promise<boolean>;
   confirmMilestone(req: ConfirmMilestoneRequest): Promise<GoalDetail | null>;
   getWindowChromeState(): Promise<WindowChromeState>;
   /** Drive the native window appearance (titlebar/background/traffic-light context) from the in-app theme toggle. */
@@ -490,6 +506,7 @@ export interface AimcubApi {
   revealWorkspace(): Promise<void>;
   onWindowChromeState(handler: (state: WindowChromeState) => void): () => void;
   onPlanningLiveEvent(handler: (event: PlanningLiveEvent) => void): () => void;
+  onRunLiveEvent(handler: (event: RunLiveEvent) => void): () => void;
 }
 
 /** Channel names — kept in one place so main and preload can't drift. */
@@ -538,6 +555,7 @@ export const IPC = {
   listLocalAgents: "aimcub:listLocalAgents",
   runLocalAgent: "aimcub:runLocalAgent",
   runMilestoneAgent: "aimcub:runMilestoneAgent",
+  cancelRun: "aimcub:cancelRun",
   confirmMilestone: "aimcub:confirmMilestone",
   getWindowChromeState: "aimcub:getWindowChromeState",
   setThemeSource: "aimcub:setThemeSource",
@@ -545,6 +563,7 @@ export const IPC = {
   revealWorkspace: "aimcub:revealWorkspace",
   windowChromeState: "aimcub:windowChromeState",
   planningLiveEvent: "aimcub:planningLiveEvent",
+  runLiveEvent: "aimcub:runLiveEvent",
 } as const;
 
 declare global {

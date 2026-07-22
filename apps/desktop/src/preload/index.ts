@@ -47,6 +47,7 @@ const api: AimcubApi = {
   listLocalAgents: () => ipcRenderer.invoke(IPC.listLocalAgents),
   runLocalAgent: (req) => ipcRenderer.invoke(IPC.runLocalAgent, req),
   runMilestoneAgent: (req) => ipcRenderer.invoke(IPC.runMilestoneAgent, req),
+  cancelRun: (runId) => ipcRenderer.invoke(IPC.cancelRun, runId),
   confirmMilestone: (req) => ipcRenderer.invoke(IPC.confirmMilestone, req),
   getWindowChromeState: () => ipcRenderer.invoke(IPC.getWindowChromeState),
   setThemeSource: (source) => ipcRenderer.invoke(IPC.setThemeSource, source),
@@ -65,6 +66,13 @@ const api: AimcubApi = {
     };
     ipcRenderer.on(IPC.planningLiveEvent, listener);
     return () => ipcRenderer.removeListener(IPC.planningLiveEvent, listener);
+  },
+  onRunLiveEvent: (handler) => {
+    const listener = (_event: IpcRendererEvent, payload: unknown) => {
+      handler(payload as Parameters<typeof handler>[0]);
+    };
+    ipcRenderer.on(IPC.runLiveEvent, listener);
+    return () => ipcRenderer.removeListener(IPC.runLiveEvent, listener);
   },
 };
 

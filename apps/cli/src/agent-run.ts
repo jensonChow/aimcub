@@ -1,3 +1,8 @@
+/**
+ * The CLI's face on the shared run queue. Selection, execution, event persistence, evidence and
+ * completion all live in `@core/local-agent`'s orchestrator — this module only translates CLI
+ * input into a queue request and the queue's outcome back into the CLI's result shape.
+ */
 import type { AimStore } from "@core/store";
 import type {
   AimProgressReadModel,
@@ -5,17 +10,21 @@ import type {
   Milestone,
   MilestoneCompletion,
   Run,
-  RunEventType,
 } from "@core/types";
 import { routingOverrideForMilestone } from "@core/domain";
 import {
+  createRunQueue,
   listLocalAgents,
+  NoRunnableMilestoneError,
   runLocalAgent,
+  type DrainedRun,
   type LocalAgentDetection,
   type LocalAgentEvent,
   type LocalAgentId,
   type LocalAgentRunOptions,
   type LocalAgentRunResult,
+  type RunOrchestratorDependencies,
+  type RunQueue,
 } from "@core/local-agent";
 
 export interface AimAgentRunInput {
@@ -55,239 +64,117 @@ const defaultDependencies: AimAgentRunDependencies = {
   runLocalAgent,
 };
 
-function milestonePlanKey(milestone: Milestone): string {
-  const key = milestone.metadata?.plan_key;
-  return typeof key === "string" && key.trim() ? key.trim() : milestone.id;
+/** Why an `--until-blocked` sweep stopped. */
+export type AimAgentSweepStopReason = "no_ready_sub_aim" | "run_failed";
+
+export interface AimAgentSweepResult {
+  goalId: string;
+  runs: AimAgentRunResult[];
+  stopReason: AimAgentSweepStopReason;
+  stopDetail: string;
 }
 
-function resolveMilestoneRef(ref: string, milestones: readonly Milestone[]): Milestone | null {
-  const asIndex = Number(ref);
-  if (Number.isInteger(asIndex) && asIndex >= 1 && asIndex <= milestones.length) {
-    return milestones[asIndex - 1] ?? null;
-  }
-  const exact = milestones.find((milestone) => milestone.id === ref);
-  if (exact) return exact;
-  const matches = milestones.filter((milestone) => milestone.id.startsWith(ref));
-  return matches.length === 1 ? matches[0] ?? null : null;
+function orchestratorDependencies(dependencies: AimAgentRunDependencies): RunOrchestratorDependencies {
+  return { ...dependencies, routingOverrideForMilestone };
 }
 
-function dependencyReady(
-  row: AimProgressReadModel["milestones"][number],
-  rows: readonly AimProgressReadModel["milestones"][number][],
-): boolean {
-  const dependencyId = row.milestone.depends_on_id;
-  if (!dependencyId) return true;
-  const dependency = rows.find((candidate) => candidate.milestone.id === dependencyId);
-  return Boolean(dependency?.completed || dependency?.milestone.status === "skipped");
+function toRunResult(goalId: string, drained: DrainedRun<AimStore>): AimAgentRunResult {
+  const { executed } = drained;
+  return {
+    goalId,
+    milestone: executed.row.milestone,
+    agent: executed.agent,
+    model: executed.model,
+    orchestrationRun: executed.run,
+    run: executed.result,
+    evidence: executed.evidence,
+    completions: executed.completions,
+    progress: executed.progress,
+  };
 }
 
-function selectableRow(
-  row: AimProgressReadModel["milestones"][number],
-  rows: readonly AimProgressReadModel["milestones"][number][],
-): boolean {
-  if (row.completed || row.milestone.status === "completed" || row.milestone.status === "skipped") return false;
-  if (row.assignment?.actor_kind !== "agent") return false;
-  if (!dependencyReady(row, rows)) return false;
-  return row.latest_run?.status !== "queued" && row.latest_run?.status !== "running";
+/**
+ * Enqueue one sub-aim and drain it here and now (following its retry, if the failure was
+ * classified retryable). The CLI has no daemon: a run only makes progress while the invocation
+ * that queued it is alive.
+ */
+async function enqueueAndDrain(
+  input: AimAgentRunInput,
+  queue: RunQueue<AimStore>,
+  excludeMilestoneIds: readonly string[] = [],
+): Promise<AimAgentRunResult> {
+  const enqueued = await queue.enqueue({
+    goalId: input.goalId,
+    ...(input.milestoneRef ? { milestoneRef: input.milestoneRef } : {}),
+    ...(excludeMilestoneIds.length > 0 ? { excludeMilestoneIds } : {}),
+    workspace: input.workspace,
+    sandbox: input.readOnly ? "read-only" : "workspace-write",
+    network: Boolean(input.network),
+    ...(input.agentId ? { agentId: input.agentId } : {}),
+    ...(input.model ? { model: input.model } : {}),
+    ...(input.reasoning ? { reasoning: input.reasoning } : {}),
+  });
+  const drained = await queue.drain({ runId: enqueued.run.id });
+  const last = drained[drained.length - 1];
+  if (!last) throw new Error("Another Aimcub process claimed this queued run before it could start.");
+  return toRunResult(input.goalId, last);
 }
 
-function chooseMilestone(
-  progress: AimProgressReadModel,
-  requestedRef?: string,
-): AimProgressReadModel["milestones"][number] {
-  const rows = [...progress.milestones].sort((a, b) => a.milestone.order_index - b.milestone.order_index);
-  if (requestedRef) {
-    const milestone = resolveMilestoneRef(requestedRef, rows.map((row) => row.milestone));
-    if (!milestone) throw new Error(`No unique sub-aim matches "${requestedRef}".`);
-    const row = rows.find((candidate) => candidate.milestone.id === milestone.id)!;
-    if (row.completed || row.milestone.status === "completed" || row.milestone.status === "skipped") {
-      throw new Error("The selected sub-aim is already complete or skipped.");
-    }
-    if (row.assignment?.actor_kind !== "agent") {
-      throw new Error("The selected sub-aim is routed to a human, not a local agent.");
-    }
-    if (!dependencyReady(row, rows)) {
-      throw new Error("The selected sub-aim is waiting for a prerequisite to complete.");
-    }
-    if (row.latest_run?.status === "queued" || row.latest_run?.status === "running") {
-      throw new Error("The selected sub-aim already has an active run.");
-    }
-    return row;
-  }
-
-  const ready = rows.find((row) => selectableRow(row, rows) && !row.blocked && row.milestone.status !== "blocked");
-  if (!ready) {
-    throw new Error("No dependency-ready, agent-owned, incomplete sub-aim is available.");
-  }
-  return ready;
-}
-
-function chooseAgent(
-  detections: readonly LocalAgentDetection[],
-  requested: LocalAgentId | undefined,
-  milestone: Milestone,
-): LocalAgentDetection {
-  const override = routingOverrideForMilestone(milestone);
-  const routedId = override?.owner === "agent" ? override.agent_id : null;
-  // An override naming an agent nobody registered falls through to the default
-  // pick rather than failing the run.
-  const routed = routedId && detections.some((agent) => agent.id === routedId) ? routedId : undefined;
-  const selectedId = requested ?? routed;
-  if (!selectedId) {
-    // Registration order is the preference order.
-    const ready = detections.find((agent) => agent.available && agent.authStatus === "ok");
-    if (!ready) throw new Error("No authenticated local agent CLI is available.");
-    return ready;
-  }
-  const selected = detections.find((agent) => agent.id === selectedId);
-  if (!selected) {
-    throw new Error(`Unknown local agent "${selectedId}". Registered agents: ${detections.map((agent) => agent.id).join(", ")}.`);
-  }
-  if (!selected.available) throw new Error(`${selected.name} is not installed or executable.`);
-  if (selected.authStatus !== "ok") throw new Error(`${selected.name} is not authenticated.`);
-  return selected;
-}
-
-function milestonePrompt(goal: AimProgressReadModel["goal"], milestone: Milestone): string {
-  const contract = milestone.metadata?.decomposition_contract as Record<string, unknown> | undefined;
-  const definition = typeof contract?.definition_of_done === "string" ? contract.definition_of_done : milestone.description;
-  const requiredEvidence = Array.isArray(contract?.required_evidence)
-    ? contract.required_evidence.filter((item): item is string => typeof item === "string").join("; ")
-    : "";
-  const evalSignal = typeof contract?.eval_signal === "string" ? contract.eval_signal : "";
-  return [
-    `Aim: ${goal.title}`,
-    goal.description ? `Aim description: ${goal.description}` : "",
-    `Sub-aim: ${milestone.title}`,
-    milestone.description ? `Sub-aim description: ${milestone.description}` : "",
-    definition ? `Definition of done: ${definition}` : "",
-    requiredEvidence ? `Required evidence: ${requiredEvidence}` : "",
-    evalSignal ? `Eval signal: ${evalSignal}` : "",
-    "",
-    "Work only on this sub-aim inside the provided workspace and permissions. Report concrete work, artifact paths, verification, blockers, and remaining work. Do not claim completion unless explicit evidence exists. Aimcub will evaluate completion separately.",
-  ].filter(Boolean).join("\n");
-}
-
-function persistedRunEvent(event: LocalAgentEvent): { type: RunEventType; summary: string; payload: Record<string, unknown> } {
-  const payload: Record<string, unknown> = {};
-  if (event.sessionId) payload.session_id = event.sessionId;
-  if (event.toolId) payload.tool_id = event.toolId;
-  if (event.toolName) payload.tool_name = event.toolName;
-  if (event.usage) payload.usage = event.usage;
-  const summary = event.type === "agent.message.delta"
-    ? "Agent response updated."
-    : event.summary.slice(0, 1_000);
-  if (event.type === "agent.tool.started") return { type: "tool.started", summary, payload };
-  if (event.type === "agent.tool.finished") return { type: "tool.finished", summary, payload };
-  return { type: "run.log", summary, payload: { ...payload, agent_event_type: event.type } };
-}
-
+/** Run exactly one dependency-ready agent-owned sub-aim. */
 export async function runAimAgent(
   store: AimStore,
   input: AimAgentRunInput,
   dependencies: AimAgentRunDependencies = defaultDependencies,
 ): Promise<AimAgentRunResult> {
-  const progress = await store.getAimProgress(input.goalId);
-  if (!progress) throw new Error(`Aim ${input.goalId} not found.`);
-  const row = chooseMilestone(progress, input.milestoneRef);
-  const detections = await dependencies.listLocalAgents();
-  const agent = chooseAgent(detections, input.agentId, row.milestone);
-  const override = routingOverrideForMilestone(row.milestone);
-  const model = input.model?.trim()
-    || (override?.owner === "agent" ? override.model?.trim() : "")
-    || agent.models.find((candidate) => candidate.id !== "default")?.id
-    || agent.models[0]?.id
-    || "default";
-  const sandbox = input.readOnly ? "read-only" : "workspace-write";
-  const assignment = row.assignment;
-  const orchestrationRun = await store.createRun({
-    goalId: progress.goal.id,
-    milestoneId: row.milestone.id,
-    assignmentId: assignment?.id ?? null,
-    actorKind: "agent",
-    actorId: assignment?.actor_id ?? null,
-    status: "running",
-    workspaceRoot: input.workspace,
-    sandbox,
-    networkEnabled: Boolean(input.network),
-    model,
-    reasoning: input.reasoning?.trim() || null,
-    summary: `${agent.name} started: ${row.milestone.title}`,
+  const queue = createRunQueue(store, orchestratorDependencies(dependencies), {
+    ...(input.onEvent ? { onEvent: (live) => void input.onEvent?.(live.event) } : {}),
   });
+  return enqueueAndDrain(input, queue);
+}
 
-  let run: LocalAgentRunResult;
-  try {
-    run = await dependencies.runLocalAgent({
-      agentId: agent.id,
-      prompt: milestonePrompt(progress.goal, row.milestone),
-      cwd: input.workspace,
-      model,
-      reasoning: input.reasoning,
-      permission: { sandbox, network: Boolean(input.network) },
-    }, {
-      onEvent: async (event) => {
-        const persisted = persistedRunEvent(event);
-        await store.appendRunEvent({ runId: orchestrationRun.id, ...persisted });
-        await input.onEvent?.(event);
-      },
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    await store.finishRun({ runId: orchestrationRun.id, status: "failed", summary: message, error: message });
-    throw error;
+/**
+ * Keep running the next dependency-ready agent-owned sub-aim until none remains ready or a run
+ * fails terminally (after the retry policy). Human-owned and dependency-blocked sub-aims end the
+ * sweep rather than being skipped — the sweep never routes around a person.
+ *
+ * Each sub-aim gets at most one attempt per sweep. A finished run does not complete a sub-aim
+ * (only `evaluate()` does), so without that rule the sweep would re-run the same sub-aim forever.
+ */
+export async function runAimAgentUntilBlocked(
+  store: AimStore,
+  input: AimAgentRunInput & { onRunComplete?: (result: AimAgentRunResult) => void | Promise<void> },
+  dependencies: AimAgentRunDependencies = defaultDependencies,
+): Promise<AimAgentSweepResult> {
+  const queue = createRunQueue(store, orchestratorDependencies(dependencies), {
+    ...(input.onEvent ? { onEvent: (live) => void input.onEvent?.(live.event) } : {}),
+  });
+  const runs: AimAgentRunResult[] = [];
+  const attempted: string[] = [];
+  for (;;) {
+    let result: AimAgentRunResult;
+    try {
+      result = await enqueueAndDrain({ ...input, milestoneRef: undefined }, queue, attempted);
+    } catch (error) {
+      if (error instanceof NoRunnableMilestoneError) {
+        return {
+          goalId: input.goalId,
+          runs,
+          stopReason: "no_ready_sub_aim",
+          stopDetail: error.message,
+        };
+      }
+      throw error;
+    }
+    runs.push(result);
+    attempted.push(result.milestone.id);
+    await input.onRunComplete?.(result);
+    if (!result.run.ok) {
+      return {
+        goalId: input.goalId,
+        runs,
+        stopReason: "run_failed",
+        stopDetail: result.run.error ?? "Local agent run failed.",
+      };
+    }
   }
-
-  let evidenceResult;
-  try {
-    evidenceResult = await store.addEvidence({
-      goalId: progress.goal.id,
-      milestoneId: row.milestone.id,
-      kind: "mcp_report",
-      emitterId: null,
-      sourceEventId: `local-agent:${orchestrationRun.id}:result`,
-      summary: run.ok
-        ? `${agent.name} worked on: ${row.milestone.title}`
-        : `${agent.name} failed on: ${row.milestone.title}`,
-      payload: {
-        agent_id: agent.id,
-        model,
-        workspace: input.workspace,
-        command: run.command,
-        args: run.args,
-        ok: run.ok,
-        output: run.outputText,
-        events: run.events.map((event) => ({ type: event.type, summary: event.summary })),
-        error: run.error,
-        plan_key: milestonePlanKey(row.milestone),
-      },
-      trustScore: 0.6,
-      runId: orchestrationRun.id,
-      assignmentId: assignment?.id ?? null,
-    });
-    await store.finishRun({
-      runId: orchestrationRun.id,
-      status: run.ok ? "completed" : "failed",
-      summary: run.ok
-        ? `${agent.name} completed its run for: ${row.milestone.title}`
-        : `${agent.name} failed its run for: ${row.milestone.title}`,
-      error: run.error,
-    });
-    await store.sedimentContextFromGoal(progress.goal.id);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    await store.finishRun({ runId: orchestrationRun.id, status: "failed", summary: message, error: message });
-    throw error;
-  }
-
-  return {
-    goalId: progress.goal.id,
-    milestone: row.milestone,
-    agent,
-    model,
-    orchestrationRun,
-    run,
-    evidence: evidenceResult.evidence,
-    completions: evidenceResult.completions,
-    progress: await store.getAimProgress(progress.goal.id),
-  };
 }

@@ -95,7 +95,12 @@ import { promptSetup } from "./setup";
 import { completionScript, normalizeShell } from "./completion";
 import { buildDoctorReport, formatDoctor } from "./doctor";
 import { formatFirstRun, formatHome, formatPostSetupNextSteps, providerSetupComplete } from "./home";
-import { runAimAgent } from "./agent-run";
+import {
+  runAimAgent,
+  runAimAgentUntilBlocked,
+  type AimAgentRunResult,
+  type AimAgentSweepStopReason,
+} from "./agent-run";
 import { localPlanningGateway } from "./local-planning";
 import {
   formatBoard,
@@ -176,6 +181,9 @@ Stored (shared ~/.aimcub store — the desktop app sees these too):
   aimcub run <id> --workspace <absolute-path> [opts]     Run one ready agent-owned sub-aim
        [--milestone <ref>] [--agent <id>] [--model <m>] [--reasoning <r>]
        [--network] [--read-only] [--jsonl]
+       [--until-blocked]                                 Keep going: run every ready agent-owned
+                                                         sub-aim until one fails or only human /
+                                                         blocked work is left (not with --milestone)
   aimcub replan <id> [--title "..."] [--desc "..."] [--json]
                                                        Re-decompose a saved aim (keeps done work)
   aimcub edit <id> [--plan <file|-|json>] [--json]     Edit a saved aim's plan ($EDITOR or --plan)
@@ -216,6 +224,7 @@ Examples:
   aimcub memories add "I prefer production-ready CLI tools with tests"
   aimcub agents --json
   aimcub run 1a2b --workspace "$PWD" --network
+  aimcub run 1a2b --workspace "$PWD" --until-blocked   # drain every ready agent-owned sub-aim
   aimcub replan 1a2b --desc "now mobile-first"`;
 
 const noopMeter = { async record(): Promise<void> {} };
@@ -1222,31 +1231,8 @@ function streamedAgentEvent(event: LocalAgentEvent): Record<string, unknown> {
   };
 }
 
-async function runAgentCommand(input: {
-  idPrefix: string;
-  milestoneRef?: string;
-  workspace?: string;
-  agent?: string;
-  model?: string;
-  reasoning?: string;
-  network: boolean;
-  readOnly: boolean;
-  json: boolean;
-  jsonl: boolean;
-}): Promise<void> {
-  const goalId = await resolveGoalId(input.idPrefix);
-  const result = await runAimAgent(store, {
-    goalId,
-    milestoneRef: input.milestoneRef,
-    workspace: absoluteWorkspace(input.workspace, input.readOnly),
-    agentId: localAgentId(input.agent),
-    model: input.model,
-    reasoning: input.reasoning,
-    network: input.network,
-    readOnly: input.readOnly,
-    onEvent: input.jsonl ? (event) => out(JSON.stringify(streamedAgentEvent(event))) : undefined,
-  });
-  const summary = {
+function agentRunSummary(result: AimAgentRunResult): Record<string, unknown> {
+  return {
     type: result.run.ok ? "aimcub.run.completed" : "aimcub.run.failed",
     ok: result.run.ok,
     goalId: result.goalId,
@@ -1258,15 +1244,89 @@ async function runAgentCommand(input: {
     completionCount: result.completions.length,
     error: result.run.error,
   };
-  if (input.jsonl) out(JSON.stringify(summary));
-  else if (input.json) out(JSON.stringify(summary, null, 2));
-  else {
-    out(`${result.run.ok ? "Completed" : "Failed"} local agent run ${result.orchestrationRun.id}`);
-    out(`sub-aim: ${result.milestone.title}`);
-    out(`agent: ${result.agent.name} · model: ${result.model}`);
-    out(`evidence: ${result.evidence.id} · derived completions: ${result.completions.length}`);
+}
+
+function printAgentRun(result: AimAgentRunResult): void {
+  out(`${result.run.ok ? "Completed" : "Failed"} local agent run ${result.orchestrationRun.id}`);
+  out(`sub-aim: ${result.milestone.title}`);
+  out(`agent: ${result.agent.name} · model: ${result.model}`);
+  out(`evidence: ${result.evidence.id} · derived completions: ${result.completions.length}`);
+}
+
+/** One line per run, so a sweep reads as progress rather than a wall of run detail. */
+function agentRunLine(result: AimAgentRunResult): string {
+  return `${result.run.ok ? "ok  " : "fail"} ${result.milestone.title} · ${result.agent.name} · run ${result.orchestrationRun.id}`;
+}
+
+const SWEEP_STOP_TEXT: Record<AimAgentSweepStopReason, string> = {
+  no_ready_sub_aim: "No further sub-aim is ready for a local agent.",
+  run_failed: "Stopped after a failed run.",
+};
+
+async function runAgentCommand(input: {
+  idPrefix: string;
+  milestoneRef?: string;
+  workspace?: string;
+  agent?: string;
+  model?: string;
+  reasoning?: string;
+  network: boolean;
+  readOnly: boolean;
+  untilBlocked: boolean;
+  json: boolean;
+  jsonl: boolean;
+}): Promise<void> {
+  const goalId = await resolveGoalId(input.idPrefix);
+  const runInput = {
+    goalId,
+    milestoneRef: input.milestoneRef,
+    workspace: absoluteWorkspace(input.workspace, input.readOnly),
+    agentId: localAgentId(input.agent),
+    model: input.model,
+    reasoning: input.reasoning,
+    network: input.network,
+    readOnly: input.readOnly,
+    onEvent: input.jsonl ? (event: LocalAgentEvent) => out(JSON.stringify(streamedAgentEvent(event))) : undefined,
+  };
+
+  if (!input.untilBlocked) {
+    const result = await runAimAgent(store, runInput);
+    const summary = agentRunSummary(result);
+    if (input.jsonl) out(JSON.stringify(summary));
+    else if (input.json) out(JSON.stringify(summary, null, 2));
+    else printAgentRun(result);
+    if (!result.run.ok) throw new UserError(result.run.error ?? "Local agent run failed.");
+    return;
   }
-  if (!result.run.ok) throw new UserError(result.run.error ?? "Local agent run failed.");
+
+  if (input.milestoneRef) throw new UserError("--until-blocked runs every ready sub-aim; drop --milestone.");
+  const sweep = await runAimAgentUntilBlocked(store, {
+    ...runInput,
+    milestoneRef: undefined,
+    onRunComplete: (result) => {
+      if (input.jsonl) out(JSON.stringify(agentRunSummary(result)));
+      else if (!input.json) out(agentRunLine(result));
+    },
+  });
+  const completed = sweep.runs.filter((result) => result.run.ok).length;
+  const tally = {
+    type: "aimcub.sweep.finished",
+    goalId: sweep.goalId,
+    runCount: sweep.runs.length,
+    completed,
+    failed: sweep.runs.length - completed,
+    stopReason: sweep.stopReason,
+    stopDetail: sweep.stopDetail,
+    runs: sweep.runs.map(agentRunSummary),
+  };
+  if (input.jsonl) out(JSON.stringify({ ...tally, runs: undefined }));
+  else if (input.json) out(JSON.stringify(tally, null, 2));
+  else {
+    out(`${sweep.runs.length} run(s): ${completed} completed, ${sweep.runs.length - completed} failed.`);
+    out(SWEEP_STOP_TEXT[sweep.stopReason]);
+  }
+  const lastFailure = sweep.runs.find((result) => !result.run.ok);
+  if (lastFailure) throw new UserError(lastFailure.run.error ?? "Local agent run failed.");
 }
 
 function runConfig(json: boolean): void {
@@ -1612,6 +1672,7 @@ async function main(): Promise<number> {
         replace: { type: "boolean" },
         network: { type: "boolean" },
         "read-only": { type: "boolean" },
+        "until-blocked": { type: "boolean" },
         jsonl: { type: "boolean" },
         json: { type: "boolean" },
         help: { type: "boolean", short: "h" },
@@ -1742,6 +1803,7 @@ async function main(): Promise<number> {
           reasoning: values.reasoning,
           network: Boolean(values.network),
           readOnly: Boolean(values["read-only"]),
+          untilBlocked: Boolean(values["until-blocked"]),
           json,
           jsonl: Boolean(values.jsonl),
         });
