@@ -15,14 +15,16 @@ import {
   createLocalAgentRegistry,
   isRecord,
   listLocalAgents,
+  queuedRunRequest,
   runLocalAgent,
   safeJsonParse,
   type LocalAgentAdapter,
+  type LocalAgentEvent,
   type LocalAgentProcessRunner,
   type LocalAgentRunResult,
 } from "@core/local-agent";
 
-import { runAimAgent } from "./agent-run";
+import { runAimAgent, streamedAgentEvent } from "./agent-run";
 
 const PLAN: DecompositionOutput = {
   goal_summary: "Run one ready local-agent sub-aim",
@@ -314,6 +316,50 @@ describe("CLI local-agent run orchestration", () => {
     expect(snapshot.completions).toEqual([]);
   });
 
+  it("records cli as the surface that queued the run, for provenance", async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), "aimcub-cli-surface-"));
+    const workspace = mkdtempSync(join(tmpdir(), "aimcub-cli-surface-workspace-"));
+    const store = createJsonFileStore(dataDir);
+    const { goal } = await store.createGoal({ title: "Ship an artifact", plan: PLAN });
+
+    const result = await runAimAgent(store, { goalId: goal.id, workspace }, {
+      async listLocalAgents() {
+        return [{
+          id: "codex",
+          name: "Codex CLI",
+          runMode: "local_cli",
+          available: true,
+          path: "/tmp/fake-codex",
+          version: "codex-test",
+          authStatus: "ok",
+          authMessage: null,
+          models: [{ id: "gpt-test", label: "GPT Test" }],
+          modelsSource: "fallback",
+          reasoningOptions: [],
+          diagnostics: [],
+        }];
+      },
+      async runLocalAgent(_request, options) {
+        await options?.onEvent?.({ type: "agent.run.completed", summary: "Local agent run completed." });
+        return {
+          ok: true,
+          agentId: "codex",
+          command: "/tmp/fake-codex",
+          args: [],
+          events: [{ type: "agent.run.completed", summary: "Local agent run completed." }],
+          outputText: "Done.",
+          exitCode: 0,
+          error: null,
+          failure: null,
+          durationMs: 1,
+        };
+      },
+    });
+
+    const request = await queuedRunRequest(store, result.orchestrationRun);
+    expect(request.surface).toBe("cli");
+  });
+
   it("runs a fake third adapter end-to-end through agent-run", async () => {
     const dataDir = mkdtempSync(join(tmpdir(), "aimcub-cli-gemini-run-"));
     const workspace = mkdtempSync(join(tmpdir(), "aimcub-cli-gemini-workspace-"));
@@ -373,5 +419,44 @@ describe("CLI local-agent run orchestration", () => {
       "tool.finished",
       "run.completed",
     ]));
+  });
+});
+
+describe("streamedAgentEvent", () => {
+  it("streams an artifact-bearing event's artifacts through --jsonl and back out of JSON", () => {
+    const event: LocalAgentEvent = {
+      type: "agent.tool.finished",
+      summary: "file_change",
+      toolName: "file_change",
+      artifacts: [
+        { path: "artifact.txt", kind: "file_write" },
+        { path: "notes/README.md", kind: "file_edit" },
+      ],
+    };
+
+    const line = streamedAgentEvent(event);
+    expect(line).toMatchObject({
+      type: "agent.event",
+      event: "agent.tool.finished",
+      summary: "file_change",
+      toolName: "file_change",
+      artifacts: [
+        { path: "artifact.txt", kind: "file_write" },
+        { path: "notes/README.md", kind: "file_edit" },
+      ],
+    });
+
+    // The exact transform a `--jsonl` run prints: `out(JSON.stringify(streamedAgentEvent(event)))`.
+    const roundTripped: unknown = JSON.parse(JSON.stringify(line));
+    expect(isRecord(roundTripped) ? roundTripped.artifacts : undefined).toEqual(event.artifacts);
+  });
+
+  it("omits the artifacts key entirely for an event that named none", () => {
+    const event: LocalAgentEvent = { type: "agent.message.delta", summary: "Thinking about the next step." };
+
+    const line = streamedAgentEvent(event);
+
+    expect(line).not.toHaveProperty("artifacts");
+    expect(JSON.stringify(line)).not.toContain("artifacts");
   });
 });

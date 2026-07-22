@@ -14,7 +14,7 @@ import { isAbsolute } from "node:path";
 
 import { routingOverrideForMilestone } from "@core/domain";
 import type { AimStore } from "@core/store";
-import { createRunQueue, type EnqueueMilestoneRunInput, type RunQueue } from "@core/local-agent";
+import { createRunQueue, queuedRunRequest, type EnqueueMilestoneRunInput, type RunQueue } from "@core/local-agent";
 
 import type { RunLiveEvent, RunPermissionConsent } from "../shared/ipc";
 import { listLocalAgents, runLocalAgent } from "./local-agents";
@@ -107,6 +107,7 @@ export async function enqueueDesktopRun(
     workspace: permission.workspace ?? null,
     sandbox: permission.sandbox,
     network: permission.network,
+    surface: "desktop",
     ...(input.agentId ? { agentId: input.agentId } : {}),
     ...(input.model ? { model: input.model } : {}),
     ...(input.instruction ? { instruction: input.instruction } : {}),
@@ -134,9 +135,53 @@ export function kickRunQueue(queue: RunQueue<AimStore>): void {
  * background floor ever runs here. Claiming by id (the same move the CLI makes for its own
  * `--workspace` run) keeps the grant tied to the consent that produced it: the broad drain stays
  * read-only-scoped, so nothing else can promote a `workspace-write` row into execution.
+ *
+ * Also the re-grant path for a run a previous session left queued (`docs/agent-permissions.md`):
+ * the renderer re-shows that row's already-recorded permission and requires a fresh click before
+ * calling this, so nothing here widens what was already on the row — it only executes it.
  */
 export function claimConsentedRun(queue: RunQueue<AimStore>, runId: string): void {
   void queue.drain({ runId }).catch((error: unknown) => {
     console.error("[aimcub] consented run drain failed:", error);
   });
+}
+
+/**
+ * Cancel a run that was never claimed — e.g. a `workspace-write` run stranded by a session that
+ * closed before running it. `RunQueue.cancel` only aborts a run actively executing in this
+ * process; a merely-queued run has no controller to abort, so this settles the row directly.
+ *
+ * `claimNextQueuedRun` is the same atomic, lock-protected gate the drain itself claims through: it
+ * only succeeds while the row is still exactly `queued`, so a run a real drain claims in the same
+ * instant is left alone (this then reports false) rather than being cancelled out from under it.
+ */
+export async function cancelQueuedRun(store: AimStore, runId: string): Promise<boolean> {
+  const claimed = await store.claimNextQueuedRun({ runId });
+  if (!claimed) return false;
+  await store.finishRun({
+    runId,
+    status: "cancelled",
+    summary: "Cancelled before it ran.",
+  });
+  return true;
+}
+
+/**
+ * Diagnostic only: report every run still queued above the background floor, with the surface
+ * that queued it when the row is new enough to carry one. This changes no claim decision — the
+ * background drain's `{ sandbox: DESKTOP_RUN_PERMISSION.sandbox }` filter in {@link kickRunQueue}
+ * remains the only enforcement — it just says out loud, once at launch, why those rows are not
+ * moving: same reason the Execute stage's stranded-run notice gives the user.
+ */
+export async function logStrandedQueuedRuns(store: AimStore): Promise<void> {
+  const runs = await store.listRuns();
+  const stranded = runs.filter((run) => run.status === "queued" && run.sandbox !== DESKTOP_RUN_PERMISSION.sandbox);
+  for (const run of stranded) {
+    const request = await queuedRunRequest(store, run);
+    console.log(
+      `[aimcub] run ${run.id} stays queued (sandbox: ${run.sandbox ?? "unknown"}` +
+      `${request.surface ? `, queued by ${request.surface}` : ""}) — ` +
+      "the background drain only claims the read-only floor; it needs same-session consent to execute.",
+    );
+  }
 }

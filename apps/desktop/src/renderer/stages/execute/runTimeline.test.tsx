@@ -168,6 +168,20 @@ describe("run timeline", () => {
     expect(entries[0]?.rows[0]?.kind).toBe("retry");
   });
 
+  it("carries the enqueuing surface from the queued event onto the run entry", () => {
+    const withSurface = [
+      event({ id: "s1", type: "run.queued", summary: "Fake Runtime queued.", payload: { surface: "cli" }, created_at: "2026-07-22T10:00:00.000Z" }),
+      event({ id: "s2", type: "run.completed", summary: "Local agent run completed.", created_at: "2026-07-22T10:00:09.000Z" }),
+    ];
+    const entry = buildRunTimeline({ runEvents: withSurface, runs: [run()], milestoneId: MILESTONE })[0]!;
+    expect(entry.surface).toBe("cli");
+  });
+
+  it("reads a run queued before the surface field existed as unknown provenance, not an error", () => {
+    const entry = buildRunTimeline({ runEvents: PERSISTED, runs: [run()], milestoneId: MILESTONE })[0]!;
+    expect(entry.surface).toBeNull();
+  });
+
   it("ignores runs belonging to a different sub-aim", () => {
     const entries = buildRunTimeline({
       runEvents: PERSISTED,
@@ -267,6 +281,19 @@ describe("run timeline", () => {
     expect(html).toContain("Something new happened.");
     expect(html).toContain("sandbox.escaped.hypothetically");
     expect(html).toContain("Sandbox read-only");
+  });
+
+  it("shows which surface queued the run in the timeline meta line", () => {
+    const withSurface = [
+      event({ id: "s1", type: "run.queued", summary: "Fake Runtime queued.", payload: { surface: "cli" }, created_at: "2026-07-22T10:00:00.000Z" }),
+      event({ id: "s2", type: "run.completed", summary: "Local agent run completed.", created_at: "2026-07-22T10:00:09.000Z" }),
+    ];
+    const html = renderToStaticMarkup(
+      <I18nProvider>
+        <RunTimelinePanel milestoneId={MILESTONE} runEvents={withSurface} runs={[run()]} />
+      </I18nProvider>,
+    );
+    expect(html).toContain("Queued by CLI");
   });
 
   it("renders an honest empty state when a sub-aim has never run", () => {

@@ -48,6 +48,7 @@ const api: AimcubApi = {
   runLocalAgent: (req) => ipcRenderer.invoke(IPC.runLocalAgent, req),
   runMilestoneAgent: (req) => ipcRenderer.invoke(IPC.runMilestoneAgent, req),
   cancelRun: (runId) => ipcRenderer.invoke(IPC.cancelRun, runId),
+  claimQueuedRun: (runId) => ipcRenderer.invoke(IPC.claimQueuedRun, runId),
   confirmMilestone: (req) => ipcRenderer.invoke(IPC.confirmMilestone, req),
   getWindowChromeState: () => ipcRenderer.invoke(IPC.getWindowChromeState),
   setThemeSource: (source) => ipcRenderer.invoke(IPC.setThemeSource, source),

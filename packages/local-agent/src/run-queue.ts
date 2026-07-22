@@ -124,6 +124,7 @@ export function createRunQueue<TStore extends RunOrchestratorStore>(
       ...(previous.model ? { model: previous.model } : {}),
       ...(previous.reasoning ? { reasoning: previous.reasoning } : {}),
       ...(executed.request.instruction ? { instruction: executed.request.instruction } : {}),
+      ...(executed.request.surface ? { surface: executed.request.surface } : {}),
       attempt: nextAttempt,
       retryOf: previous.id,
     }, dependencies);

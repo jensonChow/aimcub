@@ -59,6 +59,7 @@ export type {
   RunArtifactSummary,
   RunOrchestratorDependencies,
   RunOrchestratorStore,
+  RunSurface,
   StoreEvidenceResult,
   StoreProgress,
   StoreProgressRow,

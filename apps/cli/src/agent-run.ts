@@ -110,6 +110,7 @@ async function enqueueAndDrain(
     workspace: input.workspace,
     sandbox: input.readOnly ? "read-only" : "workspace-write",
     network: Boolean(input.network),
+    surface: "cli",
     ...(input.agentId ? { agentId: input.agentId } : {}),
     ...(input.model ? { model: input.model } : {}),
     ...(input.reasoning ? { reasoning: input.reasoning } : {}),
@@ -177,4 +178,23 @@ export async function runAimAgentUntilBlocked(
       };
     }
   }
+}
+
+/**
+ * One `LocalAgentEvent` as a `--jsonl` line: a stable, whitelisted shape rather than the raw event
+ * (which carries adapter-specific `raw` payloads not meant for scripts to depend on). `artifacts`
+ * travels through when the runtime named files it touched — the run's actual work product, and
+ * otherwise invisible to a `--jsonl` consumer until the run's evidence is queried separately.
+ */
+export function streamedAgentEvent(event: LocalAgentEvent): Record<string, unknown> {
+  return {
+    type: "agent.event",
+    event: event.type,
+    summary: event.summary,
+    ...(event.sessionId ? { sessionId: event.sessionId } : {}),
+    ...(event.toolId ? { toolId: event.toolId } : {}),
+    ...(event.toolName ? { toolName: event.toolName } : {}),
+    ...(event.usage ? { usage: event.usage } : {}),
+    ...(event.artifacts ? { artifacts: event.artifacts } : {}),
+  };
 }

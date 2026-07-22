@@ -8,6 +8,7 @@
  * emitted by a newer writer, anything a future adapter adds — still renders as type + summary +
  * time instead of disappearing or crashing the stage. Pure; no i18n, no React.
  */
+import type { RunSurface } from "@core/local-agent";
 import type { Run, RunEvent } from "@core/types";
 
 import type { LocalAgentEvent, RunLiveEvent } from "../../../shared/ipc";
@@ -38,6 +39,8 @@ export interface RunTimelineRow {
   pending: boolean;
   /** The run this attempt replaces, on the retry-linkage row the queue writes. */
   retryOf: string | null;
+  /** The surface that queued this run, when the enqueue-time row named one. */
+  surface: RunSurface | null;
   /** True until the row has been persisted — i.e. it arrived on the live channel. */
   live: boolean;
 }
@@ -55,6 +58,8 @@ export interface RunTimelineEntry {
   at: string;
   /** The earlier attempt this run replaces, when the queue linked one. */
   retryOf: string | null;
+  /** Which surface queued this run — provenance only; null for a run queued before this existed. */
+  surface: RunSurface | null;
   /** True while events for this run are still arriving on the live channel. */
   live: boolean;
   rows: RunTimelineRow[];
@@ -83,6 +88,12 @@ function readString(payload: Record<string, unknown> | undefined, key: string): 
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+/** Only ever set on the enqueue-time event's payload; every other row reads null, honestly. */
+function readSurface(payload: Record<string, unknown> | undefined): RunSurface | null {
+  const value = payload?.["surface"];
+  return value === "desktop" || value === "cli" ? value : null;
+}
+
 function rowFromEvent(event: RunEvent, index: number): RunTimelineRow {
   const payload = event.payload as Record<string, unknown> | undefined;
   const retryOf = readString(payload, "retry_of");
@@ -97,6 +108,7 @@ function rowFromEvent(event: RunEvent, index: number): RunTimelineRow {
     durationMs: null,
     pending: type === "tool.started",
     retryOf,
+    surface: readSurface(payload),
     live: false,
   };
 }
@@ -124,6 +136,7 @@ export function runTimelineRowFromLiveEvent(live: RunLiveEvent, index: number): 
     durationMs: null,
     pending: type === "tool.started",
     retryOf: null,
+    surface: null,
     live: true,
   };
 }
@@ -229,6 +242,7 @@ export function buildRunTimeline(input: BuildRunTimelineInput): RunTimelineEntry
       runId === liveRunId ? mergeLiveRows(rows, liveRows, Math.max(0, input.liveEventsDropped ?? 0)) : rows,
     );
     const retryRow = merged.find((row) => row.retryOf);
+    const surfaceRow = merged.find((row) => row.surface);
     entries.push({
       runId,
       status: run?.status ?? "running",
@@ -238,6 +252,7 @@ export function buildRunTimeline(input: BuildRunTimelineInput): RunTimelineEntry
       workspaceRoot: run?.workspace_root ?? null,
       at: run?.queued_at || run?.created_at || merged[0]?.at || "",
       retryOf: retryRow?.retryOf ?? null,
+      surface: surfaceRow?.surface ?? null,
       live: runId === liveRunId,
       rows: merged,
     });
