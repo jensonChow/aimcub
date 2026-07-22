@@ -1,83 +1,76 @@
 # Aimcub Handoff
 
-Last updated: 2026-07-13
-Branch: `main`. **The Glass sidebar + typography re-sync is COMPLETE and merged**
-(branch `glass-sidebar-type-resync`). Full gate + live packaged-app QA green; root
-`Aimcub.app` repacked. No open threads.
+Last updated: 2026-07-21
+Branch: `main`. **OSS-maturity epic batch 1 is MERGED and verified**; batch 2
+prompts are staged (gitignored `worktrees/prompts/`, see its README). Local
+`main` is ahead of `origin/main` — **push needs founder approval**.
 
-## Sidebar + typography re-sync — DONE
+## Batch 1 — integrated (four parallel worktrees, merged in order)
 
-The founder re-checked `Aimcub Glass.dc.html` (project `b99a9242-…`, via DesignSync) and said
-the sidebar still didn't match the design, and asked for the app's font/weight/size typography
-to be organized. Root causes found and fixed:
+1. `a0c6e758` **oss-hygiene** — CONTRIBUTING / SECURITY / CODE_OF_CONDUCT /
+   issue+PR templates (license-agnostic; license decision stays deferred),
+   README "Contributing & Community" section. Secrets sweep of tree + full
+   history: zero real-key hits.
+2. `79336d05` **release-scaffolding** — changesets (lockstep `@core/*`+`@app/*`;
+   workspace root can't join the fixed group — documented in
+   `docs/releasing.md`), root CHANGELOG, `release.yml` (verify → macos-14
+   CLI bundle + unsigned dmg/zip artifacts → draft GitHub Release on `v*`
+   tags; npm publish is a blocked placeholder).
+3. `9a13b3c5` **store-hardening** — `packages/store/src/safe-fs.ts`: atomic
+   tmp+fsync+rename writes, post-write `store.json.bak` mirroring, corrupt-load
+   quarantine + backup recovery + `AimStore.getDiagnostics()` (silent
+   emptyStore data loss is gone), advisory cross-process lock around every
+   mutating load→mutate→save. 16 new durability tests.
+4. `91b768a0` **adapter-boundary** — `packages/local-agent` is an open adapter
+   registry (`LocalAgentId` = string; codex/claude are built-ins; registration
+   order = preference order). Adapters own `buildInvocation`+`parseLine`;
+   engine owns processes/timeout/AbortSignal/classified failures
+   (`retryable` = timeout only). Contribution guide:
+   `docs/local-agent-adapters.md`. A fake third adapter runs end-to-end
+   through `agent-run` in tests.
 
-1. **Floating-island shell** — the app drew the sidebar as an edge-attached full-height pane
-   (280px, `border-right`, 56px top pad). The reference floats a **224px rounded island**
-   inside a padded desk: `.od-app` now has `padding: 44px 22px 22px` (`--shell-top` /
-   `--shell-gutter`) + 18px `--shell-gap`; the aside gets radius 18, `--sh-md` + `--ring`
-   inset, `padding: 18px 12px 12px`, gap 16, `overflow: hidden` (list scrolls inside).
-   Collapsed/peek keeps island geometry (abspos within the grid — horizontal insets resolve
-   against the **grid-column-1 area**, so `left: 0`, not the gutter again). The drag strip
-   spans the 44px band; the old per-stage titlebar-safe padding rules were deleted (clearance
-   is geometric now). `DEFAULT_SIDEBAR_WIDTH` 280→224 and the width storage key bumped to
-   `aimcub.sidebarWidth.v2` so persisted pre-island widths don't mask the new default.
-2. **Row + menu metrics to reference spec** — aim rows 36→32px, radius 10, `0 10px` padding,
-   3px list gap, **rest = `--mut` at 400**, hover `--island2`, selected = `--field` + ink +
-   500 + `0 1px 3px rgba(30,40,70,.08)`; draft rows follow (32px). Brand row: home button
-   radius 10 / `0 6px`, name 13.5/600, mark 700. Account trigger 46px/radius 12/`6px 8px`,
-   label sub/600. Menu items sub-size/400, `0 10px`; separator margin 5px 8px. Settings-mode:
-   back = sub/500, title = title-l 19/600 + title tracking, rail rest 500 / active 600.
-3. **Organized Glass type ramp** — cockpit.css now has 10 size tokens (tag 10.5 / meta 11.5 /
-   sub 12.5 / body 13.5 / title-s 14.5 / title 15.5 / title-m 17.5 / title-l 19 / display 24 /
-   hero 27, each with a line token), weights regular 400 / medium 500 / semibold 600 / heavy
-   700 (strong = semibold alias), and tracking tokens (title −0.01em, display −0.015em, caps
-   +0.06em with CSS uppercase so zh is unaffected). Every `font-size` / `font-weight` /
-   `letter-spacing` in cockpit.css routes through tokens — the old three-size/450-weight guard
-   test was REWRITTEN to enforce exactly this (no raw numerics anywhere). All ~270 size and
-   ~135 weight sites were swept to the design mapping (titles 600, buttons/active 500, caps
-   kickers 700+tracking+uppercase, descriptions promoted meta→sub, etc.). `styles.ts`
-   TYPE/WEIGHT fallbacks updated and extended.
-4. **Serif-portal bug (real founder-visible defect)** — the body-portaled account-menu popover
-   rendered in the UA serif because only `.od-window` carried the font family. Font stacks are
-   now tokens (`--od-font-sans` with `-apple-system` first for optical sizing — the separate
-   "SF Pro Display" declarations were dropped; `--od-font-mono`) and the sans stack is applied
-   on **`body`**; a test guards it.
+Details live in module memory now: `docs/memory/architecture.md` (store
+durability, adapter boundary), `docs/memory/operations.md` (release flow,
+release-readiness state).
 
-## Verification
+## Verification (integration round)
 
-- **Full gate green**: build (+ `@core` no-leak) + tests (**283 desktop**, incl. rewritten
-  typography guard + updated sidebar metric assertions) + typecheck + lint + core:purity.
-- **Live packaged-app QA via CDP** (isolated `AIMCUB_HOME`, real settings.json copied in; real
-  `~/.aimcub/store.json` mtime verified unchanged): computed-style probes matched the reference
-  spec exactly (shell 44/22/22, island 224/18px/18-12-12/blur30, brand 13.5·600 / mark 700,
-  rows 32px rest mut·400 / selected field+ink+500+shadow, trigger 46/12, popover portal font
-  `-apple-system`, items 12.5·400, settings title 19·600 / pane title 17.5·600 / rail active
-  acc-soft·600); screenshots of composer, Journey, Home (first-run + with-aims), account menu
-  (+ Language submenu open and hit-testable), Settings, Memory in **light + dark**; 640×520 no
-  horizontal overflow, auto-collapse works, hover-peek overlays as a floating island at exact
-  gutters (22/44/22, width clamps to 216).
-- Repacked (`pnpm desktop:pack`) + refreshed root `Aimcub.app`.
+- Full gate green on merged `main`: build 9/9 · typecheck 16/16 · lint 10/10 ·
+  purity clean · **1035 tests** (desktop 283, domain 187, llm 170, mcp 114,
+  cli 89, store 88, api 40, db 36, local-agent 28*). *local-agent double-counts
+  dist-compiled tests — real defect, fixed by batch-2 B2-2.
+- Repacked and refreshed root `Aimcub.app`.
+- Live smoke, isolated `AIMCUB_HOME`: deterministic seed wrote through the new
+  store (`.bak` mirrored); CLI `agents` detects through the registry (Codex
+  ready, Claude unauthenticated on this machine); `board` renders seeded
+  progress; **live corruption probe**: garbaged `store.json` → quarantined +
+  recovered from `.bak` in the same invocation, zero data loss; packaged app
+  boots (main + 3 renderers stable); real `~/.aimcub/store.json` mtime
+  unchanged.
 
-## Invariants (still enforced)
+## Open threads
 
-- Native traffic lights (untouched main-process geometry 16/46/14); `data-od-id` anchors
-  intact; glass-token 3-block mirror; AA overrides (`--faint`, light `--acc #0064cc`)
-  untouched; `@core` pure — this re-sync is renderer CSS + CockpitShell constants + tests only.
-- New guard: no raw numeric font-size/font-weight/letter-spacing in cockpit.css (tokens only);
-  `body` must carry `--od-font-sans` (portal font).
+- **Batch 2 staged** (`worktrees/prompts/B2-*.md`): B2-1 run queue + streamed
+  events + shared orchestrator + `--until-blocked` (Opus 4.8) · B2-2 clean
+  publishable dist, kills the dist test-dup (Sonnet 5) · B2-3 quickstart front
+  door (Sonnet 5) · B2-4 bundle id `com.jensonchow.aimcub` + placeholder icon
+  + entitlements/notarize-inert (Sonnet 5). Integration merge order:
+  B2-3 → B2-4 → B2-2 → B2-1.
+- Carried into later batches: Desktop surfacing of `getDiagnostics()`
+  (recovery banner — batch 3 run-inspection lane); store-level schema version
+  (deferred until the on-disk shape changes); `@core/*`→`@aimcub/*` rename
+  (solo lane, after B2-2); root package version-sync (documented gap).
+- Founder-owned (outward): license decision; `@aimcub` npm org; GitHub repo
+  description still says "GoalPet" + enable Discussions + private vuln
+  reporting; CODE_OF_CONDUCT enforcement contact; Apple signing credentials;
+  full-history gitleaks scan before public flip; **push authorization for
+  current `main`**.
 
-## Ops gotchas (reusable)
+## Next session
 
-- Live packaged-app QA via CDP: launch the packaged binary with isolated `AIMCUB_HOME` +
-  `--remote-debugging-port` + isolated `--user-data-dir`; drive `Runtime.evaluate` +
-  `Page.captureScreenshot` from Node 22. Use `Emulation.setDeviceMetricsOverride` (≥1180 wide)
-  to keep the sidebar pinned. React synthetic `onPointerEnter` fires from dispatched
-  `pointerover` (not `pointerenter`). `Emulation.setEmulatedMedia` prefers-color-scheme does
-  NOT flip the app's theme (native-first via `data-system-appearance`) — toggle dark through
-  the in-app Appearance row instead. Always verify real `~/.aimcub/store.json` mtime unchanged.
-- Design re-sync flow: `DesignSync get_file` → serve the `.dc.html` + project `support.js`
-  locally → click through in a browser for target visuals before diffing code.
-- Abspos children of the `.od-app` grid resolve horizontal insets against their grid-column
-  area, not the padding box — mind this for any future overlay pinned to the shell.
-- Pre-existing (carried): `com.aimcub.desktop` vs ASC `com.jensonchow.aimcub` bundle-id
-  mismatch.
+Integrate batch 2 when the founder returns the branches: read each
+`WORKTREE-REPORT.md` + diff, merge B2-3 → B2-4 → B2-2 → B2-1 (delete reports
+in merge commits), full gate + repack + live smoke (B2-1 changes desktop run
+semantics to enqueue+stream — exercise one streamed run), update memory docs,
+emit batch 3 (artifact capture · permission model + desktop consent UI ·
+run inspection/debug gating incl. diagnostics banner · distribution).

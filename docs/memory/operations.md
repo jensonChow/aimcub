@@ -107,6 +107,10 @@ At the end of a repo-changing session, update `docs/handoff.md` with:
 
 Move durable decisions into the relevant file under `docs/memory/` instead of leaving them in handoff.
 
+## Release Scaffolding
+
+Versioning is changesets-based (2026-07-21): lockstep `fixed` group across `@core/*` + `@app/*` with `privatePackages { version, tag }`; the workspace root cannot join the group (not a workspace package — documented in `docs/releasing.md`, root stays `0.0.0`). Flow: `pnpm changeset` per change → `pnpm release:version` → commit → tag `vX.Y.Z` → push tag (founder-owned) → `.github/workflows/release.yml` verifies (ci.yml steps duplicated; composite-action dedup is a flagged TODO), builds the CLI bundle + unsigned desktop dmg/zip on macos-14, and drafts a GitHub Release via `gh`. npm publish is a deliberately blocked placeholder until the license decision + `@aimcub` org registration.
+
 ## Public Release Readiness
 
-Before public open-source release, choose the license, add `CONTRIBUTING.md` and `SECURITY.md`, audit secrets/env examples, and separate public local-first docs from hosted online-platform deployment notes.
+`CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, and issue/PR templates exist (2026-07-21) and are license-agnostic. A targeted secrets sweep of the tree + full git history found zero real-key hits. Still founder-owned before the public flip: choose the license (everything-blocker), run a full-history gitleaks/trufflehog scan, set the CODE_OF_CONDUCT enforcement contact, enable GitHub private vulnerability reporting, fix the stale GitHub repo description, and register the `@aimcub` npm org.

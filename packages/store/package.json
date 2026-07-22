@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Platform-neutral local persistence for aims/milestones/memories. Path-injected, async AimStore interface (so a Supabase adapter is a swap, not a rewrite). Shared by the desktop app and the CLI.",
+  "description": "Platform-neutral local persistence for aims/milestones/memories. Path-injected, async AimStore interface (so a Supabase adapter is a swap, not a rewrite). Crash-safe atomic writes with backup/quarantine recovery and a cross-process advisory lock, so the desktop app and the CLI share one data dir safely.",
   "exports": {
     ".": {
       "types": "./src/index.ts",
