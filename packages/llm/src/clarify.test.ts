@@ -9,6 +9,7 @@ import {
   buildRefinedDescription,
   type ClarifyInput,
   type ClarifyAnswer,
+  type ClarifyOutput,
 } from "./clarify";
 import type { DecompositionOutput } from "@core/types";
 import type { LlmGateway, LlmRequest, LlmResponse, LlmUsage } from "./index";
@@ -101,7 +102,7 @@ const INPUT: ClarifyInput = {
 };
 
 /** A canned, valid clarify output: two real forks + a disclosed assumption. */
-function validQuestions() {
+function validQuestions(): ClarifyOutput {
   return {
     questions: [
       {
@@ -546,8 +547,6 @@ describe("clarify · happy path", () => {
         review: {
           quality: { score: 100, grade: "pass", issues: [], dimensions: [] },
           context: { total: 0, applied: [], unapplied: [], ignoredLowConfidence: [], gaps: [] },
-          actions: [],
-          guidance: [],
         },
         decompositionStrategy: {
           version: 1,
@@ -615,8 +614,6 @@ describe("clarify · happy path", () => {
             },
           ],
         },
-        actions: [],
-        guidance: [],
       },
       captureLearning: {
         version: 1,
@@ -702,8 +699,6 @@ describe("clarify · happy path", () => {
             },
           ],
         },
-        actions: [],
-        guidance: [],
       },
       captureLearning: {
         version: 1,
@@ -960,8 +955,6 @@ describe("clarify · happy path", () => {
               },
             ],
           },
-          actions: [],
-          guidance: [],
         },
       },
     );
@@ -1113,8 +1106,6 @@ describe("clarify · happy path", () => {
         review: {
           quality: { score: 100, grade: "pass", issues: [], dimensions: [] },
           context: { total: 0, applied: [], unapplied: [], ignoredLowConfidence: [], gaps: [] },
-          actions: [],
-          guidance: [],
         },
         lineageLearning: {
           version: 1,

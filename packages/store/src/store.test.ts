@@ -217,6 +217,7 @@ function localAlphaNode(input: {
     xp_reward: input.xp ?? 10,
     acceptance_rule: input.acceptanceRule,
     decomposition_contract: input.contract,
+    routing_override: null,
   };
 }
 
@@ -412,7 +413,7 @@ describe("createJsonFileStore · createAimShell", () => {
     expect(progress!.completed_milestones).toBe(0);
 
     const [summary] = await store.listAimProgressSummaries();
-    expect(summary.status).toBe("planning");
+    expect(summary!.status).toBe("planning");
   });
 
   it("lands the first plan on the same shell via updateGoal (no fork)", async () => {
