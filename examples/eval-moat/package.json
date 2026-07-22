@@ -1,0 +1,15 @@
+{
+  "name": "@examples/eval-moat",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The eval-moat benchmark: does accrued context and personalized eval demonstrably improve later decompositions? Seeds two conditions for the same aim, decomposes both with the real pipeline, and judges them blind against a fixed rubric. Imports package sources by relative path (see src/core.ts) so it measures the shipped planning path without becoming a dependency of it.",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "vitest": "^4.1.9"
+  }
+}

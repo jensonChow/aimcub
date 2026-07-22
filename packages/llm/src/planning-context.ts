@@ -58,30 +58,214 @@ const CATEGORY_ORDER: readonly ContextCategory[] = [
 
 const CATEGORY_SET = new Set<string>(CATEGORY_ORDER);
 
+/**
+ * Words that must never carry a relevance match.
+ *
+ * Two groups, one rule: a token here says nothing about what a row is *about*.
+ *
+ * - Closed-class English function words — determiners, pronouns, prepositions, conjunctions,
+ *   auxiliaries, degree adverbs. The class is finite and enumerable, which is exactly why a list
+ *   is the right instrument for it; content vocabulary is not.
+ * - Aimcub's own planning vocabulary, which appears in almost every aim and every memory row.
+ *
+ * Without this, a memory scoped to a completely unrelated aim could be pulled into a plan because
+ * both texts contain "the" and "should". That leak was found by `examples/eval-moat`, which
+ * reproduced it on all three benchmark personas.
+ */
 const RELEVANCE_STOPWORDS = new Set([
   "about",
+  "above",
+  "across",
   "after",
   "again",
+  "against",
   "aim",
   "aimcub",
+  "all",
+  "along",
+  "already",
+  "also",
+  "although",
+  "among",
+  "and",
+  "another",
+  "any",
+  "anything",
+  "are",
+  "around",
+  "because",
+  "been",
+  "before",
+  "behind",
+  "being",
+  "below",
+  "beside",
+  "besides",
+  "between",
+  "beyond",
+  "both",
   "build",
+  "but",
+  "can",
+  "cannot",
   "context",
+  "could",
+  "despite",
+  "did",
+  "does",
   "done",
+  "during",
+  "each",
+  "either",
+  "enough",
+  "even",
+  "ever",
+  "every",
+  "everything",
+  "except",
+  "few",
+  "for",
   "from",
   "goal",
+  "had",
+  "has",
+  "have",
+  "her",
+  "here",
+  "hers",
+  "him",
+  "his",
+  "how",
+  "however",
+  "inside",
+  "instead",
+  "into",
+  "its",
+  "itself",
+  "just",
   "make",
+  "many",
+  "may",
+  "might",
+  "mine",
+  "more",
+  "most",
+  "much",
+  "must",
   "need",
+  "neither",
+  "never",
+  "none",
+  "nor",
+  "not",
+  "nothing",
+  "now",
+  "off",
+  "often",
+  "once",
+  "one",
+  "only",
+  "onto",
+  "other",
+  "others",
+  "ought",
+  "our",
+  "ours",
+  "out",
+  "outside",
+  "over",
+  "own",
+  "per",
+  "perhaps",
   "plan",
   "project",
+  "quite",
+  "rather",
+  "really",
+  "same",
+  "several",
+  "shall",
+  "she",
+  "should",
+  "since",
+  "some",
+  "something",
+  "still",
+  "such",
+  "than",
   "that",
+  "the",
+  "their",
+  "theirs",
+  "them",
+  "themselves",
+  "then",
+  "there",
+  "therefore",
+  "these",
+  "they",
   "this",
+  "those",
+  "though",
+  "through",
+  "throughout",
+  "thus",
+  "too",
+  "toward",
+  "towards",
+  "under",
+  "unless",
+  "until",
+  "upon",
   "user",
   "using",
+  "usually",
+  "very",
+  "via",
   "want",
   "wants",
+  "was",
+  "were",
+  "what",
+  "whatever",
+  "when",
+  "whenever",
+  "where",
+  "whereas",
+  "wherever",
+  "whether",
+  "which",
+  "while",
+  "who",
+  "whom",
+  "whose",
+  "why",
+  "will",
   "with",
+  "within",
+  "without",
   "work",
+  "would",
+  "yet",
+  "you",
+  "your",
+  "yours",
 ]);
+
+/**
+ * The minimum topical signal a row scoped to ANOTHER aim must show before it is admitted into this
+ * plan. One real content word is enough — "sqlite", "kiln", "waiver" — because a single shared
+ * domain term is a genuine link between two aims. Grammar is not: see `RELEVANCE_STOPWORDS`.
+ */
+const MIN_CROSS_AIM_CONTENT_MATCHES = 1;
+
+/**
+ * A content token carries topic. Independently of the stopword list, a match must be carried by a
+ * word: a bare figure shared by two texts ("500", "1.4") is a coincidence, not a subject.
+ */
+function isContentToken(token: string): boolean {
+  return /[a-z]{3,}/.test(token) && !RELEVANCE_STOPWORDS.has(token);
+}
 
 export const PLANNING_CONTEXT_RULES = [
   "Use known context by category:",
@@ -114,7 +298,7 @@ function relevanceTokens(value: string): string[] {
     .replace(/[^a-z0-9_./-]+/g, " ")
     .split(/\s+/)
     .map((token) => token.trim().replace(/^[./-]+|[./-]+$/g, ""))
-    .filter((token) => token.length >= 3 && !RELEVANCE_STOPWORDS.has(token));
+    .filter((token) => token.length >= 3 && isContentToken(token));
 }
 
 function uniqueTokens(value: string): string[] {
@@ -210,7 +394,10 @@ function analyzePlanningMemory(input: {
     };
   }
 
-  if (matchedTokens.length > 0) {
+  // A row scoped to another aim starts from "presumed irrelevant": it is admitted only on real
+  // topical signal, never on grammar. `matchedTokens` is already content-only by construction
+  // (`relevanceTokens`), and the threshold is stated here so the admission rule is inspectable.
+  if (matchedTokens.length >= MIN_CROSS_AIM_CONTENT_MATCHES) {
     return {
       memory: input.memory,
       index: input.index,

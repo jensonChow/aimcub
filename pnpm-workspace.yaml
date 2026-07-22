@@ -9,6 +9,10 @@ packages:
   - "apps/cli"
   - "apps/desktop"
   - "apps/mcp"
+  # Examples are workspace members so their tests, typecheck, and lint run in the root gate.
+  # They depend on nothing in the workspace (they import package sources by relative path), so
+  # they never enter the release graph.
+  - "examples/*"
 confirmModulesPurge: false
 allowBuilds:
   '@swc/core': true

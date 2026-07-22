@@ -61,6 +61,83 @@ const GOOD_PLAN = {
   edges: [{ from: "core", to: "test" }],
 } as unknown as DecompositionOutput;
 
+/**
+ * A plan whose work happens in the physical world: no milestone here can produce a commit or a CI
+ * run, so `manual_confirm` is the only honest verification. Shaped after the non-technical personas
+ * in `examples/eval-moat`, where the deterministic scorer used to zero exactly this kind of plan.
+ */
+const HUMAN_PLAN = {
+  goal_summary: "Run a beginner pottery workshop series.",
+  domain: "operations",
+  rationale: "The studio owner does the teaching, the firing, and the scheduling.",
+  nodes: [
+    {
+      key: "waivers",
+      title: "Collect signed liability waivers",
+      description: "Every student signs the studio waiver before touching a wheel.",
+      est_effort: "s",
+      xp_reward: 10,
+      decomposition_contract: {
+        why: "The insurer voids cover without a signed waiver from every student.",
+        definition_of_done: "A signed waiver is on file for every enrolled student.",
+        required_evidence: ["The owner confirms every enrolled student has a signed waiver on file."],
+        likely_owner: "human",
+        context_gaps: [],
+        eval_signal: "The milestone is done when no student can sit at a wheel unwaived.",
+      },
+      acceptance_rule: {
+        logic: "all",
+        threshold: 1,
+        completion_mode: "manual",
+        clauses: [{ evaluator: "manual_confirm", auto_verifiable: false, match: {} }],
+      },
+    },
+    {
+      key: "kiln",
+      title: "Book the kiln firing window",
+      description: "Reserve a fourteen-hour bisque window that no session sits on top of.",
+      est_effort: "s",
+      xp_reward: 10,
+      decomposition_contract: {
+        why: "One kiln means a firing plus cooldown blocks the next session that needs fired work.",
+        definition_of_done: "The firing window is reserved on the studio calendar.",
+        required_evidence: ["The owner confirms the firing window is reserved."],
+        likely_owner: "human",
+        context_gaps: [],
+        eval_signal: "The milestone is done when no two firing-dependent sessions sit back to back.",
+      },
+      acceptance_rule: {
+        logic: "all",
+        threshold: 1,
+        completion_mode: "manual",
+        clauses: [{ evaluator: "manual_confirm", auto_verifiable: false, match: {} }],
+      },
+    },
+    {
+      key: "seats",
+      title: "Confirm paid seats a week out",
+      description: "Six of eight seats are paid in full seven days before the first session.",
+      est_effort: "s",
+      xp_reward: 10,
+      decomposition_contract: {
+        why: "A session below six paid seats does not cover the owner's time at the wheel.",
+        definition_of_done: "At least six seats are paid in full a week before the series starts.",
+        required_evidence: ["The owner confirms the paid seat count a week before the series."],
+        likely_owner: "human",
+        context_gaps: [],
+        eval_signal: "The milestone is done when paid seats, not reservations, clear the bar.",
+      },
+      acceptance_rule: {
+        logic: "all",
+        threshold: 1,
+        completion_mode: "manual",
+        clauses: [{ evaluator: "manual_confirm", auto_verifiable: false, match: {} }],
+      },
+    },
+  ],
+  edges: [{ from: "waivers", to: "seats" }, { from: "kiln", to: "seats" }],
+} as unknown as DecompositionOutput;
+
 function travelResearchPlan(): DecompositionOutput {
   const plan = structuredClone(GOOD_PLAN);
   plan.goal_summary = "Plan a current Cambodia travel itinerary.";
@@ -272,6 +349,65 @@ describe("critiquePlan", () => {
     expect(report.issues.map((issue) => issue.code)).toEqual(
       expect.arrayContaining(["weak_commit_pattern", "manual_only_verification"]),
     );
+  });
+
+  // Regression: `examples/eval-moat` scored honestly human-routed plans at 0/100 while a blind
+  // judge preferred them. Human work cannot produce a commit, so confirmation is not a shortcut.
+  it("does not penalize human-routed milestones verified by confirmation", () => {
+    const report = critiquePlan({ plan: HUMAN_PLAN });
+
+    expect(report.score).toBe(100);
+    expect(report.grade).toBe("pass");
+    expect(report.issues).toEqual([]);
+  });
+
+  it("keeps repeated manual confirmation across distinct human milestones out of the duplicate rule", () => {
+    const report = critiquePlan({ plan: HUMAN_PLAN });
+
+    // All three rules are byte-identical because `manual_confirm` has no fields to differ on.
+    expect(report.issues.map((issue) => issue.code)).not.toContain("duplicate_acceptance_rule");
+    expect(report.dimensions?.find((row) => row.dimension === "distinctness")?.score).toBe(100);
+  });
+
+  it("still warns when work nobody routed to a person can only be completed manually", () => {
+    const bad = structuredClone(HUMAN_PLAN);
+    bad.nodes[0]!.decomposition_contract!.likely_owner = "agent";
+    bad.nodes[1]!.decomposition_contract!.likely_owner = "either";
+
+    const report = critiquePlan({ plan: bad });
+
+    expect(report.issues.filter((issue) => issue.code === "manual_only_verification").map((issue) => issue.nodeKey))
+      .toEqual(["waivers", "kiln"]);
+    // The repetition is still not the actionable defect; the unrouted manual verification is.
+    expect(report.issues.map((issue) => issue.code)).not.toContain("duplicate_acceptance_rule");
+  });
+
+  it("lets an explicit routing override decide who the milestone is gated on", () => {
+    const overridden = structuredClone(HUMAN_PLAN);
+    overridden.nodes[0]!.decomposition_contract!.likely_owner = "agent";
+    overridden.nodes[0]!.routing_override = {
+      owner: "human",
+      agent_id: null,
+      agent_label: null,
+      run_mode: null,
+      model: null,
+      model_label: null,
+      reason: "The owner signs the waivers personally.",
+    };
+    overridden.nodes[1]!.routing_override = {
+      owner: "agent",
+      agent_id: null,
+      agent_label: null,
+      run_mode: null,
+      model: null,
+      model_label: null,
+      reason: "Routed to an agent by the user.",
+    };
+
+    const report = critiquePlan({ plan: overridden });
+
+    expect(report.issues.filter((issue) => issue.code === "manual_only_verification").map((issue) => issue.nodeKey))
+      .toEqual(["kiln"]);
   });
 
   it("warns when verification-only milestones are not linked after implementation work", () => {

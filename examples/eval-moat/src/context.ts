@@ -108,6 +108,12 @@ function charsOf(rows: readonly { content: string }[]): number {
  * by token overlap with the new aim, so a row whose only overlap is on this list was admitted on
  * grammar rather than relevance. The harness reports those rows instead of quietly counting them as
  * a win: injecting more context is not the same as injecting the right context.
+ *
+ * The first dry run found exactly that on all three personas, and the selector was fixed in
+ * `@core` (`packages/llm/src/planning-context.ts`): function words can no longer be matched
+ * tokens, and a cross-aim row needs at least one content-word match to be admitted. This detector
+ * stays as the standing regression guard — it keeps its own word list so it fails independently if
+ * the selector's list ever regresses.
  */
 const FUNCTION_WORDS = new Set([
   "and", "any", "are", "been", "before", "being", "but", "can", "could", "did", "does", "each",

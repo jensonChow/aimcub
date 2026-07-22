@@ -1,7 +1,9 @@
 import type {
   AcceptanceClause,
+  AcceptanceRule,
   ContextCategory,
   DecompositionOutput,
+  DecompositionOwner,
   MemoryKind,
   PlanNode,
 } from "@core/types";
@@ -235,18 +237,48 @@ function weakMessagePattern(pattern: string | undefined): boolean {
   return ["update", "fix", "change", "work", "done", "wip"].includes(normalized);
 }
 
+/**
+ * Who the plan says will move this milestone: an explicit routing override wins, otherwise the
+ * contract's `likely_owner`, otherwise "either". Same resolution order as `plan-handoff`.
+ */
+function milestoneOwner(node: PlanNode): DecompositionOwner {
+  return node.routing_override?.owner ?? node.decomposition_contract?.likely_owner ?? "either";
+}
+
+/**
+ * A milestone is human-gated when a person must personally do or approve it: physical-world work,
+ * legal/financial authority, final sign-off. `mixed` counts, matching `plan-handoff`'s
+ * `human_handoff` rule — the human gate is what binds completion there too.
+ *
+ * This is the line the quality rubric respects: human work cannot produce a commit or a CI run, so
+ * `manual_confirm` is its *correct* verification, not a shortcut. A plan that routes waivers, kiln
+ * schedules, or board sign-off to a person and verifies them by confirmation is being honest, and
+ * the scorer must not mark it down for that.
+ */
+function isHumanGatedNode(node: PlanNode): boolean {
+  const owner = milestoneOwner(node);
+  return owner === "human" || owner === "mixed";
+}
+
+/** No clause in this rule can be satisfied by machine-checkable evidence. */
+function isManualOnlyRule(rule: AcceptanceRule): boolean {
+  return rule.clauses.every((clause) => clause.evaluator === "manual_confirm");
+}
+
 function critiqueNodeVerification(node: PlanNode): PlanQualityIssue[] {
   const issues: PlanQualityIssue[] = [];
   const clauses = node.acceptance_rule.clauses;
   const autoSupported = clauses.some((clause) => clause.evaluator === "commit_pattern" || clause.evaluator === "ci_status");
-  const manualOnly = clauses.every((clause) => clause.evaluator === "manual_confirm");
+  const manualOnly = isManualOnlyRule(node.acceptance_rule);
 
-  if (manualOnly) {
+  // Fires only where automatic evidence is plausibly available and went unused: work an agent can
+  // run (or work whose owner the plan never declared) is expected to leave digital evidence.
+  if (manualOnly && !isHumanGatedNode(node)) {
     issues.push({
       code: "manual_only_verification",
       severity: "warning",
       nodeKey: node.key,
-      message: `Milestone "${node.title}" can only be completed manually; prefer evidence-backed rules when possible.`,
+      message: `Milestone "${node.title}" is not routed to a person but can only be completed manually; prefer evidence-backed rules where an agent can produce evidence.`,
     });
   }
 
@@ -502,6 +534,11 @@ function critiqueDuplicateAcceptanceRules(plan: DecompositionOutput): PlanQualit
   const issues: PlanQualityIssue[] = [];
 
   for (const node of plan.nodes) {
+    // Manual-only rules repeat by construction: `manual_confirm` has no `match` fields, so two
+    // human milestones cannot be made distinguishable — the person confirming decides which
+    // milestone is done. Flagging that asks for a change nobody can make. Where the repetition is
+    // a real defect (nothing routed to a person), `manual_only_verification` already reports it.
+    if (isManualOnlyRule(node.acceptance_rule)) continue;
     const signature = acceptanceRuleSignature(node);
     const first = firstBySignature.get(signature);
     if (!first) {

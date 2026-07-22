@@ -8,6 +8,12 @@ Date: 2026-07-22 · 3 aims × 2 conditions × 1 repetition · 9 provider calls
 Regenerate this file from a run's artifacts with: --rerender <run>/results.json
 
 Read the caveats in README.md before quoting any number here. N=1 per cell.
+
+This run PREDATES the two @core fixes it found: the planning-context relevance leak (unrelated-aim
+rows admitted on function-word overlap) and the cross-check penalising honest human routing. Both
+are fixed, so the context diff and the deterministic cross-check below no longer reproduce — that
+is the instrument working, not the sample rotting. It is kept as the record of the run that found
+them; regenerating it needs a fresh live run, not an edit.
 -->
 
 # Eval-moat benchmark report

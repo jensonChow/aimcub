@@ -15,8 +15,9 @@
  *  4. Every fixture carries context that SHOULD NOT reach the plan — pending candidates, a
  *     deprioritized row, a weakly-inferred row, and context scoped to an unrelated aim. Whether
  *     selection actually holds those back is a result, not an assumption: the first dry run showed
- *     that the unrelated-aim rows are admitted anyway, on function-word overlap. The report names
- *     them so the noise is counted, not celebrated as "more context".
+ *     the unrelated-aim rows being admitted anyway, on function-word overlap, which is how that
+ *     selector bug was found and fixed. The report still names any such row so the noise would be
+ *     counted, not celebrated as "more context".
  */
 import type { BenchmarkAim } from "./types.ts";
 
