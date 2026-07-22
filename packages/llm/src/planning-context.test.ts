@@ -65,6 +65,75 @@ describe("planning context rendering", () => {
     ]);
   });
 
+  // Regression: `examples/eval-moat` reproduced this leak on all three of its personas — context
+  // from a completely unrelated aim was admitted into planning on "the"/"should"/"for" alone.
+  it("does not admit another aim's context on function-word overlap alone", () => {
+    const result = selectPlanningMemoriesWithTrace({
+      title: "Add receipt scanning to my invoicing desktop app",
+      description:
+        "A user should be able to drop a photo of a paper receipt into the app and get a draft expense entry they can correct before saving.",
+      currentGoalId: "receipt-scanning",
+      memories: [
+        {
+          id: "marketing-site",
+          goalId: "old-marketing-aim",
+          category: "preference",
+          content: "Preference: The marketing site should stay a single static page with no JavaScript framework.",
+          confidence: 1,
+        },
+        {
+          id: "expense-table",
+          goalId: "old-export-aim",
+          category: "project_fact",
+          content:
+            "Project fact: Expense rows live in a local SQLite table with a NOT NULL merchant column, so any importer must produce a merchant value or an explicit unknown sentinel.",
+          confidence: 1,
+        },
+      ],
+    });
+
+    // One shared content word ("expense") is enough for a row from another aim to keep flowing.
+    expect(result.report.selected).toEqual([
+      expect.objectContaining({
+        memoryId: "expense-table",
+        scope: "related_goal",
+        reason: "related_goal_context",
+        matchedTokens: ["expense"],
+      }),
+    ]);
+    expect(result.report.ignored).toEqual([
+      expect.objectContaining({
+        memoryId: "marketing-site",
+        scope: "unrelated_goal",
+        reason: "unrelated_goal_context",
+        score: 0,
+        matchedTokens: [],
+      }),
+    ]);
+  });
+
+  it("does not let a shared bare figure carry a cross-aim match", () => {
+    const result = selectPlanningMemoriesWithTrace({
+      title: "Write the annual impact report",
+      description: "The funder wants a plain-text summary under 500 words.",
+      currentGoalId: "impact-report",
+      memories: [
+        {
+          id: "lease",
+          goalId: "old-office-aim",
+          category: "project_fact",
+          content: "Project fact: The office lease renewal costs 500 more each month.",
+          confidence: 1,
+        },
+      ],
+    });
+
+    expect(result.memories).toEqual([]);
+    expect(result.report.ignored[0]).toEqual(
+      expect.objectContaining({ memoryId: "lease", reason: "unrelated_goal_context", matchedTokens: [] }),
+    );
+  });
+
   it("keeps current-goal context for replanning even without token overlap", () => {
     const selected = selectPlanningMemories({
       title: "Polish the launch checklist",

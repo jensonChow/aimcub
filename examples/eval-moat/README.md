@@ -110,13 +110,25 @@ without spending anything. It is one run of `N=1` — read it as a shape, not as
 - **A deterministic cross-check** runs alongside it: `critiquePlan` from `@core/domain`, scored for
   both plans against the *same* ground-truth context. It needs no judge model — but see below.
 
-### Known bias in the cross-check
+### What this benchmark has already found
 
-`critiquePlan` penalises `manual_only_verification` and `duplicate_acceptance_rule`. A plan that
-correctly routes real-world human work — waivers, board sign-off, notarization — collects exactly
-those penalties for being honest. In the sample run the blind judge preferred the contexted plan on
-two aims while the deterministic scorer marked those same plans down. **Treat a disagreement between
-the two as a finding about the scorer, not as proof that either is wrong.**
+Two real `@core` defects, both surfaced by the first live run and both now fixed:
+
+1. **Planning-context relevance leak.** Context scoped to a completely unrelated aim was selected
+   into planning on function-word overlap alone (`the` + `should`, `for`, `the`) — reproduced on all
+   three personas. `selectPlanningMemories` now treats closed-class function words as stopwords and
+   requires at least one content-word match before a cross-aim row is admitted. The detector stays
+   in [`src/context.ts`](src/context.ts) as a standing regression guard with its own word list.
+2. **The cross-check punished honest human routing.** `critiquePlan` raised
+   `manual_only_verification` on every human-owned milestone and `duplicate_acceptance_rule` on
+   repeated `manual_confirm` clauses, so the contexted plans for the two non-technical personas —
+   correctly full of waivers, kiln schedules, and board sign-off — scored 0/100 while the blind
+   judge preferred them (+11, +14). Those rules now fire only where machine-checkable evidence was
+   plausibly available and went unused.
+
+The sample report below predates both fixes; it is kept as the record of the run that found them.
+Where the deterministic table and the blind judge still disagree, **treat the gap as a finding about
+the scorer, not as proof that either is wrong.**
 
 ## Adding an aim or a persona
 
@@ -137,24 +149,23 @@ Then re-run the dry run and read the context diff before spending anything on a 
 
 ## Tests
 
-`examples/` is not a workspace package, so these tests are not in the root `pnpm test` graph. Run
-them with any workspace package's vitest:
+This directory is the workspace package `@examples/eval-moat`, so its tests, typecheck, and lint run
+in the root gate (`pnpm test`, `pnpm typecheck`, `pnpm lint`) like any other package. Run them alone
+with:
 
 ```bash
-pnpm --filter @core/store exec vitest run --root ../../examples/eval-moat
+pnpm --filter @examples/eval-moat test
 ```
 
 They cover the parts that must not rot: seeding is byte-deterministic, the bare condition really is
-empty, the context diff is non-empty and excludes withheld rows, blind labelling is seeded and
-reproducible, judge output is validated rather than silently zero-scored, the report renders a
-negative result honestly, and the whole live path runs against a mock gateway — same orchestration,
-same budget guard, no key and no network.
+empty, the context diff is non-empty and excludes withheld rows, no row from another aim is admitted
+on function-word overlap alone, blind labelling is seeded and reproducible, judge output is validated
+rather than silently zero-scored, the report renders a negative result honestly, and the whole live
+path runs against a mock gateway — same orchestration, same budget guard, no key and no network.
 
-Typecheck it the same way:
-
-```bash
-pnpm --filter @app/cli exec tsc -p ../../examples/eval-moat/tsconfig.json
-```
+The package depends on nothing in the workspace: it reaches the planning code by relative path
+through [`src/core.ts`](src/core.ts), which is what keeps the benchmark out of the release graph and
+keeps the esbuild bundle above working for anyone who just wants to run it.
 
 ## Honest limitations
 

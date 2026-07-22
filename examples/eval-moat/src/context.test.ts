@@ -60,16 +60,23 @@ describe("context capture and diff", () => {
     expect(diff.withheld.some((row) => row.reason.startsWith("not_active_context"))).toBe(true);
   });
 
-  it("names rows admitted from another aim on function-word overlap alone", async () => {
+  // Deliberate inversion: the first dry run admitted the unrelated marketing-site row on
+  // "the"/"should", and every persona showed the same leak. The selector was fixed in @core, so
+  // this expectation flipped from "the leak exists" to "the leak stays closed" — for all three
+  // personas, not only the one that first showed it.
+  it("admits no row from another aim on function-word overlap alone", async () => {
+    for (const aim of BENCHMARK_AIMS) {
+      const diff = buildContextDiff(aim, await capture(aim, "bare"), await capture(aim, "contexted"));
+      expect(diff.weakMatches).toEqual([]);
+    }
+  });
+
+  it("still admits another aim's context on a real content-word match", async () => {
     const aim = BENCHMARK_AIMS[0]!;
     const diff = buildContextDiff(aim, await capture(aim, "bare"), await capture(aim, "contexted"));
-    // Current selector behaviour: the unrelated marketing-site row is admitted on "the"/"should".
-    // If a future selector fixes that, this expectation should be inverted deliberately, not quietly.
-    expect(diff.weakMatches.length).toBeGreaterThan(0);
-    for (const row of diff.weakMatches) {
-      expect(row.matchedTokens.length).toBeGreaterThan(0);
-      expect(diff.injectedOnly.some((injected) => injected.content === row.content)).toBe(true);
-    }
+    // Closing the leak must not close the door: prior aims that share real vocabulary still reach
+    // the plan, which is the whole point of accrued context.
+    expect(diff.injectedOnly.some((row) => row.scope === "related_goal")).toBe(true);
   });
 
   it("reports the learning channels the contexted store adds", async () => {
