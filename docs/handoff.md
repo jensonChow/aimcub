@@ -1,76 +1,70 @@
 # Aimcub Handoff
 
-Last updated: 2026-07-21
-Branch: `main`. **OSS-maturity epic batch 1 is MERGED and verified**; batch 2
+Last updated: 2026-07-22
+Branch: `main`. **OSS-maturity epic batch 2 is MERGED and verified**; batch 3
 prompts are staged (gitignored `worktrees/prompts/`, see its README). Local
-`main` is ahead of `origin/main` — **push needs founder approval**.
+`main` (`291ceb73` + this docs commit) is ahead of `origin/main` (`410c2776`)
+by both batches — **push needs founder approval**.
 
-## Batch 1 — integrated (four parallel worktrees, merged in order)
+## Batch 2 — integrated (merged B2-3 → B2-4 → B2-2 → B2-1)
 
-1. `a0c6e758` **oss-hygiene** — CONTRIBUTING / SECURITY / CODE_OF_CONDUCT /
-   issue+PR templates (license-agnostic; license decision stays deferred),
-   README "Contributing & Community" section. Secrets sweep of tree + full
-   history: zero real-key hits.
-2. `79336d05` **release-scaffolding** — changesets (lockstep `@core/*`+`@app/*`;
-   workspace root can't join the fixed group — documented in
-   `docs/releasing.md`), root CHANGELOG, `release.yml` (verify → macos-14
-   CLI bundle + unsigned dmg/zip artifacts → draft GitHub Release on `v*`
-   tags; npm publish is a blocked placeholder).
-3. `9a13b3c5` **store-hardening** — `packages/store/src/safe-fs.ts`: atomic
-   tmp+fsync+rename writes, post-write `store.json.bak` mirroring, corrupt-load
-   quarantine + backup recovery + `AimStore.getDiagnostics()` (silent
-   emptyStore data loss is gone), advisory cross-process lock around every
-   mutating load→mutate→save. 16 new durability tests.
-4. `91b768a0` **adapter-boundary** — `packages/local-agent` is an open adapter
-   registry (`LocalAgentId` = string; codex/claude are built-ins; registration
-   order = preference order). Adapters own `buildInvocation`+`parseLine`;
-   engine owns processes/timeout/AbortSignal/classified failures
-   (`retryable` = timeout only). Contribution guide:
-   `docs/local-agent-adapters.md`. A fake third adapter runs end-to-end
-   through `agent-run` in tests.
-
-Details live in module memory now: `docs/memory/architecture.md` (store
-durability, adapter boundary), `docs/memory/operations.md` (release flow,
-release-readiness state).
+1. `455fd094` **quickstart-front-door** — `docs/quickstart.md` (every command
+   executed verbatim), README front-door Quickstart, examples aligned.
+2. `6747132a` **desktop-packaging-identity** — appId `com.jensonchow.aimcub`
+   (ASC 6785268817 / team K9XA27TP7F), committed placeholder icon + generator,
+   hardened-runtime entitlements (JIT + network client), built-in notarize
+   enabled but inert while `identity: null`; `notarize:check` diagnostic.
+3. `4a784346` **publish-build-prep** — per-package `tsconfig.build.json`
+   (test-free dist) + vitest src-allowlists; killed the dist test double-count
+   (local-agent 28→14, api 40→20 — the api case was discovered, not reported);
+   `files` + `publishConfig` stubs so the `@aimcub` rename is a name change.
+4. `291ceb73` **queue-streaming** — durable run queue (runs collection = the
+   queue; atomic sandbox-scoped claims under the store lock), one shared
+   orchestrator behind CLI + Desktop, batched `appendRunEvents`, live
+   `runLiveEvent` push IPC + Execute status/Stop, retry-once for retryable
+   failures, `aimcub run --until-blocked`. Details in
+   `docs/memory/architecture.md`.
 
 ## Verification (integration round)
 
 - Full gate green on merged `main`: build 9/9 · typecheck 16/16 · lint 10/10 ·
-  purity clean · **1035 tests** (desktop 283, domain 187, llm 170, mcp 114,
-  cli 89, store 88, api 40, db 36, local-agent 28*). *local-agent double-counts
-  dist-compiled tests — real defect, fixed by batch-2 B2-2.
-- Repacked and refreshed root `Aimcub.app`.
-- Live smoke, isolated `AIMCUB_HOME`: deterministic seed wrote through the new
-  store (`.bak` mirrored); CLI `agents` detects through the registry (Codex
-  ready, Claude unauthenticated on this machine); `board` renders seeded
-  progress; **live corruption probe**: garbaged `store.json` → quarantined +
-  recovered from `.bak` in the same invocation, zero data loss; packaged app
-  boots (main + 3 renderers stable); real `~/.aimcub/store.json` mtime
-  unchanged.
+  purity clean · **1031 tests** with honest counts (desktop 296, domain 187,
+  llm 170, mcp 114*, cli 99, store 95, api 20, db 36, local-agent 14).
+  *mcp still double-counts dist tests — flagged by B2-2, fixed in batch 3.
+- Repacked + refreshed root `Aimcub.app`; PlistBuddy confirms
+  `com.jensonchow.aimcub`, `icon.icns`, productivity category; no
+  default-icon warning.
+- Live smoke, isolated `AIMCUB_HOME`: seed → `board` renders; queue path
+  probed without spending agent quota (`run --until-blocked --agent claude`
+  with Claude unauthenticated fails at selection BEFORE enqueuing — no
+  stranded queued rows); packaged app boots (main + 3 renderers), desktop
+  worker correctly drains nothing, real `~/.aimcub` untouched, no lock/temp
+  debris.
 
 ## Open threads
 
-- **Batch 2 staged** (`worktrees/prompts/B2-*.md`): B2-1 run queue + streamed
-  events + shared orchestrator + `--until-blocked` (Opus 4.8) · B2-2 clean
-  publishable dist, kills the dist test-dup (Sonnet 5) · B2-3 quickstart front
-  door (Sonnet 5) · B2-4 bundle id `com.jensonchow.aimcub` + placeholder icon
-  + entitlements/notarize-inert (Sonnet 5). Integration merge order:
-  B2-3 → B2-4 → B2-2 → B2-1.
-- Carried into later batches: Desktop surfacing of `getDiagnostics()`
-  (recovery banner — batch 3 run-inspection lane); store-level schema version
-  (deferred until the on-disk shape changes); `@core/*`→`@aimcub/*` rename
-  (solo lane, after B2-2); root package version-sync (documented gap).
-- Founder-owned (outward): license decision; `@aimcub` npm org; GitHub repo
-  description still says "GoalPet" + enable Discussions + private vuln
-  reporting; CODE_OF_CONDUCT enforcement contact; Apple signing credentials;
-  full-history gitleaks scan before public flip; **push authorization for
-  current `main`**.
+- **Batch 3 staged** (`worktrees/prompts/B3-*.md`): B3-1 artifact capture
+  (Opus 4.8) · B3-2 execution permissions + run inspection UX (Opus 4.8) ·
+  B3-3 test integrity: mcp dist-dup + never-typechecked test-file debt
+  (Sonnet 5) · B3-4 eval-moat benchmark harness (Opus 4.8). Merge order:
+  B3-4 → B3-3 → B3-1 → B3-2.
+- Re-sliced from the original plan: distribution (npx/Homebrew) moved to the
+  launch batch (it needs npm publish, which needs the license); the
+  `@core/*`→`@aimcub/*` rename runs as a SOLO mini-batch whenever the founder
+  wants it, ideally right before publish (build side is ready per B2-2).
+- Carried polish notes: CLI selection errors render as "Unexpected error:"
+  (B3-1 fixes via typed orchestrator errors); live-run line reuses
+  `od-work-note` styling (B3-2); a surface marker on queue requests would make
+  cross-surface claiming explicit (future); no store schema version yet.
+- Founder-owned (outward, unchanged): license decision; `@aimcub` npm org;
+  GitHub description/Discussions/private vuln reporting; CoC contact; Apple
+  signing credentials (then re-verify the 2-entitlement set under a real
+  signed launch); gitleaks history scan; **push authorization**.
 
 ## Next session
 
-Integrate batch 2 when the founder returns the branches: read each
-`WORKTREE-REPORT.md` + diff, merge B2-3 → B2-4 → B2-2 → B2-1 (delete reports
-in merge commits), full gate + repack + live smoke (B2-1 changes desktop run
-semantics to enqueue+stream — exercise one streamed run), update memory docs,
-emit batch 3 (artifact capture · permission model + desktop consent UI ·
-run inspection/debug gating incl. diagnostics banner · distribution).
+Integrate batch 3 when branches return: reports + diffs, merge
+B3-4 → B3-3 → B3-1 → B3-2 (strip reports), full gate + repack + smoke
+(exercise artifact events + permission consent + diagnostics banner), update
+memory docs, then stage the launch batch (rename solo-lane, distribution,
+community scaffolding, public-flip checklist execution).

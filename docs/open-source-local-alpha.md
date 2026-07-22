@@ -170,18 +170,20 @@ AIMCUB_HOME=/tmp/aimcub-local-alpha-demo pnpm desktop
 
 ## Known Limitations
 
-- Each `aimcub run` invocation handles one ready agent-owned sub-aim. There is no
-  daemon or until-blocked loop, and durable queueing, retries, scheduling, and
-  structured artifact capture remain future work even though normalized events
-  and low-trust result evidence are persisted.
-- Local store persistence is JSON-file based and single-user. Concurrent Desktop
-  and CLI writes are a known limitation.
+- There is no background daemon: queued runs only advance while Desktop is open
+  or a CLI invocation is running. (Durable queueing, streamed/persisted events,
+  retries, cancellation, and `aimcub run --until-blocked` exist; structured
+  artifact capture remains future work.)
+- The local store is JSON-file based. It is crash-safe (atomic writes, backup +
+  quarantine recovery) and cross-process locked for Desktop + CLI, but has no
+  on-disk schema version yet.
 - Context and personalized eval are present, but the visible proof that they
   improve later decompositions is still an active v1 gate.
 - Supabase parity for newer local Aim OS orchestration entities is future online
   platform work.
-- Public release readiness still needs a license decision, `CONTRIBUTING.md`,
-  `SECURITY.md`, and a secrets/env audit.
+- Public release readiness still needs the license decision (and the
+  founder-owned launch checklist in `docs/handoff.md`); `CONTRIBUTING.md`,
+  `SECURITY.md`, and the secrets audit are done.
 
 ## Non-Goals
 

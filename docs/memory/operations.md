@@ -107,6 +107,10 @@ At the end of a repo-changing session, update `docs/handoff.md` with:
 
 Move durable decisions into the relevant file under `docs/memory/` instead of leaving them in handoff.
 
+## Desktop Packaging Identity
+
+Since 2026-07-22 the packed app's `appId` is `com.jensonchow.aimcub` (matches ASC App ID 6785268817, team K9XA27TP7F — the old `com.aimcub.desktop` mismatch is resolved). The committed placeholder icon (`apps/desktop/build/icon.icns`) regenerates via `pnpm --filter @app/desktop run icon:generate` (dependency-free script; replace the .icns when real brand lands). Hardened runtime + minimal entitlements (JIT, network client — justified inline; may need `allow-unsigned-executable-memory` once actually signed, untestable while unsigned) are wired; electron-builder's built-in notarize is enabled but inert by construction while `identity: null`; `pnpm --filter @app/desktop run notarize:check` diagnoses credential env. Targets stay arm64 dmg+zip; universal deferred to v0.1.0. Library builds use per-package `tsconfig.build.json` (tests excluded from dist) + vitest src-allowlists — never let dist tests back into runs.
+
 ## Release Scaffolding
 
 Versioning is changesets-based (2026-07-21): lockstep `fixed` group across `@core/*` + `@app/*` with `privatePackages { version, tag }`; the workspace root cannot join the group (not a workspace package — documented in `docs/releasing.md`, root stays `0.0.0`). Flow: `pnpm changeset` per change → `pnpm release:version` → commit → tag `vX.Y.Z` → push tag (founder-owned) → `.github/workflows/release.yml` verifies (ci.yml steps duplicated; composite-action dedup is a flagged TODO), builds the CLI bundle + unsigned desktop dmg/zip on macos-14, and drafts a GitHub Release via `gh`. npm publish is a deliberately blocked placeholder until the license decision + `@aimcub` org registration.
