@@ -8,7 +8,7 @@ import { homedir } from "node:os";
 
 import { app, BrowserWindow, ipcMain, nativeTheme, shell, type IpcMainInvokeEvent } from "electron";
 
-import type { Goal, Milestone } from "@core/types";
+import type { Goal } from "@core/types";
 import { defaultDataDir, type NewMemory } from "@core/store";
 import {
   buildLocalHandoffManifest,
@@ -67,6 +67,7 @@ import {
   type PlanningDebugTraceStage,
   type PlanningLiveEvent,
   type PlanningLiveSummary,
+  type RunLiveEvent,
   type RunMilestoneAgentRequest,
   type RunMilestoneAgentResult,
   type RefineRequest,
@@ -90,6 +91,17 @@ import {
 } from "./context-source-settings";
 import { getWebResearchStatus, setWebResearchConfig, testWebResearchConfig } from "./web-research-settings";
 import { listLocalAgents, runLocalAgent } from "./local-agents";
+import { createDesktopRunQueue, enqueueDesktopRun, kickRunQueue } from "./run-queue";
+
+/** Live run events go to every open window: a background drain has no originating sender. */
+function broadcastRunLiveEvent(payload: RunLiveEvent): void {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (window.isDestroyed()) continue;
+    window.webContents.send(IPC.runLiveEvent, payload);
+  }
+}
+
+const runQueue = createDesktopRunQueue(aimStore, broadcastRunLiveEvent);
 
 async function planningContext(input: {
   title: string;
@@ -136,30 +148,6 @@ async function goalDetail(goalId: string): Promise<GoalDetail | null> {
   return aimStore.getGoal(goalId);
 }
 
-function milestonePlanKey(milestone: Milestone): string {
-  const key = milestone.metadata?.plan_key;
-  return typeof key === "string" ? key : milestone.id;
-}
-
-function milestoneAgentPrompt(goal: Goal, milestone: Milestone, extra?: string): string {
-  const contract = milestone.metadata?.decomposition_contract as Record<string, unknown> | undefined;
-  const done = typeof contract?.definition_of_done === "string" ? contract.definition_of_done : milestone.description;
-  const evidence = Array.isArray(contract?.required_evidence) ? contract.required_evidence.join(", ") : "";
-  const evalSignal = typeof contract?.eval_signal === "string" ? contract.eval_signal : "";
-  return [
-    `Aim: ${goal.title}`,
-    goal.description ? `Aim description: ${goal.description}` : "",
-    `Sub-aim: ${milestone.title}`,
-    milestone.description ? `Sub-aim description: ${milestone.description}` : "",
-    done ? `Definition of done: ${done}` : "",
-    evidence ? `Required evidence: ${evidence}` : "",
-    evalSignal ? `Eval signal: ${evalSignal}` : "",
-    extra?.trim() ? `User instruction: ${extra.trim()}` : "",
-    "",
-    "Work on this sub-aim as far as the local runtime permissions allow. Report what you did, what evidence exists, and what remains blocked. Do not claim completion unless the evidence is explicit.",
-  ].filter(Boolean).join("\n");
-}
-
 function routingAgentOptions(detections: readonly LocalAgentDetection[]): RoutingRuntimeAgentOption[] {
   return detections.map((agent) => ({
     id: agent.id,
@@ -171,96 +159,38 @@ function routingAgentOptions(detections: readonly LocalAgentDetection[]): Routin
   }));
 }
 
+/**
+ * Enqueue one sub-aim onto the durable run queue and return at once. Selection (sub-aim, runtime,
+ * model), execution, event persistence and evidence all live in the shared orchestrator; the run
+ * itself streams back on `IPC.runLiveEvent` and lands in the store, so closing the window no
+ * longer throws work away.
+ */
 async function runMilestoneAgent(req: RunMilestoneAgentRequest): Promise<RunMilestoneAgentResult> {
   const detail = await aimStore.getGoal(req.goalId);
-  if (!detail) return { ok: false, run: null, detail: null, error: "Aim not found." };
+  if (!detail) return { ok: false, runId: null, error: "Aim not found." };
   const milestone = detail.milestones.find((item) => item.id === req.milestoneId);
-  if (!milestone) return { ok: false, run: null, detail, error: "Sub-aim not found." };
+  if (!milestone) return { ok: false, runId: null, error: "Sub-aim not found." };
   const override = routingOverrideForMilestone(milestone);
   if (!req.agentId && override?.owner === "human") {
     return {
       ok: false,
-      run: null,
-      detail,
+      runId: null,
       error: "This sub-aim is routed to a human. Reassign it to an agent before running a local agent.",
     };
   }
-  const detections = await listLocalAgents();
-  const routedAgentId = override?.owner === "agent" ? override.agent_id : null;
-  // An override naming an unregistered agent falls through to the default pick.
-  const overrideAgentId = routedAgentId && detections.some((agent) => agent.id === routedAgentId) ? routedAgentId : undefined;
-  const requestedAgentId = req.agentId ?? overrideAgentId;
-  const selected = requestedAgentId
-    ? detections.find((agent) => agent.id === requestedAgentId)
-    // Detections arrive in adapter registration order, which is the preference order.
-    : detections.find((agent) => agent.available && agent.authStatus !== "missing");
-  if (!selected || !selected.available || selected.authStatus === "missing") {
-    return { ok: false, run: null, detail, error: "No authenticated local CLI agent is available." };
+  try {
+    const runId = await enqueueDesktopRun(runQueue, {
+      goalId: detail.goal.id,
+      milestoneId: milestone.id,
+      ...(req.agentId ? { agentId: req.agentId } : {}),
+      ...(req.model ? { model: req.model } : {}),
+      ...(req.prompt ? { instruction: req.prompt } : {}),
+    });
+    kickRunQueue(runQueue);
+    return { ok: true, runId, error: null };
+  } catch (error) {
+    return { ok: false, runId: null, error: error instanceof Error ? error.message : String(error) };
   }
-  const selectedModel = req.model?.trim()
-    || (override?.owner === "agent" ? override.model?.trim() : "")
-    || selected.models.find((candidate) => candidate.id !== "default")?.id
-    || selected.models[0]?.id
-    || "default";
-
-  const assignment = (await aimStore.listAssignments(detail.goal.id)).find((row) => row.milestone_id === milestone.id) ?? null;
-  const orchestrationRun = await aimStore.createRun({
-    goalId: detail.goal.id,
-    milestoneId: milestone.id,
-    assignmentId: assignment?.id ?? null,
-    actorKind: "agent",
-    status: "running",
-    sandbox: "read-only",
-    networkEnabled: false,
-    model: selectedModel,
-    summary: `Local agent ${selected.name} started with ${selectedModel}: ${milestone.title}`,
-  });
-  const run = await runLocalAgent({
-    agentId: selected.id,
-    prompt: milestoneAgentPrompt(detail.goal, milestone, req.prompt),
-    model: selectedModel,
-    permission: { sandbox: "read-only", network: false },
-  });
-
-  await aimStore.addEvidence({
-    goalId: detail.goal.id,
-    milestoneId: milestone.id,
-    kind: "mcp_report",
-    emitterId: null,
-    sourceEventId: `local-agent:${selected.id}:${Date.now()}:${milestonePlanKey(milestone)}`,
-    summary: run.ok
-      ? `Local agent ${selected.name} worked on: ${milestone.title}`
-      : `Local agent ${selected.name} failed on: ${milestone.title}`,
-      payload: {
-        agent_id: selected.id,
-        model: selectedModel,
-        command: run.command,
-        args: run.args,
-        ok: run.ok,
-      output: run.outputText,
-      events: run.events.map((event) => ({ type: event.type, summary: event.summary })),
-      error: run.error,
-    },
-    trustScore: 0.6,
-    runId: orchestrationRun.id,
-    assignmentId: orchestrationRun.assignment_id,
-  });
-  await aimStore.finishRun({
-    runId: orchestrationRun.id,
-    status: run.ok ? "completed" : "failed",
-    summary: run.ok
-      ? `Local agent ${selected.name} completed its run for: ${milestone.title}`
-      : `Local agent ${selected.name} failed its run for: ${milestone.title}`,
-    error: run.error,
-  });
-  await aimStore.sedimentContextFromGoal(detail.goal.id);
-
-  return {
-    ok: run.ok,
-    run,
-    detail: await aimStore.getGoal(detail.goal.id),
-    error: run.error,
-  };
 }
 
 function planningToolTrace(context: DesktopPlanningContext) {
@@ -901,6 +831,12 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.runMilestoneAgent, (_e, req: RunMilestoneAgentRequest): Promise<RunMilestoneAgentResult> =>
     runMilestoneAgent(req),
   );
+
+  ipcMain.handle(IPC.cancelRun, (_e, runId: string): boolean => runQueue.cancel(runId));
+
+  // Anything left queued by a previous session (or by a CLI invocation that exited) resumes as
+  // soon as the handlers are live.
+  kickRunQueue(runQueue);
 
   ipcMain.handle(IPC.confirmMilestone, async (_e, req: ConfirmMilestoneRequest): Promise<GoalDetail | null> => {
     await aimStore.confirmMilestone({

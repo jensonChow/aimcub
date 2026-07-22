@@ -60,6 +60,7 @@ import { ContextStage } from "./stages/context/ContextStage";
 import type { ClarifyPhase, ContextAnswerMap } from "./stages/context/types";
 import { EvalStage } from "./stages/eval/EvalStage";
 import { ExecutePanel } from "./stages/execute/ExecutePanel";
+import { applyRunLiveEvent, isTerminalRunEvent, type LiveRunState } from "./stages/execute/liveRun";
 import { NewAimComposer } from "./stages/aim/NewAimComposer";
 import { HomeView } from "./stages/home/HomeView";
 import { JourneyView } from "./stages/journey/JourneyView";
@@ -176,6 +177,9 @@ function AimOsApp() {
   const [planningShellId, setPlanningShellId] = useState<string | null>(null);
   const [planningDebugTraces, setPlanningDebugTraces] = useState<PlanningDebugTrace[]>([]);
   const [planningLiveEvents, setPlanningLiveEvents] = useState<PlanningLiveEvent[]>([]);
+  // The queued run the cockpit is watching. Runs are durable in the store; this is only the
+  // live face of one, so it is safe to lose on navigation.
+  const [liveRun, setLiveRun] = useState<LiveRunState | null>(null);
   const [intakeClarify, setIntakeClarify] = useState<ClarifyOutput | null>(null);
   const [intakeAnswers, setIntakeAnswers] = useState<ContextAnswerMap>({});
   const [clarifyPhase, setClarifyPhase] = useState<ClarifyPhase>(null);
@@ -336,6 +340,31 @@ function AimOsApp() {
       setPlanningLiveEvents((current) => [...current, event].slice(-80));
     });
   }, []);
+
+  // The main-process worker drains the run queue in the background, so run events arrive without
+  // an in-flight IPC call. Held in a ref so the once-only subscription always calls the current
+  // refresh closure rather than the first render's.
+  const runFinishedRef = useRef<(goalId: string) => void>(() => {});
+  useEffect(() => {
+    return window.aimcub.onRunLiveEvent((live) => {
+      if (selectedGoalRef.current?.id !== live.goalId) return;
+      setLiveRun((current) => applyRunLiveEvent(current, live));
+      if (isTerminalRunEvent(live.event)) runFinishedRef.current(live.goalId);
+    });
+  }, []);
+
+  // A finished run means new persisted events, evidence and derived progress.
+  useEffect(() => {
+    runFinishedRef.current = (goalId: string) => {
+      const goal = selectedGoalRef.current;
+      if (!goal || goal.id !== goalId) return;
+      void refreshGoalAfterSideEffect(
+        goal,
+        navigationConcurrencyRef.current.workspace,
+        navigationConcurrencyRef.current.surface,
+      );
+    };
+  });
 
   function startPlanningRun(): string {
     const runId = createPlanningRunId();
@@ -1271,6 +1300,10 @@ function AimOsApp() {
     }
   }
 
+  /**
+   * Queue the sub-aim and return. The main-process worker executes it and streams progress back on
+   * the run channel, so the window is only busy for the enqueue — not for the whole run.
+   */
   async function runAgent(milestone: Milestone) {
     if (workflowMutationIsLocked()) return;
     if (!selected) return;
@@ -1292,6 +1325,7 @@ function AimOsApp() {
       finishSideEffectOperation(operationId);
     }
   }
+
 
   async function confirmMilestone(
     milestone: Milestone,
@@ -1702,6 +1736,8 @@ function AimOsApp() {
       detail={detail}
       progress={progress}
       disabled={Boolean(busy)}
+      liveRun={liveRun && liveRun.goalId === selected.id ? liveRun : null}
+      onCancelRun={(runId) => void window.aimcub.cancelRun(runId)}
       onRunAgent={(milestone) => void runAgent(milestone)}
       onConfirm={confirmMilestone}
       onPickFiles={async () => {

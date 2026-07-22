@@ -25,11 +25,15 @@ import {
   type ExecutePrimaryActionKind,
 } from "./executePrimaryAction";
 import { LocalAgentExecutionSummary } from "./LocalAgentExecutionSummary";
+import { liveRunForMilestone, type LiveRunState } from "./liveRun";
 
 export function ExecutePanel(props: {
   detail: GoalDetail;
   progress: AimProgressReadModel | null;
   disabled: boolean;
+  /** The run currently streaming from the main-process worker, if any. */
+  liveRun?: LiveRunState | null;
+  onCancelRun?: (runId: string) => void;
   onRunAgent: (milestone: Milestone) => void;
   onConfirm: (milestone: Milestone, submission: Omit<ConfirmMilestoneRequest, "goalId" | "milestoneId">) => Promise<boolean>;
   onPickFiles: () => Promise<string[]>;
@@ -117,6 +121,7 @@ export function ExecutePanel(props: {
     }
   }
 
+  const selectedLiveRun = selectedRow ? liveRunForMilestone(props.liveRun ?? null, selectedRow.milestone.id) : null;
   const primaryAction = selectedRow ? executePrimaryAction(selectedRow, t) : null;
   const selectedHumanRoute = selectedRow ? isHumanExecuteRoute(selectedRow) : false;
   const showSecondaryRun = Boolean(
@@ -214,6 +219,14 @@ export function ExecutePanel(props: {
                     </div>
                   ) : null}
 
+                  {selectedLiveRun ? (
+                    <LiveRunLine
+                      live={selectedLiveRun}
+                      onCancel={props.onCancelRun}
+                      t={t}
+                    />
+                  ) : null}
+
                   <div className="od-execute-primary-action">
                     <div>
                       <span>{t("execute.primaryActionLabel")}</span>
@@ -276,6 +289,30 @@ export function ExecutePanel(props: {
 
 export function executeTaskContent(proofTask: ReactNode | null, normalTask: ReactNode): ReactNode {
   return proofTask ?? normalTask;
+}
+
+/**
+ * The live face of a queued run: what the agent is doing right now, and the way to stop it. The
+ * durable record is the run journal — this is the part that is only true while it is happening.
+ */
+function LiveRunLine(props: {
+  live: LiveRunState;
+  onCancel?: (runId: string) => void;
+  t: ReturnType<typeof useI18n>["t"];
+}) {
+  const { live, t } = props;
+  const running = live.status === "running";
+  return (
+    <div className="od-work-note" role="status" aria-live="polite">
+      <strong>{running ? t("execute.liveRunTitle") : t("execute.liveRunFinished")}</strong>
+      <span>{live.toolName ? t("execute.liveRunTool", { tool: live.toolName }) : shortText(live.summary, 160)}</span>
+      {running && props.onCancel ? (
+        <button className="od-aim-secondary" type="button" onClick={() => props.onCancel?.(live.runId)}>
+          {t("execute.cancelRun")}
+        </button>
+      ) : null}
+    </div>
+  );
 }
 
 function StageMetric({ label, value }: { label: string; value: string }) {

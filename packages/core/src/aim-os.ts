@@ -361,7 +361,9 @@ export function validatePlanRouting(input: {
       issues.push(issue(
         node,
         "missing_agent_runtime",
-        "No authenticated local CLI agent is available. Choose Human for this sub-aim or set up Codex or Claude CLI.",
+        // Runtime-agnostic on purpose: the adapter registry is open, so naming built-ins here
+        // would go stale the moment someone adds one.
+        "No authenticated local CLI agent is available. Choose Human for this sub-aim or set up a local agent CLI.",
       ));
       continue;
     }

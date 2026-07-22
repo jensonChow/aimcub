@@ -360,6 +360,10 @@ export const STRINGS = {
   "execute.blockedTitle": { en: "Blocked work", zh: "工作受阻" },
   "execute.blockedDefault": { en: "Resolve the blocker before this sub-aim can continue.", zh: "先解决阻塞项，然后才能继续这个子目标。" },
   "execute.secondaryActionsLabel": { en: "Secondary actions", zh: "次要动作" },
+  "execute.liveRunTitle": { en: "Agent run in progress", zh: "Agent 运行中" },
+  "execute.liveRunFinished": { en: "Agent run finished", zh: "Agent 运行结束" },
+  "execute.liveRunTool": { en: "Using {tool}", zh: "正在使用 {tool}" },
+  "execute.cancelRun": { en: "Stop run", zh: "停止运行" },
   "execute.emptySubAims": { en: "No sub-aims are ready to execute.", zh: "暂无可执行的子目标。" },
   "execute.localAgent": { en: "Local agent", zh: "本地 agent" },
   "execute.runState": { en: "Run state", zh: "运行状态" },
@@ -1339,8 +1343,8 @@ export const STRINGS = {
 
   "laf.title": { en: "Local CLI agents", zh: "本地 CLI agent" },
   "laf.blurb": {
-    en: "Use installed Codex or Claude CLIs as local helpers for agent-routed sub-aims.",
-    zh: "把已安装的 Codex 或 Claude CLI 作为本地助手，用于交给 agent 的子目标。",
+    en: "Use your installed local agent CLIs as helpers for agent-routed sub-aims.",
+    zh: "把已安装的本地 agent CLI 作为助手，用于交给 agent 的子目标。",
   },
   "laf.rescan": { en: "Rescan", zh: "重新扫描" },
   "laf.scanning": { en: "Scanning…", zh: "扫描中…" },
