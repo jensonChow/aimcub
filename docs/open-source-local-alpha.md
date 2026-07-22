@@ -4,6 +4,9 @@
 > open-source local alpha for new developers and contributors. It does not expand
 > product scope beyond the local alpha contract.
 
+New here? [`quickstart.md`](quickstart.md) is the fastest path from a clone to
+a seeded, explorable aim — come back here for the fuller contributor picture.
+
 ## What Aimcub Is
 
 Aimcub manages aims across humans and agents. The system keeps the aim as the
