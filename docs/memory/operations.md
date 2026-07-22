@@ -49,13 +49,13 @@ This creates `apps/desktop/dist/mac-arm64/Aimcub.app`; copy that bundle to root 
 Desktop currently uses Electron 43.0.0. If sandboxed packaging cannot write Electron's default cache under `~/Library/Caches/electron`, run the build and builder steps with a writable Electron download cache, for example:
 
 ```bash
-pnpm --filter @app/desktop run build
-ELECTRON_BUILDER_CACHE=/private/tmp/aimcub-electron-builder-cache pnpm --filter @app/desktop exec electron-builder --mac --dir --config.electronDownload.cache=/private/tmp/aimcub-electron-cache
+pnpm --filter @aimcub/desktop run build
+ELECTRON_BUILDER_CACHE=/private/tmp/aimcub-electron-builder-cache pnpm --filter @aimcub/desktop exec electron-builder --mac --dir --config.electronDownload.cache=/private/tmp/aimcub-electron-cache
 ```
 
 For any repo-changing session, `pnpm build` is not enough because it updates build output but not the project-root `Aimcub.app` bundle. Run `pnpm desktop:pack`, copy `apps/desktop/dist/mac-arm64/Aimcub.app` to root `Aimcub.app`, and restart/open that exact bundle when the user needs to inspect visible app behavior.
 
-Every Desktop runtime dependency under `@core/*` currently exports raw TypeScript and must be listed in `bundleFromSource` in `apps/desktop/electron.vite.config.ts`. Desktop build, pack, and dist run `scripts/verify-bundled-core.mjs`; do not bypass that check. A successful electron-builder run is not sufficient startup evidence: after refreshing the root bundle, launch that exact `Aimcub.app` with isolated `AIMCUB_HOME` and Electron user data, and confirm that both the main process and a renderer process remain alive.
+Every Desktop runtime dependency among the `@aimcub/*` library packages currently exports raw TypeScript and must be listed in `bundleFromSource` in `apps/desktop/electron.vite.config.ts`. Desktop build, pack, and dist run `scripts/verify-bundled-core.mjs`; do not bypass that check. A successful electron-builder run is not sufficient startup evidence: after refreshing the root bundle, launch that exact `Aimcub.app` with isolated `AIMCUB_HOME` and Electron user data, and confirm that both the main process and a renderer process remain alive.
 
 ## Packaged Desktop Visual QA
 
@@ -66,7 +66,7 @@ Check the normal 960 by 680 footprint and the 640 by 520 minimum. At minimum siz
 Desktop release packaging for distributable DMG/zip artifacts uses:
 
 ```bash
-pnpm --filter @app/desktop run dist
+pnpm --filter @aimcub/desktop run dist
 ```
 
 macOS DMG generation requires `hdiutil`, so it may need to run outside the sandbox.
@@ -82,7 +82,7 @@ If the local store grows too large, the intended compaction behavior is: back up
 The deterministic local alpha seed lives under `examples/local-alpha/`. Build it with:
 
 ```bash
-pnpm --filter @app/cli exec esbuild ../../examples/local-alpha/seed-local-alpha-demo.ts --bundle --platform=node --format=esm --target=node22 --outfile=/tmp/aimcub-local-alpha-demo-seed.mjs
+pnpm --filter @aimcub/cli exec esbuild ../../examples/local-alpha/seed-local-alpha-demo.ts --bundle --platform=node --format=esm --target=node22 --outfile=/tmp/aimcub-local-alpha-demo-seed.mjs
 ```
 
 Run it only against an isolated directory, for example:
@@ -109,11 +109,11 @@ Move durable decisions into the relevant file under `docs/memory/` instead of le
 
 ## Desktop Packaging Identity
 
-Since 2026-07-22 the packed app's `appId` is `com.jensonchow.aimcub` (matches ASC App ID 6785268817, team K9XA27TP7F — the old `com.aimcub.desktop` mismatch is resolved). The committed placeholder icon (`apps/desktop/build/icon.icns`) regenerates via `pnpm --filter @app/desktop run icon:generate` (dependency-free script; replace the .icns when real brand lands). Hardened runtime + minimal entitlements (JIT, network client — justified inline; may need `allow-unsigned-executable-memory` once actually signed, untestable while unsigned) are wired; electron-builder's built-in notarize is enabled but inert by construction while `identity: null`; `pnpm --filter @app/desktop run notarize:check` diagnoses credential env. Targets stay arm64 dmg+zip; universal deferred to v0.1.0. Library builds use per-package `tsconfig.build.json` (tests excluded from dist) + vitest src-allowlists — never let dist tests back into runs.
+Since 2026-07-22 the packed app's `appId` is `com.jensonchow.aimcub` (matches ASC App ID 6785268817, team K9XA27TP7F — the old `com.aimcub.desktop` mismatch is resolved). The committed placeholder icon (`apps/desktop/build/icon.icns`) regenerates via `pnpm --filter @aimcub/desktop run icon:generate` (dependency-free script; replace the .icns when real brand lands). Hardened runtime + minimal entitlements (JIT, network client — justified inline; may need `allow-unsigned-executable-memory` once actually signed, untestable while unsigned) are wired; electron-builder's built-in notarize is enabled but inert by construction while `identity: null`; `pnpm --filter @aimcub/desktop run notarize:check` diagnoses credential env. Targets stay arm64 dmg+zip; universal deferred to v0.1.0. Library builds use per-package `tsconfig.build.json` (tests excluded from dist) + vitest src-allowlists — never let dist tests back into runs.
 
 ## Release Scaffolding
 
-Versioning is changesets-based (2026-07-21): lockstep `fixed` group across `@core/*` + `@app/*` with `privatePackages { version, tag }`; the workspace root cannot join the group (not a workspace package — documented in `docs/releasing.md`, root stays `0.0.0`). Flow: `pnpm changeset` per change → `pnpm release:version` → commit → tag `vX.Y.Z` → push tag (founder-owned) → `.github/workflows/release.yml` verifies (ci.yml steps duplicated; composite-action dedup is a flagged TODO), builds the CLI bundle + unsigned desktop dmg/zip on macos-14, and drafts a GitHub Release via `gh`. npm publish is a deliberately blocked placeholder until the license decision + `@aimcub` org registration.
+Versioning is changesets-based (2026-07-21): lockstep `fixed` group across all `@aimcub/*` workspace packages with `privatePackages { version, tag }`; the workspace root cannot join the group (not a workspace package — documented in `docs/releasing.md`, root stays `0.0.0`). Flow: `pnpm changeset` per change → `pnpm release:version` → commit → tag `vX.Y.Z` → push tag (founder-owned) → `.github/workflows/release.yml` verifies (ci.yml steps duplicated; composite-action dedup is a flagged TODO), builds the CLI bundle + unsigned desktop dmg/zip on macos-14, and drafts a GitHub Release via `gh`. npm publish is a deliberately blocked placeholder until the license decision + `@aimcub` org registration.
 
 ## Public Release Readiness
 

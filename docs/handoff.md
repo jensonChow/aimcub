@@ -1,81 +1,81 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-22
-Branch: `main`. **OSS-maturity epic batch 3 is MERGED and verified**; batch 4
-(quality + launch prep) plus a standalone rename prompt are staged in
-gitignored `worktrees/prompts/`. Local `main` is ahead of `origin/main`
-(`410c2776`) by batches 1–3 — **push needs founder approval**.
+Branch: `main`. **OSS-maturity epic: all four engineering batches AND the
+`@aimcub/*` rename are MERGED and verified.** What remains is the
+founder-owned launch checklist below. Local `main` is ahead of `origin/main`
+(`410c2776`) by the entire epic — **push needs founder approval**.
 
-## Batch 3 — integrated (merged B3-4 → B3-3 → B3-1 → B3-2)
+## Batch 4 + rename — integrated
 
-1. `3cd2bea9` **eval-moat-benchmark** — `examples/eval-moat`: deterministic
-   two-condition fixtures (3 personas), budgeted live mode, blind seeded A/B
-   judging, honest reporting. **First live result** (deepseek, 9 calls):
-   contexted wins 2/1, mean +7.67/25 — directional, N=1. Surfaced two real
-   `@core` bugs (below).
-2. `e088b198` **test-integrity** — mcp test count was a pure dist mirror
-   (114 → **57**); core/store/llm typecheck now covers test files (~40 fixture
-   drifts fixed, zero weakened assertions; core gained `lib: WebWorker` for
-   `structuredClone` — purity tripwire intact).
-3. `64e3272f` **artifact-capture** — adapters emit file artifacts (codex
-   file_change/patch; claude Write/Edit/MultiEdit/NotebookEdit — nested
-   tool_use now normalizes as real tool events); orchestrator persists deduped
-   `artifact.created`, capped raw (8KB/event, 256KB/run, explicit markers),
-   artifact summary + `evidence.reported` on the run's evidence. Typed
-   selection errors → clean CLI user errors.
-4. `a8dcac97` **permissions-inspection** — per-run consent
-   (sandbox/network/workspace; main rejects `danger-full-access` and invalid
-   workspaces — renderer is not the boundary), background drain stays
-   read-only-scoped with widened runs executed only via same-session
-   claim-by-id; run timeline (generic fallback for unknown event types);
-   store-recovery banner; developer mode (gates the two real debug surfaces;
-   new `desktop-settings.json`); `docs/agent-permissions.md` threat model.
-5. `f38b4bc5` — integration fix for the planned cross-lane gap (store queue
-   fixture annotation).
+1. `e5758dde` **community-scaffolding** — `docs/roadmap.md` (gate-by-gate,
+   every claim code-verified), `docs/good-first-contributions.md` (7 items),
+   adapter-proposal issue template.
+2. `8d96be61` **cockpit-cli-loose-ends** — PlanningDebugPanel remounted in
+   ContextStage behind developer mode (its plumbing was live all along);
+   stranded widened-run affordance (re-grant claims the recorded consent by
+   id; cancel-queued needed a real fix through the drain's own atomic gate);
+   `--jsonl` streams artifacts; queue requests carry a `surface` marker
+   (desktop/cli) shown in the timeline and logged at startup.
+3. `26097df8` **core-quality-eval-findings** — both benchmark findings fixed:
+   planning-context closed-class stopwords + content-token guard (the four
+   leaked rows are withheld; related rows survive); the critic no longer
+   penalizes human-gated milestones for manual verification (ownership rule
+   reused from plan-handoff) nor undifferentiable duplicate `manual_confirm`
+   rules. 6 new regression tests fail pre-fix. `examples/eval-moat` joined
+   the workspace — its 49 tests/typecheck/lint are in the root gate.
+4. `cfa5d1e1` **rename** — `@core/*` + `@app/*` → `@aimcub/*` (names only;
+   dirs, `private`, publish-blocking unchanged; `@core/domain` → 
+   `@aimcub/core`). Purity guard survived by directory glob; the
+   escaped-regex `@core\/` in `verify-bundled-core.mjs` was caught (it would
+   have silently no-opped the bundle-leak check). The rename ran parallel to
+   batch 4 from the same base, so integration reconciled it: 4 conflicts
+   resolved (batch-4 behavior under new names) and the map re-applied to
+   batch-4-born files (strandedRun.*, three changesets, the new docs).
+   `docs/memory/**` re-pointed at integration.
 
 ## Verification (integration round)
 
-- Full gate green first run on merged `main`: build 9/9 · typecheck 16/16
-  (now honestly covering test files) · lint 10/10 · purity clean ·
-  **1028 tests** (desktop 339, domain 187, llm 170, cli 103, store 95,
-  mcp 57 honest, db 36, local-agent 21, api 20).
-- Repacked + refreshed root `Aimcub.app`; boot smoke clean (main + 3
-  renderers), real `~/.aimcub` untouched, no debris.
-- Eval-moat dry run executed from merged main: deterministic, 0 provider
-  calls, context diff non-empty for all 3 personas. Typed CLI error verified
-  live: `Claude Code is not authenticated.` with no "Unexpected error:"
-  prefix.
+- Full gate green on final `main`: build 9/9 · typecheck 17/17 · lint 11/11 ·
+  purity clean · **1108 tests** under `@aimcub/*` names (desktop 361,
+  core 191, llm 172, cli 106, store 95, mcp 57, eval-moat 49, db 36,
+  local-agent 21, api 20). Lockfile validated with a frozen install
+  post-merge.
+- Straggler sweep: zero `@core/`/`@app/` references outside git history.
+- Repacked + refreshed root `Aimcub.app`; boot smoke clean; eval-moat dry
+  run deterministic from the renamed tree; real `~/.aimcub` untouched.
 
-## Open threads
+## The epic is code-complete. Founder-owned launch checklist
 
-- **Batch 4 staged** (`worktrees/prompts/B4-*.md`, 3 parallel lanes):
-  B4-1 fix the two eval-moat findings in `@core` + join `examples/*` to the
-  workspace so the benchmark's 48 tests enter the gate (Opus 4.8) ·
-  B4-2 community scaffolding: public roadmap from v1-spec gates,
-  good-first-issues, adapter-proposal template (Sonnet 5) ·
-  B4-3 cockpit + CLI loose ends: PlanningDebugPanel dead code, stranded
-  widened-run affordance, `--jsonl` artifacts field, queue-request `surface`
-  marker (Sonnet 5). Merge order: B4-2 → B4-3 → B4-1.
-- **`SOLO-rename.md` staged** — the `@core/*`→`@aimcub/*` rename prompt.
-  Run it ALONE (no parallel worktrees); schedule at will, ideally right
-  before publish.
-- The two eval-moat `@core` findings (fixed by B4-1): planning-context admits
-  unrelated rows via function-word overlap (`RELEVANCE_STOPWORDS`,
-  `packages/llm/src/planning-context.ts:61`); `critiquePlan` zeroes honestly
-  human-routed plans (`manual_only_verification` / duplicate `manual_confirm`
-  penalties) that the blind judge preferred.
-- Post-batch-4 the epic reduces to the founder checklist + rename +
-  distribution: license decision; `@aimcub` npm org; GitHub description /
-  Discussions / private vuln reporting; CoC contact; Apple signing creds
-  (then re-verify entitlements signed); gitleaks history scan; flip public;
-  tag v0.1.0; npx/Homebrew after npm publish exists; **push authorization**.
-- Smaller carried notes: "Learn more" in the consent control is text until a
-  public repo URL exists; second-provider eval-moat run would size judge
-  bias; store schema version still deferred.
+Ordered — each unblocks the next:
+
+1. **Decide the license** (unblocks everything outward).
+2. Add the LICENSE file + register the **`@aimcub` npm org** (the rename made
+   publish a `private: false` flip + `changeset publish`; see
+   `docs/releasing.md`).
+3. GitHub repo settings: fix the stale "GoalPet" description, enable
+   Discussions + private vulnerability reporting; set the CODE_OF_CONDUCT
+   enforcement contact.
+4. Run a full-history gitleaks/trufflehog scan (targeted sweep in batch 1
+   found zero; this is the belt-and-suspenders pass).
+5. **Authorize the push** of local `main`; flip the repo public.
+6. Tag `v0.1.0` (release.yml drafts the GitHub Release with CLI bundle +
+   unsigned dmg/zip).
+7. Apple signing credentials + notarization (`notarize:check` diagnoses env;
+   re-verify the 2-entitlement set under a real signed launch).
+8. Post-publish distribution: `npx @aimcub/cli` validation, Homebrew formula.
+
+## Standing follow-ups (non-blocking, tracked in docs/good-first-contributions.md and here)
+
+- Second-provider eval-moat live run (judge-bias sizing); more personas.
+- Store on-disk schema version (design proposal welcomed).
+- Bare `@core` strings inside six test fixtures' sample prose — deliberate,
+  cosmetic only.
+- "Learn more" in the consent control becomes a real link once a public repo
+  URL exists.
 
 ## Next session
 
-Integrate batch 4 (merge B4-2 → B4-3 → B4-1; gate now includes eval-moat
-tests once B4-1 lands; re-run the benchmark dry-run as smoke). After that,
-the remaining work is founder-gated launch execution — assemble the final
-public-flip run-list when the license lands.
+If branches return again, the pattern is unchanged (reports → merge → gate →
+repack → smoke → docs). Otherwise: execute the launch checklist top-down with
+the founder; the first two items are decisions only they can make.
