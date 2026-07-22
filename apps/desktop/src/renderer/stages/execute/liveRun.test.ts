@@ -3,7 +3,13 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import type { LocalAgentEvent, RunLiveEvent } from "../../../shared/ipc";
-import { applyRunLiveEvent, isTerminalRunEvent, liveRunForMilestone, type LiveRunState } from "./liveRun";
+import {
+  applyRunLiveEvent,
+  isTerminalRunEvent,
+  liveRunForMilestone,
+  LIVE_RUN_EVENT_LIMIT,
+  type LiveRunState,
+} from "./liveRun";
 
 function live(event: LocalAgentEvent, overrides: Partial<RunLiveEvent> = {}): RunLiveEvent {
   return {
@@ -40,6 +46,32 @@ describe("live run state", () => {
     ]);
     expect(state?.summary).toBe("Codex started.");
     expect(state?.status).toBe("running");
+  });
+
+  it("buffers the run's streamed events for the timeline, bounded and per run", () => {
+    const state = fold([
+      live({ type: "agent.run.started", summary: "Codex started." }),
+      live({ type: "agent.tool.started", summary: "shell", toolName: "shell" }),
+    ]);
+    expect(state?.events.map((entry) => entry.event.type)).toEqual(["agent.run.started", "agent.tool.started"]);
+    expect(state?.eventCount).toBe(2);
+
+    // A newer run starts its own buffer instead of inheriting the previous run's.
+    const second = applyRunLiveEvent(state, live({ type: "agent.run.started", summary: "Second." }, { runId: "run-2" }));
+    expect(second.events).toHaveLength(1);
+    expect(second.eventCount).toBe(1);
+  });
+
+  it("caps the buffer while still counting everything the run streamed", () => {
+    const chatty = Array.from({ length: LIVE_RUN_EVENT_LIMIT + 25 }, (_unused, index) =>
+      live({ type: "agent.raw", summary: `line ${index}` }));
+    const state = fold(chatty)!;
+
+    expect(state.events).toHaveLength(LIVE_RUN_EVENT_LIMIT);
+    // The count keeps the truth the cap discarded, so the timeline can still align the live tail
+    // against what is already persisted.
+    expect(state.eventCount).toBe(LIVE_RUN_EVENT_LIMIT + 25);
+    expect(state.events[0]?.event.summary).toBe("line 25");
   });
 
   it("switches wholesale to a newer run rather than blending two", () => {

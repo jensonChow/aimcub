@@ -8,6 +8,8 @@ import type { AimDraft, AimProgressReadModel, DecompositionOutput, Goal, Milesto
 import type { ContextSourceStatus, GoalDetail, ProviderStatus, WebResearchStatus } from "../shared/ipc";
 
 import { App, SettingsPanel, SettingsSidebarNav } from "./App";
+import { DeveloperModeProvider } from "./developerMode";
+import { StoreDiagnosticsBanner } from "./StoreDiagnosticsBanner";
 import { HomeView } from "./stages/home/HomeView";
 import { CockpitShell, WORKBENCH_STAGE_IDS } from "./CockpitShell";
 import { I18nProvider, STRINGS } from "./i18n";
@@ -475,6 +477,48 @@ describe("ExecutePanel", () => {
     expect(html).not.toContain("Raw message delta");
     expect(html).not.toContain("Raw stream event");
   });
+
+  it("asks for per-run permission before an agent run, defaulting to read-only with no network", () => {
+    const html = renderExecute([
+      executeRow({ id: AGENT_MILESTONE, title: "Run implementation agent", owner: "agent" }),
+    ]);
+
+    expect(html).toContain('aria-label="What this run may do"');
+    expect(html).toContain('data-escalated="false"');
+    expect(html).toContain("Read only");
+    expect(html).toContain("Write in a folder");
+    expect(html).toContain("The agent can read and think. It cannot change any file on this machine.");
+    expect(html).toContain("Web search and page fetching stay disabled for this run.");
+    // The one level the cockpit will never grant.
+    expect(html).not.toContain("danger-full-access");
+    // The consent control points at the written threat model.
+    expect(html).toContain("docs/agent-permissions.md");
+  });
+
+  it("leaves the consent control off a human-routed sub-aim, which runs no agent", () => {
+    const html = renderExecute([
+      executeRow({ id: HUMAN_MILESTONE, title: "Submit launch approval", owner: "human" }),
+    ]);
+    expect(html).not.toContain('aria-label="What this run may do"');
+  });
+
+  it("shows a per-run timeline built from persisted run events", () => {
+    const html = renderExecute([
+      executeRow({ id: AGENT_MILESTONE, title: "Run implementation agent", owner: "agent" }),
+    ]);
+    expect(html).toContain('data-od-id="run-timeline"');
+    expect(html).toContain("Run timeline");
+  });
+
+  it("gives the live run its own Glass row instead of reusing the work-note style", () => {
+    const panel = readFileSync(new URL("./stages/execute/ExecutePanel.tsx", import.meta.url), "utf8");
+    const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
+
+    expect(panel).toContain('<div className="od-live-run" data-running={running ? "true" : "false"}');
+    expect(panel).not.toMatch(/className="od-work-note" role="status"/);
+    expect(css).toMatch(/\.od-live-run\s*{[^}]*background:\s*var\(--field\);/s);
+    expect(css).toMatch(/\.od-live-run\[data-running="true"\] \.od-live-run-dot\s*{[^}]*animation:\s*od-journey-pulse/s);
+  });
 });
 
 describe("LocalAgentExecutionSummary", () => {
@@ -752,13 +796,15 @@ describe("App planning state guards", () => {
     expect(contractsStage.indexOf("<ContextReviewPanel")).toBeLessThan(contractsStage.indexOf("{planPanel}"));
   });
 
-  it("keeps product error details behind an explicit developer disclosure", () => {
+  it("keeps product error details behind developer mode, not merely a disclosure", () => {
     const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
 
     expect(source).toContain('className="od-notice-copy"');
     expect(source).toContain('className="od-notice-details"');
     expect(source).toContain('summary>{t("plan.developerDetails")}</summary>');
     expect(source).toContain('props.error.details.join("\\n")');
+    // The raw failure dump renders only when the user has explicitly turned developer mode on.
+    expect(source).toContain("{developerMode && props.error.details.length > 0 ? (");
   });
 
   it("clears stale draft, error, and context state for New Aim and opened aims", () => {
@@ -1078,7 +1124,9 @@ describe("PlanPanel", () => {
     expect(html.indexOf("Eval signal")).toBeGreaterThan(detailsIndex);
     expect(html).toContain("Routing controls");
     expect(html).toContain("Structure edits");
-    expect(html).toContain("Developer details");
+    // Developer mode is off by default, so the whole developer affordance is absent — not merely
+    // collapsed. The product plan surface has no debug shape at all.
+    expect(html).not.toContain("Developer details");
     expect(html).toContain("Save aim");
     expect(html).not.toContain("Acceptance check");
     expect(html).not.toContain("Acceptance rule");
@@ -1157,10 +1205,11 @@ describe("PlanPanel", () => {
     expect(html).toContain("Codex CLI needs authentication.");
   });
 
-  it("keeps acceptance rule editing inside Developer details", () => {
+  it("keeps acceptance rule editing inside Developer details, and only in developer mode", () => {
     const node = contractPlan.nodes[0]!;
     const html = renderToStaticMarkup(
       <I18nProvider>
+        <DeveloperModeProvider enabled>
         <PlanContractCard
           node={node}
           index={0}
@@ -1193,6 +1242,7 @@ describe("PlanPanel", () => {
           onRuleText={noop}
           onRuleCommit={noop}
         />
+        </DeveloperModeProvider>
       </I18nProvider>,
     );
 
@@ -1239,7 +1289,9 @@ describe("PlanPanel", () => {
     };
     const busyHtml = renderToStaticMarkup(
       <I18nProvider>
-        <PlanContractCard {...sharedProps} editable disabled structureDisabled />
+        <DeveloperModeProvider enabled>
+          <PlanContractCard {...sharedProps} editable disabled structureDisabled />
+        </DeveloperModeProvider>
       </I18nProvider>,
     );
     const busyTextareas = [...busyHtml.matchAll(/<textarea[^>]*>/g)].map(([tag]) => tag);
@@ -1254,7 +1306,9 @@ describe("PlanPanel", () => {
 
     const savedHtml = renderToStaticMarkup(
       <I18nProvider>
-        <PlanContractCard {...sharedProps} editable={false} disabled={false} structureDisabled={false} />
+        <DeveloperModeProvider enabled>
+          <PlanContractCard {...sharedProps} editable={false} disabled={false} structureDisabled={false} />
+        </DeveloperModeProvider>
       </I18nProvider>,
     );
     expect(savedHtml).not.toContain("Apply rule");
@@ -1264,7 +1318,10 @@ describe("PlanPanel", () => {
 });
 
 describe("SettingsPanel", () => {
-  function renderSettings(section: "general" | "brain" | "workers" | "research" | "about") {
+  function renderSettings(
+    section: "general" | "brain" | "workers" | "research" | "about",
+    developerMode = false,
+  ) {
     return renderToStaticMarkup(
       <I18nProvider>
         <SettingsPanel
@@ -1273,6 +1330,8 @@ describe("SettingsPanel", () => {
           contextSources={contextSourceStatus}
           localAgents={[]}
           activeSection={section}
+          developerMode={developerMode}
+          onDeveloperMode={noop}
           onProvider={noop}
           onWeb={noop}
           onContextSources={noop}
@@ -1338,6 +1397,166 @@ describe("SettingsPanel", () => {
     // No fabricated updater — About only states real facts.
     expect(aboutHtml).not.toContain("Check");
     expect(aboutHtml).not.toContain("latest");
+  });
+
+  it("offers the developer-mode toggle in General, off by default", () => {
+    const offHtml = renderSettings("general");
+    const onHtml = renderSettings("general", true);
+
+    expect(offHtml).toContain("Developer mode");
+    expect(offHtml).toContain("Show traces, raw payloads, and other diagnostics for debugging Aimcub itself. Off by default.");
+    expect(offHtml).toContain('aria-label="Developer mode"');
+    // Off is the selected radio when nothing has been turned on.
+    expect(offHtml).toMatch(/aria-checked="true"[^>]*data-active="true">Off</);
+    expect(onHtml).toMatch(/aria-checked="true"[^>]*data-active="true">On</);
+  });
+});
+
+describe("developer mode gating", () => {
+  it("is off by default, including for a component with no provider around it", () => {
+    const source = readFileSync(new URL("./developerMode.tsx", import.meta.url), "utf8");
+    expect(source).toContain("createContext<boolean>(false)");
+  });
+
+  it("hides the plan's raw acceptance JSON until developer mode is on", () => {
+    const node = contractPlan.nodes[0]!;
+    const cardProps = {
+      node,
+      index: 0,
+      nodeCount: contractPlan.nodes.length,
+      editable: true,
+      disabled: false,
+      structureDisabled: false,
+      contract: editableContractForNode(node),
+      recommendation: routingRecommendationForPlanNode(node),
+      owner: "agent" as const,
+      selectedAgent: routingAgents[0]!,
+      selectedModel: "gpt-5",
+      readyAgents: routingAgents,
+      nodeIssues: [] as string[],
+      overrideActive: false,
+      ruleText: formatAcceptanceRule(node.acceptance_rule),
+      advancedOpen: true,
+      onNode: noop,
+      onContract: noop,
+      onMoveUp: noop,
+      onMoveDown: noop,
+      onMergeUp: noop,
+      onMergeDown: noop,
+      onSplit: noop,
+      onOwner: noop,
+      onAgent: noop,
+      onModel: noop,
+      onRoutingReset: noop,
+      onAdvancedToggle: noop,
+      onRuleText: noop,
+      onRuleCommit: noop,
+    };
+    const productHtml = renderToStaticMarkup(
+      <I18nProvider>
+        <DeveloperModeProvider enabled={false}>
+          <PlanContractCard {...cardProps} />
+        </DeveloperModeProvider>
+      </I18nProvider>,
+    );
+    const developerHtml = renderToStaticMarkup(
+      <I18nProvider>
+        <DeveloperModeProvider enabled>
+          <PlanContractCard {...cardProps} />
+        </DeveloperModeProvider>
+      </I18nProvider>,
+    );
+
+    // Even with `advancedOpen` set, the product build shows no developer affordance at all.
+    expect(productHtml).not.toContain("Developer details");
+    expect(productHtml).not.toContain("od-plan-developer-row");
+    expect(productHtml).not.toContain("completion_mode");
+    expect(developerHtml).toContain("Hide developer details");
+    expect(developerHtml).toContain("completion_mode");
+  });
+
+  it("persists the preference through its own desktop settings file, never widening a permission", () => {
+    const app = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+    const settings = readFileSync(new URL("../main/app-settings.ts", import.meta.url), "utf8");
+
+    expect(app).toContain("<DeveloperModeProvider enabled={developerMode}>");
+    expect(app).toContain("window.aimcub.setDesktopPreferences({ developerMode: enabled })");
+    expect(settings).toContain("developerMode: false");
+    expect(settings).toContain("developerMode: record.developerMode === true");
+    // The preferences file is desktop-only chrome; it must not carry run permissions.
+    expect(settings).not.toContain("sandbox");
+  });
+});
+
+describe("StoreDiagnosticsBanner", () => {
+  const recovered = {
+    kind: "recovered_from_backup" as const,
+    at: "2026-07-22T09:00:00.000Z",
+    message: "Recovered store.json from store.json.bak",
+    path: "/tmp/aimcub/store.json",
+    quarantinePath: "/tmp/aimcub/store.json.corrupt-2026-07-22T09-00-00-000Z",
+    backupPath: "/tmp/aimcub/store.json.bak",
+  };
+
+  it("says what happened and where the unusable file was kept", () => {
+    const html = renderToStaticMarkup(
+      <I18nProvider>
+        <StoreDiagnosticsBanner diagnostics={[recovered]} onDismiss={noop} />
+      </I18nProvider>,
+    );
+
+    expect(html).toContain('data-od-id="store-diagnostics-banner"');
+    expect(html).toContain("Your workspace file was recovered");
+    expect(html).toContain("Aimcub restored your workspace from its backup copy. Very recent changes may be missing.");
+    expect(html).toContain("/tmp/aimcub/store.json.corrupt-2026-07-22T09-00-00-000Z");
+    expect(html).toContain("Dismiss");
+    // Non-blocking: a status region, never an alert or a modal.
+    expect(html).toContain('role="status"');
+  });
+
+  it("names the quarantined file once, not once per diagnostic of the same incident", () => {
+    // What a real corrupt-then-recover load actually produces: two diagnostics, one file.
+    const html = renderToStaticMarkup(
+      <I18nProvider>
+        <StoreDiagnosticsBanner
+          diagnostics={[{ ...recovered, kind: "corrupt_quarantined" }, recovered]}
+          onDismiss={noop}
+        />
+      </I18nProvider>,
+    );
+
+    expect(html).toContain("The workspace file could not be read, so Aimcub set it aside instead of overwriting it.");
+    expect(html).toContain("Aimcub restored your workspace from its backup copy. Very recent changes may be missing.");
+    expect(html.split(recovered.quarantinePath).length - 1).toBe(1);
+  });
+
+  it("reports a kind it does not recognize rather than staying silent", () => {
+    const html = renderToStaticMarkup(
+      <I18nProvider>
+        <StoreDiagnosticsBanner
+          diagnostics={[{ ...recovered, kind: "something_new" as never, quarantinePath: undefined }]}
+          onDismiss={noop}
+        />
+      </I18nProvider>,
+    );
+    expect(html).toContain("Aimcub reported a storage recovery event.");
+  });
+
+  it("renders nothing when the store had a clean load", () => {
+    const html = renderToStaticMarkup(
+      <I18nProvider>
+        <StoreDiagnosticsBanner diagnostics={[]} onDismiss={noop} />
+      </I18nProvider>,
+    );
+    expect(html).toBe("");
+  });
+
+  it("is wired into the cockpit as a dismissible, non-blocking banner", () => {
+    const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+
+    expect(source).toContain("window.aimcub.getStoreDiagnostics?.().then(applyStoreDiagnostics)");
+    expect(source).toContain("{storeDiagnosticsDismissed ? null : (");
+    expect(source).toContain("onDismiss={() => setStoreDiagnosticsDismissed(true)}");
   });
 });
 

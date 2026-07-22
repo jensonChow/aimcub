@@ -1,6 +1,7 @@
 import type { PlanNodePatch, PlanNodeRoutingRecommendation, RoutingRuntimeAgentOption } from "@core/domain";
 import type { DecompositionContract, PlanNode, PlanRoutingOwner } from "@core/types";
 
+import { useDeveloperMode } from "../../developerMode";
 import { useI18n } from "../../i18n";
 import { decompositionOwnerLabel } from "../../labels";
 import { summarizeRule } from "../../summarize";
@@ -122,6 +123,9 @@ function StructureActionButton(props: {
 
 export function PlanContractCard(props: PlanContractCardProps) {
   const { t } = useI18n();
+  // The acceptance rule's raw JSON is the plan's internal representation, not product copy — the
+  // summarized rule above it is what a user reads. Hidden entirely unless developer mode is on.
+  const developerMode = useDeveloperMode();
   const selectedOwnerLabel = props.owner === "human" ? t("os.actorHuman") : t("os.actorAgent");
   const selectedRoute = props.overrideActive ? t("routing.override") : t("routing.recommended", { owner: props.owner });
   const routeParts = props.owner === "agent"
@@ -314,18 +318,20 @@ export function PlanContractCard(props: PlanContractCardProps) {
           </details>
         ) : null}
 
-        <div className="od-plan-developer-row">
-          <button
-            className="od-plan-advanced-toggle"
-            type="button"
-            aria-expanded={props.advancedOpen}
-            onClick={props.onAdvancedToggle}
-          >
-            {props.advancedOpen ? t("plan.hideDeveloperDetails") : t("plan.developerDetails")}
-          </button>
-        </div>
+        {developerMode ? (
+          <div className="od-plan-developer-row">
+            <button
+              className="od-plan-advanced-toggle"
+              type="button"
+              aria-expanded={props.advancedOpen}
+              onClick={props.onAdvancedToggle}
+            >
+              {props.advancedOpen ? t("plan.hideDeveloperDetails") : t("plan.developerDetails")}
+            </button>
+          </div>
+        ) : null}
 
-        {props.advancedOpen ? (
+        {developerMode && props.advancedOpen ? (
           <div className="od-plan-advanced-body">
             <RuleSummary node={props.node} />
             <div className="od-plan-field-head">

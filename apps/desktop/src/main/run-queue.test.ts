@@ -10,7 +10,15 @@ import type { DecompositionOutput } from "@core/types";
 import type { LocalAgentEvent, LocalAgentRunRequest, LocalAgentRunResult } from "@core/local-agent";
 
 import type { RunLiveEvent } from "../shared/ipc";
-import { createDesktopRunQueue, DESKTOP_RUN_PERMISSION, enqueueDesktopRun, kickRunQueue } from "./run-queue";
+import {
+  claimConsentedRun,
+  createDesktopRunQueue,
+  DESKTOP_RUN_PERMISSION,
+  enqueueDesktopRun,
+  isConsentedEscalation,
+  kickRunQueue,
+  resolveDesktopRunPermission,
+} from "./run-queue";
 
 /**
  * The desktop worker over the shared run queue: enqueue answers immediately with a queued run,
@@ -211,6 +219,84 @@ describe("desktop run queue", () => {
     expect((await store.listRuns(goal.id)).find((run) => run.id === cliRun.id)?.status).toBe("queued");
   });
 
+  it("never lets the background drain pick up a workspace-write run this session did not consent to", async () => {
+    const { store, goal, milestone } = await seedAim();
+    const workspace = mkdtempSync(join(tmpdir(), "aimcub-desktop-consent-"));
+    // A previous desktop session's consented run, left queued when that window closed. The consent
+    // died with the session, so the background drain must not resurrect it.
+    const stranded = await enqueueDesktopRun(createDesktopRunQueue(store, () => {}), {
+      goalId: goal.id,
+      milestoneId: milestone.id,
+      permission: { sandbox: "workspace-write", network: true, workspace },
+    });
+
+    const resumed = createDesktopRunQueue(store, () => {});
+    kickRunQueue(resumed);
+    await resumed.drain({ sandbox: DESKTOP_RUN_PERMISSION.sandbox });
+
+    expect((await store.listRuns(goal.id)).find((run) => run.id === stranded)?.status).toBe("queued");
+  });
+
+  it("records the consented permission and executes it by run id, at the sandbox the user chose", async () => {
+    spawnedRequests.length = 0;
+    const { store, goal, milestone } = await seedAim();
+    const workspace = mkdtempSync(join(tmpdir(), "aimcub-desktop-workspace-"));
+    const queue = createDesktopRunQueue(store, () => {});
+
+    const runId = await enqueueDesktopRun(queue, {
+      goalId: goal.id,
+      milestoneId: milestone.id,
+      permission: { sandbox: "workspace-write", network: true, workspace },
+    });
+
+    // The consent is on the queued row before anything executes.
+    expect((await store.listRuns(goal.id))[0]).toMatchObject({
+      id: runId,
+      status: "queued",
+      sandbox: "workspace-write",
+      network_enabled: true,
+      workspace_root: workspace,
+    });
+
+    // Claim-by-id is the only path that runs it — the same move the CLI makes for `--workspace`.
+    claimConsentedRun(queue, runId);
+    await queue.drain({ runId });
+
+    expect((await store.listRuns(goal.id))[0]?.status).toBe("completed");
+    expect(spawnedRequests).toHaveLength(1);
+    expect(spawnedRequests[0]).toMatchObject({
+      cwd: workspace,
+      permission: { sandbox: "workspace-write", network: true },
+    });
+  });
+
+  it("resolves renderer consent into what main is willing to record", () => {
+    const workspace = mkdtempSync(join(tmpdir(), "aimcub-desktop-resolve-"));
+
+    expect(resolveDesktopRunPermission(undefined)).toEqual({ sandbox: "read-only", network: false, workspace: null });
+    // A read-only run never carries a workspace, even when the renderer sends one.
+    expect(resolveDesktopRunPermission({ sandbox: "read-only", network: true, workspace }))
+      .toEqual({ sandbox: "read-only", network: true, workspace: null });
+    expect(resolveDesktopRunPermission({ sandbox: "workspace-write", network: false, workspace }))
+      .toEqual({ sandbox: "workspace-write", network: false, workspace });
+
+    // The renderer is not the security boundary: main rejects what the UI never offers.
+    expect(() => resolveDesktopRunPermission({ sandbox: "danger-full-access" as never, network: false }))
+      .toThrow(/does not grant/);
+    expect(() => resolveDesktopRunPermission({ sandbox: "workspace-write", network: false }))
+      .toThrow(/Choose the folder/);
+    expect(() => resolveDesktopRunPermission({ sandbox: "workspace-write", network: false, workspace: "relative/path" }))
+      .toThrow(/absolute folder path/);
+    expect(() => resolveDesktopRunPermission({ sandbox: "workspace-write", network: false, workspace: join(workspace, "nope") }))
+      .toThrow(/not a folder/);
+  });
+
+  it("treats anything above the read-only, network-off floor as a consented escalation", () => {
+    expect(isConsentedEscalation({ sandbox: "read-only", network: false })).toBe(false);
+    expect(isConsentedEscalation({ sandbox: "read-only", network: true })).toBe(true);
+    expect(isConsentedEscalation({ sandbox: "workspace-write", network: false })).toBe(true);
+  });
+
   it("kicks the queue without awaiting it and swallows nothing", async () => {
     const { store, goal, milestone } = await seedAim();
     const queue = createDesktopRunQueue(store, () => {});
@@ -228,11 +314,47 @@ describe("desktop run queue", () => {
 
     expect(source).toContain("const runId = await enqueueDesktopRun(runQueue, {");
     expect(source).toContain("kickRunQueue(runQueue);");
-    expect(source).toContain("return { ok: true, runId, error: null };");
+    expect(source).toContain("return { ok: true, runId, error: null, permission };");
     expect(source).toContain("ipcMain.handle(IPC.cancelRun, (_e, runId: string): boolean => runQueue.cancel(runId));");
     // Live events reach every window: a background drain has no originating sender.
     expect(source).toContain("window.webContents.send(IPC.runLiveEvent, payload);");
     // The old inline pipeline is gone from the handler.
     expect(source).not.toContain("aimStore.finishRun");
+  });
+
+  it("routes a consented escalation through claim-by-id and everything else through the floor drain", () => {
+    const source = readFileSync(new URL("./ipc.ts", import.meta.url), "utf8");
+
+    // Renderer input is resolved before it is recorded, and a widened grant only ever executes via
+    // its own run id — the broad drain stays scoped to the read-only floor.
+    expect(source).toContain("const permission = resolveDesktopRunPermission(req.permission);");
+    expect(source).toContain("if (isConsentedEscalation(permission)) claimConsentedRun(runQueue, runId);");
+    expect(source).toContain("else kickRunQueue(runQueue);");
+
+    const queueSource = readFileSync(new URL("./run-queue.ts", import.meta.url), "utf8");
+    expect(queueSource).toContain("queue.drain({ sandbox: DESKTOP_RUN_PERMISSION.sandbox })");
+    expect(queueSource).toContain("queue.drain({ runId })");
+    // The only two drains the desktop worker performs, and neither can be widened: one is pinned
+    // to the floor constant, the other is a single run id.
+    expect([...queueSource.matchAll(/\.drain\(\{[^}]*\}\)/g)].map(([call]) => call)).toEqual([
+      ".drain({ sandbox: DESKTOP_RUN_PERMISSION.sandbox })",
+      ".drain({ runId })",
+    ]);
+  });
+
+  it("keeps cancellation working for a consented run", async () => {
+    const { store, goal, milestone } = await seedAim();
+    const workspace = mkdtempSync(join(tmpdir(), "aimcub-desktop-cancel-"));
+    const queue = createDesktopRunQueue(store, () => {});
+    const runId = await enqueueDesktopRun(queue, {
+      goalId: goal.id,
+      milestoneId: milestone.id,
+      permission: { sandbox: "workspace-write", network: false, workspace },
+    });
+
+    // Nothing is executing yet, so there is no controller to abort — cancel says so honestly.
+    expect(queue.cancel(runId)).toBe(false);
+    await queue.drain({ runId });
+    expect((await store.listRuns(goal.id))[0]?.status).toBe("completed");
   });
 });

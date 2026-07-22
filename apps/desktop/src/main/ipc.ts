@@ -60,6 +60,7 @@ import {
   type ProviderTestResult,
   type ContextSourceConfig,
   type ContextSourceStatus,
+  type DesktopPreferences,
   type LocalContextPickResult,
   type LocalAgentDetection,
   type LocalAgentRunRequest,
@@ -91,7 +92,15 @@ import {
 } from "./context-source-settings";
 import { getWebResearchStatus, setWebResearchConfig, testWebResearchConfig } from "./web-research-settings";
 import { listLocalAgents, runLocalAgent } from "./local-agents";
-import { createDesktopRunQueue, enqueueDesktopRun, kickRunQueue } from "./run-queue";
+import { loadDesktopPreferences, saveDesktopPreferences } from "./app-settings";
+import {
+  claimConsentedRun,
+  createDesktopRunQueue,
+  enqueueDesktopRun,
+  isConsentedEscalation,
+  kickRunQueue,
+  resolveDesktopRunPermission,
+} from "./run-queue";
 
 /** Live run events go to every open window: a background drain has no originating sender. */
 function broadcastRunLiveEvent(payload: RunLiveEvent): void {
@@ -164,32 +173,46 @@ function routingAgentOptions(detections: readonly LocalAgentDetection[]): Routin
  * model), execution, event persistence and evidence all live in the shared orchestrator; the run
  * itself streams back on `IPC.runLiveEvent` and lands in the store, so closing the window no
  * longer throws work away.
+ *
+ * The renderer's permission is treated as untrusted input: `resolveDesktopRunPermission` decides
+ * what is recordable, and anything above the background floor is claimed BY ID here — the drain
+ * that runs on its own stays read-only-scoped, so a widened run can only ever execute inside the
+ * session whose user granted it.
  */
 async function runMilestoneAgent(req: RunMilestoneAgentRequest): Promise<RunMilestoneAgentResult> {
   const detail = await aimStore.getGoal(req.goalId);
-  if (!detail) return { ok: false, runId: null, error: "Aim not found." };
+  if (!detail) return { ok: false, runId: null, error: "Aim not found.", permission: null };
   const milestone = detail.milestones.find((item) => item.id === req.milestoneId);
-  if (!milestone) return { ok: false, runId: null, error: "Sub-aim not found." };
+  if (!milestone) return { ok: false, runId: null, error: "Sub-aim not found.", permission: null };
   const override = routingOverrideForMilestone(milestone);
   if (!req.agentId && override?.owner === "human") {
     return {
       ok: false,
       runId: null,
       error: "This sub-aim is routed to a human. Reassign it to an agent before running a local agent.",
+      permission: null,
     };
   }
   try {
+    const permission = resolveDesktopRunPermission(req.permission);
     const runId = await enqueueDesktopRun(runQueue, {
       goalId: detail.goal.id,
       milestoneId: milestone.id,
+      permission,
       ...(req.agentId ? { agentId: req.agentId } : {}),
       ...(req.model ? { model: req.model } : {}),
       ...(req.prompt ? { instruction: req.prompt } : {}),
     });
-    kickRunQueue(runQueue);
-    return { ok: true, runId, error: null };
+    if (isConsentedEscalation(permission)) claimConsentedRun(runQueue, runId);
+    else kickRunQueue(runQueue);
+    return { ok: true, runId, error: null, permission };
   } catch (error) {
-    return { ok: false, runId: null, error: error instanceof Error ? error.message : String(error) };
+    return {
+      ok: false,
+      runId: null,
+      error: error instanceof Error ? error.message : String(error),
+      permission: null,
+    };
   }
 }
 
@@ -475,6 +498,20 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.revealWorkspace, async () => {
     await shell.openPath(defaultDataDir());
   });
+
+  // Corruption/recovery reports. Read-only and cheap; the cockpit polls it with its other
+  // startup reads so a quarantined store never looks like an empty workspace.
+  ipcMain.handle(IPC.getStoreDiagnostics, () => aimStore.getDiagnostics());
+
+  ipcMain.handle(IPC.getDesktopPreferences, (): DesktopPreferences => loadDesktopPreferences());
+
+  ipcMain.handle(IPC.setDesktopPreferences, (_e, prefs: DesktopPreferences): DesktopPreferences =>
+    saveDesktopPreferences(prefs),
+  );
+
+  // The folder picker behind a `workspace-write` consent. A native dialog is the grant: the
+  // renderer cannot name a path the user did not choose here (main re-checks it at enqueue).
+  ipcMain.handle(IPC.pickRunWorkspace, async (): Promise<LocalContextPickResult> => pickLocalContextFolder());
 
   ipcMain.handle(IPC.intake, async (event, req: IntakeRequest) => {
     const runId = planningRunId(req);

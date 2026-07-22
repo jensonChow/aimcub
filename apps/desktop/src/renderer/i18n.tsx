@@ -363,7 +363,74 @@ export const STRINGS = {
   "execute.liveRunTitle": { en: "Agent run in progress", zh: "Agent 运行中" },
   "execute.liveRunFinished": { en: "Agent run finished", zh: "Agent 运行结束" },
   "execute.liveRunTool": { en: "Using {tool}", zh: "正在使用 {tool}" },
+  "execute.liveRunWaiting": { en: "Waiting for the runtime to report.", zh: "正在等待运行时回报。" },
   "execute.cancelRun": { en: "Stop run", zh: "停止运行" },
+
+  // Per-run permission consent (deliverable 1)
+  "runPermission.title": { en: "What this run may do", zh: "本次运行的权限" },
+  "runPermission.sandboxLabel": { en: "Files", zh: "文件" },
+  "runPermission.networkLabel": { en: "Network", zh: "网络" },
+  "runPermission.sandbox.readOnly": { en: "Read only", zh: "只读" },
+  "runPermission.sandbox.workspaceWrite": { en: "Write in a folder", zh: "可写入某个文件夹" },
+  "runPermission.sandbox.readOnlyBody": {
+    en: "The agent can read and think. It cannot change any file on this machine.",
+    zh: "Agent 可以阅读和思考，但不能修改本机任何文件。",
+  },
+  "runPermission.sandbox.workspaceWriteBody": {
+    en: "The agent can create and change files inside the folder you choose — and only there.",
+    zh: "Agent 可以在你选择的文件夹内创建和修改文件——仅限该文件夹。",
+  },
+  "runPermission.network.offBody": {
+    en: "Web search and page fetching stay disabled for this run.",
+    zh: "本次运行禁用网络搜索与网页抓取。",
+  },
+  "runPermission.network.onBody": {
+    en: "The agent may search the web and fetch pages during this run.",
+    zh: "本次运行允许 agent 搜索网页并抓取页面。",
+  },
+  "runPermission.networkOff": { en: "Off", zh: "关闭" },
+  "runPermission.networkOn": { en: "On", zh: "开启" },
+  "runPermission.chooseFolder": { en: "Choose folder", zh: "选择文件夹" },
+  "runPermission.changeFolder": { en: "Change", zh: "更改" },
+  "runPermission.folderRequired": {
+    en: "Choose the folder this run may write in before starting it.",
+    zh: "开始运行前，请先选择本次运行可写入的文件夹。",
+  },
+  "runPermission.folderLabel": { en: "Writable folder", zh: "可写文件夹" },
+  "runPermission.sessionOnly": {
+    en: "A wider grant applies to this run only, started from this window.",
+    zh: "更宽的授权仅对本次运行、且仅在本窗口内生效。",
+  },
+  "runPermission.learnMore": {
+    en: "Full threat model: docs/agent-permissions.md",
+    zh: "完整威胁模型见 docs/agent-permissions.md",
+  },
+
+  // Run timeline (deliverable 2)
+  "runTimeline.title": { en: "Run timeline", zh: "运行时间线" },
+  "runTimeline.empty": { en: "No runs recorded for this sub-aim yet.", zh: "此子目标尚无运行记录。" },
+  "runTimeline.runLabel": { en: "Run {n}", zh: "第 {n} 次运行" },
+  "runTimeline.attempt": { en: "Attempt {n}", zh: "第 {n} 次尝试" },
+  "runTimeline.retryOf": { en: "Retry of an earlier attempt", zh: "重试此前的尝试" },
+  "runTimeline.stepCount": { en: "{n} step(s)", zh: "{n} 个步骤" },
+  "runTimeline.live": { en: "Live", zh: "进行中" },
+  "runTimeline.duration": { en: "{ms} ms", zh: "{ms} 毫秒" },
+  "runTimeline.pending": { en: "still running", zh: "仍在进行" },
+  "runTimeline.status.queued": { en: "Queued", zh: "已排队" },
+  "runTimeline.status.running": { en: "Running", zh: "运行中" },
+  "runTimeline.status.completed": { en: "Completed", zh: "已完成" },
+  "runTimeline.status.failed": { en: "Failed", zh: "失败" },
+  "runTimeline.status.cancelled": { en: "Stopped", zh: "已停止" },
+  "runTimeline.status.blocked": { en: "Blocked", zh: "受阻" },
+  "runTimeline.kind.queued": { en: "Queued", zh: "已排队" },
+  "runTimeline.kind.started": { en: "Claimed and started", zh: "已认领并开始" },
+  "runTimeline.kind.tool": { en: "Tool", zh: "工具" },
+  "runTimeline.kind.log": { en: "Log", zh: "日志" },
+  "runTimeline.kind.retry": { en: "Retry", zh: "重试" },
+  "runTimeline.kind.artifact": { en: "Artifact", zh: "产物" },
+  "runTimeline.kind.evidence": { en: "Evidence", zh: "证据" },
+  "runTimeline.kind.terminal": { en: "Finished", zh: "结束" },
+  "runTimeline.kind.other": { en: "Event", zh: "事件" },
   "execute.emptySubAims": { en: "No sub-aims are ready to execute.", zh: "暂无可执行的子目标。" },
   "execute.localAgent": { en: "Local agent", zh: "本地 agent" },
   "execute.runState": { en: "Run state", zh: "运行状态" },
@@ -592,6 +659,38 @@ export const STRINGS = {
     zh: "目标、记忆和凭证都保存在这里——就在这台机器上。",
   },
   "settings.general.reveal": { en: "Reveal", zh: "打开位置" },
+  "settings.general.developerMode": { en: "Developer mode", zh: "开发者模式" },
+  "settings.general.developerModeBody": {
+    en: "Show traces, raw payloads, and other diagnostics for debugging Aimcub itself. Off by default.",
+    zh: "显示轨迹、原始负载等诊断信息，用于调试 Aimcub 本身。默认关闭。",
+  },
+  "settings.general.developerModeOn": { en: "On", zh: "开启" },
+  "settings.general.developerModeOff": { en: "Off", zh: "关闭" },
+
+  // Store recovery banner (deliverable 3)
+  "storeDiagnostics.title": { en: "Your workspace file was recovered", zh: "工作区文件已恢复" },
+  "storeDiagnostics.dismiss": { en: "Dismiss", zh: "知道了" },
+  "storeDiagnostics.quarantinedPath": { en: "Unusable file kept at {path}", zh: "无法读取的文件保留在 {path}" },
+  "storeDiagnostics.message.corrupt_quarantined": {
+    en: "The workspace file could not be read, so Aimcub set it aside instead of overwriting it.",
+    zh: "工作区文件无法读取，Aimcub 已将其保留而不是覆盖。",
+  },
+  "storeDiagnostics.message.recovered_from_backup": {
+    en: "Aimcub restored your workspace from its backup copy. Very recent changes may be missing.",
+    zh: "Aimcub 已从备份副本恢复工作区。最近的少量改动可能缺失。",
+  },
+  "storeDiagnostics.message.backup_unusable": {
+    en: "The backup copy could not be read either, so Aimcub started from an empty workspace.",
+    zh: "备份副本同样无法读取，Aimcub 从空工作区开始。",
+  },
+  "storeDiagnostics.message.no_backup": {
+    en: "There was no backup to fall back to, so Aimcub started from an empty workspace.",
+    zh: "没有可回退的备份，Aimcub 从空工作区开始。",
+  },
+  "storeDiagnostics.message.unknown": {
+    en: "Aimcub reported a storage recovery event.",
+    zh: "Aimcub 报告了一次存储恢复事件。",
+  },
   "settings.brain.sub": {
     en: "An API key, or a signed-in local agent — either can plan.",
     zh: "一个 API 密钥，或已登录的本地 agent——都能规划。",

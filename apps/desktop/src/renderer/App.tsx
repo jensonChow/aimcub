@@ -21,12 +21,15 @@ import type {
   ClarifyIpcResult,
   ConfirmMilestoneRequest,
   ContextSourceStatus,
+  DesktopPreferences,
   GoalDetail,
   LocalAgentDetection,
   PlanningDebugTrace,
   PlanningLiveEvent,
   PlanResult,
   ProviderStatus,
+  RunPermissionConsent,
+  StoreDiagnostic,
   WebResearchStatus,
 } from "../shared/ipc";
 
@@ -42,7 +45,9 @@ import {
   routeAfterRefresh,
   type AimHelperProfile,
 } from "./firstRunFlow";
+import { DeveloperModeProvider, useDeveloperMode } from "./developerMode";
 import { I18nProvider, useI18n, type StringKey } from "./i18n";
+import { StoreDiagnosticsBanner } from "./StoreDiagnosticsBanner";
 import {
   aimIntakeOf,
   planningContextOf,
@@ -61,6 +66,7 @@ import type { ClarifyPhase, ContextAnswerMap } from "./stages/context/types";
 import { EvalStage } from "./stages/eval/EvalStage";
 import { ExecutePanel } from "./stages/execute/ExecutePanel";
 import { applyRunLiveEvent, isTerminalRunEvent, type LiveRunState } from "./stages/execute/liveRun";
+import { DEFAULT_RUN_PERMISSION_DRAFT, runPermissionRequest } from "./stages/execute/runPermissions";
 import { NewAimComposer } from "./stages/aim/NewAimComposer";
 import { HomeView } from "./stages/home/HomeView";
 import { JourneyView } from "./stages/journey/JourneyView";
@@ -180,6 +186,13 @@ function AimOsApp() {
   // The queued run the cockpit is watching. Runs are durable in the store; this is only the
   // live face of one, so it is safe to lose on navigation.
   const [liveRun, setLiveRun] = useState<LiveRunState | null>(null);
+  // Off unless the user turned it on: with it off nothing debug-shaped renders anywhere.
+  const [developerMode, setDeveloperMode] = useState(false);
+  // Store corruption/recovery reports. Dismissing hides them for this session only — the store
+  // keeps reporting them, because the quarantined file is still sitting there.
+  const [storeDiagnostics, setStoreDiagnostics] = useState<StoreDiagnostic[]>([]);
+  const [storeDiagnosticsDismissed, setStoreDiagnosticsDismissed] = useState(false);
+  const storeDiagnosticsCountRef = useRef(0);
   const [intakeClarify, setIntakeClarify] = useState<ClarifyOutput | null>(null);
   const [intakeAnswers, setIntakeAnswers] = useState<ContextAnswerMap>({});
   const [clarifyPhase, setClarifyPhase] = useState<ClarifyPhase>(null);
@@ -415,6 +428,29 @@ function AimOsApp() {
     ]);
   }
 
+  function applyDesktopPreferences(prefs: DesktopPreferences | null | undefined): void {
+    setDeveloperMode(prefs?.developerMode === true);
+  }
+
+  function applyStoreDiagnostics(diagnostics: StoreDiagnostic[] | null | undefined): void {
+    const next = diagnostics ?? [];
+    // A NEW incident un-dismisses the banner: acknowledging the last one is not consent to stay
+    // quiet about the next. The count lives in a ref so a refresh running against an older render
+    // closure still compares against what was actually last seen.
+    if (next.length > storeDiagnosticsCountRef.current) setStoreDiagnosticsDismissed(false);
+    storeDiagnosticsCountRef.current = next.length;
+    setStoreDiagnostics(next);
+  }
+
+  async function setDeveloperModeEnabled(enabled: boolean): Promise<void> {
+    setDeveloperMode(enabled);
+    try {
+      applyDesktopPreferences(await window.aimcub.setDesktopPreferences({ developerMode: enabled }));
+    } catch {
+      // A preference that failed to persist is not worth an error banner; the next load re-reads it.
+    }
+  }
+
   async function refreshAll(options: { autoOpenFirstGoal?: boolean } = {}) {
     const transitionAtStart = navigationConcurrencyRef.current.workspace;
     const surfaceAtStart = navigationConcurrencyRef.current.surface;
@@ -425,6 +461,10 @@ function AimOsApp() {
       window.aimcub.listLocalAgents().then(setLocalAgents).catch(() => setLocalAgents([])),
       window.aimcub.listMemories().then(setMemories).catch(() => setMemories([])),
       window.aimcub.listAimProgressSummaries().then(applyProgressSummaries).catch(() => setProgressSummaries({})),
+      window.aimcub.getDesktopPreferences?.().then(applyDesktopPreferences).catch(() => {}),
+      // Diagnostics accumulate on every store load, so re-reading them here also catches a
+      // recovery that happened after startup.
+      window.aimcub.getStoreDiagnostics?.().then(applyStoreDiagnostics).catch(() => {}),
     ]).then(() => undefined);
     const [nextGoals, nextDrafts] = await Promise.all([
       window.aimcub.listGoals().catch(() => []),
@@ -1303,8 +1343,11 @@ function AimOsApp() {
   /**
    * Queue the sub-aim and return. The main-process worker executes it and streams progress back on
    * the run channel, so the window is only busy for the enqueue — not for the whole run.
+   *
+   * `permission` is the consent the user gave for THIS run. Callers with no consent control (the
+   * Journey's one-tap "Your move") omit it and get the safe default: read-only, network off.
    */
-  async function runAgent(milestone: Milestone) {
+  async function runAgent(milestone: Milestone, permission?: RunPermissionConsent) {
     if (workflowMutationIsLocked()) return;
     if (!selected) return;
     const goal = selected;
@@ -1314,7 +1357,11 @@ function AimOsApp() {
     const surfaceTransition = navigationConcurrencyRef.current.surface;
     setError(null);
     try {
-      const result = await window.aimcub.runMilestoneAgent({ goalId: goal.id, milestoneId: milestone.id });
+      const result = await window.aimcub.runMilestoneAgent({
+        goalId: goal.id,
+        milestoneId: milestone.id,
+        permission: permission ?? runPermissionRequest(DEFAULT_RUN_PERMISSION_DRAFT),
+      });
       const resultTargetIsCurrent = isCurrentWorkspaceTransition(transition) || selectedGoalRef.current?.id === goal.id;
       if (resultTargetIsCurrent && !result.ok && result.error) setError(result.error);
       await refreshGoalAfterSideEffect(goal, transition, surfaceTransition);
@@ -1735,10 +1782,15 @@ function AimOsApp() {
     <ExecutePanel
       detail={detail}
       progress={progress}
+      runEvents={journalEvents}
       disabled={Boolean(busy)}
       liveRun={liveRun && liveRun.goalId === selected.id ? liveRun : null}
       onCancelRun={(runId) => void window.aimcub.cancelRun(runId)}
-      onRunAgent={(milestone) => void runAgent(milestone)}
+      onPickRunWorkspace={async () => {
+        const result = await window.aimcub.pickRunWorkspace();
+        return result.canceled ? null : result.paths[0] ?? null;
+      }}
+      onRunAgent={(milestone, permission) => void runAgent(milestone, permission)}
       onConfirm={confirmMilestone}
       onPickFiles={async () => {
         const result = await window.aimcub.pickLocalContextFiles();
@@ -1764,6 +1816,8 @@ function AimOsApp() {
       contextSources={contextSources}
       localAgents={localAgents}
       activeSection={settingsSection}
+      developerMode={developerMode}
+      onDeveloperMode={(enabled) => void setDeveloperModeEnabled(enabled)}
       onProvider={setProvider}
       onWeb={setWebResearch}
       onContextSources={setContextSources}
@@ -1965,34 +2019,45 @@ function AimOsApp() {
   })();
 
   return (
-    <CockpitShell
-      goals={goals}
-      drafts={aimDrafts}
-      progressSummaries={progressSummaries}
-      activeStage={activeStage}
-      workspaceTarget={workspaceTarget}
-      onHome={() => void openHomePanel()}
-      onNewAim={() => void startNewAim()}
-      onOpenGoal={(goal) => void openGoal(goal)}
-      onOpenDraft={(draftRow) => void openAimDraft(draftRow)}
-      onDiscardDraft={(draftRow) => void discardAimDraft(draftRow)}
-      onStage={openCockpitStage}
-      onMemory={openMemory}
-      memoryCount={memories.length}
-      settingsSidebar={settingsSidebar}
-      main={(
-        <>
-          {error ? <ProductErrorNotice error={error} /> : null}
-          {busy ? <Notice tone="info">{busy}</Notice> : null}
-          {mainStageContent}
-        </>
-      )}
-    />
+    <DeveloperModeProvider enabled={developerMode}>
+      <CockpitShell
+        goals={goals}
+        drafts={aimDrafts}
+        progressSummaries={progressSummaries}
+        activeStage={activeStage}
+        workspaceTarget={workspaceTarget}
+        onHome={() => void openHomePanel()}
+        onNewAim={() => void startNewAim()}
+        onOpenGoal={(goal) => void openGoal(goal)}
+        onOpenDraft={(draftRow) => void openAimDraft(draftRow)}
+        onDiscardDraft={(draftRow) => void discardAimDraft(draftRow)}
+        onStage={openCockpitStage}
+        onMemory={openMemory}
+        memoryCount={memories.length}
+        settingsSidebar={settingsSidebar}
+        main={(
+          <>
+            {storeDiagnosticsDismissed ? null : (
+              <StoreDiagnosticsBanner
+                diagnostics={storeDiagnostics}
+                onDismiss={() => setStoreDiagnosticsDismissed(true)}
+              />
+            )}
+            {error ? <ProductErrorNotice error={error} /> : null}
+            {busy ? <Notice tone="info">{busy}</Notice> : null}
+            {mainStageContent}
+          </>
+        )}
+      />
+    </DeveloperModeProvider>
   );
 }
 
 function ProductErrorNotice(props: { error: string | ProductError }) {
   const { t } = useI18n();
+  // Raw failure lines are a debugging aid, not product copy: the title/message/recovery triple is
+  // what a user acts on, so the dump only exists in developer mode.
+  const developerMode = useDeveloperMode();
   if (typeof props.error === "string") {
     return <Notice tone="error">{props.error}</Notice>;
   }
@@ -2003,7 +2068,7 @@ function ProductErrorNotice(props: { error: string | ProductError }) {
         <span>{props.error.message}</span>
         <small>{props.error.recovery}</small>
       </div>
-      {props.error.details.length > 0 ? (
+      {developerMode && props.error.details.length > 0 ? (
         <details className="od-notice-details">
           <summary>{t("plan.developerDetails")}</summary>
           <pre>{props.error.details.join("\n")}</pre>
@@ -2177,6 +2242,8 @@ export function SettingsPanel(props: {
   contextSources: ContextSourceStatus | null;
   localAgents: LocalAgentDetection[];
   activeSection: SettingsSectionId;
+  developerMode?: boolean;
+  onDeveloperMode?: (enabled: boolean) => void;
   onProvider: (status: ProviderStatus) => void;
   onWeb: (status: WebResearchStatus) => void;
   onContextSources: (status: ContextSourceStatus) => void;
@@ -2198,7 +2265,13 @@ export function SettingsPanel(props: {
 
   let detailPane: ReactNode;
   if (activeSection === "general") {
-    detailPane = <SettingsGeneralPane workspacePath={appInfo?.workspacePath ?? null} />;
+    detailPane = (
+      <SettingsGeneralPane
+        workspacePath={appInfo?.workspacePath ?? null}
+        developerMode={props.developerMode ?? false}
+        {...(props.onDeveloperMode ? { onDeveloperMode: props.onDeveloperMode } : {})}
+      />
+    );
   } else if (activeSection === "brain") {
     detailPane = (
       <SettingsTabPane title={t("settings.tab.brain")} sub={t("settings.brain.sub")}>
@@ -2251,7 +2324,11 @@ function SettingsTabPane(props: { title: string; sub: string; children: ReactNod
   );
 }
 
-function SettingsGeneralPane(props: { workspacePath: string | null }) {
+function SettingsGeneralPane(props: {
+  workspacePath: string | null;
+  developerMode: boolean;
+  onDeveloperMode?: (enabled: boolean) => void;
+}) {
   const { t } = useI18n();
   const themePref = useThemePref();
   const options: Array<{ pref: "light" | "dark" | "system"; label: string }> = [
@@ -2298,6 +2375,26 @@ function SettingsGeneralPane(props: { workspacePath: string | null }) {
           >
             {t("settings.general.reveal")}
           </button>
+        </div>
+        <div className="od-settings-card-row">
+          <div className="od-settings-card-copy">
+            <strong>{t("settings.general.developerMode")}</strong>
+            <span>{t("settings.general.developerModeBody")}</span>
+          </div>
+          <div className="od-settings-seg" role="radiogroup" aria-label={t("settings.general.developerMode")}>
+            {[false, true].map((value) => (
+              <button
+                key={value ? "on" : "off"}
+                type="button"
+                role="radio"
+                aria-checked={props.developerMode === value}
+                data-active={props.developerMode === value ? "true" : "false"}
+                onClick={() => props.onDeveloperMode?.(value)}
+              >
+                {t(value ? "settings.general.developerModeOn" : "settings.general.developerModeOff")}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </SettingsTabPane>
