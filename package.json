@@ -18,9 +18,12 @@
     "lint": "turbo run lint",
     "test": "turbo run test",
     "test:live-providers": "pnpm --filter @core/llm run test:live-providers",
-    "core:purity": "pnpm --filter @core/domain --filter @core/types run purity"
+    "core:purity": "pnpm --filter @core/domain --filter @core/types run purity",
+    "changeset": "changeset",
+    "release:version": "changeset version"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.31.1",
     "@eslint/js": "^10.0.1",
     "@types/node": "^22.20.0",
     "eslint": "^10.6.0",

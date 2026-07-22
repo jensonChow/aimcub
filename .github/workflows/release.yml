@@ -1,0 +1,138 @@
+name: Release
+
+# Dry-run any time via workflow_dispatch (verify + build artifacts, no release
+# is drafted). Push a `vX.Y.Z` tag to also draft a GitHub Release with those
+# artifacts attached. See docs/releasing.md for the founder-facing flow.
+on:
+  workflow_dispatch: {}
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      # Duplicated from .github/workflows/ci.yml rather than shared, per this
+      # worktree's mission (release scaffolding only touches this file).
+      # TODO: dedup verify steps between ci.yml and release.yml into a
+      # composite action once both are stable.
+      - uses: actions/checkout@v5
+
+      # pnpm must exist before setup-node: setup-node@v5 detects the
+      # packageManager field (pnpm) and the cache: pnpm store path needs it.
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: "Lint (includes @core/* purity: no-restricted-imports)"
+        run: pnpm lint
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      # Core purity guard: @core/domain and @core/types must compile cleanly with no DOM and no node types.
+      # Any platform dependency that sneaks into the kernel turns this red — the safeguard that keeps "one shared core across all four clients" from being an empty slogan.
+      - name: Core purity guard
+        run: pnpm core:purity
+
+  artifacts:
+    name: Build release artifacts
+    needs: verify
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build CLI bundle
+        run: pnpm --filter @app/cli build
+
+      - name: Upload CLI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aimcub-cli
+          path: apps/cli/dist/index.js
+
+      - name: Build desktop artifacts (unsigned dmg + zip)
+        env:
+          # Sandboxed/local packaging can hit an unwritable default Electron
+          # cache (~/Library/Caches/electron) — see docs/memory/operations.md.
+          # Point it at a runner-owned writable dir defensively; harmless
+          # when the default cache is already writable.
+          ELECTRON_BUILDER_CACHE: ${{ runner.temp }}/electron-builder-cache
+        run: pnpm --filter @app/desktop run dist
+
+      - name: Upload desktop artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: aimcub-desktop
+          path: |
+            apps/desktop/dist/*.dmg
+            apps/desktop/dist/*.zip
+
+  release:
+    name: Draft GitHub release
+    needs: artifacts
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download CLI artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: aimcub-cli
+          path: release-assets/cli
+
+      - name: Download desktop artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: aimcub-desktop
+          path: release-assets/desktop
+
+      - name: Create draft release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --draft \
+            --title "${{ github.ref_name }}" \
+            --notes "Pre-release build. See CHANGELOG.md for per-package release notes: https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md" \
+            release-assets/cli/* \
+            release-assets/desktop/*
+
+      # npm publish is intentionally NOT wired up yet. Blocked on:
+      #   1. Choosing an OSS license for the repo.
+      #   2. Registering the @aimcub npm org and renaming packages from
+      #      @core/* + @app/* to @aimcub/* (a separate, later batch).
+      # Do not add `changeset publish` / `npm publish` here until both land.
+      - name: npm publish (blocked — placeholder)
+        run: |
+          echo "npm publish is intentionally not run here."
+          echo "Blocked on: an OSS license decision, and @aimcub npm org registration"
+          echo "(packages are still @core/* and @app/* — the @aimcub/* rename is later)."
