@@ -62,7 +62,15 @@ embedded planning-agent session (the local agent as the aim-breaking brain).
    a server-gated model (`gpt-5.6-sol` → 400) that its installed CLI cannot
    drive; live lists are the truth, fallback catalogs are not. `aimcub plan`
    gained `--model`/`--reasoning`.
-6. **LIVE END-TO-END VERIFIED (2026-07-24)**, twice on gpt-5.5:
+6. **Runtime CLIs upgraded + re-verified (2026-07-24)**: claude
+   2.1.191 → 2.1.218 (all nine planning-invocation flags still present;
+   mechanical smoke clean — auth now reports "OAuth session expired", so
+   `claude /login` is a refresh, not a first login) and codex
+   0.142.5 → 0.145.0 (default-model 400 gone; live list now leads with the
+   gpt-5.6 family, so `preferredPlanningModel` auto-selects `gpt-5.6-sol`;
+   full `aimcub plan` session re-verified on the new version). `aimcub plan`
+   now prints which brain model the session resolved to.
+7. **LIVE END-TO-END VERIFIED (2026-07-24)**, twice on gpt-5.5:
    engine-level with a blocking question (research → parked ask_user →
    answer → quality bounce → repaired accept, 181s, warn 90/100) and via the
    real `aimcub plan` binary non-interactively (0 questions by budget →

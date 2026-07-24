@@ -617,7 +617,8 @@ async function runPlan(
     }
     const agentId = session.agent || capableId;
     if (agentId) {
-      err(`Embedded planning session via ${agentId} (use --funnel for the structured-output path).`);
+      const model = session.model ?? preferredPlanningModel(detections.find((detection) => detection.id === agentId));
+      err(`Embedded planning session via ${agentId}${model ? ` (${model})` : ""} — use --funnel for the structured-output path.`);
       const sessionResult = await runEmbeddedPlanCli({
         agentId,
         title,
@@ -625,7 +626,7 @@ async function runPlan(
         memories,
         network: session.network,
         interactive: isInteractive(),
-        model: session.model ?? preferredPlanningModel(detections.find((detection) => detection.id === agentId)),
+        model,
         reasoning: session.reasoning,
         log: err,
       });
@@ -646,6 +647,7 @@ async function runPlan(
               planningContext: planning.report,
               session: {
                 agentId,
+                model: model ?? null,
                 attempts: outcome.attempts,
                 acceptedAttempt: outcome.acceptedAttempt,
                 answers: outcome.answers,
