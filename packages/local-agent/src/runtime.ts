@@ -48,7 +48,7 @@ type ProbeResult = {
   timedOut?: boolean;
 };
 
-const defaultRunner: LocalAgentProcessRunner = {
+export const defaultProcessRunner: LocalAgentProcessRunner = {
   execFile(file, args, options) {
     return execFileProbe(file, args, options);
   },
@@ -105,7 +105,7 @@ function executableCandidates(adapter: LocalAgentAdapter, env: NodeJS.ProcessEnv
   return [...new Set(out)];
 }
 
-function resolveExecutable(adapter: LocalAgentAdapter, env: NodeJS.ProcessEnv = process.env): string | null {
+export function resolveExecutable(adapter: LocalAgentAdapter, env: NodeJS.ProcessEnv = process.env): string | null {
   for (const candidate of executableCandidates(adapter, env)) {
     if (existsSync(candidate) && safeAccessExecutable(candidate)) return candidate;
   }
@@ -233,7 +233,7 @@ export async function listLocalAgents(options: {
   env?: NodeJS.ProcessEnv;
   registry?: LocalAgentRegistry;
 } = {}): Promise<LocalAgentDetection[]> {
-  const runner = options.runner ?? defaultRunner;
+  const runner = options.runner ?? defaultProcessRunner;
   const env = options.env ?? process.env;
   const adapters = (options.registry ?? defaultLocalAgentRegistry).list();
   return Promise.all(adapters.map((adapter) => detectLocalAgent(adapter, runner, env)));
@@ -293,7 +293,7 @@ export async function runLocalAgent(
   const adapter = resolveAdapter(rawRequest.agentId, options.registry ?? defaultLocalAgentRegistry);
   const request = sanitizeRunRequest(rawRequest);
   const startedAt = Date.now();
-  const runner = options.runner ?? defaultRunner;
+  const runner = options.runner ?? defaultProcessRunner;
   const env = options.env ?? process.env;
   const signal = options.signal;
   const executable = resolveExecutable(adapter, env);

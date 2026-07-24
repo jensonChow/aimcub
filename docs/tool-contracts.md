@@ -56,6 +56,10 @@ These handlers are still Aimcub-owned runtime tools, not MCP tools. They enforce
 
 `web.fetch` uses an injected or platform `fetch` implementation. It only fetches `http` / `https` URLs, blocks localhost and private-network hosts by default, enforces response-size limits, extracts text/metadata/links from text-like content, and emits web source metadata for Inspector provenance.
 
+## Planning-Session Projection
+
+When an embedded local agent drives aim breakdown, a subset of the planning surface is projected to it as session-scoped MCP tools (`packages/llm/src/planning-session-tools.ts`): `ask_user`, `search_memory`, `report_research`, `propose_memory`, and `submit_plan` (whose input embeds `decompositionJsonSchema`). These stay Aimcub-owned first-party contracts; the per-session loopback MCP bridge in `@aimcub/local-agent` is only the transport an external brain connects through. `web.*` is NOT projected — an embedded brain researches with its own web tools under the permissions its invocation grants.
+
 ## Registry-Backed Planning
 
 `packages/llm/src/tool-registry.ts` owns the unified first-party registry shape. Runtime shells register handlers for the built-in contracts, then execute tools through a single `execute(name, input, context)` path.

@@ -1,3 +1,5 @@
+import { PLANNING_SESSION_TOOL_NAMES } from "@aimcub/llm";
+
 import type {
   LocalAgentAdapter,
   LocalAgentArtifact,
@@ -5,6 +7,7 @@ import type {
   LocalAgentEvent,
   LocalAgentInvocation,
   LocalAgentRunRequest,
+  PlanningSessionInvocationRequest,
 } from "../types";
 import {
   artifactPathFromToolInput,
@@ -33,6 +36,55 @@ function buildClaudeInvocation(request: LocalAgentRunRequest): LocalAgentInvocat
   args.push("--permission-mode", permissionMode);
   if (request.permission?.network !== true) args.push("--disallowedTools", "WebSearch,WebFetch");
   return { args, stdin: request.prompt };
+}
+
+/** One injected user turn in Claude's bidirectional stream-json protocol. */
+function encodeClaudeUserTurn(text: string): string {
+  return `${JSON.stringify({ type: "user", message: { role: "user", content: [{ type: "text", text }] } })}\n`;
+}
+
+/**
+ * A planning session runs Claude as the embedded planning brain: bidirectional
+ * stream-json (so Aimcub can inject temporary-chat turns), read-only native
+ * tools plus its own web tools when network is granted, and the projected
+ * Aimcub tools over the per-session MCP bridge. Write/execute tools are both
+ * omitted from the allowlist AND explicitly disallowed (belt and suspenders —
+ * headless default mode auto-denies unlisted tools, the denylist makes the
+ * contract visible in the args).
+ */
+function buildClaudePlanningInvocation(request: PlanningSessionInvocationRequest): LocalAgentInvocation {
+  const args = ["-p", "--output-format", "stream-json", "--input-format", "stream-json", "--verbose"];
+  if (request.model && request.model !== "default") args.push("--model", request.model);
+  if (request.reasoning && request.reasoning !== "default") args.push("--effort", request.reasoning);
+  for (const dir of request.extraAllowedDirs ?? []) {
+    if (dir.trim()) args.push("--add-dir", dir.trim());
+  }
+  const projected = PLANNING_SESSION_TOOL_NAMES.map((tool) => `mcp__${request.mcp.serverName}__${tool}`);
+  const allowed = ["Read", "Glob", "Grep", ...(request.network ? ["WebSearch", "WebFetch"] : []), ...projected];
+  const disallowed = [
+    "Bash",
+    "Write",
+    "Edit",
+    "NotebookEdit",
+    // Subagents would widen the permission surface (they can run their own
+    // tools); planning research stays single-brained and legible for now.
+    "Task",
+    ...(request.network ? [] : ["WebSearch", "WebFetch"]),
+  ];
+  args.push("--permission-mode", "default");
+  args.push("--allowedTools", allowed.join(","));
+  args.push("--disallowedTools", disallowed.join(","));
+  const mcpConfig = JSON.stringify({
+    mcpServers: {
+      [request.mcp.serverName]: {
+        type: "http",
+        url: request.mcp.url,
+        headers: { Authorization: `Bearer ${request.mcp.authToken}` },
+      },
+    },
+  });
+  args.push("--mcp-config", mcpConfig, "--strict-mcp-config");
+  return { args, stdin: encodeClaudeUserTurn(request.prompt) };
 }
 
 /** Claude's file tools, mapped to what each one does to the file it names. */
@@ -150,4 +202,6 @@ export const claudeAdapter: LocalAgentAdapter = {
     const parsed = safeJsonParse(line);
     return isRecord(parsed) ? parseClaudeEvent(parsed) : null;
   },
+  buildPlanningSessionInvocation: buildClaudePlanningInvocation,
+  encodePlanningUserMessage: encodeClaudeUserTurn,
 };

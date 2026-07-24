@@ -153,6 +153,33 @@ export interface LocalAgentInvocation {
   stdin: string;
 }
 
+/** The per-session Aimcub MCP bridge an embedded planning brain connects to. */
+export interface PlanningSessionMcpConfig {
+  /** MCP server name as the runtime sees it (tool ids become `mcp__<name>__<tool>`). */
+  serverName: string;
+  /** Loopback streamable-HTTP endpoint, e.g. `http://127.0.0.1:PORT/mcp`. */
+  url: string;
+  /** Per-session bearer token; the bridge rejects requests without it. */
+  authToken: string;
+}
+
+/**
+ * Input for a planning-session invocation: the runtime is launched as Aimcub's
+ * embedded planning BRAIN — researching with its own read-only/web tools and
+ * interacting through the projected Aimcub MCP tools — not as a sub-aim executor.
+ */
+export interface PlanningSessionInvocationRequest {
+  prompt: string;
+  cwd: string;
+  model?: string;
+  reasoning?: string;
+  /** Whether the runtime may use its own live web search/fetch tools. */
+  network: boolean;
+  /** Directories the brain may read for local context research. */
+  extraAllowedDirs?: string[];
+  mcp: PlanningSessionMcpConfig;
+}
+
 /**
  * Everything the engine needs to detect, launch and normalize one CLI runtime.
  * Adapters are pure description plus two pure functions; process handling,
@@ -187,6 +214,20 @@ export interface LocalAgentAdapter {
    * the engine emits `agent.raw` (or `agent.stderr` on the stderr path) instead.
    */
   parseLine: (line: string) => LocalAgentEvent[] | null;
+  /**
+   * Build the invocation that runs this runtime as an embedded planning brain
+   * (read-only research + the Aimcub MCP bridge). Optional: a runtime without it
+   * does not support embedded planning sessions and callers fall back to the
+   * structured-output funnel. The invocation MUST keep the runtime read-only and
+   * honor `request.network`.
+   */
+  buildPlanningSessionInvocation?: (request: PlanningSessionInvocationRequest) => LocalAgentInvocation;
+  /**
+   * Encode one injected user chat turn for a live planning session's stdin.
+   * Optional: without it, queued chat still reaches the brain by riding along on
+   * the next projected-tool reply instead of arriving as a real user turn.
+   */
+  encodePlanningUserMessage?: (text: string) => string;
 }
 
 export interface LocalAgentRegistry {

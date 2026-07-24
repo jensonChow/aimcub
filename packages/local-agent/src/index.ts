@@ -1,4 +1,16 @@
-export { listLocalAgents, runLocalAgent } from "./runtime";
+export { defaultProcessRunner, listLocalAgents, resolveExecutable, runLocalAgent } from "./runtime";
+export { startPlanningMcpBridge } from "./planning/mcp-bridge";
+export type { PlanningMcpBridge, PlanningMcpBridgeOptions } from "./planning/mcp-bridge";
+export {
+  PlanningSessionUnsupportedError,
+  startEmbeddedPlanningSession,
+} from "./planning/embedded-session";
+export type {
+  EmbeddedPlanningSessionHandle,
+  EmbeddedPlanningSessionOptions,
+  EmbeddedPlanningSessionRequest,
+  EmbeddedPlanningSessionResult,
+} from "./planning/embedded-session";
 export { LocalCliLlmGateway } from "./llm-gateway";
 export {
   BUILT_IN_LOCAL_AGENT_ADAPTERS,
@@ -90,4 +102,6 @@ export type {
   LocalAgentRunRequest,
   LocalAgentRunResult,
   LocalAgentSandboxMode,
+  PlanningSessionInvocationRequest,
+  PlanningSessionMcpConfig,
 } from "./types";
