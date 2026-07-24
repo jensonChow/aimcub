@@ -50,6 +50,23 @@ import { aimRequiresWebResearch, embeddedWebResearchEnabled, linkedContextSource
 const ACTIVITY_BUFFER_LIMIT = 40;
 
 /**
+ * The brain a new session runs on: the user's explicit pick when that runtime
+ * is present, authenticated, and planning-capable; otherwise the automatic
+ * first capable runtime. A stale pick (uninstalled or signed-out runtime)
+ * degrades to Auto instead of failing the session.
+ */
+export function resolvePlanningBrain(
+  pref: DesktopPreferences["planningBrain"],
+  detections: readonly LocalAgentDetection[],
+): LocalAgentId | null {
+  if (pref) {
+    const picked = detections.find((detection) => detection.id === pref);
+    if (picked && planningCapableAgentId([picked]) === picked.id) return picked.id;
+  }
+  return planningCapableAgentId(detections);
+}
+
+/**
  * The model a new session runs on: the user's explicit pick when it targets
  * this runtime AND the runtime still advertises it live (a stale pick after a
  * CLI up/downgrade must not resurrect an undriveable model), else the
@@ -195,7 +212,7 @@ export async function startPlanningSession(req: PlanningSessionStartRequest): Pr
   if (existing && !existing.settled) return viewOf(existing);
 
   const detections = await listLocalAgents();
-  const agentId = planningCapableAgentId(detections);
+  const agentId = resolvePlanningBrain(loadDesktopPreferences().planningBrain, detections);
   if (!agentId) {
     throw new PlanningSessionUnsupportedError("claude");
   }

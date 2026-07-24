@@ -23,42 +23,45 @@ beforeEach(() => {
 
 describe("desktop preferences", () => {
   it("defaults developer mode off, which is the product state", () => {
-    expect(DEFAULT_DESKTOP_PREFERENCES).toEqual({ developerMode: false, planningModel: null });
-    expect(loadDesktopPreferences(dataDir())).toEqual({ developerMode: false, planningModel: null });
+    expect(DEFAULT_DESKTOP_PREFERENCES).toEqual({ developerMode: false, planningModel: null, planningBrain: null });
+    expect(loadDesktopPreferences(dataDir())).toEqual({ developerMode: false, planningModel: null, planningBrain: null });
   });
 
   it("round-trips through its own file beside the store", () => {
     const dir = dataDir();
-    expect(saveDesktopPreferences({ developerMode: true, planningModel: { agentId: "codex", model: "gpt-5.5" } }, dir))
-      .toEqual({ developerMode: true, planningModel: { agentId: "codex", model: "gpt-5.5" } });
+    expect(saveDesktopPreferences({ developerMode: true, planningModel: { agentId: "codex", model: "gpt-5.5" }, planningBrain: "codex" }, dir))
+      .toEqual({ developerMode: true, planningModel: { agentId: "codex", model: "gpt-5.5" }, planningBrain: "codex" });
     expect(desktopPreferencesPath(dir)).toBe(join(dir, "desktop-settings.json"));
 
     resetDesktopPreferencesCache();
-    expect(loadDesktopPreferences(dir)).toEqual({ developerMode: true, planningModel: { agentId: "codex", model: "gpt-5.5" } });
+    expect(loadDesktopPreferences(dir)).toEqual({ developerMode: true, planningModel: { agentId: "codex", model: "gpt-5.5" }, planningBrain: "codex" });
     expect(JSON.parse(readFileSync(desktopPreferencesPath(dir), "utf8")))
-      .toEqual({ developerMode: true, planningModel: { agentId: "codex", model: "gpt-5.5" } });
+      .toEqual({ developerMode: true, planningModel: { agentId: "codex", model: "gpt-5.5" }, planningBrain: "codex" });
   });
 
   it("degrades a corrupt or partial file to the defaults instead of failing to launch", () => {
     const dir = dataDir();
     writeFileSync(desktopPreferencesPath(dir), "{ not json");
-    expect(loadDesktopPreferences(dir)).toEqual({ developerMode: false, planningModel: null });
+    expect(loadDesktopPreferences(dir)).toEqual({ developerMode: false, planningModel: null, planningBrain: null });
 
     resetDesktopPreferencesCache();
     writeFileSync(desktopPreferencesPath(dir), JSON.stringify({ developerMode: "yes please" }));
-    expect(loadDesktopPreferences(dir)).toEqual({ developerMode: false, planningModel: null });
+    expect(loadDesktopPreferences(dir)).toEqual({ developerMode: false, planningModel: null, planningBrain: null });
   });
 
   it("only ever reads a strict boolean, so no truthy value can turn it on by accident", () => {
-    expect(normalizeDesktopPreferences({ developerMode: 1 })).toEqual({ developerMode: false, planningModel: null });
-    expect(normalizeDesktopPreferences({ developerMode: "true" })).toEqual({ developerMode: false, planningModel: null });
-    expect(normalizeDesktopPreferences({ developerMode: true })).toEqual({ developerMode: true, planningModel: null });
-    expect(normalizeDesktopPreferences(null)).toEqual({ developerMode: false, planningModel: null });
+    expect(normalizeDesktopPreferences({ developerMode: 1 })).toEqual({ developerMode: false, planningModel: null, planningBrain: null });
+    expect(normalizeDesktopPreferences({ developerMode: "true" })).toEqual({ developerMode: false, planningModel: null, planningBrain: null });
+    expect(normalizeDesktopPreferences({ developerMode: true })).toEqual({ developerMode: true, planningModel: null, planningBrain: null });
+    expect(normalizeDesktopPreferences(null)).toEqual({ developerMode: false, planningModel: null, planningBrain: null });
   });
 
   it("normalizes the planning-model pick and degrades junk to Auto", () => {
     expect(normalizeDesktopPreferences({ planningModel: { agentId: "codex", model: "gpt-5.6-sol" } }))
-      .toEqual({ developerMode: false, planningModel: { agentId: "codex", model: "gpt-5.6-sol" } });
+      .toEqual({ developerMode: false, planningModel: { agentId: "codex", model: "gpt-5.6-sol" }, planningBrain: null });
+    expect(normalizeDesktopPreferences({ planningBrain: " codex " }).planningBrain).toBe("codex");
+    expect(normalizeDesktopPreferences({ planningBrain: "" }).planningBrain).toBeNull();
+    expect(normalizeDesktopPreferences({ planningBrain: 7 }).planningBrain).toBeNull();
     expect(normalizeDesktopPreferences({ planningModel: { agentId: " codex ", model: " gpt-5.5 " } }).planningModel)
       .toEqual({ agentId: "codex", model: "gpt-5.5" });
     expect(normalizeDesktopPreferences({ planningModel: { agentId: "", model: "x" } }).planningModel).toBeNull();

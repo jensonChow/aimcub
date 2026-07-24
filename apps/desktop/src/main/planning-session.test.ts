@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { LocalAgentDetection } from "@aimcub/local-agent";
 
-import { resolvePlanningSessionModel } from "./planning-session";
+import { resolvePlanningBrain, resolvePlanningSessionModel } from "./planning-session";
 
 function detection(overrides: Partial<LocalAgentDetection> = {}): LocalAgentDetection {
   return {
@@ -25,6 +25,19 @@ function detection(overrides: Partial<LocalAgentDetection> = {}): LocalAgentDete
     ...overrides,
   };
 }
+
+describe("resolvePlanningBrain", () => {
+  it("honors a session-ready pick and degrades stale picks to Auto", () => {
+    const codex = detection();
+    const claude = detection({ id: "claude", name: "Claude Code" });
+    expect(resolvePlanningBrain("codex", [claude, codex])).toBe("codex");
+    expect(resolvePlanningBrain(null, [claude, codex])).toBe("claude");
+    // Signed-out pick → Auto, not a failed session.
+    expect(resolvePlanningBrain("claude", [detection({ id: "claude", authStatus: "missing" }), codex])).toBe("codex");
+    expect(resolvePlanningBrain("gone", [codex])).toBe("codex");
+    expect(resolvePlanningBrain("codex", [])).toBeNull();
+  });
+});
 
 describe("resolvePlanningSessionModel", () => {
   it("honors an explicit pick that the runtime still advertises live", () => {

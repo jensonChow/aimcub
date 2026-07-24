@@ -141,6 +141,8 @@ export const STRINGS = {
     zh: "输入目标。Aimcub 会收集上下文，生成带评估规则的子目标，把工作交给人或 agent，并用证据驱动进度。",
   },
   "os.busy.context": { en: "Checking required context before decomposition…", zh: "正在先检查拆分前必须补齐的上下文…" },
+  "planningBrain.menuLabel": { en: "Planning brain", zh: "规划大脑" },
+  "planningBrain.heading": { en: "Brain", zh: "大脑" },
   "planningModel.menuLabel": { en: "Planning model", zh: "规划模型" },
   "planningModel.heading": { en: "Models", zh: "模型" },
   "planningModel.auto": { en: "Auto", zh: "自动" },

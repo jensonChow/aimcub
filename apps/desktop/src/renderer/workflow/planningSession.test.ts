@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import type { LocalAgentDetection } from "@aimcub/local-agent";
+import type { PlanningAgentDetection } from "../../shared/ipc";
 import type { PlanningSessionQuestion } from "@aimcub/llm";
 
 import type { PlanningSessionStateView } from "../../shared/ipc";
 import {
   embeddedPlanningAgentId,
+  planningBrainMenu,
   planningModelMenu,
   sessionAnswerRequest,
   sessionPayloadIsCurrent,
@@ -13,7 +14,7 @@ import {
   sessionSurfaceVisible,
 } from "./planningSession";
 
-function detection(overrides: Partial<LocalAgentDetection>): LocalAgentDetection {
+function detection(overrides: Partial<PlanningAgentDetection>): PlanningAgentDetection {
   return {
     id: "claude",
     name: "Claude Code",
@@ -27,6 +28,7 @@ function detection(overrides: Partial<LocalAgentDetection>): LocalAgentDetection
     modelsSource: "fallback",
     reasoningOptions: [],
     diagnostics: [],
+    planningCapable: true,
     ...overrides,
   };
 }
@@ -68,12 +70,71 @@ function view(overrides: Partial<PlanningSessionStateView>): PlanningSessionStat
 }
 
 describe("embeddedPlanningAgentId", () => {
-  it("requires an available, authenticated claude", () => {
+  it("trusts the main-provided capability flag, never a renderer mirror", () => {
     expect(embeddedPlanningAgentId([detection({})])).toBe("claude");
+    // The exact bug this replaces: a codex-only machine must light up.
+    expect(embeddedPlanningAgentId([detection({ id: "codex", name: "Codex" })])).toBe("codex");
+    expect(embeddedPlanningAgentId([detection({ planningCapable: false })])).toBeNull();
     expect(embeddedPlanningAgentId([detection({ available: false })])).toBeNull();
     expect(embeddedPlanningAgentId([detection({ authStatus: "missing" })])).toBeNull();
-    expect(embeddedPlanningAgentId([detection({ id: "codex", name: "Codex" })])).toBeNull();
     expect(embeddedPlanningAgentId([])).toBeNull();
+  });
+
+  it("honors the brain pick when session-ready and degrades to Auto otherwise", () => {
+    const both = [detection({}), detection({ id: "codex", name: "Codex" })];
+    expect(embeddedPlanningAgentId(both, null)).toBe("claude");
+    expect(embeddedPlanningAgentId(both, "codex")).toBe("codex");
+    const claudeSignedOut = [detection({ authStatus: "missing" }), detection({ id: "codex", name: "Codex" })];
+    expect(embeddedPlanningAgentId(claudeSignedOut, "claude")).toBe("codex");
+  });
+});
+
+describe("planningBrainMenu", () => {
+  it("lists every planning-capable runtime, disabling the ones that cannot run", () => {
+    const menu = planningBrainMenu(
+      [detection({ authStatus: "missing", authMessage: "Please run /login" }), detection({ id: "codex", name: "Codex" })],
+      null,
+    );
+    expect(menu).not.toBeNull();
+    expect(menu?.effectiveAgentId).toBe("codex");
+    expect(menu?.currentLabel).toBe("Codex");
+    expect(menu?.autoSelected).toBe(true);
+    expect(menu?.options.map((option) => [option.id, option.disabledReason])).toEqual([
+      ["claude", "Please run /login"],
+      ["codex", null],
+    ]);
+  });
+
+  it("humanizes raw-JSON auth probe output in the disabled reason", () => {
+    const menu = planningBrainMenu(
+      [
+        detection({ authStatus: "missing", authMessage: '{\n  "loggedIn": false,\n  "authMethod": "none"\n}' }),
+        detection({ id: "codex", name: "Codex" }),
+      ],
+      null,
+    );
+    expect(menu?.options[0]?.disabledReason).toBe("Sign in required");
+    const uninstalled = planningBrainMenu(
+      [detection({ available: false, authStatus: "unknown" }), detection({ id: "codex", name: "Codex" })],
+      null,
+    );
+    expect(uninstalled?.options[0]?.disabledReason).toBe("Not installed");
+  });
+
+  it("marks an honored explicit pick; a stale pick reads as Auto", () => {
+    const both = [detection({}), detection({ id: "codex", name: "Codex" })];
+    const picked = planningBrainMenu(both, "codex");
+    expect(picked?.autoSelected).toBe(false);
+    expect(picked?.options.find((option) => option.id === "codex")?.selected).toBe(true);
+    const stale = planningBrainMenu([detection({})], "codex");
+    expect(stale?.autoSelected).toBe(true);
+    expect(stale?.effectiveAgentId).toBe("claude");
+  });
+
+  it("returns null when nothing could run a session", () => {
+    expect(planningBrainMenu([], null)).toBeNull();
+    expect(planningBrainMenu([detection({ planningCapable: false })], null)).toBeNull();
+    expect(planningBrainMenu([detection({ authStatus: "missing" })], null)).toBeNull();
   });
 });
 
