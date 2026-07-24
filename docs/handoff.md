@@ -76,6 +76,20 @@ embedded planning-agent session (the local agent as the aim-breaking brain).
    real `aimcub plan` binary non-interactively (0 questions by budget →
    disclosed assumptions + open questions, bounce → accept). Honest gaps
    named exactly what web-disabled research could not verify.
+8. **ALL FOUR BLUEPRINT ELEMENTS LIVE-VERIFIED IN ONE SESSION
+   (2026-07-24, codex/gpt-5.6-sol, 344s, warn 90/100)** — local research
+   (read the notes/ fixture: extracted audience "~20 engineer friends",
+   3-link cap, missing-URL problem; probed Node version + no-git via
+   read-only shell), web research (13 findings with real URLs across lanes:
+   Buttondown pricing/docs, Substack alternative, CASL compliance from
+   crtc.gc.ca, Node fs docs), temporary chat (mid-session zero-cost
+   constraint reshaped platform choice to free tiers + credential-free
+   generator), and two cardinality-correct single-select questions asked
+   exactly where research could not decide (launch posture, automation
+   level) whose answers redirected subsequent research (private-mode +
+   double-opt-in docs). Interleaving confirmed: research → question →
+   research → question → research → submit. Routing agent-forward (4
+   agent / 2 human).
 
 ## Open items
 
