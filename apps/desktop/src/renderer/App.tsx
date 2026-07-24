@@ -103,10 +103,12 @@ import {
 } from "./workflow/aimDrafts";
 import {
   embeddedPlanningAgentId,
+  planningModelMenu,
   sessionAnswerRequest,
   sessionPayloadIsCurrent,
   sessionSurfaceVisible,
 } from "./workflow/planningSession";
+import { PlanningModelChip } from "./PlanningModelChip";
 import {
   formatPlanValidationIssues,
   formatPlanningFailure,
@@ -196,6 +198,7 @@ function AimOsApp() {
   const [liveRun, setLiveRun] = useState<LiveRunState | null>(null);
   // Off unless the user turned it on: with it off nothing debug-shaped renders anywhere.
   const [developerMode, setDeveloperMode] = useState(false);
+  const [planningModelPref, setPlanningModelPref] = useState<DesktopPreferences["planningModel"]>(null);
   // Store corruption/recovery reports. Dismissing hides them for this session only — the store
   // keeps reporting them, because the quarantined file is still sitting there.
   const [storeDiagnostics, setStoreDiagnostics] = useState<StoreDiagnostic[]>([]);
@@ -458,6 +461,7 @@ function AimOsApp() {
 
   function applyDesktopPreferences(prefs: DesktopPreferences | null | undefined): void {
     setDeveloperMode(prefs?.developerMode === true);
+    setPlanningModelPref(prefs?.planningModel ?? null);
   }
 
   function applyStoreDiagnostics(diagnostics: StoreDiagnostic[] | null | undefined): void {
@@ -473,9 +477,27 @@ function AimOsApp() {
   async function setDeveloperModeEnabled(enabled: boolean): Promise<void> {
     setDeveloperMode(enabled);
     try {
-      applyDesktopPreferences(await window.aimcub.setDesktopPreferences({ developerMode: enabled }));
+      // Always save the FULL preferences object: a partial save would normalize
+      // the missing fields back to defaults and silently drop them.
+      applyDesktopPreferences(await window.aimcub.setDesktopPreferences({
+        developerMode: enabled,
+        planningModel: planningModelPref,
+      }));
     } catch {
       // A preference that failed to persist is not worth an error banner; the next load re-reads it.
+    }
+  }
+
+  async function selectPlanningModel(agentId: string, modelId: string | null): Promise<void> {
+    const next = modelId ? { agentId, model: modelId } : null;
+    setPlanningModelPref(next);
+    try {
+      applyDesktopPreferences(await window.aimcub.setDesktopPreferences({
+        developerMode,
+        planningModel: next,
+      }));
+    } catch {
+      // Same posture as developer mode: non-fatal, re-read on next load.
     }
   }
 
@@ -1923,6 +1945,11 @@ function AimOsApp() {
     }
   }
 
+  const planningModelMenuModel = useMemo(
+    () => planningModelMenu(localAgents, planningModelPref),
+    [localAgents, planningModelPref],
+  );
+
   const sessionSurfaceActive = sessionPayloadIsCurrent(planningSession, selected?.id ?? null)
     && planningShellId === selected?.id
     && sessionSurfaceVisible(planningSession);
@@ -2106,6 +2133,13 @@ function AimOsApp() {
       disabled={Boolean(busy)}
       elsewhereCount={journeyElsewhere.length}
       planningRuntimeReady={planningRuntimeReady}
+      modelChip={planningModelMenuModel ? (
+        <PlanningModelChip
+          menu={planningModelMenuModel}
+          disabled={Boolean(busy)}
+          onSelect={(modelId) => void selectPlanningModel(planningModelMenuModel.agentId, modelId)}
+        />
+      ) : undefined}
       onStartResearch={() => void startShellResearch()}
       planning={isPlanningShell ? {
         busy: Boolean(busy),

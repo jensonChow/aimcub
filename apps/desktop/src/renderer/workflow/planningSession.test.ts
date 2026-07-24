@@ -6,6 +6,7 @@ import type { PlanningSessionQuestion } from "@aimcub/llm";
 import type { PlanningSessionStateView } from "../../shared/ipc";
 import {
   embeddedPlanningAgentId,
+  planningModelMenu,
   sessionAnswerRequest,
   sessionPayloadIsCurrent,
   sessionQuestionClarifyOutput,
@@ -52,6 +53,7 @@ function view(overrides: Partial<PlanningSessionStateView>): PlanningSessionStat
   return {
     goalId: "g1",
     agentId: "claude",
+    model: null,
     active: true,
     phase: "researching",
     pendingQuestion: null,
@@ -72,6 +74,54 @@ describe("embeddedPlanningAgentId", () => {
     expect(embeddedPlanningAgentId([detection({ authStatus: "missing" })])).toBeNull();
     expect(embeddedPlanningAgentId([detection({ id: "codex", name: "Codex" })])).toBeNull();
     expect(embeddedPlanningAgentId([])).toBeNull();
+  });
+});
+
+describe("planningModelMenu", () => {
+  const liveModels = [
+    { id: "default", label: "Default" },
+    { id: "gpt-5.6-sol", label: "gpt-5.6-sol" },
+    { id: "gpt-5.5", label: "gpt-5.5" },
+  ];
+
+  it("builds the menu from the live list with Auto following the first advertised model", () => {
+    const menu = planningModelMenu([detection({ modelsSource: "live", models: liveModels })], null);
+    expect(menu).not.toBeNull();
+    expect(menu?.agentId).toBe("claude");
+    expect(menu?.autoSelected).toBe(true);
+    expect(menu?.currentLabel).toBe("gpt-5.6-sol");
+    expect(menu?.options.map((option) => option.id)).toEqual(["gpt-5.6-sol", "gpt-5.5"]);
+    expect(menu?.options.every((option) => !option.selected)).toBe(true);
+  });
+
+  it("marks an explicit matching pick and shows it on the chip", () => {
+    const menu = planningModelMenu(
+      [detection({ modelsSource: "live", models: liveModels })],
+      { agentId: "claude", model: "gpt-5.5" },
+    );
+    expect(menu?.autoSelected).toBe(false);
+    expect(menu?.currentLabel).toBe("gpt-5.5");
+    expect(menu?.options.find((option) => option.id === "gpt-5.5")?.selected).toBe(true);
+  });
+
+  it("ignores picks for another runtime or models no longer advertised", () => {
+    const otherAgent = planningModelMenu(
+      [detection({ modelsSource: "live", models: liveModels })],
+      { agentId: "codex", model: "gpt-5.5" },
+    );
+    expect(otherAgent?.autoSelected).toBe(true);
+    const staleModel = planningModelMenu(
+      [detection({ modelsSource: "live", models: liveModels })],
+      { agentId: "claude", model: "retired-model" },
+    );
+    expect(staleModel?.autoSelected).toBe(true);
+  });
+
+  it("returns null without a capable brain or a live model list", () => {
+    expect(planningModelMenu([], null)).toBeNull();
+    expect(planningModelMenu([detection({ authStatus: "missing" })], null)).toBeNull();
+    expect(planningModelMenu([detection({ modelsSource: "fallback", models: liveModels })], null)).toBeNull();
+    expect(planningModelMenu([detection({ modelsSource: "live", models: [{ id: "default", label: "Default" }] })], null)).toBeNull();
   });
 });
 

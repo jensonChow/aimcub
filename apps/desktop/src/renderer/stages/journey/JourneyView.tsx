@@ -475,6 +475,8 @@ export interface JourneyViewProps {
    * "build the plan" action (a not-ready shell links to Settings instead of dead-ending).
    */
   planningRuntimeReady?: boolean;
+  /** Model chip for the planning brain, rendered beside the Build-the-plan action. */
+  modelChip?: ReactNode;
   /** Start the first-plan research run for a plan-less shell goal. */
   onStartResearch?: () => void;
   /**
@@ -811,14 +813,17 @@ export function JourneyView(props: JourneyViewProps) {
                 {t("glass.journey.buildPlanNoRuntime")}
               </button>
             ) : (
-              <button
-                className="od-journey-primary"
-                type="button"
-                disabled={props.disabled || !props.onStartResearch}
-                onClick={props.onStartResearch}
-              >
-                {t("glass.journey.buildPlanCta")}
-              </button>
+              <>
+                <button
+                  className="od-journey-primary"
+                  type="button"
+                  disabled={props.disabled || !props.onStartResearch}
+                  onClick={props.onStartResearch}
+                >
+                  {t("glass.journey.buildPlanCta")}
+                </button>
+                {props.modelChip}
+              </>
             )}
           </div>
         </div>
