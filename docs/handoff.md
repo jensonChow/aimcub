@@ -93,7 +93,10 @@ embedded planning-agent session (the local agent as the aim-breaking brain).
 
 Run the first authenticated end-to-end session (Desktop + `aimcub plan`),
 then judge question quality/research depth against the founder's blueprint
-(local+web research · temporary chat · multi-choice). Judge question quality and research depth against the blueprint
+(local+web research · temporary chat · multi-choice). The planning brain now has a Claude-Code-style model chip beside
+Build-the-plan (live-advertised models + Auto, persisted in
+desktop-settings.json, honored at session start with stale-pick protection).
+Judge question quality and research depth against the blueprint
 (try `--network` for live web research). Desktop Settings surface for the
 planning brain's model/effort is a proposed follow-up. The prior OSS-launch
 checklist in git history (license → npm org → repo settings → gitleaks →

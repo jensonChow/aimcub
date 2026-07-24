@@ -28,11 +28,13 @@ import {
   preferredPlanningModel,
   startEmbeddedPlanningSession,
   type EmbeddedPlanningSessionHandle,
+  type LocalAgentDetection,
   type LocalAgentEvent,
   type LocalAgentId,
 } from "@aimcub/local-agent";
 
 import type {
+  DesktopPreferences,
   PlanningSessionActivityItem,
   PlanningSessionAnswerRequest,
   PlanningSessionEventPayload,
@@ -40,15 +42,39 @@ import type {
   PlanningSessionStartRequest,
   PlanningSessionStateView,
 } from "../shared/ipc";
+import { loadDesktopPreferences } from "./app-settings";
 import { listLocalAgents } from "./local-agents";
 import { aimStore } from "./store";
 import { aimRequiresWebResearch, embeddedWebResearchEnabled, linkedContextSources, localContextRoot } from "./tools";
 
 const ACTIVITY_BUFFER_LIMIT = 40;
 
+/**
+ * The model a new session runs on: the user's explicit pick when it targets
+ * this runtime AND the runtime still advertises it live (a stale pick after a
+ * CLI up/downgrade must not resurrect an undriveable model), else the
+ * live-advertised fallback, else the runtime's own default.
+ */
+export function resolvePlanningSessionModel(
+  pref: DesktopPreferences["planningModel"],
+  agentId: LocalAgentId,
+  detection: LocalAgentDetection | undefined,
+): string | undefined {
+  if (
+    pref
+    && pref.agentId === agentId
+    && detection?.modelsSource === "live"
+    && detection.models.some((model) => model.id === pref.model)
+  ) {
+    return pref.model;
+  }
+  return preferredPlanningModel(detection);
+}
+
 interface ManagedPlanningSession {
   goalId: string;
   agentId: LocalAgentId;
+  model: string | null;
   handle: EmbeddedPlanningSessionHandle;
   memories: PlanningMemory[];
   activity: PlanningSessionActivityItem[];
@@ -82,6 +108,7 @@ function viewOf(managed: ManagedPlanningSession): PlanningSessionStateView {
   return {
     goalId: managed.goalId,
     agentId: managed.agentId,
+    model: managed.model,
     active: state.phase === "researching" || state.phase === "waiting_user",
     phase: state.phase,
     pendingQuestion: state.pendingQuestion,
@@ -184,6 +211,7 @@ export async function startPlanningSession(req: PlanningSessionStartRequest): Pr
   const managed: ManagedPlanningSession = {
     goalId: req.goalId,
     agentId,
+    model: null,
     handle: null as unknown as EmbeddedPlanningSessionHandle,
     memories,
     activity: [],
@@ -195,7 +223,12 @@ export async function startPlanningSession(req: PlanningSessionStartRequest): Pr
     settled: false,
   };
 
-  const model = preferredPlanningModel(detections.find((detection) => detection.id === agentId));
+  const model = resolvePlanningSessionModel(
+    loadDesktopPreferences().planningModel,
+    agentId,
+    detections.find((detection) => detection.id === agentId),
+  );
+  managed.model = model ?? null;
   const handle = await startEmbeddedPlanningSession({
     agentId,
     aim: { title: req.title, description: req.description },

@@ -11,12 +11,19 @@ export interface ActionMenuProps {
   title?: string;
   className?: string;
   menuClassName?: string;
+  /** Replaces the default three-dot icon with custom trigger content (e.g. a model chip). */
+  triggerContent?: ReactNode;
+  triggerClassName?: string;
   onOpenChange?: (open: boolean) => void;
   children: (state: ActionMenuState) => ReactNode;
 }
 
 export interface ActionMenuItemProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "role"> {
   danger?: boolean;
+}
+
+export interface ActionMenuRadioItemProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "role" | "aria-checked"> {
+  checked: boolean;
 }
 
 function cx(...parts: Array<string | false | null | undefined>): string {
@@ -46,6 +53,26 @@ export const ActionMenuItem = forwardRef<HTMLButtonElement, ActionMenuItemProps>
       className={cx("od-action-menu-item", className)}
       data-tone={danger ? "danger" : undefined}
     />
+  );
+});
+
+/** One exclusive-choice row (model pickers etc.): checked state + a trailing check glyph. */
+export const ActionMenuRadioItem = forwardRef<HTMLButtonElement, ActionMenuRadioItemProps>(function ActionMenuRadioItem(
+  { className, checked, type = "button", children, ...props },
+  ref,
+) {
+  return (
+    <button
+      {...props}
+      ref={ref}
+      type={type}
+      role="menuitemradio"
+      aria-checked={checked}
+      className={cx("od-action-menu-item", "od-action-menu-radio", className)}
+    >
+      <span className="od-action-menu-radio-label">{children}</span>
+      {checked ? <span className="od-action-menu-radio-check" aria-hidden="true">✓</span> : null}
+    </button>
   );
 });
 
@@ -140,7 +167,7 @@ export function ActionMenu(props: ActionMenuProps) {
   return (
     <div className={cx("od-action-menu-anchor", props.className)} ref={rootRef}>
       <button
-        className="od-action-menu-trigger"
+        className={cx(props.triggerContent ? "od-action-menu-chip-trigger" : "od-action-menu-trigger", props.triggerClassName)}
         ref={triggerRef}
         type="button"
         aria-label={props.label}
@@ -158,7 +185,7 @@ export function ActionMenu(props: ActionMenuProps) {
           openMenu(true);
         }}
       >
-        <MoreActionsIcon />
+        {props.triggerContent ?? <MoreActionsIcon />}
       </button>
 
       {open ? (

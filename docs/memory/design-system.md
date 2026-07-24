@@ -462,6 +462,15 @@ three-size / ≤500-weight policy).
   text, a bottom icon toolbar, optional context revealed from the toolbar, an icon-only submit.
   Compact, centered, bounded below the task width; effectively borderless at rest with only a
   subtle hover/focus outline; no heavy launch focus ring or floating-card shadow.
+- Model chip (founder requirement 2026-07-24, "like Claude Code"): the planning brain's model is
+  a compact pill trigger (`.od-model-chip`: hairline border, transparent at rest, sub-size medium
+  text, small caret) placed BESIDE the primary Build-the-plan action, opening an ActionMenu-based
+  popover with a small ALL-CAPS "Models" heading and `menuitemradio` rows — label left, trailing
+  ✓ on the selected row — listing the runtime's LIVE-advertised models plus an Auto row (Auto =
+  first advertised model; a fallback catalog never becomes a menu). The pick applies to the NEXT
+  session; a running session shows its actual model as a neutral Pill on the live panel head.
+  Reuse `ActionMenu`'s chip-trigger variant (`triggerContent`) rather than inventing new popover
+  mechanics.
 
 ## Interaction and State
 

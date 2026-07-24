@@ -93,6 +93,7 @@ export function PlanningSessionPanel(props: PlanningSessionPanelProps) {
     <Panel className="od-planning-session" data-od-id="planning-session-live">
       <header className="od-planning-session-head">
         <Pill tone="accent">{t("planningSession.livePill")}</Pill>
+        {view.model ? <Pill tone="neutral">{view.model}</Pill> : null}
         <h2>{t("planningSession.liveTitle")}</h2>
         <p className="od-planning-session-sub">
           {t("planningSession.liveStatus", {

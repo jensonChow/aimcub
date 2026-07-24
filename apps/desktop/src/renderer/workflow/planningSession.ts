@@ -7,7 +7,7 @@ import type { ClarifyOutput } from "@aimcub/llm";
 import type { PlanningSessionQuestion } from "@aimcub/llm";
 import type { LocalAgentDetection } from "@aimcub/local-agent";
 
-import type { PlanningSessionAnswerRequest, PlanningSessionStateView } from "../../shared/ipc";
+import type { DesktopPreferences, PlanningSessionAnswerRequest, PlanningSessionStateView } from "../../shared/ipc";
 import type { ContextAnswerMap } from "../stages/context/types";
 
 /** Renderer-side mirror of the main gate: which runtime can act as the planning brain. */
@@ -52,6 +52,51 @@ export function sessionAnswerRequest(
     requestId: question.id,
     labels: entry.labels,
     other: entry.other,
+  };
+}
+
+export interface PlanningModelMenuOption {
+  id: string;
+  label: string;
+  selected: boolean;
+}
+
+export interface PlanningModelMenu {
+  agentId: string;
+  /** Chip label: the effective model (explicit pick, else the auto fallback), or the Auto wording. */
+  currentLabel: string | null;
+  autoSelected: boolean;
+  options: PlanningModelMenuOption[];
+}
+
+/**
+ * The model menu for the planning brain, mirroring the runtime's LIVE-advertised
+ * list (a fallback catalog is a guess, not a menu). Returns null when there is
+ * no capable brain or nothing live to offer — the chip simply does not render.
+ */
+export function planningModelMenu(
+  detections: readonly LocalAgentDetection[],
+  pref: DesktopPreferences["planningModel"],
+): PlanningModelMenu | null {
+  const agentId = embeddedPlanningAgentId(detections);
+  if (!agentId) return null;
+  const detection = detections.find((entry) => entry.id === agentId);
+  if (!detection || detection.modelsSource !== "live") return null;
+  const models = detection.models.filter((model) => model.id !== "default");
+  if (models.length === 0) return null;
+  const picked = pref && pref.agentId === agentId && models.some((model) => model.id === pref.model)
+    ? pref.model
+    : null;
+  const autoModel = models[0]?.id ?? null;
+  return {
+    agentId,
+    currentLabel: picked ?? autoModel,
+    autoSelected: picked === null,
+    options: models.map((model) => ({
+      id: model.id,
+      label: model.label || model.id,
+      selected: model.id === picked,
+    })),
   };
 }
 

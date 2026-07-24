@@ -452,6 +452,12 @@ export interface DesktopPreferences {
    * in the cockpit. On reveals them for people debugging Aimcub itself.
    */
   developerMode: boolean;
+  /**
+   * Explicit model for the embedded planning brain, scoped to the runtime it was picked for
+   * (a saved codex model must not leak onto a claude session). Null = Auto: the runtime's
+   * first live-advertised model.
+   */
+  planningModel: { agentId: string; model: string } | null;
 }
 
 /** One normalized event of a worker-executed run, pushed live as it happens. */
@@ -509,6 +515,8 @@ export interface PlanningSessionLanding {
 export interface PlanningSessionStateView {
   goalId: string;
   agentId: LocalAgentId;
+  /** The model the session actually runs on, when resolved (explicit or live-advertised fallback). */
+  model: string | null;
   active: boolean;
   phase: PlanningSessionPhase;
   pendingQuestion: PlanningSessionQuestion | null;

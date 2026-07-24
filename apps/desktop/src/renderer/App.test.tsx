@@ -1515,7 +1515,10 @@ describe("developer mode gating", () => {
     const settings = readFileSync(new URL("../main/app-settings.ts", import.meta.url), "utf8");
 
     expect(app).toContain("<DeveloperModeProvider enabled={developerMode}>");
-    expect(app).toContain("window.aimcub.setDesktopPreferences({ developerMode: enabled })");
+    expect(app).toContain("await window.aimcub.setDesktopPreferences({");
+    expect(app).toContain("developerMode: enabled,");
+    // Preference saves carry the FULL object so one toggle can never wipe another field.
+    expect(app).toContain("planningModel: planningModelPref,");
     expect(settings).toContain("developerMode: false");
     expect(settings).toContain("developerMode: record.developerMode === true");
     // The preferences file is desktop-only chrome; it must not carry run permissions.

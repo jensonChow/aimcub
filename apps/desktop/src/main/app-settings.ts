@@ -15,6 +15,7 @@ import type { DesktopPreferences } from "../shared/ipc";
 
 export const DEFAULT_DESKTOP_PREFERENCES: DesktopPreferences = {
   developerMode: false,
+  planningModel: null,
 };
 
 export function desktopPreferencesPath(dataDir: string = defaultDataDir()): string {
@@ -26,7 +27,16 @@ export function normalizeDesktopPreferences(raw: unknown): DesktopPreferences {
   const record = typeof raw === "object" && raw !== null ? (raw as Record<string, unknown>) : {};
   return {
     developerMode: record.developerMode === true,
+    planningModel: normalizePlanningModel(record.planningModel),
   };
+}
+
+function normalizePlanningModel(raw: unknown): DesktopPreferences["planningModel"] {
+  if (typeof raw !== "object" || raw === null) return null;
+  const record = raw as Record<string, unknown>;
+  const agentId = typeof record.agentId === "string" ? record.agentId.trim() : "";
+  const model = typeof record.model === "string" ? record.model.trim() : "";
+  return agentId && model ? { agentId, model } : null;
 }
 
 let cached: DesktopPreferences | null = null;
