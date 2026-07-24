@@ -1,8 +1,10 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-24
-Branch: `main`, 8 commits ahead of `origin/main` (push NOT yet authorized this
-session). **Planning-agent epic: all four stages MERGED and verified.** The aim
+Branch: `main`, 10 commits ahead of `origin/main` (push NOT yet authorized this
+session). **Planning-agent epic: all four stages MERGED and verified, plus the
+Codex brain — and the FIRST LIVE model-driven end-to-end session succeeded on
+the founder's ChatGPT subscription (gpt-5.5).** The aim
 research/breakdown engine changed shape: from a fixed collector funnel to an
 embedded planning-agent session (the local agent as the aim-breaking brain).
 
@@ -48,15 +50,31 @@ embedded planning-agent session (the local agent as the aim-breaking brain).
 - Live CLI smokes: spawn shape + MCP config registration verified against
   claude 2.1.191; honest failure paths verified end-to-end.
 
+## Codex brain + live verification (post-epic, same day)
+
+5. **codex-planning-brain** — Codex (ChatGPT login) is now a planning brain:
+   `exec --json --sandbox read-only`, streamable-HTTP MCP with the session
+   token as a `token` query param (codex MCP configs cannot set headers),
+   `tool_timeout_sec` raised for parked questions, one-shot stdin (engine
+   closes the pipe after the prompt for non-stream runtimes; chat rides tool
+   replies). `preferredPlanningModel` falls back to the first LIVE-advertised
+   model when the caller names none — the founder's codex default pointed at
+   a server-gated model (`gpt-5.6-sol` → 400) that its installed CLI cannot
+   drive; live lists are the truth, fallback catalogs are not. `aimcub plan`
+   gained `--model`/`--reasoning`.
+6. **LIVE END-TO-END VERIFIED (2026-07-24)**, twice on gpt-5.5:
+   engine-level with a blocking question (research → parked ask_user →
+   answer → quality bounce → repaired accept, 181s, warn 90/100) and via the
+   real `aimcub plan` binary non-interactively (0 questions by budget →
+   disclosed assumptions + open questions, bounce → accept). Honest gaps
+   named exactly what web-disabled research could not verify.
+
 ## Open items
 
-1. **Founder: `claude /login`.** The standalone CLI on this machine is not
-   authenticated (`loggedIn: false`), so a full model-driven session (real
-   research → questions → submitted plan) has NOT been observed live. The
-   mechanical layer (spawn, bridge handshake config, timeouts, honest
-   failures) is live-verified; protocol + engine are covered by SDK-client
-   tests acting as the brain. First real run after login is the next smoke.
-2. Codex planning adapter (needs its MCP/stream posture verified) — follow-up.
+1. **Founder: `claude /login`** — the Claude brain path is still only
+   mechanically live-verified (CLI not authenticated); the Codex path is
+   fully live-verified. First Claude-brain run after login is the remaining
+   smoke.
 3. Desktop chat while a question is parked reaches the brain right after the
    answer (stream queue) — acceptable; revisit if users expect instant reads.
 4. Renderer keeps a local mirror of the capability gate (cannot import
@@ -67,6 +85,8 @@ embedded planning-agent session (the local agent as the aim-breaking brain).
 
 Run the first authenticated end-to-end session (Desktop + `aimcub plan`),
 then judge question quality/research depth against the founder's blueprint
-(local+web research · temporary chat · multi-choice). The prior OSS-launch
+(local+web research · temporary chat · multi-choice). Judge question quality and research depth against the blueprint
+(try `--network` for live web research). Desktop Settings surface for the
+planning brain's model/effort is a proposed follow-up. The prior OSS-launch
 checklist in git history (license → npm org → repo settings → gitleaks →
 public flip) still stands, unchanged by this epic.

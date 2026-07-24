@@ -25,6 +25,7 @@ import type { AimDraftPlanningSession } from "@aimcub/types";
 import {
   PlanningSessionUnsupportedError,
   planningCapableAgentId,
+  preferredPlanningModel,
   startEmbeddedPlanningSession,
   type EmbeddedPlanningSessionHandle,
   type LocalAgentEvent,
@@ -194,6 +195,7 @@ export async function startPlanningSession(req: PlanningSessionStartRequest): Pr
     settled: false,
   };
 
+  const model = preferredPlanningModel(detections.find((detection) => detection.id === agentId));
   const handle = await startEmbeddedPlanningSession({
     agentId,
     aim: { title: req.title, description: req.description },
@@ -205,6 +207,7 @@ export async function startPlanningSession(req: PlanningSessionStartRequest): Pr
       required: aimRequiresWebResearch({ title: req.title, description: req.description }),
     },
     cwd,
+    ...(model ? { model } : {}),
   }, {
     onSessionEvent: (event) => {
       if (event.type === "question_asked") managed.questionsAsked += 1;

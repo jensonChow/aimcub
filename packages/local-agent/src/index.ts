@@ -4,6 +4,7 @@ export type { PlanningMcpBridge, PlanningMcpBridgeOptions } from "./planning/mcp
 export {
   PlanningSessionUnsupportedError,
   planningCapableAgentId,
+  preferredPlanningModel,
   startEmbeddedPlanningSession,
 } from "./planning/embedded-session";
 export type {

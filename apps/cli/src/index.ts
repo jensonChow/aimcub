@@ -74,6 +74,7 @@ import {
   listLocalAgents,
   listRegisteredLocalAgentIds,
   planningCapableAgentId,
+  preferredPlanningModel,
   RunSelectionError,
   type LocalAgentEvent,
   type LocalAgentId,
@@ -591,7 +592,7 @@ async function runPlan(
   title: string,
   description: string | undefined,
   json: boolean,
-  session: { funnel: boolean; network: boolean; agent?: string | undefined },
+  session: { funnel: boolean; network: boolean; agent?: string | undefined; model?: string | undefined; reasoning?: string | undefined },
 ): Promise<void> {
   const planning = await planningContext({ title, description });
   const memories = planning.memories;
@@ -624,6 +625,8 @@ async function runPlan(
         memories,
         network: session.network,
         interactive: isInteractive(),
+        model: session.model ?? preferredPlanningModel(detections.find((detection) => detection.id === agentId)),
+        reasoning: session.reasoning,
         log: err,
       });
       if (!sessionResult.outcome) {
@@ -1797,6 +1800,8 @@ async function main(): Promise<number> {
           funnel: Boolean(values.funnel),
           network: Boolean(values.network),
           agent: values.agent,
+          model: values.model,
+          reasoning: values.reasoning,
         });
         return 0;
       case "clarify":

@@ -83,6 +83,19 @@ export function planningCapableAgentId(
   return null;
 }
 
+/**
+ * Default model for a planning session when the caller specifies none: the
+ * first concrete model the runtime ADVERTISES (mirrors the funnel gateway's
+ * preferredModel). Live-run lesson: a runtime's configured default can point
+ * at a model its installed version cannot drive (observed: codex defaulting
+ * to a server-gated model → immediate 400), while its live-advertised list is
+ * what actually works. Explicit user choices always win over this.
+ */
+export function preferredPlanningModel(detection: LocalAgentDetection | undefined): string | undefined {
+  if (!detection || detection.modelsSource !== "live") return undefined;
+  return detection.models.find((model) => model.id !== "default")?.id;
+}
+
 export interface EmbeddedPlanningSessionRequest {
   agentId: LocalAgentId;
   aim: PlanningSessionAim;
@@ -366,7 +379,15 @@ export async function startEmbeddedPlanningSession(
     spawned.on("close", (code) => finish(code));
   });
 
-  writeToBrain(invocation.stdin);
+  // Stream-capable runtimes (encodePlanningUserMessage) keep stdin open so chat
+  // can be injected as live user turns. One-shot runtimes read the prompt until
+  // EOF and would wait forever on an open pipe — close it after the prompt;
+  // their chat rides along on projected-tool replies instead.
+  if (encodeUserMessage) {
+    writeToBrain(invocation.stdin);
+  } else {
+    spawned.stdin?.end(invocation.stdin);
+  }
 
   return {
     session,

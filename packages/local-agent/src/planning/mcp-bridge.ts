@@ -120,13 +120,19 @@ export async function startPlanningMcpBridge(options: PlanningMcpBridgeOptions):
   }
 
   async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    if (req.headers.authorization !== `Bearer ${authToken}`) {
+    const url = new URL(req.url ?? "/", `http://${req.headers.host ?? host}`);
+    // Either credential form works: the Authorization header (Claude's MCP
+    // config carries headers) or a `token` query parameter (for runtimes whose
+    // MCP config cannot set headers — the endpoint is loopback-only and the
+    // token is per-session random either way).
+    const authorized = req.headers.authorization === `Bearer ${authToken}`
+      || url.searchParams.get("token") === authToken;
+    if (!authorized) {
       res.writeHead(401, { "content-type": "application/json" }).end(
         JSON.stringify({ error: "unauthorized" }),
       );
       return;
     }
-    const url = new URL(req.url ?? "/", `http://${req.headers.host ?? host}`);
     if (url.pathname !== BRIDGE_PATH) {
       res.writeHead(404).end();
       return;
