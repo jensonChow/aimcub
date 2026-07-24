@@ -24,9 +24,9 @@ import {
 import type { AimDraftPlanningSession } from "@aimcub/types";
 import {
   PlanningSessionUnsupportedError,
+  planningCapableAgentId,
   startEmbeddedPlanningSession,
   type EmbeddedPlanningSessionHandle,
-  type LocalAgentDetection,
   type LocalAgentEvent,
   type LocalAgentId,
 } from "@aimcub/local-agent";
@@ -44,12 +44,6 @@ import { aimStore } from "./store";
 import { aimRequiresWebResearch, embeddedWebResearchEnabled, linkedContextSources, localContextRoot } from "./tools";
 
 const ACTIVITY_BUFFER_LIMIT = 40;
-
-/** The runtime that can act as the planning brain, or null when none qualifies. */
-export function embeddedPlanningAgentId(detections: readonly LocalAgentDetection[]): LocalAgentId | null {
-  const claude = detections.find((agent) => agent.id === "claude");
-  return claude && claude.available && claude.authStatus === "ok" ? claude.id : null;
-}
 
 interface ManagedPlanningSession {
   goalId: string;
@@ -173,7 +167,7 @@ export async function startPlanningSession(req: PlanningSessionStartRequest): Pr
   if (existing && !existing.settled) return viewOf(existing);
 
   const detections = await listLocalAgents();
-  const agentId = embeddedPlanningAgentId(detections);
+  const agentId = planningCapableAgentId(detections);
   if (!agentId) {
     throw new PlanningSessionUnsupportedError("claude");
   }

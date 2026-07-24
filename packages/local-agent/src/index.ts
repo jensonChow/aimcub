@@ -3,6 +3,7 @@ export { startPlanningMcpBridge } from "./planning/mcp-bridge";
 export type { PlanningMcpBridge, PlanningMcpBridgeOptions } from "./planning/mcp-bridge";
 export {
   PlanningSessionUnsupportedError,
+  planningCapableAgentId,
   startEmbeddedPlanningSession,
 } from "./planning/embedded-session";
 export type {
