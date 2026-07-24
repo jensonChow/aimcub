@@ -140,12 +140,12 @@ export function planQualityMetadata(
   return metadata;
 }
 
-/** System prompt: frozen instructions. Kept stable so it stays cache-friendly. */
-const SYSTEM_PROMPT = [
-  "You are Aimcub's planning engine. You break a user's goal into a concrete, ordered set",
-  "of milestones that humans and agents can execute and verify from real evidence.",
-  "",
-  "Rules:",
+/**
+ * The plan-shape rules, shared verbatim between the structured-output funnel
+ * (this module's SYSTEM_PROMPT) and the embedded planning-session prompt
+ * (`planning-session-prompt.ts`), so both paths target one validation contract.
+ */
+export const DECOMPOSITION_PLAN_RULES = [
   "- Produce between 1 and 15 milestones. Fewer, meaningful milestones beat many trivial ones.",
   "- Prefer 3 to 7 milestones unless the goal explicitly requires more. Do not use 15 milestones by default.",
   "- Keep JSON compact: node titles under 60 characters; descriptions, contract fields, and eval signals under 180 characters each.",
@@ -231,6 +231,15 @@ const SYSTEM_PROMPT = [
   "  (e.g. a commit_pattern clause sets workflow/conclusion to null, and vice versa).",
 ].join("\n");
 
+/** System prompt: frozen instructions. Kept stable so it stays cache-friendly. */
+const SYSTEM_PROMPT = [
+  "You are Aimcub's planning engine. You break a user's goal into a concrete, ordered set",
+  "of milestones that humans and agents can execute and verify from real evidence.",
+  "",
+  "Rules:",
+  DECOMPOSITION_PLAN_RULES,
+].join("\n");
+
 /** Build the per-goal user prompt. */
 function renderLineageLearning(learning: ContextLineageLearningReport | null | undefined): string {
   if (!learning || learning.totalQuestions === 0) return "(none yet)";
@@ -314,7 +323,7 @@ function renderResearchEvidence(research: ResearchBrief | null | undefined, requ
   return lines.join("\n");
 }
 
-function renderOutputLanguageInstruction(language: AimOutputLanguage | undefined): string {
+export function renderOutputLanguageInstruction(language: AimOutputLanguage | undefined): string {
   if (language === "simplified_chinese") {
     return [
       "Output language: Simplified Chinese.",

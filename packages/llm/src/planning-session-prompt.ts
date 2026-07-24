@@ -1,0 +1,109 @@
+/**
+ * Mission prompt for an embedded planning brain.
+ *
+ * The embedded agent (Claude Code, Codex, or any adapter runtime) receives this as
+ * its initial prompt for a planning session. It carries the aim, the durable context
+ * Aimcub already holds, the research doctrine (use YOUR tools; report gaps, never
+ * fabricate), the interaction doctrine (one blocking question at a time through
+ * `ask_user`; the user can interject over temporary chat), and the submit contract
+ * whose plan rules are shared verbatim with the structured-output funnel.
+ */
+import { DECOMPOSITION_PLAN_RULES, renderOutputLanguageInstruction } from "./decompose";
+import { renderPlanningContext, type PlanningMemory } from "./planning-context";
+import type { ContextLinkedSource } from "./tool-contract";
+import {
+  DEFAULT_PLANNING_SESSION_BUDGETS,
+  type PlanningSessionAim,
+  type PlanningSessionBudgets,
+} from "./planning-session";
+
+export interface PlanningSessionPromptInput {
+  aim: PlanningSessionAim;
+  memories?: readonly PlanningMemory[];
+  linkedSources?: readonly ContextLinkedSource[];
+  /** Absolute directories the brain has been granted read access to. */
+  workspaceRoots?: readonly string[];
+  webResearch: { enabled: boolean; required: boolean };
+  budgets?: Partial<PlanningSessionBudgets>;
+}
+
+function renderLinkedSources(sources: readonly ContextLinkedSource[] | undefined): string {
+  const enabled = (sources ?? []).filter((source) => source.enabled);
+  if (enabled.length === 0) return "(none linked)";
+  return enabled
+    .map((source) => {
+      const location = source.path ?? source.uri ?? "";
+      const status = source.status === "available" ? "" : ` [${source.status}]`;
+      return `- ${source.kind}: ${source.label}${location ? ` (${location})` : ""}${status}`;
+    })
+    .join("\n");
+}
+
+function renderWorkspaceRoots(roots: readonly string[] | undefined): string {
+  const cleaned = (roots ?? []).map((root) => root.trim()).filter(Boolean);
+  if (cleaned.length === 0) return "(none — do not read local files beyond what the user attaches)";
+  return cleaned.map((root) => `- ${root}`).join("\n");
+}
+
+function renderResearchDoctrine(webResearch: { enabled: boolean; required: boolean }): string {
+  const lines = [
+    "Research with YOUR OWN tools (file reading, code search, web search/fetch) within the permissions this session grants.",
+    "Cover, when relevant: current aim facts, authoritative requirements, realistic alternatives or market evidence, risks and trade-offs, and user/audience evidence.",
+    "Record findings through report_research AS YOU GO, each with full source URLs, so the user can audit the research live.",
+    "Never fabricate facts, sources, or availability. Anything you could not verify goes into report_research gaps or submit_plan open_questions.",
+  ];
+  if (!webResearch.enabled) {
+    lines.push(
+      "Web research is DISABLED for this session. Do not attempt network access; record the missing web coverage as an explicit gap instead.",
+    );
+  } else if (webResearch.required) {
+    lines.push("This aim depends on current external facts: treat web research as required, not optional.");
+  }
+  return lines.map((line) => `- ${line}`).join("\n");
+}
+
+export function buildPlanningSessionPrompt(input: PlanningSessionPromptInput): string {
+  const budgets = { ...DEFAULT_PLANNING_SESSION_BUDGETS, ...input.budgets };
+  const description = input.aim.description?.trim() ? input.aim.description.trim() : "(no description provided)";
+  return [
+    "You are the planning brain of Aimcub, an aim-management system that routes work across humans and agents.",
+    "Your job in this session: deeply understand the user's aim through research and dialogue, then break it into a verifiable milestone plan.",
+    "You are not executing the aim. You are researching, clarifying, and planning it.",
+    "",
+    "## The aim",
+    `Title: ${input.aim.title}`,
+    `Domain: ${input.aim.domain ?? "software"}`,
+    `Description: ${description}`,
+    "",
+    renderOutputLanguageInstruction(input.aim.outputLanguage),
+    "",
+    "## What Aimcub already knows (durable context from prior aims)",
+    renderPlanningContext(input.memories),
+    "",
+    "## Linked context sources",
+    renderLinkedSources(input.linkedSources),
+    "",
+    "## Local directories you may read",
+    renderWorkspaceRoots(input.workspaceRoots),
+    "",
+    "## How to research",
+    renderResearchDoctrine(input.webResearch),
+    "",
+    "## How to work with the user",
+    "- Call search_memory before asking anything the user may already have told Aimcub.",
+    `- ask_user asks ONE blocking question at a time, budget ${budgets.maxQuestions} per session. Spend it only on questions whose answer changes decomposition, routing, research direction, risk controls, evidence, or the definition of done.`,
+    "- Prefer options-with-tradeoffs (hypotheses) over open questions; a free-text escape hatch is always added for you.",
+    "- Choice cardinality: single ONLY when answers are mutually exclusive in the same scope or one primary choice is explicitly required; if any pair of options can be true together, use multiple; uncertainty defaults to multiple.",
+    "- Interleave: research first, ask when research cannot answer, let each answer redirect the next research step. Do not front-load a questionnaire.",
+    "- Tool replies may carry user_notes (the user's temporary-chat interjections) and directives. Treat user_notes as fresh user input; a finish_now directive means stop researching and submit the plan with your current understanding.",
+    "- Low-impact unknowns are NOT questions: default them and disclose the default in submit_plan assumptions.",
+    "- Durable, reusable facts you discover (stable preferences, constraints, capabilities) go through propose_memory as pending candidates.",
+    "",
+    "## What to deliver",
+    `- Call submit_plan with the milestone plan. If the reply lists validation errors or quality critique, fix them and submit again (budget ${budgets.maxSubmitAttempts} attempts).`,
+    "- The session ends when a submission is accepted. Do not print the plan as prose; the tool call is the deliverable.",
+    "",
+    "Plan rules:",
+    DECOMPOSITION_PLAN_RULES,
+  ].join("\n");
+}
