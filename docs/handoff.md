@@ -97,11 +97,17 @@ embedded planning-agent session (the local agent as the aim-breaking brain).
    mechanically live-verified (CLI not authenticated); the Codex path is
    fully live-verified. First Claude-brain run after login is the remaining
    smoke.
-3. Desktop chat while a question is parked reaches the brain right after the
+2. Desktop chat while a question is parked reaches the brain right after the
    answer (stream queue) — acceptable; revisit if users expect instant reads.
-4. Renderer keeps a local mirror of the capability gate (cannot import
-   local-agent values into the renderer bundle) — keep in sync.
-5. Push to origin pending founder authorization (8 commits ahead).
+3. ~~Renderer capability mirror~~ RESOLVED 2026-07-24: the mirror was the
+   predicted trap — it stayed claude-only after codex became capable, hiding
+   the chip AND silently sending Desktop down the funnel on this codex-only
+   machine. Killed for good: main now ships `planningCapable` on every
+   detection row and the renderer trusts only that flag. The brain chooser
+   chip (Claude Code / Codex, parallel to the model chip) shipped in the
+   same change; `planningBrain` preference honored at session start with
+   stale-pick degradation to Auto.
+4. Push to origin pending founder authorization.
 
 ## Next session
 

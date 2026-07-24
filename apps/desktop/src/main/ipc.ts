@@ -68,6 +68,7 @@ import {
   type PlanningDebugTraceStage,
   type PlanningLiveEvent,
   type PlanningLiveSummary,
+  type PlanningAgentDetection,
   type PlanningSessionAnswerRequest,
   type PlanningSessionChatRequest,
   type PlanningSessionRef,
@@ -96,6 +97,7 @@ import {
 } from "./context-source-settings";
 import { getWebResearchStatus, setWebResearchConfig, testWebResearchConfig } from "./web-research-settings";
 import { listLocalAgents, runLocalAgent } from "./local-agents";
+import { defaultLocalAgentRegistry } from "@aimcub/local-agent";
 import { loadDesktopPreferences, saveDesktopPreferences } from "./app-settings";
 import {
   cancelQueuedRun,
@@ -886,7 +888,17 @@ export function registerIpc(): void {
 
   ipcMain.handle(IPC.pickLocalContextFiles, async (): Promise<LocalContextPickResult> => pickLocalContextFiles());
 
-  ipcMain.handle(IPC.listLocalAgents, () => listLocalAgents());
+  ipcMain.handle(IPC.listLocalAgents, async (): Promise<PlanningAgentDetection[]> => {
+    // The renderer must not mirror adapter capabilities (a stale mirror once hid
+    // the embedded path on a codex-only machine) — main states them per row.
+    // The flag is pure ADAPTER capability; availability/auth stay separate so the
+    // brain menu can show an installed-but-signed-out runtime as disabled.
+    const detections = await listLocalAgents();
+    return detections.map((detection) => ({
+      ...detection,
+      planningCapable: Boolean(defaultLocalAgentRegistry.get(detection.id)?.buildPlanningSessionInvocation),
+    }));
+  });
 
   ipcMain.handle(IPC.runLocalAgent, (_e, req: LocalAgentRunRequest): Promise<LocalAgentRunResult> =>
     runLocalAgent(req),

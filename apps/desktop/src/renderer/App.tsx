@@ -24,6 +24,7 @@ import type {
   DesktopPreferences,
   GoalDetail,
   LocalAgentDetection,
+  PlanningAgentDetection,
   PlanningDebugTrace,
   PlanningLiveEvent,
   PlanningSessionStateView,
@@ -103,12 +104,13 @@ import {
 } from "./workflow/aimDrafts";
 import {
   embeddedPlanningAgentId,
+  planningBrainMenu,
   planningModelMenu,
   sessionAnswerRequest,
   sessionPayloadIsCurrent,
   sessionSurfaceVisible,
 } from "./workflow/planningSession";
-import { PlanningModelChip } from "./PlanningModelChip";
+import { PlanningBrainChip, PlanningModelChip } from "./PlanningModelChip";
 import {
   formatPlanValidationIssues,
   formatPlanningFailure,
@@ -177,7 +179,7 @@ function AimOsApp() {
   const [provider, setProvider] = useState<ProviderStatus | null>(null);
   const [webResearch, setWebResearch] = useState<WebResearchStatus | null>(null);
   const [contextSources, setContextSources] = useState<ContextSourceStatus | null>(null);
-  const [localAgents, setLocalAgents] = useState<LocalAgentDetection[]>([]);
+  const [localAgents, setLocalAgents] = useState<PlanningAgentDetection[]>([]);
   const [memories, setMemories] = useState<Memory[]>([]);
   const [aimSurfaceMode, setAimSurfaceMode] = useState<AimSurfaceMode>("idle");
   const [aimTitle, setAimTitle] = useState("");
@@ -199,6 +201,7 @@ function AimOsApp() {
   // Off unless the user turned it on: with it off nothing debug-shaped renders anywhere.
   const [developerMode, setDeveloperMode] = useState(false);
   const [planningModelPref, setPlanningModelPref] = useState<DesktopPreferences["planningModel"]>(null);
+  const [planningBrainPref, setPlanningBrainPref] = useState<DesktopPreferences["planningBrain"]>(null);
   // Store corruption/recovery reports. Dismissing hides them for this session only — the store
   // keeps reporting them, because the quarantined file is still sitting there.
   const [storeDiagnostics, setStoreDiagnostics] = useState<StoreDiagnostic[]>([]);
@@ -462,6 +465,7 @@ function AimOsApp() {
   function applyDesktopPreferences(prefs: DesktopPreferences | null | undefined): void {
     setDeveloperMode(prefs?.developerMode === true);
     setPlanningModelPref(prefs?.planningModel ?? null);
+    setPlanningBrainPref(prefs?.planningBrain ?? null);
   }
 
   function applyStoreDiagnostics(diagnostics: StoreDiagnostic[] | null | undefined): void {
@@ -482,6 +486,7 @@ function AimOsApp() {
       applyDesktopPreferences(await window.aimcub.setDesktopPreferences({
         developerMode: enabled,
         planningModel: planningModelPref,
+        planningBrain: planningBrainPref,
       }));
     } catch {
       // A preference that failed to persist is not worth an error banner; the next load re-reads it.
@@ -495,6 +500,20 @@ function AimOsApp() {
       applyDesktopPreferences(await window.aimcub.setDesktopPreferences({
         developerMode,
         planningModel: next,
+        planningBrain: planningBrainPref,
+      }));
+    } catch {
+      // Same posture as developer mode: non-fatal, re-read on next load.
+    }
+  }
+
+  async function selectPlanningBrain(agentId: string | null): Promise<void> {
+    setPlanningBrainPref(agentId);
+    try {
+      applyDesktopPreferences(await window.aimcub.setDesktopPreferences({
+        developerMode,
+        planningModel: planningModelPref,
+        planningBrain: agentId,
       }));
     } catch {
       // Same posture as developer mode: non-fatal, re-read on next load.
@@ -1363,7 +1382,7 @@ function AimOsApp() {
   async function startShellResearch() {
     if (workflowMutationIsLocked() || !selected) return;
     const goal = selected;
-    if (embeddedPlanningAgentId(localAgents)) {
+    if (embeddedPlanningAgentId(localAgents, planningBrainPref)) {
       await startEmbeddedPlanning(goal);
       return;
     }
@@ -1945,9 +1964,13 @@ function AimOsApp() {
     }
   }
 
+  const planningBrainMenuModel = useMemo(
+    () => planningBrainMenu(localAgents, planningBrainPref),
+    [localAgents, planningBrainPref],
+  );
   const planningModelMenuModel = useMemo(
-    () => planningModelMenu(localAgents, planningModelPref),
-    [localAgents, planningModelPref],
+    () => planningModelMenu(localAgents, planningModelPref, planningBrainPref),
+    [localAgents, planningModelPref, planningBrainPref],
   );
 
   const sessionSurfaceActive = sessionPayloadIsCurrent(planningSession, selected?.id ?? null)
@@ -2133,12 +2156,21 @@ function AimOsApp() {
       disabled={Boolean(busy)}
       elsewhereCount={journeyElsewhere.length}
       planningRuntimeReady={planningRuntimeReady}
-      modelChip={planningModelMenuModel ? (
-        <PlanningModelChip
-          menu={planningModelMenuModel}
-          disabled={Boolean(busy)}
-          onSelect={(modelId) => void selectPlanningModel(planningModelMenuModel.agentId, modelId)}
-        />
+      modelChip={planningBrainMenuModel ? (
+        <>
+          <PlanningBrainChip
+            menu={planningBrainMenuModel}
+            disabled={Boolean(busy)}
+            onSelect={(agentId) => void selectPlanningBrain(agentId)}
+          />
+          {planningModelMenuModel ? (
+            <PlanningModelChip
+              menu={planningModelMenuModel}
+              disabled={Boolean(busy)}
+              onSelect={(modelId) => void selectPlanningModel(planningModelMenuModel.agentId, modelId)}
+            />
+          ) : null}
+        </>
       ) : undefined}
       onStartResearch={() => void startShellResearch()}
       planning={isPlanningShell ? {

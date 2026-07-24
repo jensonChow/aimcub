@@ -458,6 +458,11 @@ export interface DesktopPreferences {
    * first live-advertised model.
    */
   planningModel: { agentId: string; model: string } | null;
+  /**
+   * Which runtime IS the planning brain (parallel to the model choice). Null = Auto: the
+   * first available, authenticated, planning-capable runtime in registry order.
+   */
+  planningBrain: string | null;
 }
 
 /** One normalized event of a worker-executed run, pushed live as it happens. */
@@ -470,6 +475,14 @@ export interface RunLiveEvent {
 }
 
 // ── Embedded planning session (the local agent as the aim-breaking brain) ──
+
+/**
+ * A local-agent detection enriched by main with whether its adapter supports
+ * embedded planning sessions. The renderer must never mirror that capability
+ * itself — a stale mirror is how a codex-only machine ended up hiding the
+ * whole embedded path.
+ */
+export type PlanningAgentDetection = LocalAgentDetection & { planningCapable: boolean };
 
 export interface PlanningSessionStartRequest {
   goalId: string;
@@ -601,7 +614,7 @@ export interface AimcubApi {
   setContextSourceConfig(config: ContextSourceConfig): Promise<ContextSourceStatus>;
   pickLocalContextFolder(): Promise<LocalContextPickResult>;
   pickLocalContextFiles(): Promise<LocalContextPickResult>;
-  listLocalAgents(): Promise<LocalAgentDetection[]>;
+  listLocalAgents(): Promise<PlanningAgentDetection[]>;
   runLocalAgent(req: LocalAgentRunRequest): Promise<LocalAgentRunResult>;
   runMilestoneAgent(req: RunMilestoneAgentRequest): Promise<RunMilestoneAgentResult>;
   /**

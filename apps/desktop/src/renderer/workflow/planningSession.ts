@@ -5,15 +5,83 @@
  */
 import type { ClarifyOutput } from "@aimcub/llm";
 import type { PlanningSessionQuestion } from "@aimcub/llm";
-import type { LocalAgentDetection } from "@aimcub/local-agent";
 
-import type { DesktopPreferences, PlanningSessionAnswerRequest, PlanningSessionStateView } from "../../shared/ipc";
+import type { DesktopPreferences, PlanningAgentDetection, PlanningSessionAnswerRequest, PlanningSessionStateView } from "../../shared/ipc";
 import type { ContextAnswerMap } from "../stages/context/types";
 
-/** Renderer-side mirror of the main gate: which runtime can act as the planning brain. */
-export function embeddedPlanningAgentId(detections: readonly LocalAgentDetection[]): string | null {
-  const claude = detections.find((agent) => agent.id === "claude");
-  return claude && claude.available && claude.authStatus === "ok" ? claude.id : null;
+/** A runtime that could run a planning session right now: capable, installed, authenticated. */
+function sessionReady(detection: PlanningAgentDetection): boolean {
+  return detection.planningCapable && detection.available && detection.authStatus === "ok";
+}
+
+/**
+ * The brain a new Desktop session would use: the user's pick when it is
+ * session-ready, else the first session-ready runtime. Capability comes from
+ * main on each detection row — the renderer never mirrors adapter knowledge
+ * (a stale mirror once hid the embedded path on a codex-only machine).
+ */
+export function embeddedPlanningAgentId(
+  detections: readonly PlanningAgentDetection[],
+  brainPref: DesktopPreferences["planningBrain"] = null,
+): string | null {
+  if (brainPref) {
+    const picked = detections.find((detection) => detection.id === brainPref);
+    if (picked && sessionReady(picked)) return picked.id;
+  }
+  return detections.find(sessionReady)?.id ?? null;
+}
+
+/** Auth probes sometimes emit raw JSON; a tooltip deserves words, not payloads. */
+function humanAuthReason(detection: PlanningAgentDetection): string {
+  if (!detection.available) return "Not installed";
+  const message = detection.authMessage?.trim() ?? "";
+  if (message && !message.startsWith("{") && message.length <= 80) return message;
+  return "Sign in required";
+}
+
+export interface PlanningBrainMenuOption {
+  id: string;
+  label: string;
+  selected: boolean;
+  /** Present but unusable (signed out / unavailable): rendered disabled with the reason. */
+  disabledReason: string | null;
+}
+
+export interface PlanningBrainMenu {
+  /** The brain a new session would actually use. */
+  effectiveAgentId: string;
+  currentLabel: string;
+  autoSelected: boolean;
+  options: PlanningBrainMenuOption[];
+}
+
+/**
+ * The brain chooser, parallel to the model chooser. Every planning-capable
+ * runtime is listed — a signed-out one shows disabled with its auth message —
+ * and Auto follows registry order. Null when nothing could run a session.
+ */
+export function planningBrainMenu(
+  detections: readonly PlanningAgentDetection[],
+  brainPref: DesktopPreferences["planningBrain"],
+): PlanningBrainMenu | null {
+  const effective = embeddedPlanningAgentId(detections, brainPref);
+  if (!effective) return null;
+  const capable = detections.filter((detection) => detection.planningCapable);
+  if (capable.length === 0) return null;
+  const pickedHonored = Boolean(brainPref) && effective === brainPref;
+  return {
+    effectiveAgentId: effective,
+    currentLabel: capable.find((detection) => detection.id === effective)?.name ?? effective,
+    autoSelected: !pickedHonored,
+    options: capable.map((detection) => ({
+      id: detection.id,
+      label: detection.name,
+      selected: pickedHonored && detection.id === brainPref,
+      disabledReason: sessionReady(detection)
+        ? null
+        : humanAuthReason(detection),
+    })),
+  };
 }
 
 /**
@@ -70,15 +138,17 @@ export interface PlanningModelMenu {
 }
 
 /**
- * The model menu for the planning brain, mirroring the runtime's LIVE-advertised
- * list (a fallback catalog is a guess, not a menu). Returns null when there is
- * no capable brain or nothing live to offer — the chip simply does not render.
+ * The model menu for the EFFECTIVE planning brain, mirroring the runtime's
+ * LIVE-advertised list (a fallback catalog is a guess, not a menu). Returns
+ * null when there is no usable brain or nothing live to offer — the chip
+ * simply does not render.
  */
 export function planningModelMenu(
-  detections: readonly LocalAgentDetection[],
+  detections: readonly PlanningAgentDetection[],
   pref: DesktopPreferences["planningModel"],
+  brainPref: DesktopPreferences["planningBrain"] = null,
 ): PlanningModelMenu | null {
-  const agentId = embeddedPlanningAgentId(detections);
+  const agentId = embeddedPlanningAgentId(detections, brainPref);
   if (!agentId) return null;
   const detection = detections.find((entry) => entry.id === agentId);
   if (!detection || detection.modelsSource !== "live") return null;
