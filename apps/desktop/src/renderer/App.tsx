@@ -110,7 +110,6 @@ import {
   sessionPayloadIsCurrent,
   sessionSurfaceVisible,
 } from "./workflow/planningSession";
-import { PlanningBrainChip, PlanningModelChip } from "./PlanningModelChip";
 import { SettingsPlanningBrainPane } from "./SettingsPlanningBrainPane";
 import {
   formatPlanValidationIssues,
@@ -1252,6 +1251,14 @@ function AimOsApp() {
       resetComposer();
       await refreshAll({ autoOpenFirstGoal: false });
       await openGoal(created.goal, { checkpointDraft: false });
+      // Simplified process: creating the aim IS starting the planning — the
+      // Journey opens onto the brain already working, no extra click.
+      if (embeddedPlanningAgentId(localAgents, planningBrainPref)) {
+        await startEmbeddedPlanning(created.goal);
+      } else {
+        setPlanningShellId(created.goal.id);
+        await startDraft({ shell: { goalId: created.goal.id, title: created.goal.title, description: created.goal.description ?? "" } });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -1270,7 +1277,6 @@ function AimOsApp() {
     setPlanResult({ ok: true, output: landing.plan, errors: [], quality: landing.quality, review: landing.review });
     setClarifyPhase(null);
     setMode("reviewing");
-    setStageOverride("contracts");
   }
 
   function applySessionView(view: PlanningSessionStateView) {
@@ -1306,8 +1312,9 @@ function AimOsApp() {
     setSessionAnswers({});
     setSessionChatDraft("");
     setError(null);
+    // Simplified process: the Journey hosts the whole session (working state,
+    // questions, plan review) through its planning slot — no stage hopping.
     setMode("contexting");
-    setStageOverride("context");
     try {
       const view = await window.aimcub.startPlanningSession({
         goalId: goal.id,
@@ -1929,6 +1936,15 @@ function AimOsApp() {
     setStageOverride("settings");
   }
 
+  function openBrainSettings() {
+    if (navigationIsLocked() || pendingTargetNavigationRef.current) return;
+    beginSurfaceTransition();
+    settingsReturnStageRef.current = "aim";
+    setSettingsSection("brain");
+    setMode("settings");
+    setStageOverride("settings");
+  }
+
   function openContextSettings() {
     if (navigationIsLocked() || pendingTargetNavigationRef.current) return;
     beginSurfaceTransition();
@@ -2162,25 +2178,24 @@ function AimOsApp() {
       elsewhereCount={journeyElsewhere.length}
       planningRuntimeReady={planningRuntimeReady}
       modelChip={planningBrainMenuModel ? (
-        <>
-          <PlanningBrainChip
-            menu={planningBrainMenuModel}
-            disabled={Boolean(busy)}
-            onSelect={(agentId) => void selectPlanningBrain(agentId)}
-          />
-          {planningModelMenuModel ? (
-            <PlanningModelChip
-              menu={planningModelMenuModel}
-              disabled={Boolean(busy)}
-              onSelect={(modelId) => void selectPlanningModel(planningModelMenuModel.agentId, modelId)}
-            />
-          ) : null}
-        </>
+        <button
+          type="button"
+          className="od-model-chip"
+          title={t("planningModel.openSettings")}
+          onClick={openBrainSettings}
+        >
+          <span className="od-model-chip-label">
+            {planningBrainMenuModel.currentLabel}
+            {planningModelMenuModel ? ` · ${planningModelMenuModel.currentLabel}` : ""}
+          </span>
+        </button>
       ) : undefined}
       onStartResearch={() => void startShellResearch()}
       planning={isPlanningShell ? {
         busy: Boolean(busy),
-        clarifyPanel: clarifyPhase !== null && clarify ? clarifyPanel : null,
+        clarifyPanel: (sessionPanel && planningSession && (planningSession.active || planningSession.failure !== null))
+          ? sessionPanel
+          : clarifyPhase !== null && clarify ? clarifyPanel : null,
         planReady: Boolean(finalPlan ?? draft) && clarifyPhase === null,
         onCommitPlan: () => void commitShellPlan(),
       } : undefined}

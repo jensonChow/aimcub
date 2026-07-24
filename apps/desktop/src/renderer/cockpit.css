@@ -2713,7 +2713,7 @@ kbd {
   display: inline-flex;
 }
 
-.od-action-menu-chip-trigger.od-model-chip {
+.od-model-chip {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -2728,44 +2728,15 @@ kbd {
   cursor: pointer;
 }
 
-.od-action-menu-chip-trigger.od-model-chip:hover {
+.od-model-chip:hover {
   background: var(--od-surface);
 }
 
-.od-model-chip-caret {
-  font-size: var(--od-type-tag);
-  color: var(--od-meta);
-}
 
-.od-model-chip-menu {
-  min-width: 180px;
-}
 
-.od-model-chip-heading {
-  padding: 6px 10px 2px;
-  color: var(--od-meta);
-  font-size: var(--od-type-tag);
-  font-weight: var(--od-font-weight-medium);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
 
-.od-action-menu-item.od-action-menu-radio {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
 
-.od-action-menu-radio-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
-.od-action-menu-radio-check {
-  color: var(--od-fg);
-}
 
 .od-context-clarify[data-phase="intake"] {
   gap: 24px;
