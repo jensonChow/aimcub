@@ -113,9 +113,10 @@ embedded planning-agent session (the local agent as the aim-breaking brain).
 
 Run the first authenticated end-to-end session (Desktop + `aimcub plan`),
 then judge question quality/research depth against the founder's blueprint
-(local+web research · temporary chat · multi-choice). The planning brain now has a Claude-Code-style model chip beside
-Build-the-plan (live-advertised models + Auto, persisted in
-desktop-settings.json, honored at session start with stale-pick protection).
+(local+web research · temporary chat · multi-choice). The aim process is now one continuous flow: creating an aim
+auto-starts the session, the Journey hosts everything (questions, chat,
+plan review, save), and brain/model configuration lives in Settings →
+Brain with a quiet status chip linking to it.
 Judge question quality and research depth against the blueprint
 (try `--network` for live web research). Desktop Settings surface for the
 planning brain's model/effort is a proposed follow-up. The prior OSS-launch
