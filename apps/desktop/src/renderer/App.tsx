@@ -111,6 +111,7 @@ import {
   sessionSurfaceVisible,
 } from "./workflow/planningSession";
 import { PlanningBrainChip, PlanningModelChip } from "./PlanningModelChip";
+import { SettingsPlanningBrainPane } from "./SettingsPlanningBrainPane";
 import {
   formatPlanValidationIssues,
   formatPlanningFailure,
@@ -2104,6 +2105,10 @@ function AimOsApp() {
       localAgents={localAgents}
       activeSection={settingsSection}
       developerMode={developerMode}
+      planningBrain={planningBrainPref}
+      planningModel={planningModelPref}
+      onSelectBrain={(agentId) => void selectPlanningBrain(agentId)}
+      onSelectModel={(agentId, modelId) => void selectPlanningModel(agentId, modelId)}
       onDeveloperMode={(enabled) => void setDeveloperModeEnabled(enabled)}
       onProvider={setProvider}
       onWeb={setWebResearch}
@@ -2544,9 +2549,13 @@ export function SettingsPanel(props: {
   provider: ProviderStatus | null;
   webResearch: WebResearchStatus | null;
   contextSources: ContextSourceStatus | null;
-  localAgents: LocalAgentDetection[];
+  localAgents: PlanningAgentDetection[];
   activeSection: SettingsSectionId;
   developerMode?: boolean;
+  planningBrain: DesktopPreferences["planningBrain"];
+  planningModel: DesktopPreferences["planningModel"];
+  onSelectBrain: (agentId: string | null) => void;
+  onSelectModel: (agentId: string, modelId: string | null) => void;
   onDeveloperMode?: (enabled: boolean) => void;
   onProvider: (status: ProviderStatus) => void;
   onWeb: (status: WebResearchStatus) => void;
@@ -2579,6 +2588,14 @@ export function SettingsPanel(props: {
   } else if (activeSection === "brain") {
     detailPane = (
       <SettingsTabPane title={t("settings.tab.brain")} sub={t("settings.brain.sub")}>
+        <SettingsPlanningBrainPane
+          localAgents={props.localAgents}
+          planningBrain={props.planningBrain}
+          planningModel={props.planningModel}
+          onSelectBrain={props.onSelectBrain}
+          onSelectModel={props.onSelectModel}
+        />
+        <h4 className="od-settings-subheading">{t("settings.planningBrain.apiHeading")}</h4>
         <div className="od-settings-card od-settings-card-form">
           <ProviderForm status={props.provider} onSaved={props.onProvider} />
         </div>

@@ -2672,6 +2672,42 @@ kbd {
   align-items: center;
 }
 
+/* Settings → Brain: choice rows + fallback-path subheading. */
+.od-settings-choice-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.od-settings-choice-row:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.od-settings-choice-row .od-settings-card-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.od-settings-choice-check {
+  color: var(--od-fg);
+  font-size: var(--od-type-sub);
+}
+
+.od-settings-subheading {
+  margin: 18px 0 8px;
+  color: var(--od-meta);
+  font-size: var(--od-type-tag);
+  font-weight: var(--od-font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 /* Claude-Code-style model chip for the planning brain. */
 .od-model-chip-anchor {
   display: inline-flex;

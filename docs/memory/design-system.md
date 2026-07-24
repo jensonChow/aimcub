@@ -474,7 +474,13 @@ three-size / ≤500-weight policy).
   the NEXT session; a running session shows its actual model as a neutral Pill on the live panel
   head. Renderer capability facts come from main's `planningCapable` flag on each detection —
   never a renderer-side mirror. Reuse `ActionMenu`'s chip-trigger variant (`triggerContent`)
-  rather than inventing new popover mechanics.
+  rather than inventing new popover mechanics. The CANONICAL configuration surface is Settings →
+  Brain (founder 2026-07-24: "the polish should happen in the settings and as a main item"):
+  the pane leads with the embedded-brain choice (radio rows with readiness dots — Auto shows what
+  it currently resolves to; signed-out rows disabled with a humanized reason) and the effective
+  brain's model Select, then the API provider form under an ALL-CAPS "fallback planning path"
+  subheading (`.od-settings-subheading`). The Journey chips remain the lightweight quick
+  switcher over the same preferences.
 
 ## Interaction and State
 
