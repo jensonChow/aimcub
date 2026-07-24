@@ -2,9 +2,10 @@
 
 Last updated: 2026-07-22
 Branch: `main`. **OSS-maturity epic: all four engineering batches AND the
-`@aimcub/*` rename are MERGED and verified.** What remains is the
-founder-owned launch checklist below. Local `main` is ahead of `origin/main`
-(`410c2776`) by the entire epic — **push needs founder approval**.
+`@aimcub/*` rename are MERGED, verified, and PUSHED** (founder authorized
+2026-07-22; destination verified as `jensonChow/aimcub`, ADMIN, before
+pushing — the repo itself is still PRIVATE). No unmerged branches remain.
+What remains is the founder-owned launch checklist below.
 
 ## Batch 4 + rename — integrated
 
@@ -58,7 +59,8 @@ Ordered — each unblocks the next:
    enforcement contact.
 4. Run a full-history gitleaks/trufflehog scan (targeted sweep in batch 1
    found zero; this is the belt-and-suspenders pass).
-5. **Authorize the push** of local `main`; flip the repo public.
+5. ~~Authorize the push~~ (done 2026-07-22 — `main` is on origin); **flip the
+   repo public** when 1–4 are done.
 6. Tag `v0.1.0` (release.yml drafts the GitHub Release with CLI bundle +
    unsigned dmg/zip).
 7. Apple signing credentials + notarization (`notarize:check` diagnoses env;
