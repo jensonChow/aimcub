@@ -8,7 +8,7 @@ import { homedir } from "node:os";
 
 import { app, BrowserWindow, ipcMain, nativeTheme, shell, type IpcMainInvokeEvent } from "electron";
 
-import type { Goal } from "@aimcub/types";
+import { ContextCategory, type Goal } from "@aimcub/types";
 import { defaultDataDir, type NewMemory } from "@aimcub/store";
 import {
   buildLocalHandoffManifest,
@@ -68,6 +68,10 @@ import {
   type PlanningDebugTraceStage,
   type PlanningLiveEvent,
   type PlanningLiveSummary,
+  type PlanningSessionAnswerRequest,
+  type PlanningSessionChatRequest,
+  type PlanningSessionRef,
+  type PlanningSessionStartRequest,
   type RunLiveEvent,
   type RunMilestoneAgentRequest,
   type RunMilestoneAgentResult,
@@ -103,6 +107,18 @@ import {
   logStrandedQueuedRuns,
   resolveDesktopRunPermission,
 } from "./run-queue";
+import {
+  answerPlanningQuestion,
+  cancelPlanningSession,
+  finishPlanningNow,
+  getPlanningSessionState,
+  planningSessionMemoryCandidates,
+  postPlanningChat,
+  releasePlanningSession,
+  setPlanningSessionBroadcast,
+  startPlanningSession,
+  takePlanningSessionMetadata,
+} from "./planning-session";
 
 /** Live run events go to every open window: a background drain has no originating sender. */
 function broadcastRunLiveEvent(payload: RunLiveEvent): void {
@@ -113,6 +129,15 @@ function broadcastRunLiveEvent(payload: RunLiveEvent): void {
 }
 
 const runQueue = createDesktopRunQueue(aimStore, broadcastRunLiveEvent);
+
+// Embedded planning sessions broadcast the same way: they outlive navigation,
+// so there is no single originating sender to target.
+setPlanningSessionBroadcast((payload) => {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (window.isDestroyed()) continue;
+    window.webContents.send(IPC.planningSessionEvent, payload);
+  }
+});
 
 async function planningContext(input: {
   title: string;
@@ -959,6 +984,15 @@ export function registerIpc(): void {
     return updated?.goal ?? null;
   });
 
+  ipcMain.handle(IPC.startPlanningSession, async (_e, req: PlanningSessionStartRequest) => startPlanningSession(req));
+  ipcMain.handle(IPC.getPlanningSessionState, (_e, req: PlanningSessionRef) => getPlanningSessionState(req.goalId));
+  ipcMain.handle(IPC.answerPlanningQuestion, (_e, req: PlanningSessionAnswerRequest) => answerPlanningQuestion(req));
+  ipcMain.handle(IPC.postPlanningChat, (_e, req: PlanningSessionChatRequest) => postPlanningChat(req.goalId, req.text));
+  ipcMain.handle(IPC.finishPlanningNow, (_e, req: PlanningSessionRef) => finishPlanningNow(req.goalId));
+  ipcMain.handle(IPC.cancelPlanningSession, (_e, req: PlanningSessionRef) => {
+    cancelPlanningSession(req.goalId);
+  });
+
   ipcMain.handle(IPC.updateGoalPlan, async (_e, req: UpdateGoalPlanRequest): Promise<SavedGoal | null> => {
     // Same routing gate as `saveGoal` (main trusts the renderer's validateExecutablePlan but re-checks
     // routing before persisting).
@@ -995,14 +1029,38 @@ export function registerIpc(): void {
         })
       : null;
 
+    // An embedded planning session landed this plan: its serialized transcript,
+    // research provenance, and assumptions travel on the goal metadata, and the
+    // brain's proposed durable facts become PENDING memory candidates (never
+    // silently active memory).
+    const planningSessionState = planningRunMode ? takePlanningSessionMetadata(req.goalId) : null;
+    const sessionCandidates = planningRunMode ? planningSessionMemoryCandidates(req.goalId) : [];
+    const metadata = synthesis
+      ? planningSessionState
+        ? { ...synthesis.metadata, planning_session: planningSessionState }
+        : synthesis.metadata
+      : undefined;
+
     const updated = await aimStore.updateGoal({
       id: req.goalId,
       title: req.title,
       description: req.description,
       plan: req.plan,
-      metadata: synthesis?.metadata,
+      metadata,
     });
     if (!updated) return null;
+    if (planningRunMode) {
+      for (const candidate of sessionCandidates) {
+        const category = ContextCategory.safeParse(candidate.category);
+        await aimStore.addMemoryCandidate({
+          goalId: candidate.scope === "current_aim" ? updated.goal.id : null,
+          content: candidate.content,
+          ...(category.success ? { category: category.data } : {}),
+          source: "agent_inferred",
+        });
+      }
+      releasePlanningSession(req.goalId);
+    }
 
     let answerImpact: SavedGoalSynthesis["answerImpact"] = null;
     let contextCandidates: Awaited<ReturnType<typeof recordSavedGoalContextCandidates>> | undefined;

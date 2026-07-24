@@ -46,6 +46,15 @@ function webResearchEnabled(): boolean {
   return resolveWebResearchConfig().enabled;
 }
 
+/**
+ * Whether an EMBEDDED planning brain may use its own live web tools. This is the
+ * user's web-research preference, not the Brave key: the brain brings its own
+ * search — Aimcub only grants or withholds the permission.
+ */
+export function embeddedWebResearchEnabled(): boolean {
+  return resolveContextSourceConfig().research.webEnabled;
+}
+
 function fetchWebResultsEnabled(): boolean {
   return resolveWebResearchConfig().fetchPages && resolveContextSourceConfig().research.deepResearch;
 }
@@ -54,7 +63,7 @@ function writeContextCandidatesEnabled(): boolean {
   return flagEnabled(process.env.AIMCUB_WRITE_CONTEXT_CANDIDATES);
 }
 
-function localContextRoot(): string | undefined {
+export function localContextRoot(): string | undefined {
   const context = resolveContextSourceConfig();
   const root = context.local.resolvedWorkspaceRoot ?? commonAncestor(context.local.resolvedFilePaths);
   return context.local.enabled && root?.trim() ? root.trim() : undefined;
@@ -101,7 +110,7 @@ function onlineSourceKind(provider: string): ContextLinkedSource["kind"] {
   }
 }
 
-function linkedContextSources(): ContextLinkedSource[] {
+export function linkedContextSources(): ContextLinkedSource[] {
   const context = resolveContextSourceConfig();
   const sources: ContextLinkedSource[] = [];
   const root = localContextRoot();
@@ -147,7 +156,7 @@ function aimLikelyNeedsWeb(req: DraftRequest): boolean {
     || /最新|当前|现在|近期|调研|搜索|联网|网页|在线|对比|市场|竞品|价格|文档|api|法规|法律|政策|指南|应用商店|苹果开发者|开发者账号|上架|审核|分发|旅行|旅游|签证|机票|航班|酒店|塔罗|占星|疗愈|健康|财务|教育|学习|教练|咨询/.test(text);
 }
 
-function aimRequiresWebResearch(req: DraftRequest): boolean {
+export function aimRequiresWebResearch(req: DraftRequest): boolean {
   const context = resolveContextSourceConfig();
   return envFlag("AIMCUB_ENABLE_WEB_RESEARCH") === true || (context.research.webEnabled && aimLikelyNeedsWeb(req));
 }

@@ -22,7 +22,7 @@
  * Total like the funnel: bad brain output becomes a repair reply or an honest
  * failure, never a throw.
  */
-import { DecompositionOutput } from "@aimcub/types";
+import { DecompositionOutput, type AimDraftPlanningSession } from "@aimcub/types";
 import {
   critiquePlan,
   decideChoiceSelection,
@@ -781,4 +781,44 @@ export class PlanningSession {
 
 export function createPlanningSession(config: PlanningSessionConfig): PlanningSession {
   return new PlanningSession(config);
+}
+
+/**
+ * Serialize a session for AimDraft persistence (`AimDraftPlanningSession` in
+ * `@aimcub/types`). Pure projection: the plan itself lands in `draft_plan`,
+ * this carries the session's provenance — transcript, research, assumptions,
+ * open questions, and pending memory candidates.
+ */
+export function planningSessionDraftState(
+  snapshot: PlanningSessionSnapshot,
+  agentId: string,
+  now: Date,
+): AimDraftPlanningSession {
+  const outcome = snapshot.outcome;
+  const transcriptResearch = snapshot.transcript.filter(
+    (entry): entry is Extract<PlanningSessionTranscriptEntry, { kind: "research" }> => entry.kind === "research",
+  );
+  const research = outcome?.research ?? {
+    findings: transcriptResearch.flatMap((entry) => entry.findings),
+    gaps: transcriptResearch.flatMap((entry) => entry.gaps),
+  };
+  const memoryCandidates = outcome?.memoryCandidates
+    ?? snapshot.transcript
+      .filter(
+        (entry): entry is Extract<PlanningSessionTranscriptEntry, { kind: "memory_candidate" }> =>
+          entry.kind === "memory_candidate",
+      )
+      .map((entry) => entry.candidate);
+  return {
+    agent_id: agentId,
+    phase: snapshot.phase,
+    updated_at: now.toISOString(),
+    transcript: snapshot.transcript.map((entry) => ({ ...entry })),
+    research_findings: research.findings.map((finding) => ({ ...finding })),
+    research_gaps: [...research.gaps],
+    research_summary: outcome?.research.summary ?? "",
+    assumptions: (outcome?.assumptions ?? []).map((assumption) => ({ ...assumption })),
+    open_questions: [...(outcome?.openQuestions ?? [])],
+    memory_candidates: memoryCandidates.map((candidate) => ({ ...candidate })),
+  };
 }

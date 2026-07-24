@@ -25,6 +25,9 @@ import type {
   AimcubToolObservation,
   LlmTask,
   LlmUsage,
+  PlanningSessionEvent,
+  PlanningSessionPhase,
+  PlanningSessionQuestion,
   PlanningToolObservationEvent,
   PlanningContextSelectionReport,
   PlanningToolFailure,
@@ -460,6 +463,71 @@ export interface RunLiveEvent {
   event: LocalAgentEvent;
 }
 
+// ── Embedded planning session (the local agent as the aim-breaking brain) ──
+
+export interface PlanningSessionStartRequest {
+  goalId: string;
+  title: string;
+  description?: string;
+}
+
+export interface PlanningSessionAnswerRequest {
+  goalId: string;
+  requestId: string;
+  labels: string[];
+  other: string;
+  skipped?: boolean;
+}
+
+export interface PlanningSessionChatRequest {
+  goalId: string;
+  text: string;
+}
+
+export interface PlanningSessionRef {
+  goalId: string;
+}
+
+/** One compact activity row from the brain, for the live Context surface. */
+export interface PlanningSessionActivityItem {
+  at: string;
+  label: string;
+  kind: "tool" | "status" | "chat" | "research" | "question";
+}
+
+/** Everything the renderer needs to commit the session's plan via `updateGoalPlan`. */
+export interface PlanningSessionLanding {
+  plan: DecompositionOutput;
+  quality: PlanQualityReport | null;
+  review: PlanReviewReport | null;
+  questions: ClarifyQuestion[];
+  answers: ClarifyAnswer[];
+  assumptions: ClarifyAssumption[];
+}
+
+/** Renderer-facing view of one embedded planning session (re-attachable after navigation). */
+export interface PlanningSessionStateView {
+  goalId: string;
+  agentId: LocalAgentId;
+  active: boolean;
+  phase: PlanningSessionPhase;
+  pendingQuestion: PlanningSessionQuestion | null;
+  questionsAsked: number;
+  researchFindingCount: number;
+  researchGapCount: number;
+  activity: PlanningSessionActivityItem[];
+  landing: PlanningSessionLanding | null;
+  failure: { code: string; message: string } | null;
+}
+
+/** Pushed on every session/activity change, broadcast like `runLiveEvent`. */
+export interface PlanningSessionEventPayload {
+  goalId: string;
+  at: string;
+  session?: PlanningSessionEvent;
+  view: PlanningSessionStateView;
+}
+
 export type SystemColorScheme = "light" | "dark";
 
 /** Renderer theme preference pushed to the main process to drive native window chrome. */
@@ -554,9 +622,18 @@ export interface AimcubApi {
   setDesktopPreferences(prefs: DesktopPreferences): Promise<DesktopPreferences>;
   /** Pick the folder a `workspace-write` run may write in. Cancelling grants nothing. */
   pickRunWorkspace(): Promise<LocalContextPickResult>;
+  /** Start (or re-attach to) the embedded planning session for a shell aim. */
+  startPlanningSession(req: PlanningSessionStartRequest): Promise<PlanningSessionStateView>;
+  /** Current session view for an aim, or null when none was ever started this app run. */
+  getPlanningSessionState(req: PlanningSessionRef): Promise<PlanningSessionStateView | null>;
+  answerPlanningQuestion(req: PlanningSessionAnswerRequest): Promise<PlanningSessionStateView>;
+  postPlanningChat(req: PlanningSessionChatRequest): Promise<PlanningSessionStateView>;
+  finishPlanningNow(req: PlanningSessionRef): Promise<PlanningSessionStateView>;
+  cancelPlanningSession(req: PlanningSessionRef): Promise<void>;
   onWindowChromeState(handler: (state: WindowChromeState) => void): () => void;
   onPlanningLiveEvent(handler: (event: PlanningLiveEvent) => void): () => void;
   onRunLiveEvent(handler: (event: RunLiveEvent) => void): () => void;
+  onPlanningSessionEvent(handler: (event: PlanningSessionEventPayload) => void): () => void;
 }
 
 /** Channel names — kept in one place so main and preload can't drift. */
@@ -619,6 +696,13 @@ export const IPC = {
   windowChromeState: "aimcub:windowChromeState",
   planningLiveEvent: "aimcub:planningLiveEvent",
   runLiveEvent: "aimcub:runLiveEvent",
+  startPlanningSession: "aimcub:startPlanningSession",
+  getPlanningSessionState: "aimcub:getPlanningSessionState",
+  answerPlanningQuestion: "aimcub:answerPlanningQuestion",
+  postPlanningChat: "aimcub:postPlanningChat",
+  finishPlanningNow: "aimcub:finishPlanningNow",
+  cancelPlanningSession: "aimcub:cancelPlanningSession",
+  planningSessionEvent: "aimcub:planningSessionEvent",
 } as const;
 
 declare global {

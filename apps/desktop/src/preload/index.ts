@@ -65,12 +65,25 @@ const api: AimcubApi = {
     ipcRenderer.on(IPC.windowChromeState, listener);
     return () => ipcRenderer.removeListener(IPC.windowChromeState, listener);
   },
+  startPlanningSession: (req) => ipcRenderer.invoke(IPC.startPlanningSession, req),
+  getPlanningSessionState: (req) => ipcRenderer.invoke(IPC.getPlanningSessionState, req),
+  answerPlanningQuestion: (req) => ipcRenderer.invoke(IPC.answerPlanningQuestion, req),
+  postPlanningChat: (req) => ipcRenderer.invoke(IPC.postPlanningChat, req),
+  finishPlanningNow: (req) => ipcRenderer.invoke(IPC.finishPlanningNow, req),
+  cancelPlanningSession: (req) => ipcRenderer.invoke(IPC.cancelPlanningSession, req),
   onPlanningLiveEvent: (handler) => {
     const listener = (_event: IpcRendererEvent, payload: unknown) => {
       handler(payload as Parameters<typeof handler>[0]);
     };
     ipcRenderer.on(IPC.planningLiveEvent, listener);
     return () => ipcRenderer.removeListener(IPC.planningLiveEvent, listener);
+  },
+  onPlanningSessionEvent: (handler) => {
+    const listener = (_event: IpcRendererEvent, payload: unknown) => {
+      handler(payload as Parameters<typeof handler>[0]);
+    };
+    ipcRenderer.on(IPC.planningSessionEvent, listener);
+    return () => ipcRenderer.removeListener(IPC.planningSessionEvent, listener);
   },
   onRunLiveEvent: (handler) => {
     const listener = (_event: IpcRendererEvent, payload: unknown) => {

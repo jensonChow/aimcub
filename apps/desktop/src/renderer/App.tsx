@@ -26,6 +26,7 @@ import type {
   LocalAgentDetection,
   PlanningDebugTrace,
   PlanningLiveEvent,
+  PlanningSessionStateView,
   PlanResult,
   ProviderStatus,
   RunPermissionConsent,
@@ -59,6 +60,7 @@ import { Notice } from "./Notice";
 import { mergePlanningDebugTraces, PlanningDebugPanel } from "./PlanningDebugPanel";
 import { ProviderForm } from "./ProviderForm";
 import { ContextClarifyPanel } from "./stages/context/ContextClarifyPanel";
+import { PlanningSessionPanel } from "./stages/context/PlanningSessionPanel";
 import { buildContextLoopModel } from "./stages/context/contextLoop";
 import { ContextReviewPanel } from "./stages/context/ContextReviewPanel";
 import { ContextStage } from "./stages/context/ContextStage";
@@ -99,6 +101,12 @@ import {
   type AimDraftBuildInput,
   type HydratedAimDraft,
 } from "./workflow/aimDrafts";
+import {
+  embeddedPlanningAgentId,
+  sessionAnswerRequest,
+  sessionPayloadIsCurrent,
+  sessionSurfaceVisible,
+} from "./workflow/planningSession";
 import {
   formatPlanValidationIssues,
   formatPlanningFailure,
@@ -199,6 +207,11 @@ function AimOsApp() {
   const [clarify, setClarify] = useState<ClarifyOutput | null>(null);
   const [answers, setAnswers] = useState<ContextAnswerMap>({});
   const [contextNote, setContextNote] = useState("");
+  // Embedded planning session (the local agent as the aim-breaking brain).
+  const [planningSession, setPlanningSession] = useState<PlanningSessionStateView | null>(null);
+  const [sessionAnswers, setSessionAnswers] = useState<ContextAnswerMap>({});
+  const [sessionChatDraft, setSessionChatDraft] = useState("");
+  const sessionLandingAppliedRef = useRef<string | null>(null);
   const [draftSaveBlock, setDraftSaveBlock] = useState<AimDraftSaveBlock | null>(null);
   const [error, setError] = useState<string | ProductError | null>(null);
   const [busy, setBusyState] = useState<string | null>(null);
@@ -356,6 +369,16 @@ function AimOsApp() {
       const activeRunId = navigationConcurrencyRef.current.planningRunId;
       if (!activeRunId || event.runId !== activeRunId) return;
       setPlanningLiveEvents((current) => [...current, event].slice(-80));
+    });
+  }, []);
+
+  // Embedded planning sessions broadcast from main (they outlive navigation); the
+  // once-only subscription filters to the aim on screen via the selected-goal ref.
+  const applySessionViewRef = useRef<(view: PlanningSessionStateView) => void>(() => {});
+  useEffect(() => {
+    return window.aimcub.onPlanningSessionEvent((payload) => {
+      if (selectedGoalRef.current?.id !== payload.goalId) return;
+      applySessionViewRef.current(payload.view);
     });
   }, []);
 
@@ -1195,10 +1218,133 @@ function AimOsApp() {
     }
   }
 
-  /** "Build the plan" on a plan-less shell: run the planning funnel in-Journey against the shell. */
+  /** Land an embedded session's accepted plan into the same review flow the funnel uses. */
+  function applySessionLanding(view: PlanningSessionStateView) {
+    const landing = view.landing;
+    if (!landing || sessionLandingAppliedRef.current === view.goalId) return;
+    sessionLandingAppliedRef.current = view.goalId;
+    setDraft(landing.plan);
+    setFinalPlan(landing.plan);
+    setPlanResult({ ok: true, output: landing.plan, errors: [], quality: landing.quality, review: landing.review });
+    setClarifyPhase(null);
+    setMode("reviewing");
+    setStageOverride("contracts");
+  }
+
+  function applySessionView(view: PlanningSessionStateView) {
+    setPlanningSession(view);
+    if (view.phase === "draft_ready" && view.landing && planningShellId === view.goalId) {
+      applySessionLanding(view);
+    }
+  }
+  applySessionViewRef.current = applySessionView;
+
+  // Re-attach to a session that kept running while this aim was off-screen.
+  useEffect(() => {
+    const goalId = selected?.id;
+    if (!goalId) {
+      setPlanningSession(null);
+      return;
+    }
+    let stale = false;
+    void window.aimcub.getPlanningSessionState({ goalId }).then((view) => {
+      if (stale) return;
+      if (view) applySessionViewRef.current(view);
+      else setPlanningSession(null);
+    }).catch(() => undefined);
+    return () => {
+      stale = true;
+    };
+  }, [selected?.id]);
+
+  /** Run the embedded planning brain against a shell aim; the funnel is the fallback. */
+  async function startEmbeddedPlanning(goal: Goal) {
+    setPlanningShellId(goal.id);
+    sessionLandingAppliedRef.current = null;
+    setSessionAnswers({});
+    setSessionChatDraft("");
+    setError(null);
+    setMode("contexting");
+    setStageOverride("context");
+    try {
+      const view = await window.aimcub.startPlanningSession({
+        goalId: goal.id,
+        title: goal.title,
+        description: goal.description || undefined,
+      });
+      applySessionView(view);
+    } catch {
+      // No embedded brain, or it failed to spawn — the funnel stays the honest fallback.
+      setPlanningSession(null);
+      await startDraft({ shell: { goalId: goal.id, title: goal.title, description: goal.description ?? "" } });
+    }
+  }
+
+  async function submitSessionAnswer() {
+    const view = planningSession;
+    if (!view?.pendingQuestion) return;
+    try {
+      const next = await window.aimcub.answerPlanningQuestion(
+        sessionAnswerRequest(view.goalId, view.pendingQuestion, sessionAnswers),
+      );
+      setSessionAnswers({});
+      applySessionView(next);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function sendSessionChat() {
+    const view = planningSession;
+    const text = sessionChatDraft.trim();
+    if (!view || !text) return;
+    try {
+      const next = await window.aimcub.postPlanningChat({ goalId: view.goalId, text });
+      setSessionChatDraft("");
+      applySessionView(next);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function finishSessionNow() {
+    const view = planningSession;
+    if (!view) return;
+    try {
+      applySessionView(await window.aimcub.finishPlanningNow({ goalId: view.goalId }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function cancelSession() {
+    const view = planningSession;
+    if (!view) return;
+    await window.aimcub.cancelPlanningSession({ goalId: view.goalId }).catch(() => undefined);
+    setPlanningSession(null);
+    setSessionAnswers({});
+    setSessionChatDraft("");
+    setPlanningShellId(null);
+    setMode("cockpit");
+    setStageOverride("aim");
+  }
+
+  /** The session failed: hand the same shell to the structured-output funnel. */
+  async function sessionFallbackToFunnel() {
+    if (!selected) return;
+    const goal = selected;
+    setPlanningSession(null);
+    await startDraft({ shell: { goalId: goal.id, title: goal.title, description: goal.description ?? "" } });
+  }
+
+  /** "Build the plan" on a plan-less shell: embedded brain when available, funnel otherwise. */
   async function startShellResearch() {
     if (workflowMutationIsLocked() || !selected) return;
     const goal = selected;
+    if (embeddedPlanningAgentId(localAgents)) {
+      await startEmbeddedPlanning(goal);
+      return;
+    }
     setPlanningShellId(goal.id);
     await startDraft({ shell: { goalId: goal.id, title: goal.title, description: goal.description ?? "" } });
   }
@@ -1222,6 +1368,9 @@ function AimOsApp() {
     }
     setBusy(t("os.busy.save"));
     setError(null);
+    // An embedded session carries its own interview: its Q&A and disclosed
+    // assumptions feed the same metadata synthesis the funnel uses.
+    const sessionLanding = planningSession?.goalId === goal.id ? planningSession.landing : null;
     try {
       const updated = await window.aimcub.updateGoalPlan({
         goalId: goal.id,
@@ -1233,12 +1382,12 @@ function AimOsApp() {
         review: planResult?.review ?? null,
         qualityRetry: planResult?.qualityRetry ?? undefined,
         debugTrace: mergePlanningDebugTraces(planningDebugTraces.length ? planningDebugTraces : [planResult?.debugTrace]),
-        questions: [
+        questions: sessionLanding ? sessionLanding.questions : [
           ...(intakeClarify?.questions ?? []),
           ...(clarifyPhase === "intake" ? [] : clarify?.questions ?? []),
         ],
-        answers: [...builtIntakeAnswers, ...builtAnswers],
-        assumptions: clarify?.assumptions ?? [],
+        answers: sessionLanding ? sessionLanding.answers : [...builtIntakeAnswers, ...builtAnswers],
+        assumptions: sessionLanding ? sessionLanding.assumptions : clarify?.assumptions ?? [],
       });
       if (!isCurrentWorkspaceTransition(transition)) {
         await refreshAll({ autoOpenFirstGoal: false });
@@ -1250,6 +1399,10 @@ function AimOsApp() {
       }
       setPlanningShellId(null);
       resetPlanningForAimUpdate();
+      setPlanningSession(null);
+      setSessionAnswers({});
+      setSessionChatDraft("");
+      sessionLandingAppliedRef.current = null;
       setSelected(updated.goal);
       // Route back to the Journey: clear the leftover "contracts"/"reviewing" the planning run set,
       // else `mainStageContent`'s `activeStage === "contracts"` branch would intercept the render.
@@ -1770,6 +1923,30 @@ function AimOsApp() {
     }
   }
 
+  const sessionSurfaceActive = sessionPayloadIsCurrent(planningSession, selected?.id ?? null)
+    && planningShellId === selected?.id
+    && sessionSurfaceVisible(planningSession);
+  const sessionPanel = sessionSurfaceActive && planningSession ? (
+    <PlanningSessionPanel
+      view={planningSession}
+      answers={sessionAnswers}
+      chatDraft={sessionChatDraft}
+      disabled={Boolean(busy)}
+      onAnswer={(id, value) => setSessionAnswers((current) => ({ ...current, [id]: value }))}
+      onSubmitAnswer={() => void submitSessionAnswer()}
+      onChatDraft={setSessionChatDraft}
+      onChatSend={() => void sendSessionChat()}
+      onFinishNow={() => void finishSessionNow()}
+      onCancel={() => void cancelSession()}
+      onFallback={() => void sessionFallbackToFunnel()}
+      onReview={() => {
+        if (!planningSession) return;
+        sessionLandingAppliedRef.current = null;
+        applySessionLanding(planningSession);
+      }}
+    />
+  ) : null;
+
   const clarifyPanelActive = clarifyPhase !== null;
   const clarifyPanel = clarify && clarifyPanelActive ? (
     <ContextClarifyPanel
@@ -1986,8 +2163,8 @@ function AimOsApp() {
           description={selected?.description ?? aimDescription}
           saved={Boolean(selected)}
           disabled={Boolean(busy)}
-          clarifyPhase={clarifyPhase}
-          clarifyPanel={clarifyPanel}
+          clarifyPhase={sessionPanel ? "intake" : clarifyPhase}
+          clarifyPanel={sessionPanel ?? clarifyPanel}
           contextSources={contextSources}
           review={contextReview}
           loop={contextLoop}

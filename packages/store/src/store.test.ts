@@ -631,6 +631,35 @@ describe("createJsonFileStore · round-trip", () => {
     expect(await store.listAimDrafts()).toEqual([]);
   });
 
+  it("carries planning_session state across upserts that do not touch it", async () => {
+    const store = freshStore();
+    const draft = await store.upsertAimDraft({
+      title: "Session draft",
+      planningSession: {
+        agent_id: "claude",
+        phase: "researching",
+        updated_at: "2026-07-24T10:00:00.000Z",
+        transcript: [{ at: "2026-07-24T10:00:00.000Z", kind: "user_message", text: "budget 200", delivered: true }],
+        research_findings: [{ summary: "finding", source_urls: ["https://a.example"] }],
+        research_gaps: ["no web"],
+        research_summary: "",
+        assumptions: [],
+        open_questions: [],
+        memory_candidates: [],
+      },
+    });
+    expect(draft.planning_session?.agent_id).toBe("claude");
+
+    // An unrelated field update must not clobber the session state to null.
+    const renamed = await store.upsertAimDraft({ id: draft.id, title: "Renamed session draft" });
+    expect(renamed.planning_session?.transcript).toHaveLength(1);
+    expect(renamed.planning_session?.research_gaps).toEqual(["no web"]);
+
+    // Explicit null clears it.
+    const cleared = await store.upsertAimDraft({ id: draft.id, planningSession: null });
+    expect(cleared.planning_session).toBeNull();
+  });
+
   it("keeps child breakdown drafts recoverable with parent references", async () => {
     const store = freshStore();
     const { goal, milestones } = await store.createGoal({ title: "Parent aim", plan: PLAN });

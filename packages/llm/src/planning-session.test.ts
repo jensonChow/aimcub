@@ -445,6 +445,42 @@ describe("planning session · surface", () => {
     expect(prompt).toContain("submit_plan");
   });
 
+  it("serializes a snapshot into the AimDraft planning_session shape", async () => {
+    const { session } = makeSession({ memories: [] });
+    await expectReply(session.handleToolCall("report_research", {
+      findings: [{ summary: "Finding A", source_urls: ["https://a.example"] }],
+      gaps: ["no web access"],
+    }));
+    await expectReply(session.handleToolCall("propose_memory", {
+      content: "Has an Apple Developer account",
+      category: "capability",
+      scope: "global",
+    }));
+    await expectReply(session.handleToolCall("submit_plan", {
+      plan: validPlan(),
+      assumptions: [{ statement: "English-only launch", default_value: "en" }],
+      open_questions: ["Pricing?"],
+      research_summary: "Two lanes covered.",
+    }));
+
+    const { planningSessionDraftState } = await import("./planning-session");
+    const state = planningSessionDraftState(session.snapshot(), "claude", new Date("2026-07-24T12:00:00.000Z"));
+    expect(state.agent_id).toBe("claude");
+    expect(state.phase).toBe("draft_ready");
+    expect(state.updated_at).toBe("2026-07-24T12:00:00.000Z");
+    expect(state.research_findings).toEqual([{ summary: "Finding A", source_urls: ["https://a.example"] }]);
+    expect(state.research_gaps).toEqual(["no web access"]);
+    expect(state.research_summary).toBe("Two lanes covered.");
+    expect(state.assumptions).toEqual([{ statement: "English-only launch", default_value: "en" }]);
+    expect(state.open_questions).toEqual(["Pricing?"]);
+    expect(state.memory_candidates).toEqual([
+      { content: "Has an Apple Developer account", category: "capability", scope: "global" },
+    ]);
+    expect(state.transcript.map((entry) => entry.kind)).toEqual(["research", "memory_candidate", "plan_attempt"]);
+    // Round-trips through the persistence schema unchanged.
+    expect(JSON.parse(JSON.stringify(state))).toEqual(state);
+  });
+
   it("every projected tool has a schema and matching definition lookup", () => {
     expect(PLANNING_SESSION_TOOL_DEFINITIONS.map((tool) => tool.name)).toEqual([
       "ask_user",
