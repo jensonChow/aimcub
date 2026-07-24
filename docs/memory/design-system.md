@@ -507,6 +507,31 @@ three-size / ≤500-weight policy).
   focus to the control that opened it. Not-started ("up") station names read one level quieter
   (`--mut`) than done/current ones.
 
+## Voice and Wording
+
+Founder direction 2026-07-24 ("polish the wording of the whole product"): Aimcub's copy speaks
+as a working agent, not as a form the user operates.
+
+- Division of verbs. Aimcub's verbs: research, ask, draft, route, verify, remember. The user's
+  verbs: start, answer, adopt, confirm, stop. Never give the user a machine verb — "Build the
+  plan" is wrong (the brain builds); "Start planning" is right.
+- Working states name what Aimcub is doing right now, in one concrete clause, agent-first:
+  "Aimcub is researching and drafting…", never mechanism narration ("Checking required context
+  before decomposition…").
+- Decision moments get decision verbs: adopting a plan is "Adopt this plan", not "Save plan" —
+  saving is a file gesture, adopting sets work in motion.
+- No dev-speak on product surfaces: "planning brain", never "runtime"; "break down"/"plan",
+  never "decompose/decomposition"; raw ids, schema names, and provider internals stay behind
+  Developer details.
+- Honesty stays in the copy: gaps, fallbacks, and failures are stated plainly ("Use standard
+  planning") with the recovery in the same breath. No euphemism, no ceremony.
+- zh copy is native product voice, not translationese; user-facing surfaces use 目标 for the
+  aim, 规划大脑 for the planning brain; enum values, ids, and technical identifiers stay
+  untranslated.
+- Kickers/tags stay short and quiet ("Your move — start planning"); bodies may carry one line
+  of product differentiation (what Aimcub actually does: local + web research, asks only what
+  research can't answer).
+
 ## Accessibility and Localization
 
 - Meet WCAG AA contrast (4.5:1 normal text, 3:1 large text / state icons) — verify Glass text and

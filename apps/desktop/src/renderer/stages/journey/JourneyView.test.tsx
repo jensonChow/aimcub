@@ -202,15 +202,15 @@ describe("JourneyView", () => {
     // A shell has 0 milestones; buildAimProgressReadModel would report next_action "Aim is complete."
     const html = render(progressOf([], { next_action: "Aim is complete." }), { onStartResearch: noop });
     expect(html).toContain("journey-build-plan");
-    expect(html).toContain("Build the plan");
+    expect(html).toContain("Start planning");
     expect(html).not.toContain("journey-ambient");
     expect(html).not.toContain("Aim is complete.");
   });
 
   it("links to Settings from the build-plan card when no planning runtime is configured", () => {
     const html = render(progressOf([]), { onStartResearch: noop, planningRuntimeReady: false });
-    expect(html).toContain("Connect a runtime in Settings");
-    expect(html).not.toContain(">Build the plan<");
+    expect(html).toContain("Connect a planning brain in Settings");
+    expect(html).not.toContain(">Start planning<");
   });
 
   it("hosts the in-Journey clarify Q&A while a clarify phase is active", () => {
@@ -228,7 +228,7 @@ describe("JourneyView", () => {
       planReview: { plan: miniPlan, quality: null, review: null, validationErrors: [], routingAgents: [], routingValidation: null },
     });
     expect(html).toContain("Review the plan");
-    expect(html).toContain("Save plan");
+    expect(html).toContain("Adopt this plan");
     expect(html).toContain("od-journey-plan");
   });
 
@@ -237,7 +237,7 @@ describe("JourneyView", () => {
       planning: { busy: true, clarifyPanel: null, planReady: false, onCommitPlan: noop },
     });
     expect(html).toContain("od-journey-planning-working");
-    expect(html).toContain("Working on the plan");
+    expect(html).toContain("Aimcub is researching and drafting");
   });
 });
 
