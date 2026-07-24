@@ -1366,6 +1366,10 @@ describe("SettingsPanel", () => {
           localAgents={[]}
           activeSection={section}
           developerMode={developerMode}
+          planningBrain={null}
+          planningModel={null}
+          onSelectBrain={noop}
+          onSelectModel={noop}
           onDeveloperMode={noop}
           onProvider={noop}
           onWeb={noop}
@@ -1416,7 +1420,8 @@ describe("SettingsPanel", () => {
 
     const brainHtml = renderSettings("brain");
     expect(brainHtml).toContain("Planning brain");
-    expect(brainHtml).toContain("An API key, or a signed-in local agent — either can plan.");
+    expect(brainHtml).toContain("Embedded planning brain");
+    expect(brainHtml).toContain("API provider (fallback planning path)");
 
     const workersHtml = renderSettings("workers");
     expect(workersHtml).toContain("You and your agents — same rules, same receipts.");

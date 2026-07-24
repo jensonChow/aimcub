@@ -742,9 +742,32 @@ export const STRINGS = {
     zh: "Aimcub 报告了一次存储恢复事件。",
   },
   "settings.brain.sub": {
-    en: "An API key, or a signed-in local agent — either can plan.",
-    zh: "一个 API 密钥，或已登录的本地 agent——都能规划。",
+    en: "Who researches and breaks down your aims: an embedded local agent, with an API provider as the fallback path.",
+    zh: "由谁研究并拆解你的目标：嵌入式本地 agent 为主，API 提供商作为回退路径。",
   },
+  "settings.planningBrain.brainTitle": { en: "Embedded planning brain", zh: "嵌入式规划大脑" },
+  "settings.planningBrain.brainSub": {
+    en: "The local agent that researches, asks, and drafts the plan.",
+    zh: "负责研究、提问并起草方案的本地 agent。",
+  },
+  "settings.planningBrain.auto": { en: "Auto (recommended)", zh: "自动（推荐）" },
+  "settings.planningBrain.autoNow": { en: "Currently {name}", zh: "当前：{name}" },
+  "settings.planningBrain.ready": { en: "Ready", zh: "就绪" },
+  "settings.planningBrain.none": {
+    en: "No planning-capable local agent detected. Install Claude Code or Codex, then sign in.",
+    zh: "未检测到可做规划的本地 agent。安装 Claude Code 或 Codex 并登录。",
+  },
+  "settings.planningBrain.modelTitle": { en: "Model", zh: "模型" },
+  "settings.planningBrain.modelSub": {
+    en: "From {name}'s live-advertised list.",
+    zh: "来自 {name} 的实时模型清单。",
+  },
+  "settings.planningBrain.modelAuto": { en: "Auto — {model}", zh: "自动——{model}" },
+  "settings.planningBrain.modelHint": {
+    en: "Models appear once the selected runtime is signed in.",
+    zh: "所选运行时登录后，这里会显示其模型清单。",
+  },
+  "settings.planningBrain.apiHeading": { en: "API provider (fallback planning path)", zh: "API 提供商（规划回退路径）" },
   "settings.workers.sub": {
     en: "You and your agents — same rules, same receipts.",
     zh: "你和你的 agent——同样的规则，同样的凭证。",
