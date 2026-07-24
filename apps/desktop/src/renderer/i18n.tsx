@@ -144,6 +144,7 @@ export const STRINGS = {
   "planningBrain.menuLabel": { en: "Planning brain", zh: "规划大脑" },
   "planningBrain.heading": { en: "Brain", zh: "大脑" },
   "planningModel.menuLabel": { en: "Planning model", zh: "规划模型" },
+  "planningModel.openSettings": { en: "Change in Settings → Brain", zh: "在设置 → Brain 中更改" },
   "planningModel.heading": { en: "Models", zh: "模型" },
   "planningModel.auto": { en: "Auto", zh: "自动" },
   "planningSession.livePill": { en: "Researching", zh: "研究中" },

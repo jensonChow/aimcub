@@ -462,25 +462,19 @@ three-size / ≤500-weight policy).
   text, a bottom icon toolbar, optional context revealed from the toolbar, an icon-only submit.
   Compact, centered, bounded below the task width; effectively borderless at rest with only a
   subtle hover/focus outline; no heavy launch focus ring or floating-card shadow.
-- Planning chips (founder requirement 2026-07-24, "like Claude Code" + "a choice parallel to
-  planning brain"): TWO compact pill triggers side by side BESIDE the primary Build-the-plan
-  action — the BRAIN chip (which runtime: Claude Code / Codex; every planning-capable runtime is
-  listed and a signed-out one renders disabled with its auth message as the title) and the MODEL
-  chip (the effective brain's LIVE-advertised models; a fallback catalog never becomes a menu).
-  Both share `.od-model-chip` (hairline border, transparent at rest, sub-size medium text, small
-  caret) and open ActionMenu-based popovers with a small ALL-CAPS heading ("Brain" / "Models")
-  and `menuitemradio` rows — label left, trailing ✓ — plus an Auto row (brain Auto = first
-  session-ready runtime in registry order; model Auto = first advertised model). Picks apply to
-  the NEXT session; a running session shows its actual model as a neutral Pill on the live panel
-  head. Renderer capability facts come from main's `planningCapable` flag on each detection —
-  never a renderer-side mirror. Reuse `ActionMenu`'s chip-trigger variant (`triggerContent`)
-  rather than inventing new popover mechanics. The CANONICAL configuration surface is Settings →
-  Brain (founder 2026-07-24: "the polish should happen in the settings and as a main item"):
-  the pane leads with the embedded-brain choice (radio rows with readiness dots — Auto shows what
-  it currently resolves to; signed-out rows disabled with a humanized reason) and the effective
-  brain's model Select, then the API provider form under an ALL-CAPS "fallback planning path"
-  subheading (`.od-settings-subheading`). The Journey chips remain the lightweight quick
-  switcher over the same preferences.
+- Planning brain configuration (founder arc 2026-07-24, final form: "the polish should happen in
+  the settings and as a main item" + "the UI and aim process now should be simplified"): the ONE
+  configuration surface is Settings → Brain — the pane leads with the embedded-brain choice
+  (radio rows with readiness dots; Auto shows what it currently resolves to; signed-out rows
+  disabled with a humanized reason, raw JSON auth output never reaches the UI), then the
+  effective brain's model Select built from its LIVE-advertised list (a fallback catalog never
+  becomes a menu; Auto names the model it means), then the API provider form under an ALL-CAPS
+  "fallback planning path" subheading (`.od-settings-subheading`). In the Journey, planning
+  shows only ONE quiet status chip (`.od-model-chip`: hairline pill, "Brain · model" label) that
+  OPENS Settings → Brain — no popovers in the flow. Earlier popover-chip iterations were removed;
+  do not reintroduce menu chips beside the primary action. Renderer capability facts come from
+  main's `planningCapable` flag on each detection — never a renderer-side mirror. A running
+  session shows its actual model as a neutral Pill on the live panel head.
 
 ## Interaction and State
 
