@@ -102,7 +102,13 @@ export type {
   LlmProviderDefinition,
   StructuredOutputMode,
 } from "./providers";
-export { decompose, decomposeWithQuality, planQualityMetadata } from "./decompose";
+export {
+  DECOMPOSITION_PLAN_RULES,
+  decompose,
+  decomposeWithQuality,
+  planQualityMetadata,
+  renderOutputLanguageInstruction,
+} from "./decompose";
 export type {
   DecomposeInput,
   DecomposeResult,
@@ -273,6 +279,48 @@ export type {
   WebResearchRuntimeOptions,
   WebSearchClient,
 } from "./web-research";
+
+// Planning-session protocol: the aim-breakdown loop driven by an embedded brain.
+export {
+  DEFAULT_PLANNING_SESSION_BUDGETS,
+  PlanningSession,
+  createPlanningSession,
+} from "./planning-session";
+export type {
+  PlanningSessionAim,
+  PlanningSessionAnswer,
+  PlanningSessionAssumption,
+  PlanningSessionBudgets,
+  PlanningSessionConfig,
+  PlanningSessionEvent,
+  PlanningSessionFailure,
+  PlanningSessionMemoryCandidate,
+  PlanningSessionMemorySearchInput,
+  PlanningSessionMemorySearchRow,
+  PlanningSessionOutcome,
+  PlanningSessionPhase,
+  PlanningSessionQnA,
+  PlanningSessionQuestion,
+  PlanningSessionQuestionOption,
+  PlanningSessionResearchFinding,
+  PlanningSessionResearchLog,
+  PlanningSessionSnapshot,
+  PlanningSessionToolDisposition,
+  PlanningSessionTranscriptEntry,
+} from "./planning-session";
+export {
+  PLANNING_SESSION_TOOL_DEFINITIONS,
+  PLANNING_SESSION_TOOL_NAMES,
+  getPlanningSessionToolDefinition,
+  isPlanningSessionToolName,
+} from "./planning-session-tools";
+export type {
+  PlanningSessionJsonSchema,
+  PlanningSessionToolDefinition,
+  PlanningSessionToolName,
+} from "./planning-session-tools";
+export { buildPlanningSessionPrompt } from "./planning-session-prompt";
+export type { PlanningSessionPromptInput } from "./planning-session-prompt";
 
 // Clarifying-questions step (the planning "feedback step").
 export {
