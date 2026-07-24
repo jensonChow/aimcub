@@ -1,8 +1,8 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-24
-Branch: `main`, 10 commits ahead of `origin/main` (push NOT yet authorized this
-session). **Planning-agent epic: all four stages MERGED and verified, plus the
+Branch: `main`, ahead of `origin/main` (push NOT yet authorized this
+session; exact count via `git rev-list --count origin/main..main`). **Planning-agent epic: all four stages MERGED and verified, plus the
 Codex brain — and the FIRST LIVE model-driven end-to-end session succeeded on
 the founder's ChatGPT subscription (gpt-5.5).** The aim
 research/breakdown engine changed shape: from a fixed collector funnel to an
@@ -118,7 +118,8 @@ auto-starts the session, the Journey hosts everything (questions, chat,
 plan review, save), and brain/model configuration lives in Settings →
 Brain with a quiet status chip linking to it.
 Judge question quality and research depth against the blueprint
-(try `--network` for live web research). Desktop Settings surface for the
-planning brain's model/effort is a proposed follow-up. The prior OSS-launch
+(try `--network` for live web research). Settings → Brain is the canonical
+brain/model surface (shipped); an effort/reasoning control there is the one
+proposed follow-up. The prior OSS-launch
 checklist in git history (license → npm org → repo settings → gitleaks →
 public flip) still stands, unchanged by this epic.
