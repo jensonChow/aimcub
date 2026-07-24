@@ -25,6 +25,9 @@ export interface EmbeddedPlanCliOptions {
   /** Grants the brain its own live web tools (`--network`, mirroring `aimcub run`). */
   network: boolean;
   interactive: boolean;
+  /** Runtime model/reasoning overrides; the CLI's own defaults apply otherwise. */
+  model?: string | undefined;
+  reasoning?: string | undefined;
   /** Status lines go here (stderr), keeping stdout clean for the result. */
   log: (line: string) => void;
 }
@@ -111,6 +114,8 @@ export async function runEmbeddedPlanCli(
     memories: options.memories,
     webResearch: { enabled: options.network, required: false },
     cwd: process.cwd(),
+    ...(options.model ? { model: options.model } : {}),
+    ...(options.reasoning ? { reasoning: options.reasoning } : {}),
     ...(options.interactive ? {} : { budgets: { maxQuestions: 0 } }),
   }, {
     onSessionEvent: (event) => {

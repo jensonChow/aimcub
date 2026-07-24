@@ -8,6 +8,7 @@ import type {
   LocalAgentModelOption,
   LocalAgentRunRequest,
   LocalAgentSandboxMode,
+  PlanningSessionInvocationRequest,
 } from "../types";
 import {
   DEFAULT_MODEL,
@@ -79,6 +80,40 @@ function codexSandboxArgs(sandbox: LocalAgentSandboxMode, network: boolean): str
 
 function quoteConfigString(value: string): string {
   return `"${value.replace(/\\/g, "\\\\").replace(/"/g, "\\\"")}"`;
+}
+
+/**
+ * A planning session runs Codex as the embedded planning brain: `exec --json`
+ * under a read-only sandbox (its shell research reads but never writes),
+ * `--search` when the session grants live web, and the projected Aimcub tools
+ * over the per-session streamable-HTTP MCP bridge. Codex MCP configs cannot
+ * set request headers, so the session token travels as a `token` query
+ * parameter on the loopback URL; the per-tool timeout is raised so a parked
+ * ask_user survives however long the user takes to answer. Codex exec is
+ * one-shot on stdin, so there is no `encodePlanningUserMessage`: temporary
+ * chat reaches the brain on the next projected-tool reply.
+ */
+function buildCodexPlanningInvocation(request: PlanningSessionInvocationRequest): LocalAgentInvocation {
+  const args = [
+    ...(request.network ? ["--search"] : []),
+    "exec",
+    "--json",
+    "--skip-git-repo-check",
+    ...codexSandboxArgs("read-only", false),
+    "-C", request.cwd,
+  ];
+  for (const dir of request.extraAllowedDirs ?? []) {
+    if (dir.trim()) args.push("--add-dir", dir.trim());
+  }
+  if (request.model && request.model !== "default") args.push("--model", request.model);
+  if (request.reasoning && request.reasoning !== "default") {
+    args.push("-c", `model_reasoning_effort=${quoteConfigString(request.reasoning)}`);
+  }
+  const bridgeUrl = `${request.mcp.url}?token=${request.mcp.authToken}`;
+  args.push("-c", `mcp_servers.${request.mcp.serverName}.url=${quoteConfigString(bridgeUrl)}`);
+  args.push("-c", `mcp_servers.${request.mcp.serverName}.tool_timeout_sec=604800`);
+  args.push("-c", `mcp_servers.${request.mcp.serverName}.startup_timeout_sec=20`);
+  return { args, stdin: request.prompt };
 }
 
 function buildCodexInvocation(request: LocalAgentRunRequest): LocalAgentInvocation {
@@ -221,4 +256,5 @@ export const codexAdapter: LocalAgentAdapter = {
     const parsed = safeJsonParse(line);
     return isRecord(parsed) ? parseCodexEvent(parsed) : null;
   },
+  buildPlanningSessionInvocation: buildCodexPlanningInvocation,
 };

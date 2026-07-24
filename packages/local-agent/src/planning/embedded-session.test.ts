@@ -24,7 +24,8 @@ class FakeStdin {
     this.writes.push(String(chunk));
     return true;
   }
-  end(): void {
+  end(chunk?: string): void {
+    if (chunk !== undefined) this.writes.push(String(chunk));
     this.writable = false;
   }
 }
@@ -124,12 +125,48 @@ async function startSession(
 
 describe("embedded planning session", () => {
   it("refuses a runtime without planning-session support", async () => {
+    const bare = createLocalAgentRegistry([]);
+    bare.register({
+      id: "bare",
+      name: "Bare runtime",
+      bin: "bare",
+      envVar: "BARE_BIN",
+      versionArgs: ["--version"],
+      fallbackModels: [],
+      buildInvocation: () => ({ args: [], stdin: "" }),
+      parseLine: () => null,
+    });
     await expect(
       startEmbeddedPlanningSession(
-        { agentId: "codex", aim: { title: "x" }, webResearch: { enabled: false, required: false } },
-        { registry: registry(), runner: fakeRunner(), env: TEST_ENV },
+        { agentId: "bare", aim: { title: "x" }, webResearch: { enabled: false, required: false } },
+        { registry: bare, runner: fakeRunner(), env: TEST_ENV },
       ),
     ).rejects.toBeInstanceOf(PlanningSessionUnsupportedError);
+  });
+
+  it("closes stdin after the prompt for one-shot runtimes like codex", async () => {
+    const runner = fakeRunner();
+    await startEmbeddedPlanningSession(
+      { agentId: "codex", aim: { title: "x" }, webResearch: { enabled: false, required: false }, cwd: "/tmp" },
+      {
+        registry: registry(),
+        runner,
+        env: { CODEX_BIN: "/bin/ls", PATH: "/usr/bin" } as NodeJS.ProcessEnv,
+        promptOverride: "CODEX MISSION",
+        exitGraceMs: 200,
+      },
+    );
+    // One-shot stdin: the prompt is written and the pipe is closed so exec starts.
+    expect(runner.child.stdin.writes.join("")).toBe("CODEX MISSION");
+    expect(runner.child.stdin.writable).toBe(false);
+    const args = runner.spawnArgs;
+    expect(args).toContain("--json");
+    expect(args[args.indexOf("--sandbox") + 1]).toBe("read-only");
+    expect(args.join(" ")).toContain("mcp_servers.aimcub.url=");
+    expect(args.join(" ")).toContain("?token=");
+    expect(args.join(" ")).toContain("tool_timeout_sec=604800");
+    expect(args).not.toContain("--search");
+    runner.child.emit("close", 1);
   });
 
   it("spawns Claude as a read-only planning brain wired to the session bridge", async () => {
