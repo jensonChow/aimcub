@@ -2,6 +2,7 @@ import { app, BrowserWindow, nativeTheme, type Point } from "electron";
 import { join } from "node:path";
 
 import { registerIpc } from "./ipc";
+import { cancelAllPlanningSessions } from "./planning-session";
 import { loadContextSourceConfig } from "./context-source-settings";
 import { loadProviderConfig } from "./gateway";
 import { loadWebResearchConfig } from "./web-research-settings";
@@ -155,4 +156,9 @@ app.whenReady().then(() => {
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
+});
+
+// Embedded planning brains are child processes: never orphan them past the app.
+app.on("before-quit", () => {
+  cancelAllPlanningSessions();
 });

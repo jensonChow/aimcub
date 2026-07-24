@@ -43,6 +43,7 @@ import type {
   AimDraftAnswer,
   AimDraftPhase,
   AimDraftQuestion,
+  AimDraftPlanningSession,
   AimDraftSaveBlock,
   AimDraftStage,
   AimDraftStatus,
@@ -200,6 +201,7 @@ export interface UpsertAimDraftInput {
   draftPlan?: DecompositionOutput | null;
   finalPlan?: DecompositionOutput | null;
   saveBlock?: AimDraftSaveBlock | null;
+  planningSession?: AimDraftPlanningSession | null;
 }
 
 export interface AddEvidenceInput {
@@ -1410,6 +1412,7 @@ export function createJsonFileStore(dataDir: string = defaultDataDir(), options:
           draft_plan: input.draftPlan === undefined ? existing?.draft_plan ?? null : input.draftPlan,
           final_plan: input.finalPlan === undefined ? existing?.final_plan ?? null : input.finalPlan,
           save_block: input.saveBlock === undefined ? existing?.save_block ?? null : input.saveBlock,
+          planning_session: input.planningSession === undefined ? existing?.planning_session ?? null : input.planningSession,
           created_at: existing?.created_at ?? now,
           updated_at: now,
         });

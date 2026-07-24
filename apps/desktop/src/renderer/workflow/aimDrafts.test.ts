@@ -204,6 +204,7 @@ describe("aim draft persistence helpers", () => {
       draft_plan: plan,
       final_plan: plan,
       save_block: null,
+      planning_session: null,
       created_at: "2026-07-09T00:00:00.000Z",
       updated_at: "2026-07-09T00:01:00.000Z",
     });
@@ -273,6 +274,7 @@ describe("aim draft persistence helpers", () => {
       draft_plan: null,
       final_plan: null,
       save_block: null,
+      planning_session: null,
     });
 
     expect(hydrated.aimSurface).toBe("summary");

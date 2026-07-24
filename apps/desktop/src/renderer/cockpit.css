@@ -2609,6 +2609,69 @@ kbd {
   gap: 16px;
 }
 
+.od-planning-session.od-ui-panel {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+}
+
+.od-planning-session-head {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+}
+
+.od-planning-session-head h2 {
+  margin: 0;
+  font-size: var(--od-type-title-m);
+  font-weight: var(--od-font-weight-semibold);
+}
+
+.od-planning-session-sub {
+  margin: 0;
+  color: var(--od-muted);
+  font-size: var(--od-type-sub);
+}
+
+.od-planning-session-activity {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+  font-size: var(--od-type-sub);
+}
+
+.od-planning-session-activity li {
+  display: flex;
+  min-width: 0;
+  gap: 8px;
+  color: var(--od-muted);
+}
+
+.od-planning-session-activity li[data-kind="question"],
+.od-planning-session-activity li[data-kind="chat"] {
+  color: inherit;
+}
+
+.od-planning-session-activity-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.od-planning-session-chat {
+  display: grid;
+  gap: 10px;
+}
+
+.od-planning-session-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
 .od-context-clarify[data-phase="intake"] {
   gap: 24px;
 }

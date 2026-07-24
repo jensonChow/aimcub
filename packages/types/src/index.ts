@@ -412,6 +412,33 @@ export const AimDraftSaveBlock = z.object({
 });
 export type AimDraftSaveBlock = z.infer<typeof AimDraftSaveBlock>;
 
+/**
+ * Persisted state of an embedded planning-agent session on a draft. The
+ * transcript entries follow `@aimcub/llm`'s PlanningSessionTranscriptEntry
+ * structurally; this schema stays permissive on purpose — the protocol
+ * validates at runtime, persistence only needs a faithful round-trip.
+ */
+export const AimDraftPlanningSession = z.object({
+  agent_id: z.string(),
+  phase: z.string(),
+  updated_at: z.string().default(""),
+  transcript: z.array(z.record(z.string(), z.unknown())).default([]),
+  research_findings: z.array(z.record(z.string(), z.unknown())).default([]),
+  research_gaps: z.array(z.string()).default([]),
+  research_summary: z.string().default(""),
+  assumptions: z.array(z.object({
+    statement: z.string(),
+    default_value: z.string().default(""),
+  })).default([]),
+  open_questions: z.array(z.string()).default([]),
+  memory_candidates: z.array(z.object({
+    content: z.string(),
+    category: z.string(),
+    scope: z.string(),
+  })).default([]),
+});
+export type AimDraftPlanningSession = z.infer<typeof AimDraftPlanningSession>;
+
 export const AimDraft = z.object({
   id: DbId,
   owner_id: DbId,
@@ -434,6 +461,7 @@ export const AimDraft = z.object({
   })).default([]),
   draft_plan: DecompositionOutput.nullable().default(null),
   final_plan: DecompositionOutput.nullable().default(null),
+  planning_session: AimDraftPlanningSession.nullable().default(null),
   save_block: AimDraftSaveBlock.nullable().default(null),
   created_at: z.string().optional(),
   updated_at: z.string().optional(),
