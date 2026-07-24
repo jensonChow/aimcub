@@ -31,7 +31,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@aimcub/llm": "workspace:*"
+    "@aimcub/llm": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.29.0"
   },
   "devDependencies": {
     "@types/node": "^22.20.0",
