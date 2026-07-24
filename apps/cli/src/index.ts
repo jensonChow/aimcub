@@ -73,11 +73,13 @@ import { getDefaultModel, getLlmProviderDefinition } from "@aimcub/llm/providers
 import {
   listLocalAgents,
   listRegisteredLocalAgentIds,
+  planningCapableAgentId,
   RunSelectionError,
   type LocalAgentEvent,
   type LocalAgentId,
 } from "@aimcub/local-agent";
 import { createJsonFileStore, defaultDataDir, loadSettings, saveSettings, settingsPath, type LocalStore } from "@aimcub/store";
+import { formatSessionSummary, runEmbeddedPlanCli } from "./planning-session-cli";
 import type {
   ContextCategory,
   DecompositionOutput,
@@ -149,7 +151,13 @@ const HELP = `aimcub — Aimcub CLI: turn an aim into a verifiable plan.
 
 Planning (prints, stores nothing):
   aimcub intake "<title>" [--desc "..."] [--json]     Check context readiness before decomposition
-  aimcub plan "<title>" [--desc "..."] [--json]       Decompose an aim into milestones
+  aimcub plan "<title>" [--desc "..."] [--json]       Research + decompose an aim into milestones.
+                                                      With an authenticated planning-capable local
+                                                      agent this runs an embedded session (live
+                                                      research, inline questions, chat; --network
+                                                      grants its web tools; /finish, /cancel).
+                                                      --funnel forces the structured-output path;
+                                                      --agent <id> picks the brain explicitly.
   aimcub clarify "<title>" [opts]                      Draft → ask high-impact questions → refine
        [--answers <file|-|json>] [--yes] [--max N] [--save] [--json]
 
@@ -579,9 +587,80 @@ async function runIntake(title: string, description: string | undefined, json: b
   out(json ? JSON.stringify({ intake, planningContext: planning.report }, null, 2) : formatAimIntake(intake));
 }
 
-async function runPlan(title: string, description: string | undefined, json: boolean): Promise<void> {
+async function runPlan(
+  title: string,
+  description: string | undefined,
+  json: boolean,
+  session: { funnel: boolean; network: boolean; agent?: string | undefined },
+): Promise<void> {
   const planning = await planningContext({ title, description });
   const memories = planning.memories;
+
+  // The embedded planning session is the default deep path: the local agent
+  // researches with its own tools and interacts through the projected Aimcub
+  // tools. --funnel forces the structured-output path; an explicitly named
+  // --agent that cannot run a session is an error, never a silent fallback.
+  if (!session.funnel) {
+    const detections = await listLocalAgents();
+    const capableId = planningCapableAgentId(detections);
+    if (session.agent !== undefined && session.agent !== "") {
+      const explicit = detections.find((detection) => detection.id === session.agent);
+      const explicitCapable = explicit ? planningCapableAgentId([explicit]) : null;
+      if (!explicitCapable) {
+        throw new UserError(
+          `Local agent "${session.agent}" cannot run an embedded planning session ` +
+          "(not installed, not authenticated, or no planning-session support). " +
+          "Run without --agent, or use --funnel for the structured-output path.",
+        );
+      }
+    }
+    const agentId = session.agent || capableId;
+    if (agentId) {
+      err(`Embedded planning session via ${agentId} (use --funnel for the structured-output path).`);
+      const sessionResult = await runEmbeddedPlanCli({
+        agentId,
+        title,
+        description,
+        memories,
+        network: session.network,
+        interactive: isInteractive(),
+        log: err,
+      });
+      if (!sessionResult.outcome) {
+        throw new UserError(
+          `Embedded planning failed (${sessionResult.failure.code}): ${sessionResult.failure.message}\n` +
+          "Re-run with --funnel for the structured-output path.",
+        );
+      }
+      const outcome = sessionResult.outcome;
+      const review = reviewPlan({ plan: outcome.plan, context: memories, quality: outcome.quality });
+      out(
+        json
+          ? JSON.stringify({
+              plan: outcome.plan,
+              quality: outcome.quality,
+              review,
+              planningContext: planning.report,
+              session: {
+                agentId,
+                attempts: outcome.attempts,
+                acceptedAttempt: outcome.acceptedAttempt,
+                answers: outcome.answers,
+                assumptions: outcome.assumptions,
+                openQuestions: outcome.openQuestions,
+                research: outcome.research,
+                memoryCandidates: outcome.memoryCandidates,
+              },
+            }, null, 2)
+          : [
+              formatPlanPretty(outcome.plan, outcome.quality ?? undefined, review, planning.report),
+              formatSessionSummary(outcome),
+            ].join("\n"),
+      );
+      return;
+    }
+  }
+
   const [lineageLearning, decompositionLearningReport] = await Promise.all([contextLineageLearning(), decompositionLearning()]);
   const decompositionStrategyReport = await decompositionStrategy(title, description, decompositionLearningReport);
   const result = await decomposeOrThrow(title, description, memories, lineageLearning, decompositionLearningReport, decompositionStrategyReport);
@@ -1660,6 +1739,7 @@ async function main(): Promise<number> {
         save: { type: "boolean" },
         yes: { type: "boolean", short: "y" },
         replace: { type: "boolean" },
+        funnel: { type: "boolean" },
         network: { type: "boolean" },
         "read-only": { type: "boolean" },
         "until-blocked": { type: "boolean" },
@@ -1713,7 +1793,11 @@ async function main(): Promise<number> {
         await runIntake(resolveTitle(arg, stdinClaimed), description, json);
         return 0;
       case "plan":
-        await runPlan(resolveTitle(arg, stdinClaimed), description, json);
+        await runPlan(resolveTitle(arg, stdinClaimed), description, json, {
+          funnel: Boolean(values.funnel),
+          network: Boolean(values.network),
+          agent: values.agent,
+        });
         return 0;
       case "clarify":
         await runClarify(resolveTitle(arg, stdinClaimed), description, {

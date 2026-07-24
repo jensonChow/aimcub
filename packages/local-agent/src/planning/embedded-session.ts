@@ -35,6 +35,7 @@ import {
 
 import type {
   LocalAgentAdapter,
+  LocalAgentDetection,
   LocalAgentEvent,
   LocalAgentFailure,
   LocalAgentId,
@@ -62,6 +63,24 @@ export class PlanningSessionUnsupportedError extends Error {
     super(`Local agent "${agentId}" does not support embedded planning sessions.`);
     this.name = "PlanningSessionUnsupportedError";
   }
+}
+
+/**
+ * The first detected runtime that can act as the planning brain: available,
+ * authenticated, and registered with planning-session support. Detection order
+ * follows registry order, so the registration preference carries over — and a
+ * third-party adapter that implements `buildPlanningSessionInvocation` is
+ * picked up with no change here.
+ */
+export function planningCapableAgentId(
+  detections: readonly LocalAgentDetection[],
+  registry: LocalAgentRegistry = defaultLocalAgentRegistry,
+): LocalAgentId | null {
+  for (const detection of detections) {
+    if (!detection.available || detection.authStatus !== "ok") continue;
+    if (registry.get(detection.id)?.buildPlanningSessionInvocation) return detection.id;
+  }
+  return null;
 }
 
 export interface EmbeddedPlanningSessionRequest {
