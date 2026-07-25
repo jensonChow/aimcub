@@ -1,12 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  availableWorkbenchStages,
   createDraftActivationTracker,
   deriveWorkspaceTarget,
-  hasWorkbenchNavigation,
-  isWorkbenchStageAvailable,
-  settingsReturnStage,
 } from "./workspaceNavigation";
 
 function deferred<T>() {
@@ -42,26 +38,6 @@ describe("workspace navigation", () => {
       activeDraftId: null,
       showAimComposer: false,
     })).toEqual({ kind: "goal", id: "goal-1" });
-  });
-
-  it("scopes workbench surfaces to the active content type", () => {
-    expect(availableWorkbenchStages({ kind: "draft", id: "draft-1" })).toEqual(["aim", "context", "contracts"]);
-    expect(availableWorkbenchStages({ kind: "goal", id: "goal-1" })).toEqual(["aim", "context", "contracts", "run", "eval"]);
-    expect(availableWorkbenchStages({ kind: "home" })).toEqual(["aim"]);
-    expect(availableWorkbenchStages({ kind: "newAim" })).toEqual(["aim"]);
-
-    expect(hasWorkbenchNavigation({ kind: "draft", id: "draft-1" })).toBe(true);
-    expect(isWorkbenchStageAvailable({ kind: "draft", id: "draft-1" }, "run")).toBe(false);
-    expect(isWorkbenchStageAvailable({ kind: "goal", id: "goal-1" }, "run")).toBe(true);
-  });
-
-  it("returns from Settings to the originating surface without expanding draft stages", () => {
-    const draftTarget = { kind: "draft", id: "draft-1" } as const;
-    const captured = settingsReturnStage(draftTarget, "context", "aim");
-
-    expect(captured).toBe("context");
-    expect(settingsReturnStage(draftTarget, "settings", captured)).toBe("context");
-    expect(settingsReturnStage(draftTarget, "run", captured)).toBe("context");
   });
 
   it("invalidates a deferred draft activation when that draft is discarded", async () => {

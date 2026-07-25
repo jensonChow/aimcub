@@ -26,6 +26,7 @@ import {
   type JourneyActorKind,
 } from "../../workflow/journey";
 import type { CockpitStage } from "../../workflow/workspaceNavigation";
+import { CompletionRecapPanel } from "../eval/EvalStage";
 import type { LiveRunState } from "../execute/liveRun";
 import { PlanPanel, type PlanPanelProps } from "../plan/PlanPanel";
 import { JourneyPlanBand } from "./JourneyPlanBand";
@@ -305,9 +306,6 @@ export function JourneyView(props: JourneyViewProps) {
         <header className="od-journey-head">
           {renderAimHead(t("glass.journey.noPlan"))}
         </header>
-        <button className="od-journey-primary" type="button" onClick={() => props.onOpenStage("context")}>
-          {t("glass.journey.noPlanCta")}
-        </button>
       </section>
     );
   }
@@ -338,44 +336,92 @@ export function JourneyView(props: JourneyViewProps) {
       return;
     }
     // The move resolves on its own plan row: proof opens the row's evidence form in place,
-    // review/blocked expand the row (receipts and blocker detail are inline). The old stage
-    // navigation stays only as the fallback for a move whose milestone dropped out of the model.
-    if (moveMilestone) {
-      setPlanSelectedId(moveMilestone.id);
-      if (move.kind === "submit_proof") setProofActive(moveMilestone.id);
-      return;
-    }
-    props.onOpenStage(move.kind === "review_eval" ? "eval" : "run");
+    // review/blocked expand the row (receipts and blocker detail are inline). A move whose
+    // milestone left the model between refreshes is stale — expanding nothing is honest.
+    setPlanSelectedId(move.milestoneId);
+    if (move.kind === "submit_proof" && moveMilestone) setProofActive(moveMilestone.id);
+  }
+
+  const headerEl = (
+    <header className="od-journey-head">
+      {renderAimHead(t("glass.journey.headerSub"))}
+      <div className="od-journey-head-meta">
+        {showElsewhere ? (
+          <button
+            className="od-journey-elsewhere"
+            type="button"
+            onClick={props.onJumpElsewhere}
+            title={t("glass.journey.headerSub")}
+          >
+            {elsewhereCount === 1
+              ? t("glass.journey.turnsElsewhereOne")
+              : tk("glass.journey.turnsElsewhereMany", { n: elsewhereCount })}
+          </button>
+        ) : null}
+        {headMeta ? (
+          <span
+            className="od-journey-meta"
+            aria-label={tk("shell.progressValue", { done: progress.completed_milestones, total: progress.total_milestones })}
+            title={tk("shell.progressValue", { done: progress.completed_milestones, total: progress.total_milestones })}
+          >
+            {headMeta}
+          </span>
+        ) : null}
+      </div>
+    </header>
+  );
+
+  const inboxEl = pendingCandidates.length > 0 && acceptCandidate && rejectCandidate ? (
+    <div className="od-journey-inbox" data-od-id="journey-inbox">
+      <ContextInbox
+        candidates={pendingCandidates}
+        currentAimTitle={goal.title}
+        disabled={Boolean(props.disabled)}
+        onAccept={acceptCandidate}
+        onReject={rejectCandidate}
+      />
+    </div>
+  ) : null;
+
+  const journalEl = (
+    <details className="od-journey-journal">
+      <summary className="od-journey-journal-head">
+        <span className="od-journey-eyebrow">{t("glass.journey.journalTitle")}</span>
+        <span className="od-journey-journal-hint">{t("glass.journey.journalHint")}</span>
+      </summary>
+      {journal.length === 0 ? (
+        <div className="od-journey-journal-empty">{t("glass.journal.empty")}</div>
+      ) : (
+        journal.map((entry) => (
+          <div className="od-journey-journal-row" key={entry.id}>
+            <span className="od-journey-journal-time">{formatClock(entry.at)}</span>
+            <span className={`od-journey-chip od-journey-chip-${entry.who}`}>{tk(ACTOR_KEY[entry.who])}</span>
+            <span className="od-journey-journal-what">
+              {entry.what || (entry.detailKey ? tk(`glass.journal.event.${entry.detailKey}`) : "")}
+            </span>
+          </div>
+        ))
+      )}
+    </details>
+  );
+
+  // A completed aim leads with its factual recap (final outcome, sub-aims, evidence, eval,
+  // learned context) — the live lane and plan rows would only restate it. Candidate triage
+  // and the journal stay: they are the recap's decision moment and its receipts.
+  if (progress.completion_recap?.complete) {
+    return (
+      <section className="od-journey" data-od-id="journey-view">
+        {headerEl}
+        <CompletionRecapPanel progress={progress} />
+        {inboxEl}
+        {journalEl}
+      </section>
+    );
   }
 
   return (
     <section className="od-journey" data-od-id="journey-view">
-      <header className="od-journey-head">
-        {renderAimHead(t("glass.journey.headerSub"))}
-        <div className="od-journey-head-meta">
-          {showElsewhere ? (
-            <button
-              className="od-journey-elsewhere"
-              type="button"
-              onClick={props.onJumpElsewhere}
-              title={t("glass.journey.headerSub")}
-            >
-              {elsewhereCount === 1
-                ? t("glass.journey.turnsElsewhereOne")
-                : tk("glass.journey.turnsElsewhereMany", { n: elsewhereCount })}
-            </button>
-          ) : null}
-          {headMeta ? (
-            <span
-              className="od-journey-meta"
-              aria-label={tk("shell.progressValue", { done: progress.completed_milestones, total: progress.total_milestones })}
-              title={tk("shell.progressValue", { done: progress.completed_milestones, total: progress.total_milestones })}
-            >
-              {headMeta}
-            </span>
-          ) : null}
-        </div>
-      </header>
+      {headerEl}
 
       {props.planning ? (
         <div className="od-journey-planning" data-od-id="journey-planning">
@@ -501,37 +547,9 @@ export function JourneyView(props: JourneyViewProps) {
         />
       ) : null}
 
-      {pendingCandidates.length > 0 && acceptCandidate && rejectCandidate ? (
-        <div className="od-journey-inbox" data-od-id="journey-inbox">
-          <ContextInbox
-            candidates={pendingCandidates}
-            currentAimTitle={goal.title}
-            disabled={Boolean(props.disabled)}
-            onAccept={acceptCandidate}
-            onReject={rejectCandidate}
-          />
-        </div>
-      ) : null}
+      {inboxEl}
 
-      <details className="od-journey-journal">
-        <summary className="od-journey-journal-head">
-          <span className="od-journey-eyebrow">{t("glass.journey.journalTitle")}</span>
-          <span className="od-journey-journal-hint">{t("glass.journey.journalHint")}</span>
-        </summary>
-        {journal.length === 0 ? (
-          <div className="od-journey-journal-empty">{t("glass.journal.empty")}</div>
-        ) : (
-          journal.map((entry) => (
-            <div className="od-journey-journal-row" key={entry.id}>
-              <span className="od-journey-journal-time">{formatClock(entry.at)}</span>
-              <span className={`od-journey-chip od-journey-chip-${entry.who}`}>{tk(ACTOR_KEY[entry.who])}</span>
-              <span className="od-journey-journal-what">
-                {entry.what || (entry.detailKey ? tk(`glass.journal.event.${entry.detailKey}`) : "")}
-              </span>
-            </div>
-          ))
-        )}
-      </details>
+      {journalEl}
     </section>
   );
 }

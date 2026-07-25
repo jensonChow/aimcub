@@ -1,5 +1,5 @@
 import type { AimProgressReadModel } from "@aimcub/core";
-import type { DecompositionOutput, Goal, Milestone } from "@aimcub/types";
+import type { DecompositionOutput, Milestone } from "@aimcub/types";
 
 import type { GoalDetail } from "../../shared/ipc";
 import type { CockpitStage } from "../CockpitShell";
@@ -18,11 +18,12 @@ export function planNodeForMilestone(plan: DecompositionOutput | null | undefine
     ?? null;
 }
 
-export function cockpitStageFor(mode: AppMode, selected: Goal | null, activePlan: DecompositionOutput | null): CockpitStage {
+/**
+ * Collapsed stage model: every planning/answering/reviewing/working moment renders on the
+ * Journey ("aim"); only Settings is a distinct mode-driven stage (Memory is override-only).
+ */
+export function cockpitStageFor(mode: AppMode): CockpitStage {
   if (mode === "settings") return "settings";
-  if (mode === "contexting" || mode === "answering") return "context";
-  if (mode === "reviewing" || (!selected && activePlan)) return "contracts";
-  if (selected) return "run";
   return "aim";
 }
 

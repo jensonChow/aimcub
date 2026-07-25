@@ -165,10 +165,32 @@ describe("JourneyView", () => {
     expect(html).not.toContain("journey-move");
   });
 
-  it("renders a no-plan state when progress is null", () => {
+  it("renders a quiet header-only state while progress has not loaded", () => {
     const html = render(null);
     expect(html).toContain("Two weeks in Japan");
-    expect(html).toContain("Gather context");
+    expect(html).not.toContain("od-journey-primary"); // no dead CTA into removed stages
+  });
+
+  it("leads with the completion recap for a completed aim (no live lane, no plan band)", () => {
+    const recap = {
+      complete: true,
+      final_outcome: "Completed 1/1 sub-aims.",
+      completed_sub_aims: [],
+      passing_evidence: [],
+      eval_results: [],
+      learned_context: [],
+      evidence_empty_reason: "",
+      context_empty_reason: "",
+    };
+    const html = render(progressOf(
+      [row({ id: "m1", title: "Ship the fix", completed: true })],
+      { completion_recap: recap as AimProgressReadModel["completion_recap"] },
+    ));
+    expect(html).toContain("Completion recap");
+    expect(html).toContain("Completed 1/1 sub-aims.");
+    expect(html).not.toContain("journey-plan-band");
+    expect(html).not.toContain("journey-move");
+    expect(html).toContain("od-journey-journal");
   });
 
   it("shows the in-Journey aim-rename control only when onRenameAim is provided (both header sites)", () => {

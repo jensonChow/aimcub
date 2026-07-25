@@ -10,9 +10,6 @@ import { setThemePref, useThemePref } from "./theme";
 import { aimNavigationLabels } from "./workflow/aimNavigationTitle";
 import { PROGRESS_STATUS_KEY } from "./workflow/progressSummary";
 import {
-  availableWorkbenchStages,
-  isWorkbenchStageAvailable,
-  WORKBENCH_STAGE_IDS,
   type CockpitStage,
   type WorkbenchStage,
   type WorkspaceTarget,
@@ -20,7 +17,6 @@ import {
 
 import "./cockpit.css";
 
-export { WORKBENCH_STAGE_IDS };
 export type { CockpitStage, WorkbenchStage, WorkspaceTarget };
 type SidebarState = "pinned" | "collapsed" | "peek";
 const USER_MENU_ID = "od-sidebar-user-menu";
@@ -66,12 +62,6 @@ interface CockpitShellProps {
   /** While the Settings stage is open, replaces the aim list (brand row + account menu stay). */
   settingsSidebar?: ReactNode;
   commands?: CockpitCommand[];
-}
-
-interface StageItem {
-  stage: WorkbenchStage;
-  shortcut: string;
-  title: string;
 }
 
 function prefersCollapsedSidebar() {
@@ -146,40 +136,15 @@ export function CockpitShell({
   const sidebarId = "od-left-aim-sidebar";
   const appStyle = { "--sidebar-width": `${sidebarWidth}px` } as CSSProperties;
 
-  const stages = useMemo<StageItem[]>(() => [
-    { stage: "aim", shortcut: "1", title: t("cockpit.surface.aim") },
-    { stage: "context", shortcut: "2", title: t("cockpit.surface.context") },
-    { stage: "contracts", shortcut: "3", title: t("cockpit.surface.contracts") },
-    { stage: "run", shortcut: "4", title: t("cockpit.surface.run") },
-    { stage: "eval", shortcut: "5", title: t("cockpit.surface.eval") },
-  ], [t]);
-  const availableStageIds = availableWorkbenchStages(workspaceTarget);
-  const availableStages = stages.filter((item) => availableStageIds.includes(item.stage));
-
   const visibleGoals = goals.slice(0, 12);
 
   const commandItems = useMemo<CockpitCommand[]>(() => {
-    const stageCommandDetails = {
-      aim: t("command.stageAim.detail"),
-      context: t("command.stageContext.detail"),
-      contracts: t("command.stagePlan.detail"),
-      run: t("command.stageRun.detail"),
-      eval: t("command.stageEval.detail"),
-    } satisfies Record<WorkbenchStage, string>;
-
     return commands ?? [
       { id: "home-panel", label: t("command.homePanel"), detail: t("command.homePanel.detail"), shortcut: "Cmd 0", action: onHome },
       { id: "new-aim", label: t("command.newAim"), detail: t("command.newAim.detail"), shortcut: "Cmd N", action: onNewAim },
-      ...availableStages.map((item) => ({
-        id: `stage-${item.stage}`,
-        label: item.title,
-        detail: stageCommandDetails[item.stage],
-        shortcut: `Cmd ${item.shortcut}`,
-        action: () => onStage(item.stage),
-      })),
       { id: "settings", label: t("os.settings"), detail: t("command.settings.detail"), shortcut: "Cmd ,", action: () => onStage("settings") },
     ];
-  }, [availableStages, commands, onHome, onNewAim, onStage, t]);
+  }, [commands, onHome, onNewAim, onStage, t]);
 
   function clearSidebarRevealTimer() {
     if (revealSidebarTimer.current === null) return;
@@ -456,17 +421,11 @@ export function CockpitShell({
       if (key === ",") {
         event.preventDefault();
         onStage("settings");
-        return;
-      }
-      if (["1", "2", "3", "4", "5"].includes(key)) {
-        event.preventDefault();
-        const stage = WORKBENCH_STAGE_IDS[Number(key) - 1];
-        if (stage && isWorkbenchStageAvailable(workspaceTarget, stage)) onStage(stage);
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onHome, onNewAim, onStage, workspaceTarget]);
+  }, [onHome, onNewAim, onStage]);
 
   return (
     <div className="od-window" data-od-id="desktop-window">

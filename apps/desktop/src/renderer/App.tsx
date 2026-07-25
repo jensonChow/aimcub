@@ -35,11 +35,9 @@ import type {
   WebResearchStatus,
 } from "../shared/ipc";
 
-import { CockpitShell, type CockpitStage, type WorkbenchStage } from "./CockpitShell";
-import { hasCompletionRecap, stageForOpenedAim } from "./completionRecap";
+import { CockpitShell, type CockpitStage } from "./CockpitShell";
 import { buildContextCandidateAcceptRequest, type ContextInboxScope } from "./ContextInbox";
 import { ContextSourcesPanel } from "./ContextSourcesPanel";
-import { buildContextBundleReview } from "./contextReview";
 import {
   deriveAimHelperProfile,
   hasPlanningRuntime,
@@ -51,10 +49,6 @@ import { DeveloperModeProvider, useDeveloperMode } from "./developerMode";
 import { I18nProvider, useI18n, type StringKey } from "./i18n";
 import { StoreDiagnosticsBanner } from "./StoreDiagnosticsBanner";
 import {
-  aimIntakeOf,
-  planningContextOf,
-  planningToolsOf,
-  reviewOf,
 } from "./labels";
 import { LocalAgentForm } from "./LocalAgentForm";
 import { Notice } from "./Notice";
@@ -62,12 +56,7 @@ import { mergePlanningDebugTraces, PlanningDebugPanel } from "./PlanningDebugPan
 import { ProviderForm } from "./ProviderForm";
 import { ContextClarifyPanel } from "./stages/context/ContextClarifyPanel";
 import { PlanningSessionPanel } from "./stages/context/PlanningSessionPanel";
-import { buildContextLoopModel } from "./stages/context/contextLoop";
-import { ContextReviewPanel } from "./stages/context/ContextReviewPanel";
-import { ContextStage } from "./stages/context/ContextStage";
 import type { ClarifyPhase, ContextAnswerMap } from "./stages/context/types";
-import { EvalStage } from "./stages/eval/EvalStage";
-import { ExecutePanel } from "./stages/execute/ExecutePanel";
 import { applyRunLiveEvent, isTerminalRunEvent, type LiveRunState } from "./stages/execute/liveRun";
 import { DEFAULT_RUN_PERMISSION_DRAFT, runPermissionRequest } from "./stages/execute/runPermissions";
 import { NewAimComposer } from "./stages/aim/NewAimComposer";
@@ -75,9 +64,7 @@ import { HomeView } from "./stages/home/HomeView";
 import { JourneyView } from "./stages/journey/JourneyView";
 import { MemoryView } from "./stages/memory/MemoryView";
 import { WebResearchForm } from "./WebResearchForm";
-import { PlanPanel } from "./stages/plan/PlanPanel";
 import { setThemePref, useThemePref } from "./theme";
-import { Button, Panel } from "./ui";
 import {
   appendIntakeQuestions,
   answersFor,
@@ -86,19 +73,17 @@ import {
   intakeToClarifyOutput,
   shouldBlockForIntake,
 } from "./workflow/intakeClarify";
-import { createPlanningRunId, latestLiveValue } from "./workflow/planningLiveEvents";
+import { createPlanningRunId } from "./workflow/planningLiveEvents";
 import { formatRoutingValidation, routingAgentsFromDetections } from "./workflow/routingAgents";
 import {
   cockpitStageFor,
   planNodeForMilestone,
-  progressRows,
   type AppMode,
 } from "./workflow/stageRouting";
 import {
   buildAimDraftUpsertRequest,
   hydrateAimDraft,
   persistedAimSurface,
-  saveBlockFromProductError,
   type AimDraftBuildInput,
   type HydratedAimDraft,
 } from "./workflow/aimDrafts";
@@ -136,14 +121,10 @@ import {
   canApplyDeferredWorkspaceResponse,
   canStartWorkflowMutation,
   createNavigationConcurrencyState,
-  finishSaveInFlight,
-  withSaveInFlight,
 } from "./workflow/navigationConcurrency";
 import {
   createDraftActivationTracker,
   deriveWorkspaceTarget,
-  isWorkbenchStageAvailable,
-  settingsReturnStage,
 } from "./workflow/workspaceNavigation";
 import { shortText } from "./workflow/text";
 
@@ -226,7 +207,7 @@ function AimOsApp() {
   const [settingsSection, setSettingsSection] = useState<SettingsSectionId>("general");
   const [manualProofDraftActive, setManualProofDraftActive] = useState(false);
   const proofNavigationErrorRef = useRef<string | null>(null);
-  const [workspaceRevision, setWorkspaceRevision] = useState(0);
+  const [, setWorkspaceRevision] = useState(0);
   const handleProofDraftActiveChange = useCallback((active: boolean) => {
     setManualProofDraftActive(active);
     if (!active) {
@@ -250,7 +231,6 @@ function AimOsApp() {
     targetDraftId?: string;
   } | null>(null);
   const discardInFlightDraftIdRef = useRef<string | null>(null);
-  const settingsReturnStageRef = useRef<WorkbenchStage>("aim");
   const draftPersistenceRef = useRef<DraftPersistenceQueue | null>(null);
   const activeDraftIdRef = useRef<string | null>(null);
   const [activeDraftId, setActiveDraftIdState] = useState<string | null>(null);
@@ -405,11 +385,7 @@ function AimOsApp() {
     runFinishedRef.current = (goalId: string) => {
       const goal = selectedGoalRef.current;
       if (!goal || goal.id !== goalId) return;
-      void refreshGoalAfterSideEffect(
-        goal,
-        navigationConcurrencyRef.current.workspace,
-        navigationConcurrencyRef.current.surface,
-      );
+      void refreshGoalAfterSideEffect(goal, navigationConcurrencyRef.current.workspace);
     };
   });
 
@@ -580,7 +556,6 @@ function AimOsApp() {
     )) return;
     interruptPlanningForNavigation();
     const transition = beginWorkspaceTransition();
-    const surfaceTransition = navigationConcurrencyRef.current.surface;
     beginPendingTargetNavigation(transition);
     try {
       if (options.checkpointDraft !== false && !(await checkpointCurrentDraftBeforeNavigation())) return;
@@ -614,7 +589,7 @@ function AimOsApp() {
       setRuntimeGuidanceVisible(false);
       setContextNote("");
       try {
-        await refreshGoalState(goal, transition, surfaceTransition);
+        await refreshGoalState(goal, transition);
       } catch (err) {
         if (isCurrentWorkspaceTransition(transition)) setError(err instanceof Error ? err.message : String(err));
       }
@@ -626,8 +601,6 @@ function AimOsApp() {
   async function refreshGoalState(
     goal: Goal | null = selected,
     transition = navigationConcurrencyRef.current.workspace,
-    surfaceTransition = navigationConcurrencyRef.current.surface,
-    options: { route?: boolean } = {},
   ) {
     if (!goal) return;
     const [nextDetail, nextProgress, nextJournal] = await Promise.all([
@@ -640,28 +613,16 @@ function AimOsApp() {
     setDetail(nextDetail);
     setProgress(nextProgress);
     setJournalEvents(nextJournal);
-    if (options.route !== false && isCurrentSurfaceTransition(surfaceTransition)) {
-      setStageOverride(stageForOpenedAim(nextProgress));
-    }
   }
 
-  async function refreshGoalAfterSideEffect(
-    goal: Goal,
-    transition: number,
-    surfaceTransition: number,
-  ) {
+  async function refreshGoalAfterSideEffect(goal: Goal, transition: number) {
     void refreshListSurfaces();
     if (isCurrentWorkspaceTransition(transition)) {
-      await refreshGoalState(goal, transition, surfaceTransition, { route: false });
+      await refreshGoalState(goal, transition);
       return;
     }
     if (selectedGoalRef.current?.id !== goal.id) return;
-    await refreshGoalState(
-      goal,
-      navigationConcurrencyRef.current.workspace,
-      navigationConcurrencyRef.current.surface,
-      { route: false },
-    );
+    await refreshGoalState(goal, navigationConcurrencyRef.current.workspace);
   }
 
   function resetComposer(options: { openComposer?: boolean } = {}) {
@@ -724,7 +685,7 @@ function AimOsApp() {
       if (!options.skipIntakeGate) {
         setBusy(t("os.busy.context"));
         setMode("contexting");
-        setStageOverride("context");
+        setStageOverride("aim");
         const intake = await window.aimcub.intake({
           title,
           description: requestedDescription.trim() || undefined,
@@ -745,7 +706,7 @@ function AimOsApp() {
 
       setBusy(t("os.busy.draft"));
       setMode("drafting");
-      setStageOverride("contracts");
+      setStageOverride("aim");
       const planningDescription = descriptionWithContext(requestedDescription);
       const req = { title, description: planningDescription, clientRunId: runId };
       const nextDraft = await window.aimcub.draft(req);
@@ -775,7 +736,7 @@ function AimOsApp() {
       setClarifyPhase("postDraft");
       setAnswers({});
       setMode("answering");
-      setStageOverride("context");
+      setStageOverride("aim");
     } catch (err) {
       if (!isCurrentPlanningRun(runId, transition)) return;
       setError(formatPlanningFailure({
@@ -807,11 +768,6 @@ function AimOsApp() {
       title: overrides.title ?? aimTitle,
       description: overrides.description ?? aimDescription,
       parent,
-      activeStage: resetPlanning
-        ? "aim"
-        : stageOverride === "settings"
-        ? settingsReturnStageRef.current
-        : stageOverride ?? cockpitStageFor(mode, selected, (finalPlan ?? draft ?? detail?.goal.plan_json ?? null) as DecompositionOutput | null),
       aimSurface: overrides.aimSurface ?? persistedAimSurface(aimSurfaceMode),
       phase: resetPlanning ? null : clarifyPhase,
       contextNote: resetPlanning ? "" : contextNote,
@@ -1067,7 +1023,7 @@ function AimOsApp() {
         fallback: t("os.err.draft"),
       }));
       setMode("contexting");
-      setStageOverride("context");
+      setStageOverride("aim");
     } finally {
       if (isCurrentPlanningRun(runId, transition)) setBusy(null);
     }
@@ -1113,7 +1069,7 @@ function AimOsApp() {
       }
       setClarifyPhase(null);
       setMode("reviewing");
-      setStageOverride("contracts");
+      setStageOverride("aim");
     } catch (err) {
       if (!isCurrentPlanningRun(runId, transition)) return;
       setError(formatPlanningFailure({
@@ -1127,97 +1083,6 @@ function AimOsApp() {
       setStageOverride(route.stageOverride);
     } finally {
       if (isCurrentPlanningRun(runId, transition)) setBusy(null);
-    }
-  }
-
-  async function savePlan() {
-    if (workflowMutationIsLocked()) return;
-    const transition = navigationConcurrencyRef.current.workspace;
-    const plan = finalPlan ?? draft;
-    if (!plan) return;
-    const validation = validateExecutablePlan(plan);
-    if (!validation.ok) {
-      const productError = formatPlanningFailure({ stage: "save", errors: validation.errors, t, fallback: t("plan.validationFailed") });
-      const saveBlock = saveBlockFromProductError(productError);
-      setError(productError);
-      setDraftSaveBlock(saveBlock);
-      await persistCurrentDraftNow({ saveBlock });
-      if (!isCurrentWorkspaceTransition(transition)) return;
-      const route = routeAfterPlanningFailure("save");
-      setMode(route.mode);
-      setStageOverride(route.stageOverride);
-      return;
-    }
-    const routingValidation = validatePlanRouting({
-      plan,
-      agents: routingAgentsFromDetections(localAgents),
-      allowHuman: true,
-    });
-    if (!routingValidation.ok) {
-      const message = formatRoutingValidation(routingValidation);
-      const saveBlock: AimDraftSaveBlock = {
-        title: t("planningError.save.title"),
-        message: t("planningError.save.message"),
-        recovery: t("planningError.save.recovery"),
-        issues: routingValidation.issues.slice(0, 3).map((issue) => issue.title),
-      };
-      setError(message);
-      setDraftSaveBlock(saveBlock);
-      await persistCurrentDraftNow({ saveBlock });
-      if (!isCurrentWorkspaceTransition(transition)) return;
-      setStageOverride("contracts");
-      setMode("reviewing");
-      return;
-    }
-    setBusy(t("os.busy.save"));
-    setError(null);
-    navigationConcurrencyRef.current = withSaveInFlight(navigationConcurrencyRef.current, true);
-    try {
-      const savedDraft = await persistCurrentDraftNow({}, { throwOnError: true });
-      if (!isCurrentWorkspaceTransition(transition)) return;
-      draftPersistence.pauseAutosave();
-      const saved = await window.aimcub.saveGoal({
-        draftId: savedDraft?.id ?? draftPersistence.currentDraftId() ?? activeDraftIdRef.current ?? undefined,
-        title: aimTitle.trim(),
-        description: aimDescription.trim() || undefined,
-        parentGoalId: parent?.goalId,
-        parentMilestoneId: parent?.milestoneId,
-        draft,
-        plan,
-        quality: planResult?.quality ?? null,
-        review: planResult?.review ?? null,
-        qualityRetry: planResult?.qualityRetry ?? undefined,
-        debugTrace: mergePlanningDebugTraces(planningDebugTraces.length ? planningDebugTraces : [planResult?.debugTrace]),
-        questions: [
-          ...(intakeClarify?.questions ?? []),
-          ...(clarifyPhase === "intake" ? [] : clarify?.questions ?? []),
-        ],
-        answers: [...builtIntakeAnswers, ...builtAnswers],
-        assumptions: clarify?.assumptions ?? [],
-      });
-      if (!isCurrentWorkspaceTransition(transition)) {
-        await refreshAll({ autoOpenFirstGoal: false });
-        return;
-      }
-      setActiveDraftId(null);
-      setDraftSaveBlock(null);
-      setBusy(null);
-      resetComposer();
-      await refreshAll({ autoOpenFirstGoal: false });
-      if (!isCurrentWorkspaceTransition(transition)) return;
-      await openGoal(saved.goal, { allowDuringSave: true, checkpointDraft: false });
-    } catch (err) {
-      if (!isCurrentWorkspaceTransition(transition)) return;
-      setError(formatPlanningFailure({
-        stage: "save",
-        errors: [err instanceof Error ? err.message : String(err)],
-        t,
-        fallback: t("planningError.save.message"),
-      }));
-    } finally {
-      navigationConcurrencyRef.current = finishSaveInFlight(navigationConcurrencyRef.current);
-      draftPersistence.resumeAutosave();
-      setBusy(null);
     }
   }
 
@@ -1453,12 +1318,12 @@ function AimOsApp() {
       setSessionChatDraft("");
       sessionLandingAppliedRef.current = null;
       setSelected(updated.goal);
-      // Route back to the Journey: clear the leftover "contracts"/"reviewing" the planning run set,
-      // else `mainStageContent`'s `activeStage === "contracts"` branch would intercept the render.
+      // Clear the leftover "reviewing" mode the planning run set; the Journey renders the
+      // saved plan's rows from here.
       setMode("cockpit");
       setStageOverride("aim");
       setBusy(null);
-      await refreshGoalState(updated.goal, transition, navigationConcurrencyRef.current.surface, { route: false });
+      await refreshGoalState(updated.goal, transition);
       void refreshListSurfaces();
     } catch (err) {
       setError(formatPlanningFailure({
@@ -1503,7 +1368,7 @@ function AimOsApp() {
       }
       setSelected(updated.goal);
       setBusy(null);
-      await refreshGoalState(updated.goal, transition, navigationConcurrencyRef.current.surface, { route: false });
+      await refreshGoalState(updated.goal, transition);
       void refreshListSurfaces();
     } catch (err) {
       setError(formatPlanningFailure({
@@ -1538,7 +1403,7 @@ function AimOsApp() {
       }
       setSelected(updated);
       setBusy(null);
-      await refreshGoalState(updated, transition, navigationConcurrencyRef.current.surface, { route: false });
+      await refreshGoalState(updated, transition);
       void refreshListSurfaces();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -1561,7 +1426,6 @@ function AimOsApp() {
     const operationId = `agent:${goal.id}:${milestone.id}`;
     if (!beginSideEffectOperation(operationId, t("os.busy.agent"))) return;
     const transition = navigationConcurrencyRef.current.workspace;
-    const surfaceTransition = navigationConcurrencyRef.current.surface;
     setError(null);
     try {
       const result = await window.aimcub.runMilestoneAgent({
@@ -1575,7 +1439,7 @@ function AimOsApp() {
       if (result.runId) sessionRunIdsRef.current.add(result.runId);
       const resultTargetIsCurrent = isCurrentWorkspaceTransition(transition) || selectedGoalRef.current?.id === goal.id;
       if (resultTargetIsCurrent && !result.ok && result.error) setError(result.error);
-      await refreshGoalAfterSideEffect(goal, transition, surfaceTransition);
+      await refreshGoalAfterSideEffect(goal, transition);
     } catch (err) {
       if (!isCurrentWorkspaceTransition(transition) && selectedGoalRef.current?.id !== goal.id) return;
       setError(err instanceof Error ? err.message : String(err));
@@ -1597,14 +1461,13 @@ function AimOsApp() {
     const operationId = `regrant:${goal.id}:${runId}`;
     if (!beginSideEffectOperation(operationId, t("os.busy.agent"))) return;
     const transition = navigationConcurrencyRef.current.workspace;
-    const surfaceTransition = navigationConcurrencyRef.current.surface;
     setError(null);
     // Recorded before the IPC round-trip so the affordance cannot flash again for the very run the
     // user just re-granted while the claim is still landing.
     sessionRunIdsRef.current.add(runId);
     try {
       await window.aimcub.claimQueuedRun(runId);
-      await refreshGoalAfterSideEffect(goal, transition, surfaceTransition);
+      await refreshGoalAfterSideEffect(goal, transition);
     } catch (err) {
       if (!isCurrentWorkspaceTransition(transition) && selectedGoalRef.current?.id !== goal.id) return;
       setError(err instanceof Error ? err.message : String(err));
@@ -1624,7 +1487,6 @@ function AimOsApp() {
     const operationId = `confirm:${goal.id}:${milestone.id}`;
     if (!beginSideEffectOperation(operationId, t("os.busy.confirm"))) return false;
     const transition = navigationConcurrencyRef.current.workspace;
-    const surfaceTransition = navigationConcurrencyRef.current.surface;
     setError(null);
     try {
       const outcome = await confirmMilestoneAndRefresh(
@@ -1658,10 +1520,6 @@ function AimOsApp() {
       const originalTargetIsCurrent = isCurrentWorkspaceTransition(transition);
       if (!originalTargetIsCurrent && selectedGoalRef.current?.id !== goal.id) return true;
       setProgress(nextProgress);
-      if (originalTargetIsCurrent && hasCompletionRecap(nextProgress) && isCurrentSurfaceTransition(surfaceTransition)) {
-        setMode("reviewing");
-        setStageOverride("eval");
-      }
       return true;
     } finally {
       finishSideEffectOperation(operationId);
@@ -1674,11 +1532,10 @@ function AimOsApp() {
     const operationId = `context-accept:${candidate.id}`;
     if (!beginSideEffectOperation(operationId, t("os.busy.contextReview"))) return;
     const transition = navigationConcurrencyRef.current.workspace;
-    const surfaceTransition = navigationConcurrencyRef.current.surface;
     setError(null);
     try {
       await window.aimcub.acceptContextCandidate(buildContextCandidateAcceptRequest(candidate, content, scope));
-      if (goal) await refreshGoalAfterSideEffect(goal, transition, surfaceTransition);
+      if (goal) await refreshGoalAfterSideEffect(goal, transition);
     } catch (err) {
       if (!isCurrentWorkspaceTransition(transition) && (!goal || selectedGoalRef.current?.id !== goal.id)) return;
       setError(err instanceof Error ? err.message : String(err));
@@ -1693,11 +1550,10 @@ function AimOsApp() {
     const operationId = `context-reject:${candidate.id}`;
     if (!beginSideEffectOperation(operationId, t("os.busy.contextReview"))) return;
     const transition = navigationConcurrencyRef.current.workspace;
-    const surfaceTransition = navigationConcurrencyRef.current.surface;
     setError(null);
     try {
       await window.aimcub.rejectContextCandidate(candidate.id);
-      if (goal) await refreshGoalAfterSideEffect(goal, transition, surfaceTransition);
+      if (goal) await refreshGoalAfterSideEffect(goal, transition);
     } catch (err) {
       if (!isCurrentWorkspaceTransition(transition) && (!goal || selectedGoalRef.current?.id !== goal.id)) return;
       setError(err instanceof Error ? err.message : String(err));
@@ -1767,7 +1623,7 @@ function AimOsApp() {
     || Boolean(draft)
     || Boolean(activeDraftId);
   const showAimEditor = aimSurfaceMode === "compose";
-  const activeStage = stageOverride ?? cockpitStageFor(mode, selected, activePlan);
+  const activeStage = stageOverride ?? cockpitStageFor(mode);
   const workspaceTarget = deriveWorkspaceTarget({
     selectedGoalId: selected?.id ?? null,
     activeDraftId: aimSurfaceMode === "compose" ? null : activeDraftId,
@@ -1779,92 +1635,19 @@ function AimOsApp() {
     () => deriveAimHelperProfile({ title: activeAimTitle, description: activeAimDescription }),
     [activeAimDescription, activeAimTitle],
   );
-  const livePlanningContext = latestLiveValue(planningLiveEvents, (event) => event.planningContext);
-  const livePlanningTools = latestLiveValue(planningLiveEvents, (event) => event.planningTools);
-  const liveIntake = latestLiveValue(planningLiveEvents, (event) => event.intake);
-  const currentPlanningContext = planResult?.planningContext ?? livePlanningContext ?? (selected ? planningContextOf(selected) : null);
-  const currentPlanningTools = planResult?.planningTools ?? livePlanningTools ?? (selected ? planningToolsOf(selected) : null);
-  const currentIntake = planResult?.intake ?? liveIntake ?? (selected ? aimIntakeOf(selected) : null);
-  const currentReview = planResult?.review ?? (selected ? reviewOf(selected) : null);
-  const contextReview = useMemo(() => buildContextBundleReview({
-    planningContext: currentPlanningContext,
-    planningTools: currentPlanningTools,
-    intake: currentIntake,
-    review: currentReview,
-    plan: activePlan,
-    answeredQuestionIds: [...builtIntakeAnswers, ...builtAnswers].map((answer) => answer.question_id),
-  }), [activePlan, builtAnswers, builtIntakeAnswers, currentIntake, currentPlanningContext, currentPlanningTools, currentReview]);
-  const contextReviewItemCount = contextReview.usedContext.length
-    + contextReview.skippedContext.length
-    + contextReview.permissionGaps.length
-    + contextReview.decompositionRisks.length;
-  const shouldShowContextReviewInContext = clarifyPhase !== "intake"
-    && (contextReviewItemCount > 0
-      || (mode === "contexting" && Boolean(busy))
-      || mode === "drafting");
-  const contextLoop = useMemo(() => buildContextLoopModel({
-    contextSources,
-    review: contextReview,
-    planningContext: currentPlanningContext,
-    planningTools: currentPlanningTools,
-    intake: currentIntake,
-    liveEvents: planningLiveEvents,
-    running: (mode === "contexting" || mode === "drafting") && Boolean(busy),
-    answeredQuestionCount: builtIntakeAnswers.length + builtAnswers.length,
-    questionCount: clarify?.questions.length ?? currentIntake?.questions.length ?? 0,
-    contextNote,
-  }), [
-    builtAnswers.length,
-    builtIntakeAnswers.length,
-    busy,
-    clarify,
-    contextNote,
-    contextReview,
-    contextSources,
-    currentIntake,
-    currentPlanningContext,
-    currentPlanningTools,
-    mode,
-    planningLiveEvents,
-  ]);
-
-  function applyPlanEdit(nextPlan: DecompositionOutput) {
-    setDraftSaveBlock(null);
-    setFinalPlan(nextPlan);
-    setPlanResult((current) => (current ? { ...current, output: nextPlan } : current));
-  }
-
   function openCockpitStage(stage: CockpitStage): boolean {
     if (navigationIsLocked() || pendingTargetNavigationRef.current) return false;
-    if (stage !== "settings" && !isWorkbenchStageAvailable(workspaceTarget, stage)) return false;
     if (stage !== activeStage) {
       beginSurfaceTransition();
       interruptPlanningForNavigation();
     }
     if (stage === "settings") {
-      settingsReturnStageRef.current = settingsReturnStage(
-        workspaceTarget,
-        activeStage,
-        settingsReturnStageRef.current,
-      );
       setStageOverride(stage);
       setSettingsSection("general");
       setMode("settings");
       return true;
     }
     setStageOverride(stage);
-    if (stage === "context") {
-      setMode("contexting");
-      return true;
-    }
-    if (stage === "contracts") {
-      setMode(activePlan ? "reviewing" : "contexting");
-      return true;
-    }
-    if (stage === "run" || stage === "eval") {
-      setMode(selected || activePlan ? "reviewing" : "cockpit");
-      return true;
-    }
     setMode("cockpit");
     return true;
   }
@@ -1926,11 +1709,6 @@ function AimOsApp() {
     if (navigationIsLocked() || pendingTargetNavigationRef.current) return;
     beginSurfaceTransition();
     interruptPlanningForNavigation();
-    settingsReturnStageRef.current = settingsReturnStage(
-      workspaceTarget,
-      activeStage,
-      settingsReturnStageRef.current,
-    );
     setSettingsSection(settingsSectionForFocus(activeAimHelper.settingsFocus));
     setMode("settings");
     setStageOverride("settings");
@@ -1939,7 +1717,6 @@ function AimOsApp() {
   function openBrainSettings() {
     if (navigationIsLocked() || pendingTargetNavigationRef.current) return;
     beginSurfaceTransition();
-    settingsReturnStageRef.current = "aim";
     setSettingsSection("brain");
     setMode("settings");
     setStageOverride("settings");
@@ -1949,7 +1726,6 @@ function AimOsApp() {
     if (navigationIsLocked() || pendingTargetNavigationRef.current) return;
     beginSurfaceTransition();
     interruptPlanningForNavigation();
-    settingsReturnStageRef.current = "context";
     setSettingsSection("research");
     setMode("settings");
     setStageOverride("settings");
@@ -1957,7 +1733,7 @@ function AimOsApp() {
 
   function returnFromSettings() {
     if (planningRuntimeReady) setRuntimeGuidanceVisible(false);
-    openCockpitStage(settingsReturnStageRef.current);
+    openCockpitStage("aim");
   }
 
   async function refreshMemories() {
@@ -2033,68 +1809,13 @@ function AimOsApp() {
       }}
       onContextNote={setContextNote}
       onRefine={() => void (clarifyPhase === "intake" ? continueFromContext() : refinePlan())}
-      onSkip={clarifyPhase === "intake" ? undefined : () => {
-        setClarifyPhase(null);
-        // In-Journey shell planning stays in the Journey (the plan review then shows in place);
-        // the funnel path still hops to the old contracts stage.
-        if (!isPlanningShell) openCockpitStage("contracts");
-      }}
+      onSkip={clarifyPhase === "intake" ? undefined : () => setClarifyPhase(null)}
       onOpenSettings={openContextSettings}
       flowKey={activeDraftId ?? selected?.id ?? "new-aim"}
     />
   ) : null;
 
-  const planPanel = activePlan ? (
-    <PlanPanel
-      key={`plan-workspace-${workspaceRevision}`}
-      plan={activePlan}
-      quality={planResult?.quality ?? null}
-      review={planResult?.review ?? null}
-      saved={Boolean(selected)}
-      disabled={Boolean(busy)}
-      validationErrors={activePlanValidationMessages}
-      routingAgents={routingAgents}
-      routingValidation={planRoutingValidation}
-      onChange={selected ? undefined : applyPlanEdit}
-      onSave={() => void savePlan()}
-    />
-  ) : null;
-
-  const executePanel = selected && detail ? (
-    <ExecutePanel
-      detail={detail}
-      progress={progress}
-      runEvents={journalEvents}
-      disabled={Boolean(busy)}
-      liveRun={liveRun && liveRun.goalId === selected.id ? liveRun : null}
-      onCancelRun={(runId) => void window.aimcub.cancelRun(runId)}
-      sessionRunIds={sessionRunIdsRef.current}
-      onRegrantRun={(runId) => void regrantQueuedRun(runId)}
-      onPickRunWorkspace={async () => {
-        const result = await window.aimcub.pickRunWorkspace();
-        return result.canceled ? null : result.paths[0] ?? null;
-      }}
-      onRunAgent={(milestone, permission) => void runAgent(milestone, permission)}
-      onConfirm={confirmMilestone}
-      onPickFiles={async () => {
-        const result = await window.aimcub.pickLocalContextFiles();
-        return result.canceled ? [] : result.paths;
-      }}
-      onBreakDown={(milestone) => void breakDown(milestone)}
-      onReviewEval={() => openCockpitStage("eval")}
-      onProofDraftActiveChange={handleProofDraftActiveChange}
-    />
-  ) : null;
-
-  const evalPanel = selected && detail ? (
-    <EvalStage
-      rows={progressRows(detail, progress)}
-      progress={progress}
-    />
-  ) : null;
-
-  // Developer-mode-only raw trace view; ContextStage decides whether to actually render it
-  // (via useDeveloperMode), so this is safe to build unconditionally like the other stage panels.
+  // Developer-mode-only raw trace view, rendered under the Journey when developer mode is on.
   const debugPanel = (
     <PlanningDebugPanel
       mode={mode}
@@ -2139,12 +1860,6 @@ function AimOsApp() {
       onBack={returnFromSettings}
     />
   );
-  const continueContextToPlan = () => {
-    // Goal-first: the Context stage is only reachable for a saved goal now, so continuing always
-    // opens the Plan (contracts) stage — the old unsaved-aim `startDraft` funnel is gone.
-    openCockpitStage("contracts");
-  };
-
   // Aims (other than the selected one) with a turn waiting on the user → the header "N turns
   // elsewhere" jump chip. `needs_you` is the faithful "your move waiting" signal; blocked aims are
   // excluded (they may be waiting on an agent/dependency, not the user).
@@ -2235,80 +1950,16 @@ function AimOsApp() {
         />
       );
     }
-    // Goal-first: a shell mid first-plan keeps the Journey mounted (the research/clarify/plan-review
-    // interaction renders in-Journey) instead of falling through to the funnel Context/Plan stages.
-    if (isPlanningShell && journeyView) return journeyView;
-    if (activeStage === "context") {
-      if (!selected && !parent && !hasUnsavedAim) {
-        return (
-          <LockedStagePanel
-            eyebrow={t("os.stepContext")}
-            title={t("cockpit.contextLockedTitle")}
-            body={t("cockpit.contextLockedBody")}
-            action={t("os.stepAim")}
-            onAction={() => openCockpitStage("aim")}
-          />
-        );
-      }
-      return (
-        <ContextStage
-          title={selected?.title ?? aimTitle}
-          description={selected?.description ?? aimDescription}
-          saved={Boolean(selected)}
-          disabled={Boolean(busy)}
-          clarifyPhase={sessionPanel ? "intake" : clarifyPhase}
-          clarifyPanel={sessionPanel ?? clarifyPanel}
-          contextSources={contextSources}
-          review={contextReview}
-          loop={contextLoop}
-          showReview={shouldShowContextReviewInContext}
-          reviewRunning={mode === "contexting" && Boolean(busy)}
-          onOpenSettings={openContextSettings}
-          onContextSources={setContextSources}
-          onContinueToPlan={continueContextToPlan}
-          debugPanel={debugPanel}
-        />
-      );
-    }
-    if (activeStage === "contracts") {
-      return planPanel ? (
+    // One work surface: the Journey hosts the whole loop (planning shell or planned goal).
+    // Developer mode appends the raw planning-trace panel below it, never a default column.
+    if (journeyView && (isPlanningShell || !draft)) {
+      return developerMode ? (
         <>
-          <ContextReviewPanel bundle={contextReview} running={mode === "drafting" && Boolean(busy)} compact />
-          {planPanel}
+          {journeyView}
+          {debugPanel}
         </>
-      ) : (
-        <LockedStagePanel
-          eyebrow={t("os.stepPlan")}
-          title={t("cockpit.contractsLockedTitle")}
-          body={t("cockpit.contractsLockedBody")}
-          action={t("cockpit.next.context")}
-          onAction={() => openCockpitStage("context")}
-        />
-      );
+      ) : journeyView;
     }
-    if (activeStage === "run") {
-      return executePanel ?? (
-        <LockedStagePanel
-          eyebrow={t("os.stepExecute")}
-          title={t("cockpit.runLockedTitle")}
-          body={t("cockpit.runLockedBody")}
-          action={t("os.stepAim")}
-          onAction={() => openCockpitStage("aim")}
-        />
-      );
-    }
-    if (activeStage === "eval") {
-      return evalPanel ?? (
-        <LockedStagePanel
-          eyebrow={t("os.stepEval")}
-          title={t("cockpit.runLockedTitle")}
-          body={t("cockpit.runLockedBody")}
-          action={t("os.stepAim")}
-          onAction={() => openCockpitStage("aim")}
-        />
-      );
-    }
-    if (journeyView && !draft) return journeyView;
     if (showAimEditor) {
       // Goal-first: the composer is the only intake surface. Editing a saved aim happens in the
       // Journey (rename); child breakdown mints a linked shell — both skip this funnel.
@@ -2491,36 +2142,6 @@ function HelperFact(props: { label: string; value: string }) {
   );
 }
 
-function LockedStagePanel(props: {
-  eyebrow: string;
-  title: string;
-  body: string;
-  action: string;
-  onAction: () => void;
-}) {
-  return (
-    <Panel variant="plain" className="od-stage-panel od-locked-stage-panel">
-      <div className="od-stage-panel-head">
-        <div>
-          <div className="od-stage-kicker">{props.eyebrow}</div>
-          <h2>{props.title}</h2>
-        </div>
-        <Button variant="primary" size="lg" onClick={props.onAction}>
-          {props.action}
-        </Button>
-      </div>
-      <p>{props.body}</p>
-    </Panel>
-  );
-}
-
-/**
- * Settings — the re-synced Glass IA: the aim sidebar stays put; the workspace hosts a
- * "Settings" title + category nav (General / Planning brain / Workers / Research / About)
- * rendered IN THE SIDEBAR (`SettingsSidebarNav`, swapped in for the aim list) while the
- * workspace holds one centered detail pane. Forms keep their full capability; this component
- * only arranges them and owns the two General controls (appearance pref + workspace reveal).
- */
 const SETTINGS_TABS: Array<{ id: SettingsSectionId; labelKey: StringKey }> = [
   { id: "general", labelKey: "settings.tab.general" },
   { id: "brain", labelKey: "settings.tab.brain" },
@@ -2529,7 +2150,6 @@ const SETTINGS_TABS: Array<{ id: SettingsSectionId; labelKey: StringKey }> = [
   { id: "about", labelKey: "settings.tab.about" },
 ];
 
-/** The sidebar's settings mode: a quiet Back row, the Settings title, and the category nav. */
 export function SettingsSidebarNav(props: {
   activeSection: SettingsSectionId;
   onSection: (section: SettingsSectionId) => void;
