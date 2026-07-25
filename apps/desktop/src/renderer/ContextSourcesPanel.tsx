@@ -12,8 +12,6 @@ interface ContextSourcesPanelProps {
   status: ContextSourceStatus | null;
   disabled?: boolean;
   compact?: boolean;
-  variant?: "settings" | "workbench";
-  onOpenSettings?: () => void;
   onSaved: (status: ContextSourceStatus) => void;
 }
 
@@ -85,8 +83,6 @@ export function ContextSourcesPanel({
   status,
   disabled = false,
   compact = false,
-  variant = "settings",
-  onOpenSettings,
   onSaved,
 }: ContextSourcesPanelProps) {
   const { t } = useI18n();
@@ -325,91 +321,6 @@ export function ContextSourcesPanel({
         sources: current.online.sources.filter((source) => source.id !== id),
       },
     }));
-  }
-
-  if (variant === "workbench") {
-    const localSummary = localActive
-      ? t("context.workbench.localReady", { n: localCount })
-      : t("context.workbench.localEmpty");
-
-    return (
-      <Panel variant="warm" className="od-context-workbench-panel" data-od-id="context-workbench-sources">
-        <div className="od-context-workbench-head">
-          <div>
-            <div className="od-stage-kicker">{t("context.workbench.eyebrow")}</div>
-            <h2>{t("context.workbench.title")}</h2>
-            <p>{t("context.workbench.body")}</p>
-          </div>
-          {hasUnsavedChanges ? (
-            <Button variant="primary" size="lg" className="od-context-save-button" disabled={disabled || saving} onClick={() => void save()}>
-              {saving ? t("context.sources.saving") : t("context.workbench.save")}
-            </Button>
-          ) : (
-            <span className={`od-pill ${localActive ? "success" : ""}`}>{localActive ? t("intake.ready") : t("context.sources.status.optional")}</span>
-          )}
-        </div>
-
-        {error ? <div className="od-context-source-error" role="status">{error}</div> : null}
-
-        <div className="od-context-workbench-steps">
-          <div className="od-context-workbench-step od-context-workbench-step-local">
-            <div>
-              <strong>{t("context.workbench.localTitle")}</strong>
-              <p>{localSummary}</p>
-              <div className="od-context-source-actions">
-                <button type="button" disabled={disabled || saving} className="od-chip primary" onClick={() => void pickFolder()}>
-                  {t("context.sources.pickFolder")}
-                </button>
-                <button type="button" disabled={disabled || saving} className="od-chip" onClick={() => void pickFiles()}>
-                  {t("context.sources.pickFiles")}
-                </button>
-              </div>
-              {draft.local.workspaceRoot ? <div className="od-context-workbench-path">{draft.local.workspaceRoot}</div> : null}
-              {draft.local.filePaths.length > 0 ? (
-                <div className="od-context-workbench-file-list">
-                  {draft.local.filePaths.map((filePath) => (
-                    <div key={filePath} className="od-context-path-row">
-                      <span>{filePath}</span>
-                      <button
-                        type="button"
-                        disabled={disabled || saving}
-                        onClick={() => setDraft((current) => ({
-                          ...current,
-                          local: {
-                            ...current.local,
-                            filePaths: current.local.filePaths.filter((path) => path !== filePath),
-                          },
-                        }))}
-                        className="od-context-small-button"
-                      >
-                        {t("context.sources.remove")}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-            <span className={`od-pill ${localActive ? "success" : ""}`}>
-              {localActive ? t("context.sources.status.connected") : t("context.sources.status.optional")}
-            </span>
-          </div>
-
-          <div className="od-context-workbench-step">
-            <div>
-              <strong>{t("context.workbench.helpersTitle")}</strong>
-              <p>{t("context.workbench.helpersBody")}</p>
-            </div>
-            {onOpenSettings ? (
-              <button type="button" className="od-context-small-button" onClick={onOpenSettings}>
-                {t("context.workbench.manage")}
-              </button>
-            ) : (
-              <span className="od-pill">{t("context.sources.status.optional")}</span>
-            )}
-          </div>
-        </div>
-      </Panel>
-    );
   }
 
   return (

@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { routingRecommendationForPlanNode, type RoutingRuntimeAgentOption } from "@aimcub/core";
 import type { AimDraft, AimProgressReadModel, DecompositionOutput, Goal, Milestone } from "@aimcub/types";
-import type { ContextSourceStatus, GoalDetail, ProviderStatus, WebResearchStatus } from "../shared/ipc";
+import type { ContextSourceStatus, ProviderStatus, WebResearchStatus } from "../shared/ipc";
 
 import { App, SettingsPanel, SettingsSidebarNav } from "./App";
 import { DeveloperModeProvider } from "./developerMode";
@@ -14,7 +14,7 @@ import { HomeView } from "./stages/home/HomeView";
 import { CockpitShell } from "./CockpitShell";
 import { I18nProvider, STRINGS } from "./i18n";
 import { EvidenceSubmissionForm } from "./stages/execute/EvidenceSubmissionForm";
-import { ExecutePanel } from "./stages/execute/ExecutePanel";
+import { JourneyPlanBand } from "./stages/journey/JourneyPlanBand";
 import { LocalAgentExecutionSummary } from "./stages/execute/LocalAgentExecutionSummary";
 import { PlanContractCard } from "./stages/plan/PlanContractCard";
 import { PlanPanel } from "./stages/plan/PlanPanel";
@@ -352,22 +352,20 @@ function renderExecute(
   rows: AimProgressReadModel["milestones"],
   options: { sessionRunIds?: ReadonlySet<string> } = {},
 ): string {
-  const detail: GoalDetail = {
-    goal: savedGoal,
-    milestones: rows.map((row) => row.milestone),
-  };
   return renderToStaticMarkup(
     <I18nProvider>
-      <ExecutePanel
-        detail={detail}
+      <JourneyPlanBand
         progress={executeProgress(rows)}
         disabled={false}
         sessionRunIds={options.sessionRunIds ?? new Set()}
+        selectedMilestoneId={rows[0]?.milestone.id ?? null}
+        onSelectMilestone={noop}
+        activeProofId={null}
+        onProofActiveChange={noop}
         onRunAgent={noop}
-        onConfirm={asyncTrue}
-        onPickFiles={async () => []}
+        onConfirmMilestone={asyncTrue}
+        onPickEvidenceFiles={async () => []}
         onBreakDown={noop}
-        onReviewEval={noop}
       />
     </I18nProvider>,
   );
@@ -405,25 +403,23 @@ describe("EvidenceSubmissionForm", () => {
   });
 });
 
-describe("ExecutePanel", () => {
-  it("keeps the Execute stage out of the App controller body", () => {
+describe("JourneyPlanBand work detail (the Execute stage's surface, ported home)", () => {
+  it("keeps the work detail out of the App controller body", () => {
     const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
 
-    expect(source).not.toContain("export function ExecutePanel");
-    expect(source).not.toContain("function ExecutePanel");
+    expect(source).not.toContain("ExecutePanel");
     expect(source).not.toContain('className="od-execute-layout"');
     expect(source).not.toContain("activeProofId");
   });
 
-  it("renders a selected-work surface with a compact sub-aim selector", () => {
+  it("renders plan rows with the selected row's work detail expanded in place", () => {
     const html = renderExecute([
       executeRow({ id: AGENT_MILESTONE, title: "Run implementation agent", owner: "agent" }),
       executeRow({ id: HUMAN_MILESTONE, title: "Submit launch approval", owner: "human" }),
     ]);
 
-    expect(html).toContain('class="od-execute-layout"');
-    expect(html).toContain('aria-label="Sub-aims"');
-    expect(html).toContain('aria-label="Selected work detail"');
+    expect(html).toContain("journey-plan-band");
+    expect(html).toContain("journey-planrow-detail");
     expect(html).toContain("Run implementation agent");
     expect(html).toContain("Agent route");
     expect(html).toContain("Human route");
@@ -457,7 +453,7 @@ describe("ExecutePanel", () => {
     expect(html).not.toContain('<button class="od-aim-secondary" type="button">Run agent</button>');
   });
 
-  it("routes completed and low-trust selected work to Eval review instead of expanding evidence detail", () => {
+  it("shows eval receipts inline for completed and low-trust work — no Eval-stage hop, no primary button", () => {
     const completedHtml = renderExecute([
       executeRow({ id: COMPLETE_MILESTONE, title: "Review completed proof", owner: "agent", completed: true }),
     ]);
@@ -465,11 +461,13 @@ describe("ExecutePanel", () => {
       executeRow({ id: LOW_TRUST_MILESTONE, title: "Inspect low-trust report", owner: "agent", lowTrust: true }),
     ]);
 
-    expect(completedHtml).toContain('<button class="od-aim-primary od-execute-primary-button" type="button">Review in Eval</button>');
-    expect(lowTrustHtml).toContain('<button class="od-aim-primary od-execute-primary-button" type="button">Review in Eval</button>');
-    expect(lowTrustHtml).toContain("Low-trust evidence needs review");
-    expect(lowTrustHtml).not.toContain("Trust is below the floor.");
-    expect(lowTrustHtml).not.toContain('class="od-evidence-review');
+    expect(completedHtml).not.toContain("od-execute-primary-button");
+    expect(lowTrustHtml).not.toContain("od-execute-primary-button");
+    expect(completedHtml).toContain("od-eval-detail-section");
+    expect(lowTrustHtml).toContain("od-eval-detail-section");
+    expect(lowTrustHtml).toContain('class="od-evidence-review');
+    // The review note now IS the inline receipt — the collapse shows it in place.
+    expect(lowTrustHtml).toContain("Trust is below the floor.");
   });
 
   it("keeps Break Down secondary and raw agent deltas hidden", () => {
@@ -518,11 +516,11 @@ describe("ExecutePanel", () => {
   });
 
   it("gives the live run its own Glass row instead of reusing the work-note style", () => {
-    const panel = readFileSync(new URL("./stages/execute/ExecutePanel.tsx", import.meta.url), "utf8");
+    const band = readFileSync(new URL("./stages/journey/JourneyPlanBand.tsx", import.meta.url), "utf8");
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
 
-    expect(panel).toContain('<div className="od-live-run" data-running={running ? "true" : "false"}');
-    expect(panel).not.toMatch(/className="od-work-note" role="status"/);
+    expect(band).toContain('<div className="od-live-run" data-running={live.status === "running" ? "true" : "false"}');
+    expect(band).not.toMatch(/className="od-work-note" role="status"/);
     expect(css).toMatch(/\.od-live-run\s*{[^}]*background:\s*var\(--field\);/s);
     expect(css).toMatch(/\.od-live-run\[data-running="true"\] \.od-live-run-dot\s*{[^}]*animation:\s*od-journey-pulse/s);
   });
@@ -1872,7 +1870,6 @@ describe("CockpitShell", () => {
     expect(css).toMatch(/\.od-workspace-aim:has\(> \.od-initial-workspace\[data-has-drafts="true"\]\)\s*{[^}]*align-content:\s*safe center;[^}]*justify-items:\s*stretch;/s);
     expect(css).toMatch(/\.od-initial-workspace\[data-has-drafts="true"\]\s*{[^}]*min-height:\s*0;[^}]*align-content:\s*start;[^}]*padding:\s*0;/s);
     expect(css).toMatch(/\.od-draft-recovery\s*{[^}]*width:\s*min\(100%, var\(--od-rail-compose\)\);[^}]*margin:\s*0 auto;/s);
-    expect(css).toMatch(/\.od-context-focus\s*{[^}]*width:\s*min\(100%, var\(--od-rail-reading\)\);[^}]*padding-top:\s*0;/s);
   });
 
   it("keeps the saved-goal workbench on a single-row grid", () => {
