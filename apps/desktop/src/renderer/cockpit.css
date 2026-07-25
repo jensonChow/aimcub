@@ -557,10 +557,19 @@ kbd {
 .od-user-menu-item:active,
 .od-chip:active,
 .od-sidebar-toggle:active,
-.od-aim-card:active,
 .od-content-entry-main:active,
 .od-action-menu-trigger:active,
 .od-action-menu-item:active {
+  transform: scale(0.99);
+}
+
+/* The aim row's pressed-scale must stay off while its More Actions menu is open: pressing
+   inside the popover bubbles :active up to the card, and any transform on the card (even at
+   scale≈1 mid-transition) creates a stacking context that traps the z-indexed popover under
+   the NEXT sibling row — which then steals the pointerup, so the menu item's click never
+   fires. Draft rows avoid this by scaling only od-content-entry-main (a sibling of the
+   popover anchor), never the container. */
+.od-aim-card:active:not(:has(.od-content-entry-more [aria-expanded="true"])) {
   transform: scale(0.99);
 }
 
@@ -968,6 +977,13 @@ kbd {
   display: grid;
   gap: 8px;
   padding: 4px;
+}
+
+/* The popover is right-pinned to the row's trigger, so a fixed-width confirm card walks off
+   the island's left rounded clip at sidebar widths below ~250px. Cap it to the row width
+   inside the sidebar (20px covers the menu's own padding and border). */
+.od-sidebar .od-action-menu-confirm {
+  width: min(216px, calc(var(--sidebar-content-width) - 20px));
 }
 
 .od-action-menu-confirm strong {

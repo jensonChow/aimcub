@@ -1672,6 +1672,22 @@ describe("CockpitShell", () => {
     expect(mainIpcSource).toMatch(/IPC\.deleteGoal[\s\S]*?cancelPlanningSession\(id\);[\s\S]*?aimStore\.deleteGoal\(id\)/);
   });
 
+  it("keeps the aim row's pressed-scale off while its More Actions menu is open", () => {
+    const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
+
+    // Pressing inside the open popover bubbles :active up to the row card. A bare transform
+    // on the card (even at scale≈1, mid-transition) instantly creates a stacking context
+    // that traps the z-indexed popover under the NEXT sibling row, which then steals the
+    // pointerup — the menu item's click never fires, so aims could not be deleted (2026-07-25).
+    expect(css).not.toMatch(/^\.od-aim-card:active,?\s*$/m);
+    expect(css).toContain('.od-aim-card:active:not(:has(.od-content-entry-more [aria-expanded="true"]))');
+
+    // The confirm card is right-pinned to the trigger; uncapped it walks off the island's
+    // left rounded clip and the Cancel/Delete actions render half-hidden.
+    expect(css).toContain(".od-sidebar .od-action-menu-confirm");
+    expect(css).toContain("width: min(216px, calc(var(--sidebar-content-width) - 20px));");
+  });
+
   it("renders the sidebar brand row: Aimcub → Home plus a compact New-aim action", () => {
     const html = renderToStaticMarkup(
       <I18nProvider>
