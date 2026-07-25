@@ -44,6 +44,9 @@ export function PlanningSessionPanel(props: PlanningSessionPanelProps) {
         onAnswer={props.onAnswer}
         onContextNote={() => undefined}
         onRefine={props.onSubmitAnswer}
+        // Answering resumes the brain's research — it does not generate the plan, so the
+        // funnel's "Generate plan" label would promise the wrong thing here.
+        primaryLabelKey="planningSession.sendAnswer"
         flowKey={`planning-session-${view.goalId}-${view.pendingQuestion.id}`}
       />
     );
@@ -112,22 +115,24 @@ export function PlanningSessionPanel(props: PlanningSessionPanelProps) {
           })}
         </p>
       ) : null}
+      {/* One integrated composer: the field is the container, send lives inside it. */}
       <div className="od-planning-session-chat">
         <TextArea
           value={props.chatDraft}
           rows={1}
+          fieldClassName="od-planning-session-chat-field"
           placeholder={t("planningSession.chatPlaceholder")}
           disabled={props.disabled}
           onChange={(event) => props.onChatDraft(event.currentTarget.value)}
           onKeyDown={(event) => {
-            if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-              event.preventDefault();
-              props.onChatSend();
-            }
+            if (event.key !== "Enter" || event.shiftKey) return;
+            event.preventDefault();
+            if (props.chatDraft.trim()) props.onChatSend();
           }}
         />
         <Button
-          variant="primary"
+          variant="ghost"
+          className="od-planning-session-chat-send"
           disabled={props.disabled || !props.chatDraft.trim()}
           onClick={props.onChatSend}
         >

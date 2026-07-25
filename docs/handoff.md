@@ -4,6 +4,31 @@ Last updated: 2026-07-25 (second session)
 Branch: `main` (delete-click fix merged locally, **NOT pushed** — push needs
 founder authorization). Everything before it is on origin (e6d7df78).
 
+## Second session part 3: planning surfaces simplified + integrated
+
+Founder (screenshots of the live re-drive): "screen 1 could be optimized, not
+simple enough / the elements are not integrated smoothly". Shipped:
+
+1. **Live card** — the mid-research chat is now ONE integrated composer (the
+   bordered container is the field, quiet Send inside it, one line at rest,
+   Enter sends); the junk "Using tool" line is gone (unknown runtime tool ids
+   render the generic "Researching…" line, never an interpolated id); controls
+   stay quiet and tight under the composer.
+2. **Question card** — a lone question no longer shows "Question 1/1"; the
+   single/multi pill only appears when options exist; an options-less question
+   labels its field "Your answer" (not "Add a custom answer / Write a different
+   answer"); a session answer submits as **"Send answer"** (the funnel's
+   "Generate plan" promised the wrong thing mid-research); the footer slab is
+   transparent so the card reads as one surface.
+
+Both states VERIFIED VISUALLY by mounting the real renderer in a browser with
+a stubbed bridge (start planning → live card; parked free-text question →
+question card). Desktop tests 350 (+5 markup tests pinning all of the above).
+Doctrine extended in design-system.md ("elements integrate; questions dress
+for their actual shape"). Note for later: renderer-side session re-attach after
+navigation looks gated off (`planningShellId` is only set on start/create, and
+`openGoal` clears it), worth a dedicated look.
+
 ## Second session part 2: planning research grounded, questions recalibrated
 
 Founder (driving the collapsed surface): "研究不贴切，选择题总是只有一道" — research
@@ -71,11 +96,12 @@ that hosts an open popover").
 
 ## Verification
 
-Full gate green after every batch, the delete-click fix, and the domain/question
-recalibration (build 9/9 · typecheck 17/17 · lint 11/11 · purity · desktop 345 ·
-llm 197 · store 99). Root `Aimcub.app` repacked + boot-smoked after each change
-(founder must restart the app to get the fixes). Renderer mass after the
-collapse: ~14.6k non-test LOC, cockpit.css 6,4xx lines, i18n ~800 keys.
+Full gate green after every batch, the delete-click fix, the domain/question
+recalibration, and the surface simplification (build 9/9 · typecheck 17/17 ·
+lint 11/11 · purity · desktop 350 · llm 197 · store 99). Root `Aimcub.app`
+repacked + boot-smoked after each change (founder must restart the app to get
+the fixes). Renderer mass after the collapse: ~14.6k non-test LOC, cockpit.css
+6,4xx lines, i18n ~800 keys.
 
 ## Open items
 
