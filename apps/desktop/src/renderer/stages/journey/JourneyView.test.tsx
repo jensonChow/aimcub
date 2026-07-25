@@ -6,6 +6,7 @@ import type { ContextBundleReview } from "../../contextReview";
 import { I18nProvider } from "../../i18n";
 import type { JourneyStationInteraction } from "../../workflow/journey";
 import { buildContextLoopModel } from "../context/contextLoop";
+import { JourneyPlanBand, planRowIsLive, type JourneyPlanBandProps } from "./JourneyPlanBand";
 import { JourneyContextSheetBody, JourneyEvalSheetBody, JourneyPlanSheetBody, JourneyRunSheetBody, JourneyView, type JourneyViewProps } from "./JourneyView";
 
 const OWNER = "owner-1";
@@ -598,5 +599,106 @@ describe("JourneyEvalSheetBody", () => {
     expect(html).toContain("Completion recap");
     expect(html).toContain("Completed 1/1 sub-aims.");
     expect(html).not.toContain("od-journey-eval-title"); // recap branch, not the per-milestone frame
+  });
+});
+
+describe("JourneyPlanBand (the plan as the object, Collapse Stage 1)", () => {
+  function renderBand(rows: AimProgressMilestoneRead[], extra: Partial<JourneyPlanBandProps> = {}): string {
+    return renderToStaticMarkup(
+      <I18nProvider>
+        <JourneyPlanBand
+          progress={progressOf(rows)}
+          disabled={false}
+          selectedMilestoneId={null}
+          onSelectMilestone={noop}
+          activeProofId={null}
+          onProofActiveChange={noop}
+          onRunAgent={noop}
+          {...extra}
+        />
+      </I18nProvider>,
+    );
+  }
+
+  it("renders one collapsed row per sub-aim with owner chip and status pill", () => {
+    const html = renderBand([
+      row({ id: "m1", title: "Book flights", human: true }),
+      row({ id: "m2", title: "Draft itinerary" }),
+    ]);
+    expect(html).toContain("journey-plan-band");
+    expect(html).toContain("Book flights");
+    expect(html).toContain("Draft itinerary");
+    expect(html).toContain("od-journey-chip-you");
+    expect(html).toContain("od-journey-chip-agent");
+    expect(html).not.toContain("journey-planrow-detail");
+  });
+
+  it("expands the selected row to the work detail with consent control for an agent route", () => {
+    const html = renderBand(
+      [row({ id: "m1", title: "Draft itinerary" })],
+      { selectedMilestoneId: "m1" },
+    );
+    expect(html).toContain("journey-planrow-detail");
+    expect(html).toContain("od-run-permission");
+    expect(html).toContain("od-execute-primary-action");
+  });
+
+  it("shows the proof form in place of the normal detail when the row's proof is active", () => {
+    const html = renderBand(
+      [row({ id: "m1", title: "Confirm the booking", human: true })],
+      { selectedMilestoneId: "m1", activeProofId: "m1", onConfirmMilestone: async () => true },
+    );
+    expect(html).toContain("od-proof-form");
+    expect(html).not.toContain("od-execute-primary-action");
+  });
+
+  it("disables the other rows while a proof draft is open", () => {
+    const html = renderBand(
+      [row({ id: "m1", title: "Confirm the booking", human: true }), row({ id: "m2", title: "Other work" })],
+      { selectedMilestoneId: "m1", activeProofId: "m1", onConfirmMilestone: async () => true },
+    );
+    expect(html).toContain("disabled");
+  });
+
+  it("renders inline eval receipts (no primary action) for a completed row with evidence", () => {
+    const done = row({ id: "m1", title: "Ship the fix", completed: true });
+    done.evidence_count = 2;
+    done.evaluator_results = [{
+      evaluator: "manual_confirm",
+      status: "passed",
+      matched_evidence_ids: [],
+      trust_score: 0.9,
+      explanation: "Confirmed by you.",
+      failure_reason: null,
+      requires_human_confirmation: false,
+    }] as AimProgressMilestoneRead["evaluator_results"];
+    const html = renderBand([done], { selectedMilestoneId: "m1" });
+    expect(html).toContain("od-eval-detail-section");
+    expect(html).toContain("Confirmed by you.");
+    expect(html).not.toContain("od-execute-primary-action");
+  });
+
+  it("marks only in-flight rows as live (pulsing dot), never completed ones", () => {
+    const running = row({ id: "m1", title: "In flight", running: true });
+    const idle = row({ id: "m2", title: "Waiting" });
+    const done = row({ id: "m3", title: "Done", completed: true });
+    expect(planRowIsLive(running, null)).toBe(true);
+    expect(planRowIsLive(idle, null)).toBe(false);
+    expect(planRowIsLive(done, null)).toBe(false);
+    const html = renderBand([running, idle]);
+    expect(html.split("od-journey-dot-active").length - 1).toBe(1);
+  });
+});
+
+describe("JourneyView plan band mount", () => {
+  it("renders the plan band for a planned goal, collapsed by default", () => {
+    const html = render(progressOf([row({ id: "m1", title: "Book flights", human: true })]));
+    expect(html).toContain("journey-plan-band");
+    expect(html).not.toContain("journey-planrow-detail");
+  });
+
+  it("hides the plan band for a plan-less shell", () => {
+    const html = render(progressOf([]));
+    expect(html).not.toContain("journey-plan-band");
   });
 });

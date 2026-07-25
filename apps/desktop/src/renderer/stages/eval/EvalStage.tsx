@@ -230,7 +230,7 @@ export function EvidenceReviewList(props: {
   );
 }
 
-function EvaluatorMatchList({ row }: { row: EvalStageMilestoneRow }) {
+export function EvaluatorMatchList({ row }: { row: EvalStageMilestoneRow }) {
   const { t } = useI18n();
 
   return (

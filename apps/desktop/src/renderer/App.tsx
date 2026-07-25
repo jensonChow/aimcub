@@ -2200,7 +2200,17 @@ function AimOsApp() {
         onCommitPlan: () => void commitShellPlan(),
       } : undefined}
       onOpenStage={openCockpitStage}
-      onRunAgent={(milestone) => void runAgent(milestone)}
+      onRunAgent={(milestone, permission) => void runAgent(milestone, permission)}
+      liveRun={liveRun && liveRun.goalId === selected.id ? liveRun : null}
+      sessionRunIds={sessionRunIdsRef.current}
+      onCancelRun={(runId) => void window.aimcub.cancelRun(runId)}
+      onRegrantRun={(runId) => void regrantQueuedRun(runId)}
+      onPickRunWorkspace={async () => {
+        const result = await window.aimcub.pickRunWorkspace();
+        return result.canceled ? null : result.paths[0] ?? null;
+      }}
+      onBreakDown={(milestone) => void breakDown(milestone)}
+      onProofDraftActiveChange={handleProofDraftActiveChange}
       onConfirmMilestone={confirmMilestone}
       onPickEvidenceFiles={async () => {
         const result = await window.aimcub.pickLocalContextFiles();

@@ -20,7 +20,7 @@
 import type { AimProgressReadModel, DecompositionOutput, Goal, Memory, Milestone, RunEvent } from "@aimcub/core";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
-import type { ConfirmMilestoneRequest } from "../../../shared/ipc";
+import type { ConfirmMilestoneRequest, RunPermissionConsent } from "../../../shared/ipc";
 import { ContextInbox, type ContextInboxScope } from "../../ContextInbox";
 import type { ContextBundleReview } from "../../contextReview";
 import { useI18n, type StringKey } from "../../i18n";
@@ -53,7 +53,9 @@ import type { ContextLoopModel } from "../context/contextLoop";
 import { ContextReviewPanel } from "../context/ContextReviewPanel";
 import { CompletionRecapPanel, EvidenceReviewList } from "../eval/EvalStage";
 import { EvidenceSubmissionForm } from "../execute/EvidenceSubmissionForm";
+import type { LiveRunState } from "../execute/liveRun";
 import { PlanPanel, type PlanPanelProps } from "../plan/PlanPanel";
+import { JourneyPlanBand } from "./JourneyPlanBand";
 
 const STATION_NAME_KEY: Record<JourneyStationId, StringKey> = {
   aim: "glass.station.aim",
@@ -446,7 +448,20 @@ export interface JourneyViewProps {
   /** Count of OTHER aims with a turn waiting on the user, for the header jump chip. */
   elsewhereCount?: number;
   onOpenStage: (stage: CockpitStage) => void;
-  onRunAgent: (milestone: Milestone) => void;
+  /** Dispatch an agent run. Without consent the App defaults to a read-only, no-network grant. */
+  onRunAgent: (milestone: Milestone, permission?: RunPermissionConsent) => void;
+  /**
+   * The plan band's work-detail wiring (the Execute stage's surface moving home, Collapse
+   * Stage 1). All optional: a Journey without them renders read-only rows.
+   */
+  liveRun?: LiveRunState | null;
+  sessionRunIds?: ReadonlySet<string>;
+  onCancelRun?: (runId: string) => void;
+  onRegrantRun?: (runId: string) => void;
+  onPickRunWorkspace?: () => Promise<string | null>;
+  onBreakDown?: (milestone: Milestone) => void;
+  /** Nav lock while an in-Journey proof draft is open (same contract as the Execute stage). */
+  onProofDraftActiveChange?: (active: boolean) => void;
   /**
    * Submit human evidence for a milestone from the Run sheet's in-place evidence form (the live
    * `confirmMilestone` App handler). Returns whether the confirm persisted. When present, human
@@ -518,6 +533,25 @@ export function JourneyView(props: JourneyViewProps) {
   const [pickingEvidence, setPickingEvidence] = useState(false);
   const sheetCloseRef = useRef<HTMLButtonElement | null>(null);
   const sheetTriggerRef = useRef<HTMLElement | null>(null);
+  // Plan-band selection: which sub-aim row is expanded, and which one's proof form is open.
+  // Owned here (not in the band) so the "Your move" CTA can land on a row. Keyed by goal.id at
+  // the App mount, so switching aims resets both. The proof form carries the same navigation
+  // lock the Execute stage had, released on unmount so a stale lock can never outlive the view.
+  const [planSelectedId, setPlanSelectedId] = useState<string | null>(null);
+  const [planProofId, setPlanProofId] = useState<string | null>(null);
+  const proofLockRef = useRef(props.onProofDraftActiveChange);
+  useEffect(() => {
+    proofLockRef.current = props.onProofDraftActiveChange;
+  }, [props.onProofDraftActiveChange]);
+  useEffect(() => {
+    return () => proofLockRef.current?.(false);
+  }, []);
+
+  function setProofActive(milestoneId: string | null): void {
+    setPlanProofId(milestoneId);
+    props.onProofDraftActiveChange?.(milestoneId !== null);
+  }
+
   // In-Journey aim rename (Stage 7): a component-local buffer seeded on open, committed via the
   // epoch-safe App `onRenameAim` handler. JourneyView is keyed by goal.id in App, so switching aims
   // remounts and resets this — no reset effect needed.
@@ -679,6 +713,14 @@ export function JourneyView(props: JourneyViewProps) {
     if (!move) return;
     if (move.kind === "run_agent" && moveMilestone) {
       props.onRunAgent(moveMilestone);
+      return;
+    }
+    // The move resolves on its own plan row now: proof opens the row's evidence form in place,
+    // review/blocked expand the row (receipts and blocker detail are inline). The old stage
+    // navigation stays only as the fallback for a move whose milestone dropped out of the model.
+    if (moveMilestone) {
+      setPlanSelectedId(moveMilestone.id);
+      if (move.kind === "submit_proof") setProofActive(moveMilestone.id);
       return;
     }
     props.onOpenStage(move.kind === "review_eval" ? "eval" : "run");
@@ -874,6 +916,27 @@ export function JourneyView(props: JourneyViewProps) {
           ) : null}
         </div>
       )}
+
+      {progress.total_milestones > 0 ? (
+        <JourneyPlanBand
+          progress={progress}
+          runEvents={props.runEvents}
+          disabled={Boolean(props.disabled)}
+          liveRun={props.liveRun}
+          sessionRunIds={props.sessionRunIds}
+          selectedMilestoneId={planSelectedId}
+          onSelectMilestone={setPlanSelectedId}
+          activeProofId={planProofId}
+          onProofActiveChange={setProofActive}
+          onCancelRun={props.onCancelRun}
+          onRegrantRun={props.onRegrantRun}
+          onPickRunWorkspace={props.onPickRunWorkspace}
+          onRunAgent={props.onRunAgent}
+          onConfirmMilestone={props.onConfirmMilestone}
+          onPickEvidenceFiles={props.onPickEvidenceFiles}
+          onBreakDown={props.onBreakDown}
+        />
+      ) : null}
 
       {turns.length > 0 ? (
         <div className="od-journey-turns">
