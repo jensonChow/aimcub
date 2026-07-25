@@ -1,8 +1,8 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-24
-Branch: `main`, ahead of `origin/main` (push NOT yet authorized this
-session; exact count via `git rev-list --count origin/main..main`). **Planning-agent epic: all four stages MERGED and verified, plus the
+Branch: `main`, **PUSHED to origin 2026-07-24** (founder authorized; destination
+jensonChow/aimcub verified). All session branches merged and deleted locally. **Planning-agent epic: all four stages MERGED and verified, plus the
 Codex brain — and the FIRST LIVE model-driven end-to-end session succeeded on
 the founder's ChatGPT subscription (gpt-5.5).** The aim
 research/breakdown engine changed shape: from a fixed collector funnel to an
@@ -107,7 +107,7 @@ embedded planning-agent session (the local agent as the aim-breaking brain).
    chip (Claude Code / Codex, parallel to the model chip) shipped in the
    same change; `planningBrain` preference honored at session start with
    stale-pick degradation to Auto.
-4. Push to origin pending founder authorization.
+4. ~~Push to origin~~ DONE 2026-07-24 (founder authorized).
 
 ## Next session
 
