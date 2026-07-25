@@ -808,7 +808,12 @@ export function registerIpc(): void {
 
   ipcMain.handle(IPC.listAimProgressSummaries, () => aimStore.listAimProgressSummaries());
 
-  ipcMain.handle(IPC.deleteGoal, (_e, id: string): Promise<void> => aimStore.deleteGoal(id));
+  ipcMain.handle(IPC.deleteGoal, (_e, id: string): Promise<void> => {
+    // Never delete under a writer: a planning brain still running for this aim stops first
+    // (safe no-op when none). The store cascade below is authoritative for the rows.
+    cancelPlanningSession(id);
+    return aimStore.deleteGoal(id);
+  });
 
   ipcMain.handle(IPC.listAimDrafts, () => aimStore.listAimDrafts());
 

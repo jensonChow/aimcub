@@ -944,6 +944,35 @@ function AimOsApp() {
     }
   }
 
+  /**
+   * Delete a saved aim and every record under it (menu-gated in the sidebar; the store
+   * cascade is authoritative). Main stops any planning brain still working on the aim
+   * before rows go; a live agent run this renderer can see stops first for the same
+   * reason. Deleting the open aim lands on Home, mirroring active-draft discard.
+   */
+  async function deleteAim(goal: Goal) {
+    if (navigationIsLocked() || sideEffectOperationRef.current) return;
+    const deletingSelected = selectedGoalRef.current?.id === goal.id;
+    const operationId = `delete:${goal.id}`;
+    if (!beginSideEffectOperation(operationId, t("os.busy.deleteAim"))) return;
+    if (deletingSelected) interruptPlanningForNavigation();
+    const transition = deletingSelected ? beginWorkspaceTransition() : navigationConcurrencyRef.current.workspace;
+    setError(null);
+    try {
+      if (liveRun && liveRun.goalId === goal.id && liveRun.status === "running") {
+        await window.aimcub.cancelRun(liveRun.runId);
+      }
+      await window.aimcub.deleteGoal(goal.id);
+      if (deletingSelected && isCurrentWorkspaceTransition(transition)) resetComposer();
+      await refreshAll({ autoOpenFirstGoal: false });
+      void refreshMemories();
+    } catch (err) {
+      if (isCurrentWorkspaceTransition(transition)) setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      finishSideEffectOperation(operationId);
+    }
+  }
+
   useEffect(() => {
     if (selected) return;
     const timer = window.setTimeout(() => {
@@ -2011,6 +2040,7 @@ function AimOsApp() {
         onHome={() => void openHomePanel()}
         onNewAim={() => void startNewAim()}
         onOpenGoal={(goal) => void openGoal(goal)}
+        onDeleteGoal={(goal) => void deleteAim(goal)}
         onOpenDraft={(draftRow) => void openAimDraft(draftRow)}
         onDiscardDraft={(draftRow) => void discardAimDraft(draftRow)}
         onStage={openCockpitStage}

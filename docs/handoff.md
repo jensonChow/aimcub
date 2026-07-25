@@ -73,6 +73,15 @@ Journey is now the ONE work surface per aim.
    "Aimcub researches first, and asks only what research can't answer" while a
    session runs. 19 new `planningSession.now.*` keys (en+zh); 6 voice tests.
 
+6. **aim-delete-action** — founder: "should add a delete or archive action."
+   Saved aims now carry the draft rows' menu idiom: a hover/focus-revealed More
+   Actions trigger with menu-gated **Delete aim** + inline confirm. Store
+   cascade already existed (`deleteGoal`, CLI parity included); main now stops
+   any planning session for the aim before deleting; the renderer stops a live
+   run it can see, and deleting the open aim lands on Home. Archive-with-
+   restore deliberately deferred until shelving real aims is the need (delete
+   answers the test-junk cleanup without a data-black-hole archive view).
+
 ## Open items
 
 1. **Founder look-through** of the collapsed Journey + the clarified planning

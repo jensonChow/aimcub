@@ -1617,6 +1617,61 @@ describe("CockpitShell", () => {
     expect(html).not.toContain("<p>Workbench</p>");
   });
 
+  it("gates aim deletion behind the row's More Actions menu with an inline confirm", () => {
+    const goal = { ...savedGoal, id: "00000000-0000-4000-8000-000000000077", title: "Throwaway test aim" };
+    const withDelete = renderToStaticMarkup(
+      <I18nProvider>
+        <CockpitShell
+          goals={[goal]}
+          activeStage="aim"
+          workspaceTarget={{ kind: "home" }}
+          onHome={noop}
+          onNewAim={noop}
+          onOpenGoal={noop}
+          onDeleteGoal={noop}
+          onStage={noop}
+          main={<div>Home</div>}
+        />
+      </I18nProvider>,
+    );
+
+    // The trigger is present and labelled per aim; the destructive item renders only
+    // inside the opened menu (never as visible row text), and never as a bare button.
+    expect(withDelete).toContain('aria-label="Actions for Throwaway test aim"');
+    expect(withDelete).toContain('aria-haspopup="menu"');
+    expect(withDelete).not.toContain(">Delete aim</button>");
+
+    const withoutDelete = renderToStaticMarkup(
+      <I18nProvider>
+        <CockpitShell
+          goals={[goal]}
+          activeStage="aim"
+          workspaceTarget={{ kind: "home" }}
+          onHome={noop}
+          onNewAim={noop}
+          onOpenGoal={noop}
+          onStage={noop}
+          main={<div>Home</div>}
+        />
+      </I18nProvider>,
+    );
+    expect(withoutDelete).not.toContain('aria-label="Actions for Throwaway test aim"');
+  });
+
+  it("deletes an aim only through guarded handlers that stop writers first", () => {
+    const appSource = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+    const mainIpcSource = readFileSync(new URL("../main/ipc.ts", import.meta.url), "utf8");
+    const deleteAim = appSource.match(/async function deleteAim[\s\S]*?\n {2}useEffect/)?.[0] ?? "";
+
+    expect(deleteAim).toContain("if (navigationIsLocked() || sideEffectOperationRef.current) return;");
+    expect(deleteAim).toContain("beginSideEffectOperation(operationId");
+    expect(deleteAim).toContain("await window.aimcub.cancelRun(liveRun.runId);");
+    expect(deleteAim).toContain("if (deletingSelected && isCurrentWorkspaceTransition(transition)) resetComposer();");
+    expect(deleteAim).toContain("finishSideEffectOperation(operationId)");
+    // Main is the authority: it stops a planning brain for the aim before the cascade.
+    expect(mainIpcSource).toMatch(/IPC\.deleteGoal[\s\S]*?cancelPlanningSession\(id\);[\s\S]*?aimStore\.deleteGoal\(id\)/);
+  });
+
   it("renders the sidebar brand row: Aimcub → Home plus a compact New-aim action", () => {
     const html = renderToStaticMarkup(
       <I18nProvider>
@@ -1849,15 +1904,20 @@ describe("CockpitShell", () => {
     );
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
 
-    expect(html).toContain('<button class="od-aim-card" type="button" aria-label="Ship a coherent desktop workspace" title="Ship a coherent desktop workspace"');
+    expect(html).toContain('<div class="od-aim-card">');
+    expect(html).toContain('<button class="od-aim-card-main" type="button" aria-label="Ship a coherent desktop workspace" title="Ship a coherent desktop workspace"');
     expect(html).toContain('class="od-content-entry-main od-draft-card-main" type="button" aria-label="Ship a useful contract review" title="Ship a useful contract review"');
     expect(html).toContain(`aria-label="More actions for ${verboseDraftTitle}"`);
     expect(html).toContain("Coordinate the entire desktop application…");
     expect(html).not.toContain(">active<");
     expect(html).not.toContain("Save blocked");
-    expect(css).toMatch(/\.od-aim-card\s*{[^}]*min-height:\s*32px;[^}]*padding:\s*0 var\(--sidebar-row-padding-x\);[^}]*border-radius:\s*10px;[^}]*color:\s*var\(--mut\);/s);
-    expect(css).toMatch(/\.od-aim-card\.selected,\s*\.od-aim-card\.current\s*{[^}]*background:\s*var\(--field\);[^}]*border-color:\s*transparent;[^}]*box-shadow:\s*0 1px 3px rgba\(30, 40, 70, 0\.08\);/s);
-    expect(css).toMatch(/\.od-aim-card\.selected:focus-visible,\s*\.od-aim-card\.current:focus-visible\s*{[^}]*box-shadow:\s*var\(--od-focus\);/s);
+    expect(css).toMatch(/\.od-aim-card\s*{[^}]*min-height:\s*32px;[^}]*border-radius:\s*10px;[^}]*color:\s*var\(--mut\);/s);
+    expect(css).toMatch(/\.od-aim-card\.selected\s*{[^}]*background:\s*var\(--field\);[^}]*border-color:\s*transparent;[^}]*box-shadow:\s*0 1px 3px rgba\(30, 40, 70, 0\.08\);/s);
+    expect(css).toMatch(/\.od-aim-card-main\s*{[^}]*min-height:\s*32px;[^}]*padding:\s*0 2px 0 var\(--sidebar-row-padding-x\);/s);
+    expect(css).toMatch(/\.od-aim-card-main:focus-visible\s*{[^}]*box-shadow:\s*var\(--od-focus\);/s);
+    // The row menu stays hidden until hover/focus, and while its popover is open.
+    expect(css).toMatch(/\.od-aim-card \.od-content-entry-more\s*{[^}]*opacity:\s*0;/s);
+    expect(css).toMatch(/\.od-aim-card:hover \.od-content-entry-more,\s*[\r\n\s]*\.od-aim-card:focus-within \.od-content-entry-more/s);
     expect(css).toMatch(/\.od-draft-card \.od-content-entry-main\s*{[^}]*min-height:\s*32px;[^}]*padding:\s*0 2px 0 var\(--sidebar-row-padding-x\);/s);
     expect(css).toMatch(/\.od-aim-card strong,\s*\.od-draft-card \.od-content-entry-copy strong\s*{[^}]*overflow:\s*hidden;[^}]*text-overflow:\s*ellipsis;[^}]*white-space:\s*nowrap;/s);
   });
@@ -1915,9 +1975,9 @@ describe("CockpitShell", () => {
     expect(css).toMatch(/\.od-aim-browser\s*{[^}]*width:\s*var\(--sidebar-content-width\);[^}]*justify-self:\s*center;[^}]*padding-right:\s*0;/s);
     expect(css).toMatch(/\.od-section-label\s*{[^}]*justify-content:\s*flex-start;[^}]*padding:\s*0 var\(--sidebar-row-padding-x\);/s);
     expect(css).toMatch(/\.od-sidebar-empty\s*{[^}]*padding:\s*8px var\(--sidebar-row-padding-x\);[^}]*font-size:\s*var\(--od-type-sub\);/s);
-    expect(css).toMatch(/\.od-aim-card\s*{[^}]*padding:\s*0 var\(--sidebar-row-padding-x\);/s);
-    expect(css).toMatch(/\.od-aim-card\.selected,\s*\.od-aim-card\.current\s*{[^}]*background:\s*var\(--field\);[^}]*border-color:\s*transparent;[^}]*box-shadow:\s*0 1px 3px rgba\(30, 40, 70, 0\.08\);[^}]*color:\s*var\(--od-fg\);/s);
-    expect(css).toMatch(/\.od-aim-card\.selected:focus-visible,\s*\.od-aim-card\.current:focus-visible\s*{[^}]*background:\s*var\(--field\);[^}]*box-shadow:\s*var\(--od-focus\);/s);
+    expect(css).toMatch(/\.od-aim-card-main\s*{[^}]*padding:\s*0 2px 0 var\(--sidebar-row-padding-x\);/s);
+    expect(css).toMatch(/\.od-aim-card\.selected\s*{[^}]*background:\s*var\(--field\);[^}]*border-color:\s*transparent;[^}]*box-shadow:\s*0 1px 3px rgba\(30, 40, 70, 0\.08\);[^}]*color:\s*var\(--od-fg\);/s);
+    expect(css).toMatch(/\.od-aim-card-main:focus-visible\s*{[^}]*box-shadow:\s*var\(--od-focus\);/s);
     // The sidebar-row status dot marks only attention states.
     expect(css).toMatch(/\.od-aim-progress-dot\.is-needs_you\s*{\s*background:\s*var\(--acc\);\s*}/s);
     expect(css).toMatch(/\.od-aim-progress-dot\.is-blocked\s*{\s*background:\s*var\(--danger\);\s*}/s);
@@ -1959,7 +2019,8 @@ describe("CockpitShell", () => {
 
     expect(html).toContain('data-od-id="sidebar-new-aim-action"');
     expect(html).toContain('<button class="od-sidebar-plus" type="button" aria-label="New aim" title="New aim" data-od-id="sidebar-new-aim-action"');
-    expect(html).toContain('<button class="od-aim-card selected" type="button" aria-current="page"');
+    expect(html).toContain('<div class="od-aim-card selected">');
+    expect(html).toContain('<button class="od-aim-card-main" type="button" aria-current="page"');
     expect(html).not.toContain('data-current=');
   });
 

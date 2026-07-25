@@ -687,35 +687,32 @@ kbd {
 }
 
 /* Aim rows read quiet at rest (muted, regular); the open aim is an ink-on-field pill. */
+/*
+ * Aim row = a wrapper pill (hover/selected state) + the opening button + a trailing
+ * More Actions menu that reveals on hover/focus. The row body only opens the aim;
+ * destructive actions stay menu-gated (the draft rows' idiom).
+ */
 .od-aim-card {
+  position: relative;
   width: 100%;
   min-width: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  column-gap: 8px;
   align-items: center;
   min-height: 32px;
-  padding: 0 var(--sidebar-row-padding-x);
   border: 1px solid transparent;
   border-radius: 10px;
   background: transparent;
   color: var(--mut);
-  text-align: left;
-  cursor: pointer;
 }
 
-.od-aim-card:hover {
+.od-aim-card:hover,
+.od-aim-card:focus-within {
   background: var(--island2);
   box-shadow: none;
 }
 
-.od-aim-card:focus-visible {
-  background: var(--island2);
-  box-shadow: var(--od-focus);
-}
-
-.od-aim-card.selected,
-.od-aim-card.current {
+.od-aim-card.selected {
   background: var(--field);
   border-color: transparent;
   box-shadow: 0 1px 3px rgba(30, 40, 70, 0.08);
@@ -723,15 +720,40 @@ kbd {
 }
 
 .od-aim-card.selected:hover,
-.od-aim-card.current:hover {
+.od-aim-card.selected:focus-within {
   background: var(--field);
   box-shadow: 0 1px 3px rgba(30, 40, 70, 0.08);
 }
 
-.od-aim-card.selected:focus-visible,
-.od-aim-card.current:focus-visible {
-  background: var(--field);
+.od-aim-card-main {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 8px;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 2px 0 var(--sidebar-row-padding-x);
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.od-aim-card-main:focus-visible {
   box-shadow: var(--od-focus);
+}
+
+/* The menu trigger stays out of the way until the row is hovered or holds focus. */
+.od-aim-card .od-content-entry-more {
+  opacity: 0;
+  margin-right: 2px;
+}
+
+.od-aim-card:hover .od-content-entry-more,
+.od-aim-card:focus-within .od-content-entry-more,
+.od-aim-card .od-content-entry-more:has([aria-expanded="true"]) {
+  opacity: 1;
 }
 
 .od-aim-row-main {
@@ -747,8 +769,7 @@ kbd {
   font-weight: var(--od-font-weight-regular);
 }
 
-.od-aim-card.selected strong,
-.od-aim-card.current strong {
+.od-aim-card.selected strong {
   font-weight: var(--od-font-weight-medium);
 }
 
