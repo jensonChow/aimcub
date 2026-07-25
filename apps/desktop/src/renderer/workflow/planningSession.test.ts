@@ -6,6 +6,8 @@ import type { PlanningSessionQuestion } from "@aimcub/llm";
 import type { PlanningSessionStateView } from "../../shared/ipc";
 import {
   embeddedPlanningAgentId,
+  planningActivityLine,
+  planningActivityNow,
   planningBrainMenu,
   planningModelMenu,
   sessionAnswerRequest,
@@ -244,5 +246,56 @@ describe("session view predicates", () => {
     }))).toBe(true);
     expect(sessionSurfaceVisible(view({ active: false, phase: "canceled" }))).toBe(false);
     expect(sessionSurfaceVisible(null)).toBe(false);
+  });
+});
+
+describe("planningActivityLine (live-lane product voice)", () => {
+  // A stub `t` that echoes the key (+ vars) so assertions target keys, not copy.
+  const t = (key: string, vars?: Record<string, string | number>) =>
+    vars ? `${key}:${JSON.stringify(vars)}` : key;
+
+  it("never renders raw event or tool words — unsayable rows drop to null", () => {
+    // The exact leak the founder screenshotted: a tool event with no usable name.
+    expect(planningActivityLine({ kind: "tool", label: "tool", tool: "" }, t)).toBeNull();
+    expect(planningActivityLine({ kind: "status", label: "brain started" }, t)).toBeNull(); // legacy, no code
+    expect(planningActivityLine({ kind: "research", label: "" }, t)).toBeNull(); // no count
+    expect(planningActivityLine({ kind: "question", label: "  " }, t)).toBeNull();
+  });
+
+  it("speaks known tools as concrete working verbs", () => {
+    expect(planningActivityLine({ kind: "tool", label: "", tool: "web.search" }, t)).toBe("planningSession.now.webSearch");
+    expect(planningActivityLine({ kind: "tool", label: "", tool: "mcp__aimcub__report_research" }, t)).toBe("planningSession.now.reportResearch");
+    expect(planningActivityLine({ kind: "tool", label: "", tool: "Read" }, t)).toBe("planningSession.now.readLocal");
+  });
+
+  it("humanizes unknown tool ids instead of leaking them raw", () => {
+    expect(planningActivityLine({ kind: "tool", label: "", tool: "mcp__foo__fetch_calendar" }, t))
+      .toBe('planningSession.now.tool:{"tool":"fetch calendar"}');
+  });
+
+  it("maps status codes and structured counts to localized lines", () => {
+    expect(planningActivityLine({ kind: "status", label: "", code: "started" }, t)).toBe("planningSession.now.started");
+    expect(planningActivityLine({ kind: "status", label: "", code: "draft_now" }, t)).toBe("planningSession.now.draftNow");
+    expect(planningActivityLine({ kind: "status", label: "schema", code: "plan_rejected", count: 2 }, t))
+      .toBe('planningSession.now.planRejected:{"n":2}');
+    expect(planningActivityLine({ kind: "research", label: "", count: 3 }, t))
+      .toBe('planningSession.now.research:{"n":3}');
+  });
+
+  it("passes question and chat content through as content", () => {
+    expect(planningActivityLine({ kind: "question", label: "Launch privately?" }, t))
+      .toBe('planningSession.now.askedYou:{"q":"Launch privately?"}');
+    expect(planningActivityLine({ kind: "chat", label: "zero budget" }, t))
+      .toBe('planningSession.now.chat:{"text":"zero budget"}');
+  });
+
+  it("planningActivityNow returns the latest sayable line, skipping unsayable ones", () => {
+    const now = planningActivityNow([
+      { at: "1", kind: "status", label: "", code: "started" },
+      { at: "2", kind: "tool", label: "", tool: "web.search" },
+      { at: "3", kind: "tool", label: "tool", tool: "" }, // unsayable → skipped
+    ], t);
+    expect(now).toBe("planningSession.now.webSearch");
+    expect(planningActivityNow([], t)).toBeNull();
   });
 });

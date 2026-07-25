@@ -56,10 +56,25 @@ Journey is now the ONE work surface per aim.
 - Sources setup: Settings → Research (`ContextSourcesPanel`, settings variant
   only). Memory page, Home, composer, drafts, funnel fallback: unchanged.
 
+## Post-collapse polish (same day)
+
+5. **planning-lane-clarity** — the founder's first live look said the planning
+   card was "not clear enough"; the screenshot showed raw trace words ("brain
+   started", "tool") on the product surface, three zero-counters, and the
+   optional chat box dominating. Fix: main now emits STRUCTURED activity
+   (kind/code/tool/count — never display copy) and the renderer speaks it in
+   localized agent voice (`planningActivityLine`; unsayable rows drop to null,
+   so raw ids can never render). The live card is one pulsing title + ONE
+   current-activity line + counts only when non-zero + a single-lane chat
+   composer + quiet Draft-now/Stop controls; the Journey header sub swaps to
+   "Aimcub researches first, and asks only what research can't answer" while a
+   session runs. 19 new `planningSession.now.*` keys (en+zh); 6 voice tests.
+
 ## Open items
 
-1. **Founder look-through** of the collapsed Journey (this epic was executed on
-   the founder's "proceed"; visual acceptance pending).
+1. **Founder look-through** of the collapsed Journey + the clarified planning
+   card (a FRESH session shows the new lines; a session started under the old
+   build replays legacy rows as the quiet fallback).
 2. Prior open items unchanged: founder `claude /login` → first Claude-brain
    live smoke; Settings → Brain effort/reasoning control; online linked-source
    connectors reading content; the OSS launch checklist (license → npm org →

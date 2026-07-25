@@ -180,19 +180,20 @@ function landingFromOutcome(managed: ManagedPlanningSession): PlanningSessionLan
   };
 }
 
+/** Structure only — the renderer owns every displayed word (localized product voice). */
 function summarizeSessionEvent(event: PlanningSessionEvent): PlanningSessionActivityItem | null {
   const at = new Date().toISOString();
   switch (event.type) {
     case "research_reported":
-      return { at, kind: "research", label: `research +${event.findingCount}` };
+      return { at, kind: "research", label: "", count: event.findingCount };
     case "question_asked":
       return { at, kind: "question", label: event.question.question };
     case "memory_proposed":
-      return { at, kind: "status", label: `memory candidate: ${event.candidate.category}` };
+      return { at, kind: "status", code: "memory_proposed", label: event.candidate.category };
     case "plan_rejected":
-      return { at, kind: "status", label: `plan attempt ${event.attempt} needs ${event.reason} fixes` };
+      return { at, kind: "status", code: "plan_rejected", label: event.reason, count: event.attempt };
     case "plan_accepted":
-      return { at, kind: "status", label: "plan accepted" };
+      return { at, kind: "status", code: "plan_accepted", label: "" };
     default:
       return null;
   }
@@ -201,9 +202,9 @@ function summarizeSessionEvent(event: PlanningSessionEvent): PlanningSessionActi
 function summarizeActivityEvent(event: LocalAgentEvent): PlanningSessionActivityItem | null {
   const at = new Date().toISOString();
   if (event.type === "agent.tool.started") {
-    return { at, kind: "tool", label: event.toolName ?? event.summary };
+    return { at, kind: "tool", label: event.summary ?? "", tool: event.toolName ?? "" };
   }
-  if (event.type === "agent.run.started") return { at, kind: "status", label: "brain started" };
+  if (event.type === "agent.run.started") return { at, kind: "status", code: "started", label: "" };
   return null;
 }
 
@@ -319,7 +320,8 @@ export function answerPlanningQuestion(req: PlanningSessionAnswerRequest): Plann
   pushActivity(managed, {
     at: new Date().toISOString(),
     kind: "status",
-    label: req.skipped ? "question skipped" : "question answered",
+    code: req.skipped ? "question_skipped" : "question_answered",
+    label: "",
   });
   managed.handle.provideAnswer(req.requestId, {
     selected_labels: req.labels,
@@ -343,7 +345,7 @@ export function finishPlanningNow(goalId: string): PlanningSessionStateView {
   const managed = sessions.get(goalId);
   if (!managed) throw new Error("No planning session is active for this aim.");
   managed.handle.requestFinishNow();
-  pushActivity(managed, { at: new Date().toISOString(), kind: "status", label: "asked the brain to draft now" });
+  pushActivity(managed, { at: new Date().toISOString(), kind: "status", code: "draft_now", label: "" });
   emitView(managed);
   return viewOf(managed);
 }

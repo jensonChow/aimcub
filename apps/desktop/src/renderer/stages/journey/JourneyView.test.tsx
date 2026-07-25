@@ -260,6 +260,15 @@ describe("JourneyView", () => {
     expect(html).not.toContain(">Start planning<");
   });
 
+  it("swaps the header sub for the planning explainer while a session runs", () => {
+    const planning = render(progressOf([]), {
+      planning: { busy: true, clarifyPanel: null, planReady: false, onCommitPlan: noop },
+    });
+    expect(planning).toContain("asks only what research can");
+    const idle = render(progressOf([row({ id: "m1", title: "x", human: true })]));
+    expect(idle).toContain("an aim moves by turns");
+  });
+
   it("hosts the in-Journey clarify Q&A while a clarify phase is active", () => {
     const html = render(progressOf([]), {
       planning: { busy: false, clarifyPanel: <div>CLARIFY_QA_MARKER</div>, planReady: false, onCommitPlan: noop },

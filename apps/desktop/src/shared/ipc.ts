@@ -507,11 +507,30 @@ export interface PlanningSessionRef {
   goalId: string;
 }
 
-/** One compact activity row from the brain, for the live Context surface. */
+/**
+ * One compact activity row from the brain, for the live planning surface. Main emits
+ * STRUCTURE, never display copy: the renderer maps kind/code/tool to localized
+ * product-voice lines and silently drops rows it cannot say in product language —
+ * raw event types and tool ids must never reach the user.
+ */
 export interface PlanningSessionActivityItem {
   at: string;
+  /** Raw detail for the row (question text, chat line, tool summary, reject reason, memory category). */
   label: string;
   kind: "tool" | "status" | "chat" | "research" | "question";
+  /** Machine code for status rows; the renderer owns the words. */
+  code?:
+    | "started"
+    | "question_answered"
+    | "question_skipped"
+    | "draft_now"
+    | "plan_accepted"
+    | "plan_rejected"
+    | "memory_proposed";
+  /** Tool id as reported by the runtime (e.g. "web.search", "mcp__aimcub__report_research"). */
+  tool?: string;
+  /** Count hint: research findings recorded, or plan repair attempt. */
+  count?: number;
 }
 
 /** Everything the renderer needs to commit the session's plan via `updateGoalPlan`. */
