@@ -1,101 +1,47 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-25
-Branch: `main`, **PUSHED to origin 2026-07-25** (founder authorized; destination
-jensonChow/aimcub verified). On origin from this day: the UI collapse (4 stages),
-the planning-lane clarity polish, and the menu-gated Delete-aim action. All
-session branches merged and deleted locally.
-**The UI collapse epic ("agent + plan") is CODE-COMPLETE**: the founder said the
-UI was still too complicated the day after the one-flow shipped; the audit found
-two product generations mounted at once (funnel-era workbench pages beside the
-agent one-flow) with most state rendered 2–4 times. The fix was structural: the
-Journey is now the ONE work surface per aim.
+Branch: `main`, **PUSHED to origin** (founder authorized each push; destination
+jensonChow/aimcub verified; repo still PRIVATE). No unmerged branches.
 
-## What changed (four stages on this branch)
+## What shipped today (all on origin)
 
-1. `034569b1` **plan-as-object rows** — the Journey gained `JourneyPlanBand`:
-   one row per sub-aim (owner chip, in-flight dot, status pill, route+evidence
-   meta) expanding in place to the full work detail (blocker, live run + Stop,
-   stranded-run recovery, per-session permission consent, primary action, proof
-   form with the nav lock) plus inline eval receipts (evidence review +
-   evaluator matches). The "Your move" CTA lands on its own row instead of
-   navigating to stages.
-2. `fcb5ecc2` **stations/sheets/turns removed** — the 6-station strip, all
-   station drill-in sheets (7 bodies), and the Turns roster deleted; the journal
-   became a closed-by-default disclosure; pending context candidates became an
-   inline Journey band (the sheet was the only triage surface); Re-plan moved to
-   the plan band head; `JourneyPlanSheetBody` → `JourneyPlanReview`.
-3. `f5e05edf` **standalone stage pages retired** — `CockpitStage` collapsed to
-   `aim | settings | memory`; Context/Contracts/Run/Eval pages, LockedStagePanel,
-   Cmd+1..5, and palette stage entries deleted; every planning failure and
-   refinement lands on the Journey; the completed-aim recap renders at the top
-   of the Journey; `savePlan`/`saveGoal` renderer path deleted (goal-first is
-   the only path); the developer trace panel mounts under the Journey when
-   developer mode is on.
-4. (this commit) **mass deletion + purge** — deleted ContextStage +
-   overview/activity/review panels + contextLoop + contextReview,
-   ExecutePanel, the EvalStage page component (file survives as the receipts
-   module), and ContextSourcesPanel's workbench variant; purged 451 unused
-   i18n keys (en+zh) and ~1,400 lines of dead CSS; docs/memory updated.
+1. **The UI collapse ("agent + plan")** — founder: the UI was still too
+   complicated. The Journey is now the ONE work surface per aim: header → one
+   live-lane card → the plan band (sub-aim rows expanding in place to run
+   consent/proof/receipts) → inline candidate review → journal disclosure.
+   Stations, station sheets, Turns, the standalone Context/Plan/Run/Eval pages,
+   Cmd+1..5, and the last funnel-era save path are deleted (451 i18n keys,
+   ~1,400 CSS lines). The durable model + what must not come back:
+   `docs/memory/design-system.md` and `docs/memory/desktop.md`.
+2. **Planning-lane clarity** — founder: the live card was "not clear enough"
+   (raw "brain started"/"tool" on screen). Now: main emits structured activity
+   only; the renderer speaks localized agent voice and drops the unsayable
+   (`planningActivityLine`). Doctrine recorded in design-system.md ("status
+   streams: main emits structure, the renderer owns every displayed word").
+3. **Delete aim** — founder: "should add a delete or archive action." Sidebar
+   aim rows: hover-revealed More Actions → menu-gated Delete with inline
+   confirm; main cancels the aim's planning session before the store cascade.
+   Delete over archive was deliberate (no archive view = data black hole);
+   archive-with-restore is the designed follow-up.
 
 ## Verification
 
-- Full gate green after every stage: build 9/9 · typecheck 17/17 · lint 11/11 ·
-  purity clean · desktop tests 335 (Execute-stage behavior tests ported to the
-  plan band, receipts/recap tests ported to the kept components).
-- Renderer mass: ~17.6k → ~14.6k non-test LOC; cockpit.css 7,644 → 6,399 lines;
-  i18n 1,239 → 788 keys. Root `Aimcub.app` repacked + boot-smoked this session.
-
-## What survived, where
-
-- Planning session/funnel: both mount through the Journey's planning slot
-  (`ContextClarifyPanel`, `PlanningSessionPanel` kept).
-- Plan editing/repair: `PlanPanel`/`PlanContractCard` as `JourneyPlanReview`
-  (in-place buffered commit; also the planning landing's review).
-- Work detail internals: `stages/execute/*` helpers + controls (consent,
-  timeline, stranded-run, proof form) — consumed by `JourneyPlanBand`.
-- Receipts: `stages/eval/EvalStage.tsx` = EvidenceReviewList,
-  EvaluatorMatchList, CompletionRecapPanel only.
-- Sources setup: Settings → Research (`ContextSourcesPanel`, settings variant
-  only). Memory page, Home, composer, drafts, funnel fallback: unchanged.
-
-## Post-collapse polish (same day)
-
-5. **planning-lane-clarity** — the founder's first live look said the planning
-   card was "not clear enough"; the screenshot showed raw trace words ("brain
-   started", "tool") on the product surface, three zero-counters, and the
-   optional chat box dominating. Fix: main now emits STRUCTURED activity
-   (kind/code/tool/count — never display copy) and the renderer speaks it in
-   localized agent voice (`planningActivityLine`; unsayable rows drop to null,
-   so raw ids can never render). The live card is one pulsing title + ONE
-   current-activity line + counts only when non-zero + a single-lane chat
-   composer + quiet Draft-now/Stop controls; the Journey header sub swaps to
-   "Aimcub researches first, and asks only what research can't answer" while a
-   session runs. 19 new `planningSession.now.*` keys (en+zh); 6 voice tests.
-
-6. **aim-delete-action** — founder: "should add a delete or archive action."
-   Saved aims now carry the draft rows' menu idiom: a hover/focus-revealed More
-   Actions trigger with menu-gated **Delete aim** + inline confirm. Store
-   cascade already existed (`deleteGoal`, CLI parity included); main now stops
-   any planning session for the aim before deleting; the renderer stops a live
-   run it can see, and deleting the open aim lands on Home. Archive-with-
-   restore deliberately deferred until shelving real aims is the need (delete
-   answers the test-junk cleanup without a data-black-hole archive view).
+Full gate green after every batch (build 9/9 · typecheck 17/17 · lint 11/11 ·
+purity · desktop 344 tests). Root `Aimcub.app` repacked + boot-smoked after
+each batch. Renderer mass after the collapse: ~14.6k non-test LOC, cockpit.css
+6,4xx lines, i18n ~800 keys.
 
 ## Open items
 
-1. **Founder look-through** of the collapsed Journey + the clarified planning
-   card (a FRESH session shows the new lines; a session started under the old
-   build replays legacy rows as the quiet fallback).
-2. Prior open items unchanged: founder `claude /login` → first Claude-brain
-   live smoke; Settings → Brain effort/reasoning control; online linked-source
-   connectors reading content; the OSS launch checklist (license → npm org →
-   repo settings → gitleaks → public flip).
-
-## Next session
-
-Have the founder drive one real aim end-to-end on the collapsed surface
-(create → answer → adopt → run/proof → receipts) and collect what still feels
-heavy. Candidate follow-ups only if he flags them: trimming Settings panes,
-Memory palette entry, renaming `stages/execute|eval` directories to match their
-new roles.
+1. **Founder drives one real aim end-to-end** on the collapsed surface
+   (create → answer → adopt → run/proof → receipts) and flags what still
+   feels heavy. Candidate follow-ups only if flagged: Settings pane merge,
+   Memory palette entry, renaming `stages/execute|eval` dirs to their new
+   roles, archive-with-restore.
+2. Founder `claude /login` → first Claude-brain live smoke (Codex path is the
+   live-verified one).
+3. Settings → Brain effort/reasoning control (proposed follow-up).
+4. Online linked-source connectors actually reading content.
+5. OSS launch checklist (license → npm org → repo settings → gitleaks →
+   public flip) — founder-owned, unchanged.

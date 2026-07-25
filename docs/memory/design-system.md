@@ -527,6 +527,18 @@ as a working agent, not as a form the user operates.
 - Kickers/tags stay short and quiet ("Your move — start planning"); bodies may carry one line
   of product differentiation (what Aimcub actually does: local + web research, asks only what
   research can't answer).
+- **Status streams: main emits structure, the renderer owns every displayed word** (founder
+  2026-07-25, after raw "brain started"/"tool" reached the live planning card). Any main→renderer
+  activity/status feed carries machine fields only (kind, code, tool id, count); the renderer
+  maps them to localized agent-voice lines and silently DROPS anything it cannot say in product
+  language — a raw event type or tool id must never render. Known tools become concrete verbs
+  ("Searching the web", "Reading local files"); unknown tool ids are humanized, never shown raw.
+- The live planning card reads top-down as one thought: pulsing dot + working title, the model
+  as one quiet pill, ONE current-activity line, counts only once at least one is non-zero, a
+  single-lane chat composer, and quiet Draft-now/Stop controls. While a session runs, the
+  Journey header sub states the deal ("Aimcub researches first, and asks only what research
+  can't answer") instead of the motto. Never stack zero-counters or multiple mottos on a
+  working surface.
 
 ## Accessibility and Localization
 
