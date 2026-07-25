@@ -1,7 +1,10 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-25
-Branch: `aim-surface-collapse` (merge into `main` pending at session end).
+Branch: `main`, **PUSHED to origin 2026-07-25** (founder authorized; destination
+jensonChow/aimcub verified). Both same-day epics are on origin: the UI collapse
+(4 stages) and the planning-lane clarity polish. All session branches merged
+and deleted locally.
 **The UI collapse epic ("agent + plan") is CODE-COMPLETE**: the founder said the
 UI was still too complicated the day after the one-flow shipped; the audit found
 two product generations mounted at once (funnel-era workbench pages beside the
