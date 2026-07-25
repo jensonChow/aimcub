@@ -2,11 +2,9 @@ import type { AimProgressMilestoneRead, AimProgressReadModel, DecompositionOutpu
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import type { ContextBundleReview } from "../../contextReview";
 import { I18nProvider } from "../../i18n";
-import type { JourneyStationInteraction } from "../../workflow/journey";
-import { buildContextLoopModel } from "../context/contextLoop";
-import { JourneyContextSheetBody, JourneyEvalSheetBody, JourneyPlanSheetBody, JourneyRunSheetBody, JourneyView, type JourneyViewProps } from "./JourneyView";
+import { JourneyPlanBand, planRowIsLive, type JourneyPlanBandProps } from "./JourneyPlanBand";
+import { JourneyPlanReview, JourneyView, type JourneyViewProps } from "./JourneyView";
 
 const OWNER = "owner-1";
 const noop = () => {};
@@ -117,14 +115,41 @@ const miniPlan: DecompositionOutput = {
 } as unknown as DecompositionOutput;
 
 describe("JourneyView", () => {
-  it("renders the aim title, all six stations, and the journal", () => {
+  it("renders the aim title, the plan band, and the journal — with no station strip, sheet, or turns roster", () => {
     const html = render(progressOf([row({ id: "m1", title: "Book flights", human: true })]));
     expect(html).toContain("Two weeks in Japan");
-    for (const name of ["Aim", "Research", "Context", "Plan", "Run", "Eval"]) {
-      expect(html).toContain(`>${name}`);
-    }
+    expect(html).toContain("journey-plan-band");
     expect(html).toContain("Journal");
     expect(html).toContain("journey-view");
+    expect(html).not.toContain("od-journey-stations");
+    expect(html).not.toContain("od-journey-sheet");
+    expect(html).not.toContain("od-journey-turns");
+  });
+
+  it("keeps the journal behind a quiet disclosure (a details element, closed by default)", () => {
+    const html = render(progressOf([row({ id: "m1", title: "Book flights", human: true })]));
+    expect(html).toContain("<details class=\"od-journey-journal\"");
+    expect(html).toContain("<summary class=\"od-journey-journal-head\"");
+    expect(html).not.toContain("<details class=\"od-journey-journal\" open");
+  });
+
+  it("surfaces pending context candidates as an inline review band only when they exist", () => {
+    const candidate: Memory = {
+      id: "c1", owner_id: OWNER, goal_id: "g1", kind: "semantic", category: "preference",
+      content: "Prefers window seats", confidence: 0.7, source: "agent_inferred", status: "pending",
+      superseded_by: null,
+    } as Memory;
+    const p = progressOf([row({ id: "m1", title: "Book flights", human: true })], { context_candidates: [candidate] });
+    const withHandlers = render(p, { onAcceptContextCandidate: noop, onRejectContextCandidate: noop });
+    expect(withHandlers).toContain("journey-inbox");
+    expect(withHandlers).toContain("Prefers window seats");
+
+    expect(render(p)).not.toContain("journey-inbox"); // no handlers → no dead surface
+    const none = render(progressOf([row({ id: "m1", title: "Book flights", human: true })]), {
+      onAcceptContextCandidate: noop,
+      onRejectContextCandidate: noop,
+    });
+    expect(none).not.toContain("journey-inbox"); // no candidates → no band
   });
 
   it("shows a Your-move card for a human-routed task", () => {
@@ -140,10 +165,32 @@ describe("JourneyView", () => {
     expect(html).not.toContain("journey-move");
   });
 
-  it("renders a no-plan state when progress is null", () => {
+  it("renders a quiet header-only state while progress has not loaded", () => {
     const html = render(null);
     expect(html).toContain("Two weeks in Japan");
-    expect(html).toContain("Gather context");
+    expect(html).not.toContain("od-journey-primary"); // no dead CTA into removed stages
+  });
+
+  it("leads with the completion recap for a completed aim (no live lane, no plan band)", () => {
+    const recap = {
+      complete: true,
+      final_outcome: "Completed 1/1 sub-aims.",
+      completed_sub_aims: [],
+      passing_evidence: [],
+      eval_results: [],
+      learned_context: [],
+      evidence_empty_reason: "",
+      context_empty_reason: "",
+    };
+    const html = render(progressOf(
+      [row({ id: "m1", title: "Ship the fix", completed: true })],
+      { completion_recap: recap as AimProgressReadModel["completion_recap"] },
+    ));
+    expect(html).toContain("Completion recap");
+    expect(html).toContain("Completed 1/1 sub-aims.");
+    expect(html).not.toContain("journey-plan-band");
+    expect(html).not.toContain("journey-move");
+    expect(html).toContain("od-journey-journal");
   });
 
   it("shows the in-Journey aim-rename control only when onRenameAim is provided (both header sites)", () => {
@@ -241,185 +288,7 @@ describe("JourneyView", () => {
   });
 });
 
-describe("JourneyRunSheetBody", () => {
-  const interaction: JourneyStationInteraction = {
-    actionKind: "run_agent",
-    options: [
-      { milestoneId: "m1", text: "Draft the copy", note: "pending", chip: "owner.agent" },
-      { milestoneId: "m2", text: "Book the venue", note: "pending", chip: "owner.agent" },
-    ],
-    evidenceOptions: [],
-    contextRows: [{ chip: "status.blocked", text: "Blocked bit", meta: "blocked" }],
-  };
-
-  function renderBody(selectedOptionId: string | null, disabled = false): string {
-    return renderToStaticMarkup(
-      <I18nProvider>
-        <JourneyRunSheetBody
-          interaction={interaction}
-          selectedOptionId={selectedOptionId}
-          disabled={disabled}
-          onSelect={noop}
-          onConfirm={noop}
-        />
-      </I18nProvider>,
-    );
-  }
-
-  it("renders a radiogroup of options plus read-only context, confirm disabled until a pick", () => {
-    const html = renderBody(null);
-    expect(html).toContain('role="radiogroup"');
-    expect(html).toContain('role="radio"');
-    expect(html).toContain("Draft the copy");
-    expect(html).toContain("Book the venue");
-    expect(html).toContain("Blocked bit"); // non-dispatchable context stays visible
-    expect(html).toContain('aria-checked="false"');
-    expect(html).toContain("Pick one to continue");
-    expect(html).toContain("disabled"); // the confirm button
-  });
-
-  it("enables confirm and marks the chosen option once a selection is made", () => {
-    const html = renderBody("m2");
-    expect(html).toContain("Run with agent");
-    expect(html).toContain('aria-checked="true"');
-    expect(html).toContain("od-journey-option-open");
-    expect(html).not.toContain("Pick one to continue");
-  });
-
-  it("keeps confirm disabled while busy even with a valid selection", () => {
-    const html = renderBody("m2", true);
-    expect(html).toContain("Run with agent"); // label reflects the live selection
-    expect(html).toContain("disabled"); // but busy → not confirmable
-  });
-
-  const evidenceInteraction: JourneyStationInteraction = {
-    actionKind: "run_agent",
-    options: [],
-    evidenceOptions: [{ milestoneId: "h1", text: "Submit launch approval", note: "pending", chip: "owner.you" }],
-    contextRows: [],
-  };
-
-  it("renders ready human milestones as actionable evidence options when a submit handler is wired", () => {
-    const html = renderToStaticMarkup(
-      <I18nProvider>
-        <JourneyRunSheetBody
-          interaction={evidenceInteraction}
-          selectedOptionId={null}
-          disabled={false}
-          onSelect={noop}
-          onConfirm={noop}
-          onPickEvidence={noop}
-        />
-      </I18nProvider>,
-    );
-    expect(html).toContain("od-journey-evidence-option");
-    expect(html).toContain("Submit launch approval");
-    expect(html).toContain("Your move — submit proof");
-    expect(html).not.toContain('role="radiogroup"'); // no agent work → no radiogroup or confirm hint
-    expect(html).not.toContain("Pick one to continue");
-  });
-
-  it("renders evidence options as read-only rows when no submit handler is wired (honest)", () => {
-    const html = renderToStaticMarkup(
-      <I18nProvider>
-        <JourneyRunSheetBody
-          interaction={evidenceInteraction}
-          selectedOptionId={null}
-          disabled={false}
-          onSelect={noop}
-          onConfirm={noop}
-        />
-      </I18nProvider>,
-    );
-    expect(html).toContain("Submit launch approval");
-    expect(html).not.toContain("od-journey-evidence-option"); // not actionable without a handler
-  });
-});
-
-describe("JourneyContextSheetBody", () => {
-  const emptyReview: ContextBundleReview = {
-    usedContext: [],
-    skippedContext: [],
-    permissionGaps: [],
-    decompositionRisks: [],
-    sourceCount: 0,
-  };
-  const reviewWithItems: ContextBundleReview = {
-    usedContext: [{ id: "u1", title: "Prefers nonstop flights", body: "From the Japan trip", meta: [], tone: "neutral" }],
-    skippedContext: [],
-    permissionGaps: [],
-    decompositionRisks: [],
-    sourceCount: 1,
-  };
-  // Real builder → valid i18n message keys; running:true flips hasLiveResearchData on.
-  const idleLoop = buildContextLoopModel({ contextSources: null, review: emptyReview });
-  const liveLoop = buildContextLoopModel({ contextSources: null, review: emptyReview, running: true });
-
-  function candidate(): Memory {
-    return {
-      id: "aaaaaaaa-1111-4111-8111-111111111111",
-      owner_id: "bbbbbbbb-2222-4222-8222-222222222222",
-      goal_id: "g1",
-      kind: "semantic",
-      category: "preference",
-      content: "Prefers nonstop flights when traveling with kids.",
-      confidence: 0.9,
-      source: "user_stated",
-      status: "pending",
-      superseded_by: null,
-      created_at: "2026-07-05T08:00:00.000Z",
-    } as Memory;
-  }
-
-  function renderBody(
-    over: Partial<{ loop: typeof idleLoop; review: ContextBundleReview; pendingCandidates: Memory[]; disabled: boolean }> = {},
-  ): string {
-    return renderToStaticMarkup(
-      <I18nProvider>
-        <JourneyContextSheetBody
-          loop={over.loop ?? idleLoop}
-          review={over.review ?? emptyReview}
-          pendingCandidates={over.pendingCandidates ?? []}
-          currentAimTitle="Two weeks in Japan"
-          disabled={over.disabled ?? false}
-          onAccept={noop}
-          onReject={noop}
-        />
-      </I18nProvider>,
-    );
-  }
-
-  it("shows the honest empty hint when nothing is pending, live, or reviewed", () => {
-    const html = renderBody();
-    expect(html).toContain("Context is folded into the plan");
-    expect(html).not.toContain("od-context-inbox");
-    expect(html).not.toContain("context-activity-surface");
-    expect(html).not.toContain("context-bundle-review");
-  });
-
-  it("renders the pending-candidate inbox (actionable triage)", () => {
-    const html = renderBody({ pendingCandidates: [candidate()] });
-    expect(html).toContain("od-context-inbox");
-    expect(html).toContain("Prefers nonstop flights when traveling with kids.");
-    expect(html).toContain("Accept");
-    expect(html).toContain("Reject");
-    expect(html).not.toContain("Context is folded into the plan");
-  });
-
-  it("shows the activity panel only while research is live", () => {
-    expect(renderBody({ loop: liveLoop })).toContain("context-activity-surface");
-    expect(renderBody({ loop: idleLoop })).not.toContain("context-activity-surface");
-  });
-
-  it("renders the context review receipt when there are review items", () => {
-    const html = renderBody({ review: reviewWithItems });
-    expect(html).toContain("context-bundle-review");
-    expect(html).toContain("Prefers nonstop flights");
-    expect(html).not.toContain("Context is folded into the plan");
-  });
-});
-
-describe("JourneyPlanSheetBody", () => {
+describe("JourneyPlanReview", () => {
   // Two nodes so the contract selector renders (PlanPanel gates it on nodes.length > 1); the second
   // node's distinctive body text must NOT appear (only the selected first node's card is rendered).
   const planFixture: DecompositionOutput = {
@@ -478,7 +347,7 @@ describe("JourneyPlanSheetBody", () => {
   function renderBody(opts: { editable?: boolean; disabled?: boolean } = {}): string {
     return renderToStaticMarkup(
       <I18nProvider>
-        <JourneyPlanSheetBody
+        <JourneyPlanReview
           plan={planFixture}
           quality={null}
           review={null}
@@ -527,76 +396,103 @@ describe("JourneyPlanSheetBody", () => {
   });
 });
 
-describe("JourneyEvalSheetBody", () => {
-  function renderBody(progress: AimProgressReadModel): string {
+describe("JourneyPlanBand (the plan as the object, Collapse Stage 1)", () => {
+  function renderBand(rows: AimProgressMilestoneRead[], extra: Partial<JourneyPlanBandProps> = {}): string {
     return renderToStaticMarkup(
       <I18nProvider>
-        <JourneyEvalSheetBody progress={progress} />
+        <JourneyPlanBand
+          progress={progressOf(rows)}
+          disabled={false}
+          selectedMilestoneId={null}
+          onSelectMilestone={noop}
+          activeProofId={null}
+          onProofActiveChange={noop}
+          onRunAgent={noop}
+          {...extra}
+        />
       </I18nProvider>,
     );
   }
 
-  function evidenceRow(): AimProgressMilestoneRead {
-    return {
-      ...row({ id: "m1", title: "Ship the fix" }),
-      evidence: [
-        {
-          evidence: {
-            id: "ev-1", owner_id: OWNER, goal_id: "g1", milestone_id: "m1", emitter_id: null,
-            kind: "git_commit", source_event_id: "commit:xyz", occurred_at: "2026-07-07T08:00:00.000Z",
-            summary: "Journey eval evidence row rendered", payload: { message: "Fix" }, trust_score: 0.9,
-            created_at: "2026-07-07T08:00:00.000Z",
-          },
-          rule_matches: [],
-          status: "matched",
-          review_note: "Matches the acceptance rule.",
-        },
-      ],
-      evidence_count: 1,
-    } as AimProgressMilestoneRead;
-  }
-
-  it("frames every milestone with a met/open chip and no evidence list when there is no evidence", () => {
-    const html = renderBody(progressOf([
+  it("renders one collapsed row per sub-aim with owner chip and status pill", () => {
+    const html = renderBand([
       row({ id: "m1", title: "Book flights", human: true }),
-      row({ id: "m2", title: "Draft the copy" }),
-    ]));
-    expect(html).toContain("od-journey-eval");
-    expect(html).toContain("od-journey-eval-title");
+      row({ id: "m2", title: "Draft itinerary" }),
+    ]);
+    expect(html).toContain("journey-plan-band");
     expect(html).toContain("Book flights");
-    expect(html).toContain("Draft the copy"); // no milestone dropped
-    expect(html).toContain("od-journey-chip-eval");
-    expect(html).not.toContain("od-evidence-review"); // nothing to review yet
+    expect(html).toContain("Draft itinerary");
+    expect(html).toContain("od-journey-chip-you");
+    expect(html).toContain("od-journey-chip-agent");
+    expect(html).not.toContain("journey-planrow-detail");
   });
 
-  it("nests the read-only evidence review under a milestone that has evidence", () => {
-    const html = renderBody(progressOf([evidenceRow()]));
-    expect(html).toContain("od-journey-eval");
-    expect(html).toContain("od-evidence-review");
-    expect(html).toContain("Journey eval evidence row rendered");
+  it("expands the selected row to the work detail with consent control for an agent route", () => {
+    const html = renderBand(
+      [row({ id: "m1", title: "Draft itinerary" })],
+      { selectedMilestoneId: "m1" },
+    );
+    expect(html).toContain("journey-planrow-detail");
+    expect(html).toContain("od-run-permission");
+    expect(html).toContain("od-execute-primary-action");
   });
 
-  it("shows the completion recap when the aim is complete", () => {
-    const recap = {
-      complete: true,
-      final_outcome: "Completed 1/1 sub-aims.",
-      completed_sub_aims: [{
-        milestone_id: "m1", title: "Ship the fix", outcome: "Shipped.",
-        completed_at: "2026-07-07T08:20:00.000Z", decided_by: "rule_auto",
-        evidence_ids: [], eval_status: "passed",
-      }],
-      passing_evidence: [],
-      eval_results: [],
-      learned_context: [],
-      evidence_empty_reason: "",
-      context_empty_reason: "",
-    };
-    const html = renderBody(progressOf(
-      [row({ id: "m1", title: "Ship the fix", completed: true })],
-      { completion_recap: recap as AimProgressReadModel["completion_recap"] },
-    ));
-    expect(html).toContain("Completion recap");
-    expect(html).toContain("Completed 1/1 sub-aims.");
-    expect(html).not.toContain("od-journey-eval-title"); // recap branch, not the per-milestone frame
+  it("shows the proof form in place of the normal detail when the row's proof is active", () => {
+    const html = renderBand(
+      [row({ id: "m1", title: "Confirm the booking", human: true })],
+      { selectedMilestoneId: "m1", activeProofId: "m1", onConfirmMilestone: async () => true },
+    );
+    expect(html).toContain("od-proof-form");
+    expect(html).not.toContain("od-execute-primary-action");
+  });
+
+  it("disables the other rows while a proof draft is open", () => {
+    const html = renderBand(
+      [row({ id: "m1", title: "Confirm the booking", human: true }), row({ id: "m2", title: "Other work" })],
+      { selectedMilestoneId: "m1", activeProofId: "m1", onConfirmMilestone: async () => true },
+    );
+    expect(html).toContain("disabled");
+  });
+
+  it("renders inline eval receipts (no primary action) for a completed row with evidence", () => {
+    const done = row({ id: "m1", title: "Ship the fix", completed: true });
+    done.evidence_count = 2;
+    done.evaluator_results = [{
+      evaluator: "manual_confirm",
+      status: "passed",
+      matched_evidence_ids: [],
+      trust_score: 0.9,
+      explanation: "Confirmed by you.",
+      failure_reason: null,
+      requires_human_confirmation: false,
+    }] as AimProgressMilestoneRead["evaluator_results"];
+    const html = renderBand([done], { selectedMilestoneId: "m1" });
+    expect(html).toContain("od-eval-detail-section");
+    expect(html).toContain("Confirmed by you.");
+    expect(html).not.toContain("od-execute-primary-action");
+  });
+
+  it("marks only in-flight rows as live (pulsing dot), never completed ones", () => {
+    const running = row({ id: "m1", title: "In flight", running: true });
+    const idle = row({ id: "m2", title: "Waiting" });
+    const done = row({ id: "m3", title: "Done", completed: true });
+    expect(planRowIsLive(running, null)).toBe(true);
+    expect(planRowIsLive(idle, null)).toBe(false);
+    expect(planRowIsLive(done, null)).toBe(false);
+    const html = renderBand([running, idle]);
+    expect(html.split("od-journey-dot-active").length - 1).toBe(1);
+  });
+});
+
+describe("JourneyView plan band mount", () => {
+  it("renders the plan band for a planned goal, collapsed by default", () => {
+    const html = render(progressOf([row({ id: "m1", title: "Book flights", human: true })]));
+    expect(html).toContain("journey-plan-band");
+    expect(html).not.toContain("journey-planrow-detail");
+  });
+
+  it("hides the plan band for a plan-less shell", () => {
+    const html = render(progressOf([]));
+    expect(html).not.toContain("journey-plan-band");
   });
 });

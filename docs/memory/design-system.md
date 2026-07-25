@@ -23,13 +23,17 @@ target sizes, accessibility, native macOS chrome, Electron engineering) are reta
 Glass is two things at once:
 
 - **A glassmorphism visual system** — a gradient "desktop" background behind translucent,
-  backdrop-blurred "islands" (sidebar, workspace, cards, sheets), soft shadows, pill chips,
+  backdrop-blurred "islands" (sidebar, workspace, cards), soft shadows, pill chips,
   14–24px radii, and full light+dark token sets.
-- **A "Journey" information architecture** for the work surface — a 6-station strip
-  (Aim · Research · Context · Plan · Run · Eval), a single "Your move" card (or an "Ambient"
-  card when nothing is waiting on the human), a "Turns" roster, a "Journal" receipt/evidence
-  timeline, and a read-only station drill-in **sheet**. Memory is promoted to a top-level page;
-  Home / New / Settings are reworked in the same visual language.
+- **A collapsed "agent + plan" information architecture** for the work surface (founder
+  direction 2026-07-25: "the UI is too complicated" → structural collapse). One aim surface —
+  the Journey — holds the whole loop: a header (title · rename · completion %), exactly ONE
+  live lane (planning session / build-plan / "Your move" / ambient), **the plan as the
+  object** (one row per sub-aim, expanding in place to the full work detail), an inline
+  context-candidate review band only when candidates exist, and a quiet closed-by-default
+  Journal disclosure. The earlier 6-station strip, station drill-in sheets, Turns roster,
+  and the standalone Context/Plan/Run/Eval stage pages are REMOVED — do not reintroduce
+  them. Memory stays a top-level page; Home / New / Settings share the visual language.
 
 **Shipped** (stages 0/A/B/C/D on `main`): the additive Glass token set in `cockpit.css`
 (present identically in all three theme blocks), the gradient-desktop + translucent-island
@@ -118,7 +122,8 @@ Reference links:
   behind an explicit developer surface. The run-lifecycle Journal shows product-facing receipts
   (run started/finished, evidence, artifacts), never raw `run.log` / `tool.*` traces.
 - One primary task per screen: a view should make one user action obvious. On the Journey that
-  is the single "Your move" card; secondary facts (Turns, Journal, stations) support it.
+  is the single live-lane card ("Your move" / planning / ambient); the plan rows and the
+  journal disclosure support it without competing.
 - Desktop quality bar: Aimcub should feel like a focused desktop workbench, not a web dashboard
   inside Electron. Prefer stable panes, compact command surfaces, native-feeling shortcuts,
   complete control states, and strict row/spacing rhythm.
@@ -152,43 +157,32 @@ Reference links:
   local, online, web, deep-research, context-session, or questionnaire controls as separate
   card, table, and toggle representations. Planning-readiness gates may sit under the summary as
   compact rows when they explain why planning can proceed or what remains blocked.
-- Context stage workbench is stepwise and sparse. Keep provider setup, web capability, online
-  connectors, and permission configuration in onboarding or Settings. While a blocking question
-  or optional draft refinement is active, that question flow is the whole task surface: hide the
-  Aim summary and edit action, automated activity, sufficiency, source controls, bundle review,
-  and future questions. Show one reply lane plus one bottom primary action. After the question
-  flow ends, restore aim-local attachments/notes and planning/review state with a single
-  Continue to Plan action when no refinement panel is active.
-- Context stage intake is an iterative context-building loop, not a dashboard or blocking form.
-  Derive automated activity and sufficiency from live planning events, planning context/tools,
-  intake, review buckets, answers, notes, and source status; show that overview only while
-  collection runs without a user question or after the focused question flow. Activity copy
-  summarizes tool/action state (local reads, linked context, web research, distillation,
-  follow-up questions, access gaps) without exposing raw prompts, traces, or chain-of-thought.
-  A question stays visible while the user selects choices or types a custom answer, and advances
-  only through an explicit Next. After each answer, generate the next highest-value question
-  from the same intake run and cumulative history; stop when no consequential unknown remains or
-  the bounded limit is reached. Pending draft refinement survives current-tab clicks and stage
-  re-entry; only a successful refinement or explicit accept/skip completes it. Do not show a
-  question-specific custom answer and a general context note at once. If all intake paths are
-  disabled, replace the question with one Settings recovery action.
+- Context collection has no page of its own: the planning brain (or funnel) asks through the
+  Journey's live lane. While a blocking question or optional draft refinement is active, that
+  question flow is the whole live-lane surface — one question visible, one reply lane, one
+  bottom primary action; advance only through an explicit Next. Keep provider setup, web
+  capability, online connectors, and permission configuration in Settings. Questions stay
+  adaptive and bounded; a question-specific custom answer and the general context note never
+  appear together. If all intake paths are disabled, show one Settings recovery action.
 - Choice-card controls render the normalized domain mode instead of inferring it from option
   count or question category. Expose single selection as a `radiogroup` of `radio` choices with
   one roving tab stop and Arrow/Home/End navigation; expose multiple selection as pressed toggle
   buttons. Keep the custom-answer lane available in both modes.
-- Context bundle review is a default product surface before/inside planning: separate used
-  context, skipped/unread context, permission/setup gaps, and unresolved decomposition risks
-  without exposing raw prompts or traces, and omit empty buckets.
+- Context provenance stays honest without a dedicated review page: the planning session's
+  landing carries disclosed assumptions and open gaps in product language; raw prompts and
+  traces stay behind developer mode.
 - Evidence is trustworthy UI: completion, progress, warnings, and quality claims show the
   evidence or review path behind them without exposing private chain-of-thought. The Journey's
-  station sheets and Journal are read-only receipts derived from real orchestration state — bind
-  them to real data with honest empty states; never fabricate rows.
-- Eval is the trust center for an aim: its default view makes evidence, matched rule/evaluator,
-  trust score, missing/low-trust proof, and learned-context review clear without sending users
-  to Settings or debug surfaces. Empty Context Inbox states do not render a full review block.
-- Completed aims use the Eval stage for a factual, compact completion recap (final outcome,
-  completed sub-aims, passing evidence, eval result, learned context, future reuse). Not a
-  celebration or marketing page.
+  plan-row receipts (evidence review + evaluator matches) and Journal are read-only receipts
+  derived from real orchestration state — bind them to real data with honest empty states;
+  never fabricate rows.
+- Eval is trust shown in place: each plan row carries its eval verdict and opens its evidence
+  review and evaluator matches inline behind closed disclosures. Pending context candidates
+  render as an inline review band on the Journey only when they exist; an empty inbox renders
+  nothing.
+- Completed aims lead the Journey with a factual, compact completion recap (final outcome,
+  completed sub-aims, passing evidence, eval result, learned context, future reuse) in place
+  of the live lane and plan rows. Not a celebration or marketing page.
 
 ## Desktop Information Architecture
 
@@ -250,14 +244,12 @@ Reference links:
   collapsed, hovering the button or the 32px left-edge rail reveals a transient overlay peek
   sidebar without resizing the workspace. In fullscreen the product toggle moves left into
   traffic-light-safe space, but native traffic lights must remain in the revealed system titlebar.
-- Center workspace: a constrained-max-width workbench. For a saved aim the default surface is
-  the **Journey** work view (replacing the old `AimOverviewPanel`). **There is no top workbench
-  stage switcher** — the old `.od-stage-nav` strip was removed (Stage 7) because it duplicated the
-  Journey's own 6-station strip above every open goal. The heavier interactive stage panels
-  (Context/Plan/Run/Eval) are unchanged and still reached through the epoch-safe
-  `openCockpitStage(...)` — now via the Journey's own `onOpenStage`, the Cmd/Ctrl+1..5 shortcuts,
-  and the Cmd+K command palette. `.od-main` is a single-row grid (`minmax(0,1fr)`); the
-  `.od-workspace` child is the `overflow:auto` scroll container.
+- Center workspace: a constrained-max-width workbench. For a saved aim the ONLY surface is
+  the **Journey** work view. There are no standalone stage pages, no stage switcher, no
+  station strip, and no Cmd+1..5 stage shortcuts — `CockpitStage` is just
+  `aim | settings | memory` and the palette carries Home / New aim / Settings. `.od-main` is
+  a single-row grid (`minmax(0,1fr)`); the `.od-workspace` child is the `overflow:auto`
+  scroll container.
 - **Goal-first front door (shipped, Stage 6–7).** Submitting a New Aim mints a plan-less Goal
   *shell* immediately (`createAim` → `createAimShell`) and mounts its Journey — it never routes
   through an unsaved-aim intake funnel. The shell shows a "Turn this aim into a plan" card;
@@ -270,20 +262,21 @@ Reference links:
   funnel is gone. A composer draft is autosaved while typing but discarded when the shell is
   created; resuming any older draft lands back in the composer, never a funnel.
 - **The Journey work surface** renders from pure, unit-tested helpers under
-  `renderer/workflow/journey/` off the existing `AimProgressReadModel` (+ the run-event journal
-  and the aim's memories): a 6-station strip (Aim · Research · Context · Plan · Run · Eval) with
-  one-line summaries — only the **active** station carries a visible (pulsing accent) dot;
-  done/living/partial/up stations stay dot-free with the summary line and muted "up" name
-  carrying state (never color-only). The header meta reads as the completion **percent** (exact
-  fraction on the accessible name/tooltip; hidden for a plan-less shell). Below: a single
-  "Your move" card (reusing the Execute stage's `executePrimaryAction` mapping) or an "Ambient"
-  card when an agent is running or the aim is idle/complete; a "Turns" roster of who is doing
-  what now; and a "Journal" ledger merging appended evidence with run-lifecycle events,
-  newest-first. Clicking a station opens a
-  read-only **sheet** (local component state — it never touches the workspace/surface navigation
-  epochs and clears on any real navigation); the sheet footer CTA routes into the interactive
-  stage via `openCockpitStage`. Research is a real `@core`-derived station (gathered-context
-  signal) shown as a read-only receipt; do not fabricate demo content.
+  `renderer/workflow/journey/` (yourMove, journal) off the existing `AimProgressReadModel` +
+  the run-event journal. Top to bottom: the header (title · inline rename · completion
+  **percent**, exact fraction on the accessible name; "N turns elsewhere" jump chip);
+  exactly ONE live-lane card (planning session ▸ build-plan ▸ "Your move" via the
+  `executePrimaryAction` mapping ▸ ambient); the **plan band** (`JourneyPlanBand`) — one row
+  per sub-aim (pulsing dot only while its work is in flight, title, route + evidence meta,
+  owner chip, status pill) that expands IN PLACE to the full work detail: blocker, live run
+  line with Stop, stranded-run recovery, per-session run-permission consent, one primary
+  action, secondary run/proof/break-down actions, eval receipts (evidence review + evaluator
+  matches) behind closed disclosures, and the run timeline. The "Your move" CTA lands on its
+  own plan row (proof opens that row's evidence form in place; review/blocked expand the
+  row). Below: the inline context-candidate band (only when candidates exist) and the Journal
+  as a quiet closed-by-default `<details>` disclosure merging evidence with run-lifecycle
+  events, newest-first. A completed aim replaces the live lane + plan band with the
+  completion recap. Re-plan is a quiet control on the plan band head.
 - Status markers (re-synced): sidebar aim rows mark only the states that ask for the user's
   attention — needs-you (`--acc` accent dot) and blocked (`--danger`) — with accessible names;
   running/planning/complete rows stay unmarked so the strip reads calm. Home cards carry the
@@ -295,12 +288,10 @@ Reference links:
   `listAimProgressSummaries` endpoint, not N per-aim progress calls.
 - Optional inspector: process/context/quality/activity/debug detail may exist as an opt-in
   overlay/drawer/developer surface — independently scrollable, never displacing the primary task.
-- Stage model: Aim, Context, Plan/Contracts, Execute/Work, Eval/Review are iterative workbench
-  surfaces, not a strict wizard. The Journey's own 6-station strip is the navigation surface
-  (there is no separate top mode switcher); each full-page stage presents a single dominant action
-  and is opened from the Journey / palette / keyboard, not a persistent segmented control.
-- Existing aims open to the Journey (aim overview) first, not Run details; completed aims
-  (`completion_recap.complete`) open Eval with the recap.
+- Stage model (collapsed): `aim | settings | memory`. The Journey IS the work model — planning,
+  answering, plan review, dispatching, proof, and eval receipts all happen on it in place.
+  Settings and Memory are overlay detours that return to it. Existing aims open to the Journey;
+  completed aims lead it with the completion recap.
 - Settings (re-synced IA, sidebar-nav revision): while Settings is open the SIDEBAR swaps its aim
   list for the settings navigation — the brand row and the bottom account trigger stay; between
   them sit a quiet **Back** row (chevron + label, sub size at 500, `--mut` → `--ink` on hover;
@@ -500,12 +491,11 @@ three-size / ≤500-weight policy).
 - Motion is fast, direct, functional (~120–180ms). The only sanctioned loop is the gentle
   running-status dot pulse; avoid decorative animation. Text must never overlap, clip without
   intentional ellipsis, or occlude neighbors at supported sizes and Chinese/English lengths.
-- Journey drill-in controls follow the shared quiet idiom completely: station tiles and Home cards
-  press with `transform: scale(0.99)` on `:active`; every focusable control (including the journal
-  "view" links) carries the `--od-focus` ring and a ≥24px target. The station "sheet" is a real
-  modal — on open it moves focus into the dialog (the close button), closes on Escape, and restores
-  focus to the control that opened it. Not-started ("up") station names read one level quieter
-  (`--mut`) than done/current ones.
+- Journey controls follow the shared quiet idiom completely: plan rows and Home cards press with
+  `transform: scale(0.99)` on `:active`; every focusable control carries the `--od-focus` ring and
+  a ≥24px target. A plan row is a disclosure button (`aria-expanded`); while a proof draft is open
+  the other rows disable and normal navigation blocks until submit or cancel (the Execute stage's
+  invariant, kept). The journal summary is a real `<details>` summary with a visible focus ring.
 
 ## Voice and Wording
 
@@ -589,7 +579,7 @@ as a working agent, not as a form the user operates.
 
 ## Review Checklist
 
-- Does the screen expose one primary next action (on the Journey, the single "Your move")?
+- Does the screen expose one primary next action (on the Journey, the single live-lane card)?
 - Does the layout preserve the default two-column glass shell unless an opt-in surface is opened?
 - Are type sizes, weights, line heights, and spacing from this file? Every `font-size`,
   `font-weight`, and `letter-spacing` must use a ramp token — no raw numeric values (a test
@@ -601,7 +591,7 @@ as a working agent, not as a form the user operates.
 - Do hover, selected, focus, disabled, loading, error, and empty states exist? Do controls meet
   target-size, contrast, keyboard, and accessible-name expectations (including status dots)?
 - Does the UI stay stable at 960×680 / 760×600 / 640×520 with no horizontal overflow?
-- Are debug/process details outside the default product view; are Journal/sheet rows real (not
-  fabricated)?
+- Are debug/process details outside the default product view; are Journal and receipt rows real
+  (not fabricated)?
 - Is business logic in `@core` (pure, tested) with the app only rendering/bridging?
 - Did any new user design requirement get added back to this file?

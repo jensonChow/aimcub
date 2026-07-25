@@ -1,125 +1,74 @@
 # Aimcub Handoff
 
-Last updated: 2026-07-24
-Branch: `main`, **PUSHED to origin 2026-07-24** (founder authorized; destination
-jensonChow/aimcub verified). All session branches merged and deleted locally. **Planning-agent epic: all four stages MERGED and verified, plus the
-Codex brain — and the FIRST LIVE model-driven end-to-end session succeeded on
-the founder's ChatGPT subscription (gpt-5.5).** The aim
-research/breakdown engine changed shape: from a fixed collector funnel to an
-embedded planning-agent session (the local agent as the aim-breaking brain).
+Last updated: 2026-07-25
+Branch: `aim-surface-collapse` (merge into `main` pending at session end).
+**The UI collapse epic ("agent + plan") is CODE-COMPLETE**: the founder said the
+UI was still too complicated the day after the one-flow shipped; the audit found
+two product generations mounted at once (funnel-era workbench pages beside the
+agent one-flow) with most state rendered 2–4 times. The fix was structural: the
+Journey is now the ONE work surface per aim.
 
-## What merged (four stage branches, in order)
+## What changed (four stages on this branch)
 
-1. `c20a3b71` **planning-session-protocol** — pure session layer in
-   `@aimcub/llm`: phase machine, five projected tools (`ask_user`,
-   `search_memory`, `report_research`, `propose_memory`, `submit_plan`),
-   temporary-chat queue (exactly-once delivery), finish_now, submit/repair
-   with one quality bounce + best-candidate acceptance, honest `finalize()`.
-   `DECOMPOSITION_PLAN_RULES` shared verbatim with the funnel prompt.
-2. `7bb76f8b` **embedded-planning-brain** — `packages/local-agent/planning/`:
-   per-session loopback MCP bridge (bearer token; parked ask_user = held
-   tool response; connection-loss auto-skip; drain-then-close teardown) +
-   embedded session engine (bidirectional stream-json, chat injection,
-   waiting_user pauses the active clock, idle-grace stdin close). Claude
-   adapter implements planning invocations; Codex declines → funnel.
-   Three live-only bugs found by real-CLI smokes and fixed: giant
-   `MCP_TIMEOUT` (startup gate) caused silent hangs; dead `MultiEdit` tool
-   name; stream-json runtimes never exit on their own.
-3. `46548c8b` **desktop-live-planning** — "Build the plan" runs the embedded
-   session when an authenticated Claude CLI exists (funnel = automatic
-   fallback). Context stage mounts the live surface through the existing
-   focused-panel slot; questions render through `ContextClarifyPanel`
-   unchanged; landing mirrors `refinePlan` and commits through
-   `commitShellPlan`; `metadata.planning_session` + pending `agent_inferred`
-   candidates recorded at `updateGoalPlan`; sessions survive navigation and
-   die at `before-quit`. Store carries `planning_session` through draft
-   upserts (clobber regression-tested).
-4. (this branch) **cli-plan-session** — `aimcub plan` runs the same session
-   in the terminal: streamed activity, inline numbered questions, temporary
-   chat lines, `/finish`, `/cancel`; non-TTY runs get a zero-question budget;
-   `--network` grants the brain's web tools (mirrors `aimcub run`);
-   `--funnel` forces the old path; explicit `--agent` never silently falls
-   back. `planningCapableAgentId` is the shared registry-aware gate.
+1. `034569b1` **plan-as-object rows** — the Journey gained `JourneyPlanBand`:
+   one row per sub-aim (owner chip, in-flight dot, status pill, route+evidence
+   meta) expanding in place to the full work detail (blocker, live run + Stop,
+   stranded-run recovery, per-session permission consent, primary action, proof
+   form with the nav lock) plus inline eval receipts (evidence review +
+   evaluator matches). The "Your move" CTA lands on its own row instead of
+   navigating to stages.
+2. `fcb5ecc2` **stations/sheets/turns removed** — the 6-station strip, all
+   station drill-in sheets (7 bodies), and the Turns roster deleted; the journal
+   became a closed-by-default disclosure; pending context candidates became an
+   inline Journey band (the sheet was the only triage surface); Re-plan moved to
+   the plan band head; `JourneyPlanSheetBody` → `JourneyPlanReview`.
+3. `f5e05edf` **standalone stage pages retired** — `CockpitStage` collapsed to
+   `aim | settings | memory`; Context/Contracts/Run/Eval pages, LockedStagePanel,
+   Cmd+1..5, and palette stage entries deleted; every planning failure and
+   refinement lands on the Journey; the completed-aim recap renders at the top
+   of the Journey; `savePlan`/`saveGoal` renderer path deleted (goal-first is
+   the only path); the developer trace panel mounts under the Journey when
+   developer mode is on.
+4. (this commit) **mass deletion + purge** — deleted ContextStage +
+   overview/activity/review panels + contextLoop + contextReview,
+   ExecutePanel, the EvalStage page component (file survives as the receipts
+   module), and ContextSourcesPanel's workbench variant; purged 451 unused
+   i18n keys (en+zh) and ~1,400 lines of dead CSS; docs/memory updated.
 
 ## Verification
 
-- Full gate green after every stage: build 9/9 · typecheck 17/17 · lint 11/11
-  · purity clean · tests: llm 195, local-agent 42, cli 112, desktop 367,
-  store 96 (+ unchanged others).
-- Root `Aimcub.app` repacked + boot-smoked after stages 3 and 4.
-- Live CLI smokes: spawn shape + MCP config registration verified against
-  claude 2.1.191; honest failure paths verified end-to-end.
+- Full gate green after every stage: build 9/9 · typecheck 17/17 · lint 11/11 ·
+  purity clean · desktop tests 335 (Execute-stage behavior tests ported to the
+  plan band, receipts/recap tests ported to the kept components).
+- Renderer mass: ~17.6k → ~14.6k non-test LOC; cockpit.css 7,644 → 6,399 lines;
+  i18n 1,239 → 788 keys. Root `Aimcub.app` repacked + boot-smoked this session.
 
-## Codex brain + live verification (post-epic, same day)
+## What survived, where
 
-5. **codex-planning-brain** — Codex (ChatGPT login) is now a planning brain:
-   `exec --json --sandbox read-only`, streamable-HTTP MCP with the session
-   token as a `token` query param (codex MCP configs cannot set headers),
-   `tool_timeout_sec` raised for parked questions, one-shot stdin (engine
-   closes the pipe after the prompt for non-stream runtimes; chat rides tool
-   replies). `preferredPlanningModel` falls back to the first LIVE-advertised
-   model when the caller names none — the founder's codex default pointed at
-   a server-gated model (`gpt-5.6-sol` → 400) that its installed CLI cannot
-   drive; live lists are the truth, fallback catalogs are not. `aimcub plan`
-   gained `--model`/`--reasoning`.
-6. **Runtime CLIs upgraded + re-verified (2026-07-24)**: claude
-   2.1.191 → 2.1.218 (all nine planning-invocation flags still present;
-   mechanical smoke clean — auth now reports "OAuth session expired", so
-   `claude /login` is a refresh, not a first login) and codex
-   0.142.5 → 0.145.0 (default-model 400 gone; live list now leads with the
-   gpt-5.6 family, so `preferredPlanningModel` auto-selects `gpt-5.6-sol`;
-   full `aimcub plan` session re-verified on the new version). `aimcub plan`
-   now prints which brain model the session resolved to.
-7. **LIVE END-TO-END VERIFIED (2026-07-24)**, twice on gpt-5.5:
-   engine-level with a blocking question (research → parked ask_user →
-   answer → quality bounce → repaired accept, 181s, warn 90/100) and via the
-   real `aimcub plan` binary non-interactively (0 questions by budget →
-   disclosed assumptions + open questions, bounce → accept). Honest gaps
-   named exactly what web-disabled research could not verify.
-8. **ALL FOUR BLUEPRINT ELEMENTS LIVE-VERIFIED IN ONE SESSION
-   (2026-07-24, codex/gpt-5.6-sol, 344s, warn 90/100)** — local research
-   (read the notes/ fixture: extracted audience "~20 engineer friends",
-   3-link cap, missing-URL problem; probed Node version + no-git via
-   read-only shell), web research (13 findings with real URLs across lanes:
-   Buttondown pricing/docs, Substack alternative, CASL compliance from
-   crtc.gc.ca, Node fs docs), temporary chat (mid-session zero-cost
-   constraint reshaped platform choice to free tiers + credential-free
-   generator), and two cardinality-correct single-select questions asked
-   exactly where research could not decide (launch posture, automation
-   level) whose answers redirected subsequent research (private-mode +
-   double-opt-in docs). Interleaving confirmed: research → question →
-   research → question → research → submit. Routing agent-forward (4
-   agent / 2 human).
+- Planning session/funnel: both mount through the Journey's planning slot
+  (`ContextClarifyPanel`, `PlanningSessionPanel` kept).
+- Plan editing/repair: `PlanPanel`/`PlanContractCard` as `JourneyPlanReview`
+  (in-place buffered commit; also the planning landing's review).
+- Work detail internals: `stages/execute/*` helpers + controls (consent,
+  timeline, stranded-run, proof form) — consumed by `JourneyPlanBand`.
+- Receipts: `stages/eval/EvalStage.tsx` = EvidenceReviewList,
+  EvaluatorMatchList, CompletionRecapPanel only.
+- Sources setup: Settings → Research (`ContextSourcesPanel`, settings variant
+  only). Memory page, Home, composer, drafts, funnel fallback: unchanged.
 
 ## Open items
 
-1. **Founder: `claude /login`** — the Claude brain path is still only
-   mechanically live-verified (CLI not authenticated); the Codex path is
-   fully live-verified. First Claude-brain run after login is the remaining
-   smoke.
-2. Desktop chat while a question is parked reaches the brain right after the
-   answer (stream queue) — acceptable; revisit if users expect instant reads.
-3. ~~Renderer capability mirror~~ RESOLVED 2026-07-24: the mirror was the
-   predicted trap — it stayed claude-only after codex became capable, hiding
-   the chip AND silently sending Desktop down the funnel on this codex-only
-   machine. Killed for good: main now ships `planningCapable` on every
-   detection row and the renderer trusts only that flag. The brain chooser
-   chip (Claude Code / Codex, parallel to the model chip) shipped in the
-   same change; `planningBrain` preference honored at session start with
-   stale-pick degradation to Auto.
-4. ~~Push to origin~~ DONE 2026-07-24 (founder authorized).
+1. **Founder look-through** of the collapsed Journey (this epic was executed on
+   the founder's "proceed"; visual acceptance pending).
+2. Prior open items unchanged: founder `claude /login` → first Claude-brain
+   live smoke; Settings → Brain effort/reasoning control; online linked-source
+   connectors reading content; the OSS launch checklist (license → npm org →
+   repo settings → gitleaks → public flip).
 
 ## Next session
 
-Run the first authenticated end-to-end session (Desktop + `aimcub plan`),
-then judge question quality/research depth against the founder's blueprint
-(local+web research · temporary chat · multi-choice). The aim process is now one continuous flow: creating an aim
-auto-starts the session, the Journey hosts everything (questions, chat,
-plan review, save), and brain/model configuration lives in Settings →
-Brain with a quiet status chip linking to it.
-Judge question quality and research depth against the blueprint
-(try `--network` for live web research). Settings → Brain is the canonical
-brain/model surface (shipped); an effort/reasoning control there is the one
-proposed follow-up. The prior OSS-launch
-checklist in git history (license → npm org → repo settings → gitleaks →
-public flip) still stands, unchanged by this epic.
+Have the founder drive one real aim end-to-end on the collapsed surface
+(create → answer → adopt → run/proof → receipts) and collect what still feels
+heavy. Candidate follow-ups only if he flags them: trimming Settings panes,
+Memory palette entry, renaming `stages/execute|eval` directories to match their
+new roles.

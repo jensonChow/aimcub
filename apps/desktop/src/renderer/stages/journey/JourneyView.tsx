@@ -1,140 +1,41 @@
 /**
- * Aimcub Glass — the "Journey" work surface.
+ * Aimcub Glass — the Journey work surface (post-collapse).
  *
- * Replaces the goal landing panel (AimOverviewPanel). It renders the 6-station strip,
- * a single "Your move" card (or an "Ambient" card when nothing is waiting on the user),
- * a "Turns" roster, and a "Journal" receipt timeline — all derived from the existing
- * AimProgressReadModel via the pure helpers in ../../workflow/journey.
+ * One aim, four things: the header (title, rename, completion), exactly one live lane
+ * (planning session / build-plan / "Your move" / ambient), the plan as the object
+ * (JourneyPlanBand — sub-aim rows that expand in place to the full work detail), and a
+ * quiet journal disclosure of receipts. Pending context candidates surface as an inline
+ * review band only when they exist.
  *
- * The station "sheet" is component-local overlay state, keyed by goal id at the mount
- * site, so it never touches the App's workspace/surface navigation epochs and is cleared
- * automatically on any real navigation (stage change unmounts this view; goal change
- * remounts it). Actual mutations route through the existing epoch-safe App handlers.
- *
- * A station sheet can also be *interactive*: the Run station lists the aim's dispatchable
- * agent work as selectable options gated behind a confirm that calls the existing `runAgent`
- * handler in place (see `JourneyRunSheetBody`). Selection is component-local and reset on
- * every station change; the confirm is membership-gated so a background progress refresh
- * can't dispatch a milestone that dropped out of the option set.
+ * The old 6-station strip, the station drill-in sheets, and the Turns roster are gone
+ * (Collapse Stage 2): stations presented the machine, and everything they opened now
+ * lives on the plan rows or in the journal. All derivations still come from the pure
+ * helpers under ../../workflow/journey off the existing AimProgressReadModel.
  */
 import type { AimProgressReadModel, DecompositionOutput, Goal, Memory, Milestone, RunEvent } from "@aimcub/core";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
-import type { ConfirmMilestoneRequest } from "../../../shared/ipc";
+import type { ConfirmMilestoneRequest, RunPermissionConsent } from "../../../shared/ipc";
 import { ContextInbox, type ContextInboxScope } from "../../ContextInbox";
-import type { ContextBundleReview } from "../../contextReview";
 import { useI18n, type StringKey } from "../../i18n";
 import { pendingContextCandidates } from "../../labels";
 import {
-  emptyEvidenceDraft,
-  evidenceDraftIsSubmittable,
-  evidenceSubmissionPayload,
-  type EvidenceSubmissionDraft,
-} from "../../workflow/evidenceSubmission";
-import type { CockpitStage } from "../../workflow/workspaceNavigation";
-import {
   buildJourneyAmbient,
   buildJourneyJournal,
-  buildJourneyStationSheet,
-  buildJourneyStations,
-  buildJourneyTurns,
   buildJourneyYourMove,
-  canConfirmInteraction,
-  resolveSelectedOption,
   type JourneyActorKind,
-  type JourneyChip,
-  type JourneyStationId,
-  type JourneyStationInteraction,
-  type JourneyStationKind,
-  type JourneyStationSheetRow,
 } from "../../workflow/journey";
-import { ContextActivityPanel } from "../context/ContextActivityPanel";
-import type { ContextLoopModel } from "../context/contextLoop";
-import { ContextReviewPanel } from "../context/ContextReviewPanel";
-import { CompletionRecapPanel, EvidenceReviewList } from "../eval/EvalStage";
-import { EvidenceSubmissionForm } from "../execute/EvidenceSubmissionForm";
+import type { CockpitStage } from "../../workflow/workspaceNavigation";
+import { CompletionRecapPanel } from "../eval/EvalStage";
+import type { LiveRunState } from "../execute/liveRun";
 import { PlanPanel, type PlanPanelProps } from "../plan/PlanPanel";
-
-const STATION_NAME_KEY: Record<JourneyStationId, StringKey> = {
-  aim: "glass.station.aim",
-  research: "glass.station.research",
-  context: "glass.station.context",
-  plan: "glass.station.plan",
-  run: "glass.station.run",
-  eval: "glass.station.eval",
-};
-
-/** Static, data-free descriptor shown under each station-sheet title (mirrors the reference sub). */
-const SHEET_SUB_KEY: Record<JourneyStationId, StringKey> = {
-  aim: "glass.journey.sheetSub.aim",
-  research: "glass.journey.sheetSub.research",
-  context: "glass.journey.sheetSub.context",
-  plan: "glass.journey.sheetSub.plan",
-  run: "glass.journey.sheetSub.run",
-  eval: "glass.journey.sheetSub.eval",
-};
-
-const CHIP_KEY: Record<JourneyChip, StringKey> = {
-  "aim": "glass.chip.aim",
-  "owner.you": "glass.chip.you",
-  "owner.agent": "glass.chip.agent",
-  "status.done": "glass.chip.met",
-  "status.open": "glass.chip.open",
-  "status.blocked": "glass.chip.blocked",
-  "eval.met": "glass.chip.met",
-  "eval.open": "glass.chip.open",
-  "context": "glass.chip.context",
-};
+import { JourneyPlanBand } from "./JourneyPlanBand";
 
 const ACTOR_KEY: Record<JourneyActorKind, StringKey> = {
   you: "glass.actor.you",
   agent: "glass.actor.agent",
   cub: "glass.actor.cub",
 };
-
-/** Localized labels for the memory-category `meta` shown on context/research sheet rows. */
-const MEMORY_CAT_KEY: Record<string, StringKey> = {
-  preference: "glass.memory.cat.preference",
-  constraint: "glass.memory.cat.constraint",
-  capability: "glass.memory.cat.capability",
-  eval_signal: "glass.memory.cat.eval_signal",
-  project_fact: "glass.memory.cat.project_fact",
-  procedure: "glass.memory.cat.procedure",
-};
-
-/**
- * Localized labels for the status-token `meta` on plan/run/eval sheet rows (the milestone/run
- * status literals). Free-text metas — e.g. an eval row's `next_action` — are not in this map and
- * pass through verbatim, so `translate()` is never called with an unknown key.
- */
-const STATION_META_KEY: Record<string, StringKey> = {
-  done: "glass.station.meta.done",
-  blocked: "glass.station.meta.blocked",
-  met: "glass.station.meta.met",
-  pending: "glass.station.meta.pending",
-  in_progress: "glass.station.meta.inProgress",
-  completed: "glass.station.meta.completed",
-  skipped: "glass.station.meta.skipped",
-  queued: "glass.station.meta.queued",
-  running: "glass.station.meta.running",
-  failed: "glass.station.meta.failed",
-  cancelled: "glass.station.meta.cancelled",
-};
-
-/** Localizes a status-literal meta (run/milestone status) via `STATION_META_KEY`, else passes it through. */
-function statusMetaLabel(meta: string | undefined, tk: (key: string) => string): string {
-  if (!meta) return "";
-  const key = STATION_META_KEY[meta];
-  return key ? tk(key) : meta;
-}
-
-function stationGlyphClass(kind: JourneyStationKind): string {
-  return `od-journey-dot od-journey-dot-${kind}`;
-}
-
-function chipClass(chip: JourneyChip): string {
-  return `od-journey-chip od-journey-chip-${chip.split(".")[0]}`;
-}
 
 function formatClock(iso: string): string {
   const ms = Date.parse(iso);
@@ -147,175 +48,30 @@ function formatClock(iso: string): string {
 }
 
 /**
- * The interactive body of the Run station sheet: agent-dispatchable milestones as a single-select
- * radiogroup with an enable-gated confirm; human milestones ready for proof as a second, actionable
- * group (each opens the in-sheet evidence form via `onPickEvidence`); and the non-dispatchable
- * remainder read-only below. Stateless and prop-driven so it renders (and is asserted) under
- * `renderToStaticMarkup` — the parent owns the selection/draft state. The evidence group renders as
- * plain read-only rows when `onPickEvidence` is absent (honest: no actionable affordance without a
- * handler).
- */
-export interface JourneyRunSheetBodyProps {
-  interaction: JourneyStationInteraction;
-  selectedOptionId: string | null;
-  disabled: boolean;
-  onSelect: (milestoneId: string) => void;
-  onConfirm: () => void;
-  onPickEvidence?: (milestoneId: string) => void;
-}
-
-export function JourneyRunSheetBody(props: JourneyRunSheetBodyProps) {
-  const { interaction, selectedOptionId, disabled, onSelect, onConfirm, onPickEvidence } = props;
-  const { t } = useI18n();
-  const tk = (key: string, vars?: Record<string, string | number>) => t(key as StringKey, vars);
-  const hasSelection = resolveSelectedOption(interaction.options, selectedOptionId) !== null;
-  const canConfirm = canConfirmInteraction(selectedOptionId, interaction.options, disabled);
-  const hasAgentWork = interaction.options.length > 0;
-
-  return (
-    <div className="od-journey-interactive">
-      {hasAgentWork ? (
-        <div className="od-journey-options" role="radiogroup" aria-label={t("glass.station.run")}>
-          {interaction.options.map((option) => {
-            const selected = option.milestoneId === selectedOptionId;
-            return (
-              <button
-                key={option.milestoneId}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                className={`od-journey-option${selected ? " od-journey-option-open" : ""}`}
-                onClick={() => onSelect(option.milestoneId)}
-              >
-                <span className="od-journey-option-title">{option.text}</span>
-                {option.note ? <span className="od-journey-option-note">{statusMetaLabel(option.note, tk)}</span> : null}
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
-
-      {interaction.evidenceOptions.length > 0 ? (
-        <div className="od-journey-evidence">
-          <span className="od-journey-evidence-label">{t("glass.journey.evidenceGroup")}</span>
-          {interaction.evidenceOptions.map((option) => (onPickEvidence ? (
-            <button
-              key={option.milestoneId}
-              type="button"
-              className="od-journey-evidence-option"
-              disabled={disabled}
-              onClick={() => onPickEvidence(option.milestoneId)}
-            >
-              <span className="od-journey-option-title">{option.text}</span>
-              {option.note ? <span className="od-journey-option-note">{statusMetaLabel(option.note, tk)}</span> : null}
-            </button>
-          ) : (
-            <div className="od-journey-sheet-row" key={option.milestoneId}>
-              <span className={chipClass(option.chip)}>{tk(CHIP_KEY[option.chip])}</span>
-              <span className="od-journey-sheet-text">{option.text}</span>
-            </div>
-          )))}
-        </div>
-      ) : null}
-
-      {interaction.contextRows.length > 0 ? (
-        <div className="od-journey-sheet-rows">
-          {interaction.contextRows.map((row, index) => (
-            <div className="od-journey-sheet-row" key={`ctx-${row.chip}-${index}`}>
-              <span className={chipClass(row.chip)}>{t(CHIP_KEY[row.chip])}</span>
-              <span className="od-journey-sheet-text">{row.text}</span>
-              {row.meta ? <span className="od-journey-sheet-meta">{statusMetaLabel(row.meta, tk)}</span> : null}
-            </div>
-          ))}
-        </div>
-      ) : null}
-
-      {hasAgentWork ? (
-        <div className="od-journey-sheet-hint">
-          <span className="od-journey-sheet-hint-text">{t("glass.journey.interactiveHint")}</span>
-          <button className="od-journey-primary" type="button" disabled={!canConfirm} onClick={onConfirm}>
-            {hasSelection ? t("glass.journey.confirmRun") : t("glass.journey.confirmPick")}
-          </button>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-/**
- * The Context station sheet's interior: the pending-candidate inbox (actionable triage), an
- * honest activity/sufficiency panel shown ONLY while research is live, and a read-only receipt of
- * the context behind the contracts. Stateless and prop-driven so it renders (and is asserted)
- * under `renderToStaticMarkup`; the accept/reject side effects route through the App handlers.
- */
-export interface JourneyContextSheetBodyProps {
-  loop: ContextLoopModel;
-  review: ContextBundleReview;
-  pendingCandidates: Memory[];
-  currentAimTitle: string;
-  disabled: boolean;
-  onAccept: (candidate: Memory, content: string, scope: ContextInboxScope) => void;
-  onReject: (candidate: Memory) => void;
-}
-
-export function JourneyContextSheetBody(props: JourneyContextSheetBodyProps) {
-  const { loop, review, pendingCandidates, currentAimTitle, disabled, onAccept, onReject } = props;
-  const { t } = useI18n();
-  const reviewCount =
-    review.usedContext.length +
-    review.skippedContext.length +
-    review.permissionGaps.length +
-    review.decompositionRisks.length;
-  const hasInbox = pendingCandidates.length > 0;
-  // On a settled goal the activity rows resolve to misleading "waiting" states, so the panel is
-  // shown only when research is actually in flight.
-  const showActivity = loop.hasLiveResearchData;
-  const isEmpty = !hasInbox && !showActivity && reviewCount === 0;
-
-  return (
-    <div className="od-journey-context">
-      {hasInbox ? (
-        <ContextInbox
-          candidates={pendingCandidates}
-          currentAimTitle={currentAimTitle}
-          disabled={disabled}
-          onAccept={onAccept}
-          onReject={onReject}
-        />
-      ) : null}
-      {showActivity ? <ContextActivityPanel model={loop} /> : null}
-      <ContextReviewPanel bundle={review} running={false} compact />
-      {isEmpty ? <p className="od-journey-context-empty">{t("glass.journey.contextEmpty")}</p> : null}
-    </div>
-  );
-}
-
-/**
- * The Plan station sheet's interior. Reuses `PlanPanel` for a saved goal — the node selector + one
- * contract card (why / done-when / evidence / eval-signal / routing / acceptance-rule) + metrics +
+ * The plan-review interior: `PlanPanel` for a saved goal — the node selector + one contract
+ * card (why / done-when / evidence / eval-signal / routing / acceptance-rule) + metrics +
  * validation.
  *
- * Read-only by default (no `onCommitPlan`): `saved` + `onChange={undefined}`, exactly what the old
- * contracts stage shows. When `onCommitPlan` is supplied (Stage 6B), the sheet becomes editable
- * in place: edits buffer into a component-local `editedPlan` (never persisted per-keystroke —
- * `planMerge` matches milestones by title, so a per-keystroke merge would churn ids), and an
- * explicit "Save plan changes" commits the whole buffered plan through the App handler
- * (→ `updateGoalPlan`). The buffer is dropped whenever the underlying saved plan changes (commit /
- * refresh / re-plan), so a background update never fights a stale local edit. Rendered under
- * `renderToStaticMarkup` in tests (hooks are SSR-safe: the reset effect is a no-op there).
+ * Read-only by default (no `onCommitPlan`): `saved` + `onChange={undefined}`. When
+ * `onCommitPlan` is supplied, it becomes editable in place: edits buffer into a
+ * component-local `editedPlan` (never persisted per-keystroke — `planMerge` matches
+ * milestones by title, so a per-keystroke merge would churn ids), and an explicit
+ * "Save plan changes" commits the whole buffered plan through the App handler
+ * (→ `updateGoalPlan`). The buffer is dropped whenever the underlying saved plan changes
+ * (commit / refresh / re-plan), so a background update never fights a stale local edit.
  */
-export type JourneyPlanSheetBodyProps = Pick<
+export type JourneyPlanReviewProps = Pick<
   PlanPanelProps,
   "plan" | "quality" | "review" | "validationErrors" | "routingAgents" | "routingValidation"
 > & {
   disabled: boolean;
-  /** When present, the plan sheet is editable in place; commit persists the buffered plan. */
+  /** When present, the plan review is editable in place; commit persists the buffered plan. */
   onCommitPlan?: (plan: DecompositionOutput) => void;
 };
 
 const NOOP_SAVE = () => {};
 
-export function JourneyPlanSheetBody(props: JourneyPlanSheetBodyProps) {
+export function JourneyPlanReview(props: JourneyPlanReviewProps) {
   const { t } = useI18n();
   const editable = Boolean(props.onCommitPlan);
   const [editedPlan, setEditedPlan] = useState<DecompositionOutput | null>(null);
@@ -363,107 +119,63 @@ export function JourneyPlanSheetBody(props: JourneyPlanSheetBodyProps) {
   );
 }
 
-/**
- * The Eval station sheet's interior: the saved-goal read-only eval review. When the aim is complete
- * it shows the real `CompletionRecapPanel` (the same recap the old Eval stage renders); otherwise it
- * frames every milestone (met/open chip + title + next-action meta, mirroring the flat `evalRows`)
- * and nests the read-only `EvidenceReviewList` under any milestone that already has evidence. Eval
- * has no live milestone-mutation (evidence review is read-only; context-candidate triage lives in the
- * Context sheet), so this body is honest read-only. Stateless; rendered under `renderToStaticMarkup`.
- */
-export interface JourneyEvalSheetBodyProps {
-  progress: AimProgressReadModel;
-}
-
-export function JourneyEvalSheetBody(props: JourneyEvalSheetBodyProps) {
-  const { t } = useI18n();
-  const tk = (key: string) => t(key as StringKey);
-  const { progress } = props;
-
-  if (progress.completion_recap?.complete) {
-    return (
-      <div className="od-journey-eval">
-        <CompletionRecapPanel progress={progress} />
-      </div>
-    );
-  }
-
-  return (
-    <div className="od-journey-eval">
-      {progress.milestones.map((row) => {
-        const chip: JourneyChip = row.eval_review.passed ? "eval.met" : "eval.open";
-        const meta = row.eval_review.passed ? tk("glass.station.meta.met") : row.next_action;
-        return (
-          <div className="od-journey-eval-item" key={row.milestone.id}>
-            <div className="od-journey-eval-head">
-              <span className={chipClass(chip)}>{tk(CHIP_KEY[chip])}</span>
-              <span className="od-journey-eval-title">{row.milestone.title}</span>
-              {meta ? <span className="od-journey-eval-meta">{meta}</span> : null}
-            </div>
-            {row.evidence.length > 0 ? <EvidenceReviewList row={row} compact /> : null}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 export interface JourneyViewProps {
   goal: Goal;
   progress: AimProgressReadModel | null;
   /** The aim's run-lifecycle event stream (loaded separately from progress). */
   runEvents?: RunEvent[];
-  /** Active context/research memories in play for this aim (aim-scoped + global). */
-  researchMemories?: Memory[];
-  /**
-   * Pure Context view-models for the Context station sheet (the saved-goal Context interior).
-   * When present alongside the candidate handlers, the Context sheet hosts the inbox / activity /
-   * review instead of read-only rows.
-   */
-  contextLoop?: ContextLoopModel;
-  contextReview?: ContextBundleReview;
   onAcceptContextCandidate?: (candidate: Memory, content: string, scope: ContextInboxScope) => void;
   onRejectContextCandidate?: (candidate: Memory) => void;
   /**
-   * Pure Plan view-model for the Plan station sheet. When present, the Plan sheet hosts the real
-   * contract interior (`PlanPanel`) instead of flat plan rows. `onCommitPlan` (Stage 6B) makes the
-   * saved-goal Plan drill-in sheet editable in place; omit it for a read-only review.
+   * Pure Plan view-model for the in-place plan review (the plan-ready landing while planning,
+   * and the buffered plan editor for a saved goal). `onCommitPlan` makes it editable in place;
+   * omit it for a read-only review.
    */
   planReview?: Pick<
     PlanPanelProps,
     "plan" | "quality" | "review" | "validationErrors" | "routingAgents" | "routingValidation"
   > & { onCommitPlan?: (plan: DecompositionOutput) => void };
-  /** Re-plan the SAME aim with a fresh planning run (Stage 6B; merges, freezing completed work). */
+  /** Re-plan the SAME aim with a fresh planning run (merges, freezing completed work). */
   onReplan?: () => void;
   /**
-   * Rename the aim's title/description in place (Stage 7; works on a shell or a planned goal — no
-   * plan change). When present, the Journey header shows an inline "Rename" editor. This is a plain
-   * header control, NOT a station interaction, so the journey.test "only Run carries an interactive
-   * payload" invariant is untouched.
+   * Rename the aim's title/description in place (works on a shell or a planned goal — no
+   * plan change). When present, the Journey header shows an inline "Rename" editor.
    */
   onRenameAim?: (input: { title: string; description: string }) => void;
   disabled?: boolean;
   /** Count of OTHER aims with a turn waiting on the user, for the header jump chip. */
   elsewhereCount?: number;
   onOpenStage: (stage: CockpitStage) => void;
-  onRunAgent: (milestone: Milestone) => void;
+  /** Dispatch an agent run. Without consent the App defaults to a read-only, no-network grant. */
+  onRunAgent: (milestone: Milestone, permission?: RunPermissionConsent) => void;
   /**
-   * Submit human evidence for a milestone from the Run sheet's in-place evidence form (the live
-   * `confirmMilestone` App handler). Returns whether the confirm persisted. When present, human
-   * milestones ready for proof become actionable evidence options; otherwise they stay read-only.
+   * The plan band's work-detail wiring (the Execute stage's surface moving home, Collapse
+   * Stage 1). All optional: a Journey without them renders read-only rows.
+   */
+  liveRun?: LiveRunState | null;
+  sessionRunIds?: ReadonlySet<string>;
+  onCancelRun?: (runId: string) => void;
+  onRegrantRun?: (runId: string) => void;
+  onPickRunWorkspace?: () => Promise<string | null>;
+  onBreakDown?: (milestone: Milestone) => void;
+  /** Nav lock while an in-Journey proof draft is open (same contract as the Execute stage). */
+  onProofDraftActiveChange?: (active: boolean) => void;
+  /**
+   * Submit human evidence for a milestone from a plan row's in-place evidence form (the live
+   * `confirmMilestone` App handler). Returns whether the confirm persisted.
    */
   onConfirmMilestone?: (
     milestone: Milestone,
     submission: Omit<ConfirmMilestoneRequest, "goalId" | "milestoneId">,
   ) => Promise<boolean>;
-  /** Pick local files to attach to the in-sheet evidence draft (the App file picker). */
+  /** Pick local files to attach to an in-place evidence draft (the App file picker). */
   onPickEvidenceFiles?: () => Promise<string[]>;
   onNewAim: () => void;
   /** Jump to the next aim with a turn waiting elsewhere (header chip). */
   onJumpElsewhere?: () => void;
   /**
    * Secondary "Your move" / ambient affordances. Each renders only when its handler is
-   * provided; the routing/scheduling backends land in Stage 6, so App passes none today
+   * provided; the routing/scheduling backends have not landed, so App passes none today
    * and these stay hidden (the markup + CSS ship as forward-ready infrastructure).
    */
   onHandToAgent?: () => void;
@@ -471,7 +183,7 @@ export interface JourneyViewProps {
   onLater?: () => void;
   onTakeBack?: () => void;
   /**
-   * Goal-first (Stage 6). Whether a planning runtime is configured — gates the plan-less shell's
+   * Goal-first. Whether a planning runtime is configured — gates the plan-less shell's
    * "build the plan" action (a not-ready shell links to Settings instead of dead-ending).
    */
   planningRuntimeReady?: boolean;
@@ -496,31 +208,28 @@ export interface JourneyViewProps {
 export function JourneyView(props: JourneyViewProps) {
   const { t } = useI18n();
   const tk = (key: string, vars?: Record<string, string | number>) => t(key as StringKey, vars);
-  // Sheet `meta` is a raw memory-category enum only on context/research rows; localize those,
-  // pass other metas (run/eval status, "done"/"blocked") through verbatim.
-  const sheetMetaLabel = (row: JourneyStationSheetRow): string => {
-    if (!row.meta) return "";
-    if (row.chip === "context") {
-      const catKey = MEMORY_CAT_KEY[row.meta];
-      return catKey ? tk(catKey) : row.meta;
-    }
-    return statusMetaLabel(row.meta, tk);
-  };
-  const [openStation, setOpenStation] = useState<JourneyStationId | null>(null);
-  const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
-  // Evidence-form state for the Run sheet. `activeEvidenceMilestoneId` = which human milestone's
-  // form is open (null → the option list); `evidenceDrafts` is a per-milestone draft map that
-  // PERSISTS across sheet open/close (modal-hide, not discard) and is only dropped when a real
-  // navigation unmounts this view (keyed by goal.id). The sheet never touches App nav epochs, so
-  // there is no `onProofDraftActiveChange` nav-lock here — closing the sheet keeps the draft parked.
-  const [activeEvidenceMilestoneId, setActiveEvidenceMilestoneId] = useState<string | null>(null);
-  const [evidenceDrafts, setEvidenceDrafts] = useState<Record<string, EvidenceSubmissionDraft>>({});
-  const [pickingEvidence, setPickingEvidence] = useState(false);
-  const sheetCloseRef = useRef<HTMLButtonElement | null>(null);
-  const sheetTriggerRef = useRef<HTMLElement | null>(null);
-  // In-Journey aim rename (Stage 7): a component-local buffer seeded on open, committed via the
-  // epoch-safe App `onRenameAim` handler. JourneyView is keyed by goal.id in App, so switching aims
-  // remounts and resets this — no reset effect needed.
+  // Plan-band selection: which sub-aim row is expanded, and which one's proof form is open.
+  // Owned here (not in the band) so the "Your move" CTA can land on a row. Keyed by goal.id at
+  // the App mount, so switching aims resets both. The proof form carries the same navigation
+  // lock the Execute stage had, released on unmount so a stale lock can never outlive the view.
+  const [planSelectedId, setPlanSelectedId] = useState<string | null>(null);
+  const [planProofId, setPlanProofId] = useState<string | null>(null);
+  const proofLockRef = useRef(props.onProofDraftActiveChange);
+  useEffect(() => {
+    proofLockRef.current = props.onProofDraftActiveChange;
+  }, [props.onProofDraftActiveChange]);
+  useEffect(() => {
+    return () => proofLockRef.current?.(false);
+  }, []);
+
+  function setProofActive(milestoneId: string | null): void {
+    setPlanProofId(milestoneId);
+    props.onProofDraftActiveChange?.(milestoneId !== null);
+  }
+
+  // In-Journey aim rename: a component-local buffer seeded on open, committed via the
+  // epoch-safe App `onRenameAim` handler. JourneyView is keyed by goal.id in App, so switching
+  // aims remounts and resets this — no reset effect needed.
   const [renaming, setRenaming] = useState(false);
   const [renameTitle, setRenameTitle] = useState("");
   const [renameDescription, setRenameDescription] = useState("");
@@ -591,82 +300,27 @@ export function JourneyView(props: JourneyViewProps) {
     );
   }
 
-  // Modal-sheet focus management: move focus into the dialog on open, close on Escape, and
-  // restore focus to the control that opened it on close. `aria-modal` alone does not do this.
-  // Also resets any interactive selection whenever the open station changes.
-  useEffect(() => {
-    setSelectedOptionId(null);
-    // Return to the option list on any station change; drafts persist in `evidenceDrafts`.
-    setActiveEvidenceMilestoneId(null);
-    if (!openStation) return;
-    sheetTriggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const focusFrame = requestAnimationFrame(() => sheetCloseRef.current?.focus());
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key !== "Escape") return;
-      event.stopPropagation();
-      setOpenStation(null);
-    }
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      cancelAnimationFrame(focusFrame);
-      window.removeEventListener("keydown", onKeyDown, true);
-      const trigger = sheetTriggerRef.current;
-      sheetTriggerRef.current = null;
-      if (trigger) requestAnimationFrame(() => trigger.focus());
-    };
-  }, [openStation]);
-
   if (!progress) {
     return (
       <section className="od-journey" data-od-id="journey-view">
         <header className="od-journey-head">
           {renderAimHead(t("glass.journey.noPlan"))}
         </header>
-        <button className="od-journey-primary" type="button" onClick={() => props.onOpenStage("context")}>
-          {t("glass.journey.noPlanCta")}
-        </button>
       </section>
     );
   }
 
-  const researchMemories = props.researchMemories ?? [];
-  const stations = buildJourneyStations(progress, researchMemories);
   const move = buildJourneyYourMove(progress, t);
   const ambient = buildJourneyAmbient(progress);
-  const turns = buildJourneyTurns(progress, t, Date.now());
   const journal = buildJourneyJournal(progress, props.runEvents ?? []);
-  const sheet = openStation ? buildJourneyStationSheet(openStation, progress, researchMemories) : null;
   // The header meta reads as the design's completion percent; the exact fraction stays
   // on the accessible name/tooltip.
   const headMeta = progress.total_milestones > 0
     ? `${Math.round((progress.completed_milestones / progress.total_milestones) * 100)}%`
     : "";
-  // The Context station sheet hosts the live saved-goal Context interior when App supplies the
-  // pure view-models + candidate handlers; otherwise it falls back to read-only rows.
-  const contextBody =
-    sheet?.station === "context" && props.contextLoop && props.contextReview
-      && props.onAcceptContextCandidate && props.onRejectContextCandidate
-      ? {
-          loop: props.contextLoop,
-          review: props.contextReview,
-          onAccept: props.onAcceptContextCandidate,
-          onReject: props.onRejectContextCandidate,
-        }
-      : null;
-  // The Plan station sheet hosts the saved-goal read-only plan review (the real contract interior)
-  // when App supplies the pure plan view-model; otherwise it falls back to flat plan rows.
-  const planBody = sheet?.station === "plan" && props.planReview ? props.planReview : null;
-  // The Eval station sheet hosts the saved-goal read-only eval review (recap or per-milestone
-  // evidence). All the data is already in `progress`, so this is gated purely on the open station.
-  const evalBody = sheet?.station === "eval" ? progress : null;
-  // The Run sheet's in-place evidence form: the human milestone whose form is open, membership-checked
-  // against the CURRENT interaction so a background refresh that drops it falls back to the option list.
-  const activeEvidenceOption = sheet?.interaction && activeEvidenceMilestoneId
-    ? sheet.interaction.evidenceOptions.find((option) => option.milestoneId === activeEvidenceMilestoneId) ?? null
-    : null;
-  const activeEvidenceMilestone = activeEvidenceOption
-    ? progress.milestones.find((row) => row.milestone.id === activeEvidenceOption.milestoneId)?.milestone ?? null
-    : null;
+  const pendingCandidates = pendingContextCandidates(progress.context_candidates);
+  const acceptCandidate = props.onAcceptContextCandidate;
+  const rejectCandidate = props.onRejectContextCandidate;
   const elsewhereCount = props.elsewhereCount ?? 0;
   const showElsewhere = elsewhereCount > 0 && Boolean(props.onJumpElsewhere);
   const hasMoveSecondary = Boolean(props.onHandToAgent || props.onSchedule || props.onLater);
@@ -681,97 +335,93 @@ export function JourneyView(props: JourneyViewProps) {
       props.onRunAgent(moveMilestone);
       return;
     }
-    props.onOpenStage(move.kind === "review_eval" ? "eval" : "run");
+    // The move resolves on its own plan row: proof opens the row's evidence form in place,
+    // review/blocked expand the row (receipts and blocker detail are inline). A move whose
+    // milestone left the model between refreshes is stale — expanding nothing is honest.
+    setPlanSelectedId(move.milestoneId);
+    if (move.kind === "submit_proof" && moveMilestone) setProofActive(moveMilestone.id);
   }
 
-  function confirmInteraction(): void {
-    if (!progress || !sheet?.interaction) return;
-    if (!canConfirmInteraction(selectedOptionId, sheet.interaction.options, Boolean(props.disabled))) return;
-    const option = resolveSelectedOption(sheet.interaction.options, selectedOptionId);
-    if (!option) return;
-    const milestone = progress.milestones.find((row) => row.milestone.id === option.milestoneId)?.milestone;
-    if (!milestone) return;
-    props.onRunAgent(milestone);
-    setOpenStation(null);
-  }
+  const headerEl = (
+    <header className="od-journey-head">
+      {renderAimHead(t("glass.journey.headerSub"))}
+      <div className="od-journey-head-meta">
+        {showElsewhere ? (
+          <button
+            className="od-journey-elsewhere"
+            type="button"
+            onClick={props.onJumpElsewhere}
+            title={t("glass.journey.headerSub")}
+          >
+            {elsewhereCount === 1
+              ? t("glass.journey.turnsElsewhereOne")
+              : tk("glass.journey.turnsElsewhereMany", { n: elsewhereCount })}
+          </button>
+        ) : null}
+        {headMeta ? (
+          <span
+            className="od-journey-meta"
+            aria-label={tk("shell.progressValue", { done: progress.completed_milestones, total: progress.total_milestones })}
+            title={tk("shell.progressValue", { done: progress.completed_milestones, total: progress.total_milestones })}
+          >
+            {headMeta}
+          </span>
+        ) : null}
+      </div>
+    </header>
+  );
 
-  async function pickEvidenceFiles(milestone: Milestone): Promise<void> {
-    if (!props.onPickEvidenceFiles) return;
-    setPickingEvidence(true);
-    try {
-      const paths = await props.onPickEvidenceFiles();
-      if (paths.length === 0) return;
-      setEvidenceDrafts((current) => {
-        const base = current[milestone.id] ?? emptyEvidenceDraft(milestone);
-        return { ...current, [milestone.id]: { ...base, filePaths: [...new Set([...base.filePaths, ...paths])] } };
-      });
-    } finally {
-      setPickingEvidence(false);
-    }
-  }
+  const inboxEl = pendingCandidates.length > 0 && acceptCandidate && rejectCandidate ? (
+    <div className="od-journey-inbox" data-od-id="journey-inbox">
+      <ContextInbox
+        candidates={pendingCandidates}
+        currentAimTitle={goal.title}
+        disabled={Boolean(props.disabled)}
+        onAccept={acceptCandidate}
+        onReject={rejectCandidate}
+      />
+    </div>
+  ) : null;
 
-  async function submitEvidence(milestone: Milestone): Promise<void> {
-    if (!props.onConfirmMilestone) return;
-    const draft = evidenceDrafts[milestone.id] ?? emptyEvidenceDraft(milestone);
-    if (!evidenceDraftIsSubmittable(draft)) return;
-    const ok = await props.onConfirmMilestone(milestone, evidenceSubmissionPayload(draft));
-    // On failure keep the form + draft open — App surfaces the error banner. On success drop the draft.
-    if (!ok) return;
-    setActiveEvidenceMilestoneId(null);
-    setEvidenceDrafts((current) => {
-      const next = { ...current };
-      delete next[milestone.id];
-      return next;
-    });
+  const journalEl = (
+    <details className="od-journey-journal">
+      <summary className="od-journey-journal-head">
+        <span className="od-journey-eyebrow">{t("glass.journey.journalTitle")}</span>
+        <span className="od-journey-journal-hint">{t("glass.journey.journalHint")}</span>
+      </summary>
+      {journal.length === 0 ? (
+        <div className="od-journey-journal-empty">{t("glass.journal.empty")}</div>
+      ) : (
+        journal.map((entry) => (
+          <div className="od-journey-journal-row" key={entry.id}>
+            <span className="od-journey-journal-time">{formatClock(entry.at)}</span>
+            <span className={`od-journey-chip od-journey-chip-${entry.who}`}>{tk(ACTOR_KEY[entry.who])}</span>
+            <span className="od-journey-journal-what">
+              {entry.what || (entry.detailKey ? tk(`glass.journal.event.${entry.detailKey}`) : "")}
+            </span>
+          </div>
+        ))
+      )}
+    </details>
+  );
+
+  // A completed aim leads with its factual recap (final outcome, sub-aims, evidence, eval,
+  // learned context) — the live lane and plan rows would only restate it. Candidate triage
+  // and the journal stay: they are the recap's decision moment and its receipts.
+  if (progress.completion_recap?.complete) {
+    return (
+      <section className="od-journey" data-od-id="journey-view">
+        {headerEl}
+        <CompletionRecapPanel progress={progress} />
+        {inboxEl}
+        {journalEl}
+      </section>
+    );
   }
 
   return (
     <section className="od-journey" data-od-id="journey-view">
-      <header className="od-journey-head">
-        {renderAimHead(t("glass.journey.headerSub"))}
-        <div className="od-journey-head-meta">
-          {showElsewhere ? (
-            <button
-              className="od-journey-elsewhere"
-              type="button"
-              onClick={props.onJumpElsewhere}
-              title={t("glass.journey.headerSub")}
-            >
-              {elsewhereCount === 1
-                ? t("glass.journey.turnsElsewhereOne")
-                : tk("glass.journey.turnsElsewhereMany", { n: elsewhereCount })}
-            </button>
-          ) : null}
-          {headMeta ? (
-            <span
-              className="od-journey-meta"
-              aria-label={tk("shell.progressValue", { done: progress.completed_milestones, total: progress.total_milestones })}
-              title={tk("shell.progressValue", { done: progress.completed_milestones, total: progress.total_milestones })}
-            >
-              {headMeta}
-            </span>
-          ) : null}
-        </div>
-      </header>
-
-      <div className="od-journey-stations" role="group" aria-label={t("cockpit.workflow")}>
-        {stations.map((station) => (
-          <button
-            key={station.id}
-            type="button"
-            className={`od-journey-station${station.kind === "up" ? " od-journey-station-up" : ""}${openStation === station.id ? " od-journey-station-open" : ""}`}
-            onClick={() => setOpenStation(station.id)}
-          >
-            <span className="od-journey-station-name">
-              <i className={stationGlyphClass(station.kind)} aria-hidden="true" />
-              {tk(STATION_NAME_KEY[station.id])}
-            </span>
-            <span className="od-journey-station-line">
-              {tk(`glass.station.line.${station.lineKey}`, station.lineVars)}
-            </span>
-          </button>
-        ))}
-      </div>
+      {headerEl}
 
       {props.planning ? (
         <div className="od-journey-planning" data-od-id="journey-planning">
@@ -780,7 +430,7 @@ export function JourneyView(props: JourneyViewProps) {
           ) : props.planning.planReady && props.planReview ? (
             <div className="od-journey-planning-review">
               <div className="od-journey-eyebrow">{t("glass.journey.planReviewTitle")}</div>
-              <JourneyPlanSheetBody {...props.planReview} onCommitPlan={undefined} disabled={props.planning.busy} />
+              <JourneyPlanReview {...props.planReview} onCommitPlan={undefined} disabled={props.planning.busy} />
               <div className="od-journey-move-actions">
                 <button
                   className="od-journey-primary"
@@ -875,165 +525,31 @@ export function JourneyView(props: JourneyViewProps) {
         </div>
       )}
 
-      {turns.length > 0 ? (
-        <div className="od-journey-turns">
-          <div className="od-journey-eyebrow">{t("glass.journey.turnsTitle")}</div>
-          {turns.map((turn, index) => (
-            <div className="od-journey-turn" key={`${turn.who}-${index}`}>
-              <span className={`od-journey-chip od-journey-chip-${turn.who}`}>{turn.label}</span>
-              <span className="od-journey-turn-doing">{turn.doing}</span>
-              {turn.since ? <span className="od-journey-turn-since">{turn.since}</span> : null}
-            </div>
-          ))}
-        </div>
+      {progress.total_milestones > 0 ? (
+        <JourneyPlanBand
+          progress={progress}
+          runEvents={props.runEvents}
+          disabled={Boolean(props.disabled)}
+          liveRun={props.liveRun}
+          sessionRunIds={props.sessionRunIds}
+          selectedMilestoneId={planSelectedId}
+          onSelectMilestone={setPlanSelectedId}
+          activeProofId={planProofId}
+          onProofActiveChange={setProofActive}
+          onCancelRun={props.onCancelRun}
+          onRegrantRun={props.onRegrantRun}
+          onPickRunWorkspace={props.onPickRunWorkspace}
+          onRunAgent={props.onRunAgent}
+          onConfirmMilestone={props.onConfirmMilestone}
+          onPickEvidenceFiles={props.onPickEvidenceFiles}
+          onBreakDown={props.onBreakDown}
+          onReplan={props.onReplan}
+        />
       ) : null}
 
-      <div className="od-journey-journal">
-        <div className="od-journey-journal-head">
-          <span className="od-journey-eyebrow">{t("glass.journey.journalTitle")}</span>
-          <span className="od-journey-journal-hint">{t("glass.journey.journalHint")}</span>
-        </div>
-        {journal.length === 0 ? (
-          <div className="od-journey-journal-empty">{t("glass.journal.empty")}</div>
-        ) : (
-          journal.map((entry) => (
-            <div className="od-journey-journal-row" key={entry.id}>
-              <span className="od-journey-journal-time">{formatClock(entry.at)}</span>
-              <span className={`od-journey-chip od-journey-chip-${entry.who}`}>{tk(ACTOR_KEY[entry.who])}</span>
-              <span className="od-journey-journal-what">
-                {entry.what || (entry.detailKey ? tk(`glass.journal.event.${entry.detailKey}`) : "")}
-              </span>
-              {entry.stationId ? (
-                <button
-                  className="od-journey-journal-view"
-                  type="button"
-                  aria-label={`${t("glass.journey.view")} · ${tk(STATION_NAME_KEY[entry.stationId])}`}
-                  onClick={() => setOpenStation(entry.stationId ?? null)}
-                >
-                  {t("glass.journey.view")}
-                </button>
-              ) : null}
-            </div>
-          ))
-        )}
-      </div>
+      {inboxEl}
 
-      {sheet ? (
-        <div
-          className="od-journey-sheet-scrim"
-          role="presentation"
-          onClick={() => setOpenStation(null)}
-        >
-          <div
-            className="od-journey-sheet"
-            role="dialog"
-            aria-modal="true"
-            aria-label={tk(STATION_NAME_KEY[sheet.station])}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="od-journey-sheet-head">
-              <span className="od-journey-sheet-title">{tk(STATION_NAME_KEY[sheet.station])}</span>
-              <span className="od-journey-sheet-sub">{t(SHEET_SUB_KEY[sheet.station])}</span>
-              <button
-                ref={sheetCloseRef}
-                className="od-journey-sheet-close"
-                type="button"
-                aria-label={t("glass.journey.close")}
-                onClick={() => setOpenStation(null)}
-              >
-                ✕
-              </button>
-            </div>
-            {sheet.interaction ? (
-              activeEvidenceMilestone ? (
-                <EvidenceSubmissionForm
-                  milestone={activeEvidenceMilestone}
-                  draft={evidenceDrafts[activeEvidenceMilestone.id] ?? emptyEvidenceDraft(activeEvidenceMilestone)}
-                  disabled={Boolean(props.disabled)}
-                  pickingFiles={pickingEvidence}
-                  onChange={(draft) => setEvidenceDrafts((current) => ({ ...current, [activeEvidenceMilestone.id]: draft }))}
-                  onPickFiles={() => void pickEvidenceFiles(activeEvidenceMilestone)}
-                  onCancel={() => setActiveEvidenceMilestoneId(null)}
-                  onSubmit={() => void submitEvidence(activeEvidenceMilestone)}
-                />
-              ) : (
-                <JourneyRunSheetBody
-                  interaction={sheet.interaction}
-                  selectedOptionId={selectedOptionId}
-                  disabled={Boolean(props.disabled)}
-                  onSelect={setSelectedOptionId}
-                  onConfirm={confirmInteraction}
-                  onPickEvidence={props.onConfirmMilestone ? setActiveEvidenceMilestoneId : undefined}
-                />
-              )
-            ) : contextBody ? (
-              <JourneyContextSheetBody
-                loop={contextBody.loop}
-                review={contextBody.review}
-                pendingCandidates={pendingContextCandidates(progress.context_candidates)}
-                currentAimTitle={goal.title}
-                disabled={Boolean(props.disabled)}
-                onAccept={contextBody.onAccept}
-                onReject={contextBody.onReject}
-              />
-            ) : planBody ? (
-              <JourneyPlanSheetBody
-                plan={planBody.plan}
-                quality={planBody.quality}
-                review={planBody.review}
-                validationErrors={planBody.validationErrors}
-                routingAgents={planBody.routingAgents}
-                routingValidation={planBody.routingValidation}
-                onCommitPlan={planBody.onCommitPlan}
-                disabled={Boolean(props.disabled)}
-              />
-            ) : evalBody ? (
-              <JourneyEvalSheetBody progress={evalBody} />
-            ) : sheet.rows.length === 0 ? (
-              <p className="od-journey-sheet-empty">{t("glass.journey.sheetEmpty")}</p>
-            ) : (
-              <div className="od-journey-sheet-rows">
-                {sheet.rows.map((row, index) => (
-                  <div className="od-journey-sheet-row" key={`${row.chip}-${index}`}>
-                    <span className={chipClass(row.chip)}>{tk(CHIP_KEY[row.chip])}</span>
-                    <span className="od-journey-sheet-text">{row.text}</span>
-                    {row.meta ? <span className="od-journey-sheet-meta">{sheetMetaLabel(row)}</span> : null}
-                  </div>
-                ))}
-              </div>
-            )}
-            {sheet.actionStage || (sheet.station === "plan" && props.onReplan) ? (
-              <div className="od-journey-sheet-foot">
-                {sheet.station === "plan" && props.onReplan ? (
-                  <button
-                    className="od-journey-secondary"
-                    type="button"
-                    onClick={() => {
-                      setOpenStation(null);
-                      props.onReplan?.();
-                    }}
-                  >
-                    {t("glass.journey.replan")}
-                  </button>
-                ) : null}
-                {sheet.actionStage ? (
-                  <button
-                    className="od-journey-secondary"
-                    type="button"
-                    onClick={() => {
-                      const stage = sheet.actionStage;
-                      setOpenStation(null);
-                      if (stage) props.onOpenStage(stage);
-                    }}
-                  >
-                    {t("glass.journey.continue")}
-                  </button>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
+      {journalEl}
     </section>
   );
 }

@@ -94,12 +94,12 @@ describe("live run state", () => {
     expect(isTerminalRunEvent({ type: "agent.stderr", summary: "" })).toBe(false);
   });
 
-  it("is wired into the Execute stage and the App run subscription", () => {
-    const panel = readFileSync(new URL("./ExecutePanel.tsx", import.meta.url), "utf8");
+  it("is wired into the Journey plan band and the App run subscription", () => {
+    const panel = readFileSync(new URL("../journey/JourneyPlanBand.tsx", import.meta.url), "utf8");
     const app = readFileSync(new URL("../../App.tsx", import.meta.url), "utf8");
 
-    // The stage renders the live line for the selected sub-aim, with a way to stop the run.
-    expect(panel).toContain("liveRunForMilestone(props.liveRun ?? null, selectedRow.milestone.id)");
+    // The band renders the live line for the open sub-aim row, with a way to stop the run.
+    expect(panel).toContain("liveRunForMilestone(props.liveRun ?? null, row.milestone.id)");
     expect(panel).toContain('t("execute.cancelRun")');
     // The window subscribes once and refreshes derived progress when a run settles.
     expect(app).toContain("window.aimcub.onRunLiveEvent((live) => {");

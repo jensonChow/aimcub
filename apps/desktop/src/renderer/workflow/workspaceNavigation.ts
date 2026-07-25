@@ -1,4 +1,12 @@
-export type CockpitStage = "aim" | "context" | "contracts" | "run" | "eval" | "settings" | "memory";
+/**
+ * The collapsed navigation model (Collapse Stage 3): one work surface per target.
+ *
+ * A goal's whole loop — planning, work, proof, receipts — lives on the Journey ("aim").
+ * Settings and Memory are overlay stages that return to it. The old workbench stages
+ * (context / contracts / run / eval) are gone; their essential controls live on the
+ * Journey's plan rows and live lane.
+ */
+export type CockpitStage = "aim" | "settings" | "memory";
 export type WorkbenchStage = Exclude<CockpitStage, "settings" | "memory">;
 export type WorkspaceTarget =
   | { kind: "home" }
@@ -17,10 +25,6 @@ export interface DraftActivationTracker {
   isCurrent(token: DraftActivationToken): boolean;
 }
 
-export const WORKBENCH_STAGE_IDS = ["aim", "context", "contracts", "run", "eval"] as const satisfies readonly WorkbenchStage[];
-
-export const DRAFT_WORKBENCH_STAGE_IDS = ["aim", "context", "contracts"] as const satisfies readonly WorkbenchStage[];
-
 interface WorkspaceTargetInput {
   selectedGoalId: string | null;
   activeDraftId: string | null;
@@ -32,28 +36,6 @@ export function deriveWorkspaceTarget(input: WorkspaceTargetInput): WorkspaceTar
   if (input.activeDraftId) return { kind: "draft", id: input.activeDraftId };
   if (input.showAimComposer) return { kind: "newAim" };
   return { kind: "home" };
-}
-
-export function availableWorkbenchStages(target: WorkspaceTarget): readonly WorkbenchStage[] {
-  if (target.kind === "goal") return WORKBENCH_STAGE_IDS;
-  if (target.kind === "draft") return DRAFT_WORKBENCH_STAGE_IDS;
-  return ["aim"];
-}
-
-export function hasWorkbenchNavigation(target: WorkspaceTarget): boolean {
-  return target.kind === "draft" || target.kind === "goal";
-}
-
-export function isWorkbenchStageAvailable(target: WorkspaceTarget, stage: CockpitStage): stage is WorkbenchStage {
-  return stage !== "settings" && stage !== "memory" && availableWorkbenchStages(target).includes(stage);
-}
-
-export function settingsReturnStage(
-  target: WorkspaceTarget,
-  activeStage: CockpitStage,
-  currentReturnStage: WorkbenchStage,
-): WorkbenchStage {
-  return isWorkbenchStageAvailable(target, activeStage) ? activeStage : currentReturnStage;
 }
 
 export function createDraftActivationTracker(): DraftActivationTracker {

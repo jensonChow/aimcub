@@ -5,16 +5,16 @@ import { describe, expect, it } from "vitest";
 
 import { routingRecommendationForPlanNode, type RoutingRuntimeAgentOption } from "@aimcub/core";
 import type { AimDraft, AimProgressReadModel, DecompositionOutput, Goal, Milestone } from "@aimcub/types";
-import type { ContextSourceStatus, GoalDetail, ProviderStatus, WebResearchStatus } from "../shared/ipc";
+import type { ContextSourceStatus, ProviderStatus, WebResearchStatus } from "../shared/ipc";
 
 import { App, SettingsPanel, SettingsSidebarNav } from "./App";
 import { DeveloperModeProvider } from "./developerMode";
 import { StoreDiagnosticsBanner } from "./StoreDiagnosticsBanner";
 import { HomeView } from "./stages/home/HomeView";
-import { CockpitShell, WORKBENCH_STAGE_IDS } from "./CockpitShell";
+import { CockpitShell } from "./CockpitShell";
 import { I18nProvider, STRINGS } from "./i18n";
 import { EvidenceSubmissionForm } from "./stages/execute/EvidenceSubmissionForm";
-import { ExecutePanel } from "./stages/execute/ExecutePanel";
+import { JourneyPlanBand } from "./stages/journey/JourneyPlanBand";
 import { LocalAgentExecutionSummary } from "./stages/execute/LocalAgentExecutionSummary";
 import { PlanContractCard } from "./stages/plan/PlanContractCard";
 import { PlanPanel } from "./stages/plan/PlanPanel";
@@ -352,22 +352,20 @@ function renderExecute(
   rows: AimProgressReadModel["milestones"],
   options: { sessionRunIds?: ReadonlySet<string> } = {},
 ): string {
-  const detail: GoalDetail = {
-    goal: savedGoal,
-    milestones: rows.map((row) => row.milestone),
-  };
   return renderToStaticMarkup(
     <I18nProvider>
-      <ExecutePanel
-        detail={detail}
+      <JourneyPlanBand
         progress={executeProgress(rows)}
         disabled={false}
         sessionRunIds={options.sessionRunIds ?? new Set()}
+        selectedMilestoneId={rows[0]?.milestone.id ?? null}
+        onSelectMilestone={noop}
+        activeProofId={null}
+        onProofActiveChange={noop}
         onRunAgent={noop}
-        onConfirm={asyncTrue}
-        onPickFiles={async () => []}
+        onConfirmMilestone={asyncTrue}
+        onPickEvidenceFiles={async () => []}
         onBreakDown={noop}
-        onReviewEval={noop}
       />
     </I18nProvider>,
   );
@@ -405,25 +403,23 @@ describe("EvidenceSubmissionForm", () => {
   });
 });
 
-describe("ExecutePanel", () => {
-  it("keeps the Execute stage out of the App controller body", () => {
+describe("JourneyPlanBand work detail (the Execute stage's surface, ported home)", () => {
+  it("keeps the work detail out of the App controller body", () => {
     const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
 
-    expect(source).not.toContain("export function ExecutePanel");
-    expect(source).not.toContain("function ExecutePanel");
+    expect(source).not.toContain("ExecutePanel");
     expect(source).not.toContain('className="od-execute-layout"');
     expect(source).not.toContain("activeProofId");
   });
 
-  it("renders a selected-work surface with a compact sub-aim selector", () => {
+  it("renders plan rows with the selected row's work detail expanded in place", () => {
     const html = renderExecute([
       executeRow({ id: AGENT_MILESTONE, title: "Run implementation agent", owner: "agent" }),
       executeRow({ id: HUMAN_MILESTONE, title: "Submit launch approval", owner: "human" }),
     ]);
 
-    expect(html).toContain('class="od-execute-layout"');
-    expect(html).toContain('aria-label="Sub-aims"');
-    expect(html).toContain('aria-label="Selected work detail"');
+    expect(html).toContain("journey-plan-band");
+    expect(html).toContain("journey-planrow-detail");
     expect(html).toContain("Run implementation agent");
     expect(html).toContain("Agent route");
     expect(html).toContain("Human route");
@@ -457,7 +453,7 @@ describe("ExecutePanel", () => {
     expect(html).not.toContain('<button class="od-aim-secondary" type="button">Run agent</button>');
   });
 
-  it("routes completed and low-trust selected work to Eval review instead of expanding evidence detail", () => {
+  it("shows eval receipts inline for completed and low-trust work — no Eval-stage hop, no primary button", () => {
     const completedHtml = renderExecute([
       executeRow({ id: COMPLETE_MILESTONE, title: "Review completed proof", owner: "agent", completed: true }),
     ]);
@@ -465,11 +461,13 @@ describe("ExecutePanel", () => {
       executeRow({ id: LOW_TRUST_MILESTONE, title: "Inspect low-trust report", owner: "agent", lowTrust: true }),
     ]);
 
-    expect(completedHtml).toContain('<button class="od-aim-primary od-execute-primary-button" type="button">Review in Eval</button>');
-    expect(lowTrustHtml).toContain('<button class="od-aim-primary od-execute-primary-button" type="button">Review in Eval</button>');
-    expect(lowTrustHtml).toContain("Low-trust evidence needs review");
-    expect(lowTrustHtml).not.toContain("Trust is below the floor.");
-    expect(lowTrustHtml).not.toContain('class="od-evidence-review');
+    expect(completedHtml).not.toContain("od-execute-primary-button");
+    expect(lowTrustHtml).not.toContain("od-execute-primary-button");
+    expect(completedHtml).toContain("od-eval-detail-section");
+    expect(lowTrustHtml).toContain("od-eval-detail-section");
+    expect(lowTrustHtml).toContain('class="od-evidence-review');
+    // The review note now IS the inline receipt — the collapse shows it in place.
+    expect(lowTrustHtml).toContain("Trust is below the floor.");
   });
 
   it("keeps Break Down secondary and raw agent deltas hidden", () => {
@@ -518,11 +516,11 @@ describe("ExecutePanel", () => {
   });
 
   it("gives the live run its own Glass row instead of reusing the work-note style", () => {
-    const panel = readFileSync(new URL("./stages/execute/ExecutePanel.tsx", import.meta.url), "utf8");
+    const band = readFileSync(new URL("./stages/journey/JourneyPlanBand.tsx", import.meta.url), "utf8");
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
 
-    expect(panel).toContain('<div className="od-live-run" data-running={running ? "true" : "false"}');
-    expect(panel).not.toMatch(/className="od-work-note" role="status"/);
+    expect(band).toContain('<div className="od-live-run" data-running={live.status === "running" ? "true" : "false"}');
+    expect(band).not.toMatch(/className="od-work-note" role="status"/);
     expect(css).toMatch(/\.od-live-run\s*{[^}]*background:\s*var\(--field\);/s);
     expect(css).toMatch(/\.od-live-run\[data-running="true"\] \.od-live-run-dot\s*{[^}]*animation:\s*od-journey-pulse/s);
   });
@@ -793,16 +791,17 @@ describe("App planning state guards", () => {
     expect(confirmFlow).toContain("return false;");
   });
 
-  it("routes accepted or skipped draft refinements to Contracts", () => {
+  it("keeps accepted or skipped draft refinements on the Journey", () => {
     const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
-    const clarifyPanel = source.match(/const clarifyPanel = clarify[\s\S]*?const planPanel =/)?.[0] ?? "";
-    const refinePlan = source.match(/async function refinePlan[\s\S]*?async function savePlan/)?.[0] ?? "";
+    const clarifyPanel = source.match(/const clarifyPanel = clarify[\s\S]*?const debugPanel =/)?.[0] ?? "";
+    const refinePlan = source.match(/async function refinePlan[\s\S]*?\n {2}\/\/ ── Goal-first/)?.[0] ?? "";
     const builtAnswers = source.match(/const builtAnswers[\s\S]*?const builtIntakeAnswers/)?.[0] ?? "";
     const currentAimDraftInput = source.match(/function currentAimDraftInput[\s\S]*?async function persistCurrentDraftNow/)?.[0] ?? "";
 
     expect(source).toContain("const clarifyPanelActive = clarifyPhase !== null;");
-    expect(clarifyPanel).toMatch(/onSkip=\{clarifyPhase === "intake" \? undefined : \(\) => \{[\s\S]*?setClarifyPhase\(null\);[\s\S]*?openCockpitStage\("contracts"\);/);
-    expect(refinePlan.indexOf("setClarifyPhase(null)")).toBeLessThan(refinePlan.indexOf('setStageOverride("contracts")'));
+    // Skipping refinement stays in place: clear the phase, the in-Journey plan review takes over.
+    expect(clarifyPanel).toContain('onSkip={clarifyPhase === "intake" ? undefined : () => setClarifyPhase(null)}');
+    expect(refinePlan.indexOf("setClarifyPhase(null)")).toBeLessThan(refinePlan.indexOf('setStageOverride("aim")'));
     expect(builtAnswers).toContain('clarifyPhase === "intake" ? null : clarify');
     expect(currentAimDraftInput).toContain('clarify: resetPlanning || clarifyPhase === "intake" ? null : clarify');
     expect(clarifyPanel).toContain('flowKey={activeDraftId ?? selected?.id ?? "new-aim"}');
@@ -822,13 +821,14 @@ describe("App planning state guards", () => {
     expect(continueFromContext).toMatch(/setClarifyPhase\(null\)[\s\S]*?startDraft\(\{ skipIntakeGate: true[^}]*\}\)/);
   });
 
-  it("keeps the Contracts context review compact above the plan", () => {
+  it("has no standalone stage branches left — the Journey is the one work surface", () => {
     const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
-    const contractsStage = source.match(/if \(activeStage === "contracts"\)[\s\S]*?if \(activeStage === "run"\)/)?.[0] ?? "";
 
-    expect(contractsStage).toContain("<ContextReviewPanel");
-    expect(contractsStage).toContain("compact />");
-    expect(contractsStage.indexOf("<ContextReviewPanel")).toBeLessThan(contractsStage.indexOf("{planPanel}"));
+    expect(source).not.toContain('activeStage === "context"');
+    expect(source).not.toContain('activeStage === "contracts"');
+    expect(source).not.toContain('activeStage === "run"');
+    expect(source).not.toContain('activeStage === "eval"');
+    expect(source).toContain("if (journeyView && (isPlanningShell || !draft))");
   });
 
   it("keeps product error details behind developer mode, not merely a disclosure", () => {
@@ -903,26 +903,27 @@ describe("App planning state guards", () => {
     expect(source).not.toContain('setAimSurfaceMode("summary")');
     expect(source).not.toContain("function checkpointSubmittedAim");
 
-    // continueContextToPlan is the saved-goal-only contracts hop (no unsaved-aim startDraft funnel).
-    expect(source).toContain("const continueContextToPlan = () => {");
+    // The saved-goal contracts hop went with the standalone stages.
+    expect(source).not.toContain("continueContextToPlan");
   });
 
-  it("keeps plan validation failures repairable instead of disabling contract edits", () => {
+  it("keeps plan validation on the in-place commit paths, never disabling repair edits", () => {
     const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
-    const planPanel = source.match(/<PlanPanel[\s\S]*?\/>/)?.[0] ?? "";
+    const commitShellPlan = source.match(/async function commitShellPlan[\s\S]*?\n {2}async function commitPlanEdit/)?.[0] ?? "";
+    const commitPlanEdit = source.match(/async function commitPlanEdit[\s\S]*?\n {2}async function/)?.[0] ?? "";
     const beginWorkspaceTransition = source.match(/function beginWorkspaceTransition[\s\S]*?function bumpWorkspaceRevision/)?.[0] ?? "";
     const openGoal = source.match(/async function openGoal[\s\S]*?async function refreshGoalState/)?.[0] ?? "";
     const resetComposer = source.match(/function resetComposer[\s\S]*?function descriptionWithContext/)?.[0] ?? "";
     const applyHydratedDraft = source.match(/function applyHydratedDraft[\s\S]*?async function openAimDraft/)?.[0] ?? "";
 
-    expect(planPanel).toContain('key={`plan-workspace-${workspaceRevision}`}');
+    expect(commitShellPlan).toContain("validateExecutablePlan(plan)");
+    expect(commitPlanEdit).toContain("validateExecutablePlan(plan)");
     expect(beginWorkspaceTransition).not.toContain("bumpWorkspaceRevision()");
     expect(openGoal).toContain("bumpWorkspaceRevision()");
     expect(resetComposer).toContain("bumpWorkspaceRevision()");
     expect(applyHydratedDraft).toContain("bumpWorkspaceRevision()");
-    expect(planPanel).toContain("validationErrors={activePlanValidationMessages}");
-    expect(planPanel).toContain("disabled={Boolean(busy)}");
-    expect(planPanel).not.toContain("activePlanValidation?.ok === false");
+    // The Journey's plan review passes validation messages through, not a disabled state.
+    expect(source).toContain("validationErrors: activePlanValidationMessages");
   });
 
   it("autosaves draft state before Home, New Aim, or opening a saved aim clears the composer", () => {
@@ -939,25 +940,15 @@ describe("App planning state guards", () => {
     expect(source).not.toContain("localStorage.setItem(\"aim");
   });
 
-  it("clears the saved draft only after saveGoal succeeds", () => {
+  it("keeps the renderer goal-first: no saveGoal path, drafts persist through the queue", () => {
     const appSource = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
-    const mainIpcSource = readFileSync(new URL("../main/ipc.ts", import.meta.url), "utf8");
-    const savePlan = appSource.match(/async function savePlan[\s\S]*?\n {2}async function runAgent/)?.[0] ?? "";
     const persistCurrentDraftNow = appSource.match(/async function persistCurrentDraftNow[\s\S]*?\n {2}async function refreshAimDrafts/)?.[0] ?? "";
 
     expect(persistCurrentDraftNow).toContain("const discardingCurrentDraft = Boolean(discardInFlightDraftIdRef.current)");
     expect(persistCurrentDraftNow).toContain("discardingCurrentDraft && !options.allowDuringDiscard");
     expect(persistCurrentDraftNow).toContain("draftPersistence.enqueue(req)");
-    expect(savePlan.indexOf("const savedDraft = await persistCurrentDraftNow({}, { throwOnError: true });")).toBeLessThan(savePlan.indexOf("draftPersistence.pauseAutosave();"));
-    expect(savePlan.indexOf("draftPersistence.pauseAutosave();")).toBeLessThan(savePlan.indexOf("window.aimcub.saveGoal"));
-    expect(savePlan).toContain("draftId: savedDraft?.id ?? draftPersistence.currentDraftId() ?? activeDraftIdRef.current ?? undefined");
-    expect(savePlan).toContain("await openGoal(saved.goal, { allowDuringSave: true, checkpointDraft: false });");
-    expect(savePlan).toContain("draftPersistence.resumeAutosave();");
-    const saveFinally = savePlan.slice(savePlan.lastIndexOf("} finally {"));
-    expect(saveFinally.indexOf("finishSaveInFlight(navigationConcurrencyRef.current)")).toBeLessThan(
-      saveFinally.indexOf("setBusy(null)"),
-    );
-    expect(mainIpcSource).toContain("if (req.draftId) await aimStore.discardAimDraft(req.draftId);");
+    expect(appSource).not.toContain("window.aimcub.saveGoal");
+    expect(appSource).not.toContain("async function savePlan");
   });
 
   it("discards a pre-goal draft when the goal-first shell is created", () => {
@@ -1026,19 +1017,16 @@ describe("App planning state guards", () => {
     );
   });
 
-  it("keeps navigation scoped to the active work target and records the Settings return surface", () => {
+  it("keeps navigation on the collapsed stage model (Journey + Settings + Memory)", () => {
     const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
-    const openCockpitStage = source.match(/function openCockpitStage[\s\S]*?\n {2}async function startNewAim/)?.[0] ?? "";
-    const currentAimDraftInput = source.match(/function currentAimDraftInput[\s\S]*?\n {2}async function persistCurrentDraftNow/)?.[0] ?? "";
+    const openCockpitStage = source.match(/function openCockpitStage[\s\S]*?\n {2}function resetPlanningForAimUpdate/)?.[0] ?? "";
 
-    expect(openCockpitStage).toContain("isWorkbenchStageAvailable(workspaceTarget, stage)");
-    // Settings still records the pre-settings stage so a draft persisted while Settings is
-    // open resumes on the real workbench surface, not on "settings".
-    expect(openCockpitStage).toContain("settingsReturnStage(");
-    expect(currentAimDraftInput).toContain('stageOverride === "settings"');
-    expect(currentAimDraftInput).toContain("settingsReturnStageRef.current");
-    expect(source).not.toContain("executePanel ?? planPanel");
-    expect(source).not.toContain("evalPanel ?? planPanel");
+    // Only Settings is special-cased; everything else lands on the Journey ("aim").
+    expect(openCockpitStage).toContain('if (stage === "settings")');
+    expect(openCockpitStage).not.toContain('"contracts"');
+    expect(source).not.toContain("settingsReturnStageRef");
+    expect(source).not.toContain("isWorkbenchStageAvailable");
+    expect(source).not.toContain("LockedStagePanel");
   });
 
   it("guards async planning and goal responses against later target or surface navigation", () => {
@@ -1047,7 +1035,7 @@ describe("App planning state guards", () => {
     const refreshGoalState = source.match(/async function refreshGoalState[\s\S]*?\n {2}function resetComposer/)?.[0] ?? "";
     const startDraft = source.match(/async function startDraft[\s\S]*?\n {2}const builtAnswers/)?.[0] ?? "";
     const checkpoint = source.match(/async function checkpointCurrentDraftBeforeNavigation[\s\S]*?\n {2}async function refreshAimDrafts/)?.[0] ?? "";
-    const openCockpitStage = source.match(/function openCockpitStage[\s\S]*?\n {2}async function startNewAim/)?.[0] ?? "";
+    const openCockpitStage = source.match(/function openCockpitStage[\s\S]*?\n {2}function resetPlanningForAimUpdate/)?.[0] ?? "";
     const runAgent = source.match(/async function runAgent[\s\S]*?\n {2}async function confirmMilestone/)?.[0] ?? "";
 
     expect(openGoal).toContain("const transition = beginWorkspaceTransition()");
@@ -1056,7 +1044,7 @@ describe("App planning state guards", () => {
     expect(source).toContain("if (!isCurrentWorkspaceTransition(transition)) return;");
     expect(startDraft).toContain("if (workflowMutationIsLocked()) return;");
     expect(startDraft).toContain("isCurrentPlanningRun(runId, transition)");
-    expect(refreshGoalState).toContain("isCurrentSurfaceTransition(surfaceTransition)");
+    expect(refreshGoalState).toContain("if (!isCurrentWorkspaceTransition(transition)) return;");
     expect(openCockpitStage).toContain("beginSurfaceTransition()");
     expect(runAgent).toContain("beginSideEffectOperation(operationId");
     expect(runAgent).toContain("finishSideEffectOperation(operationId)");
@@ -1882,7 +1870,6 @@ describe("CockpitShell", () => {
     expect(css).toMatch(/\.od-workspace-aim:has\(> \.od-initial-workspace\[data-has-drafts="true"\]\)\s*{[^}]*align-content:\s*safe center;[^}]*justify-items:\s*stretch;/s);
     expect(css).toMatch(/\.od-initial-workspace\[data-has-drafts="true"\]\s*{[^}]*min-height:\s*0;[^}]*align-content:\s*start;[^}]*padding:\s*0;/s);
     expect(css).toMatch(/\.od-draft-recovery\s*{[^}]*width:\s*min\(100%, var\(--od-rail-compose\)\);[^}]*margin:\s*0 auto;/s);
-    expect(css).toMatch(/\.od-context-focus\s*{[^}]*width:\s*min\(100%, var\(--od-rail-reading\)\);[^}]*padding-top:\s*0;/s);
   });
 
   it("keeps the saved-goal workbench on a single-row grid", () => {
@@ -2021,16 +2008,13 @@ describe("CockpitShell", () => {
     expect(main).toContain("minHeight: MIN_WINDOW_HEIGHT");
   });
 
-  it("keeps command palette and keyboard stage mappings on the same workbench stages", () => {
+  it("keeps the palette and keyboard shortcuts free of workbench stage entries (collapsed model)", () => {
     const source = readFileSync(new URL("./CockpitShell.tsx", import.meta.url), "utf8");
 
-    expect(WORKBENCH_STAGE_IDS).toEqual(["aim", "context", "contracts", "run", "eval"]);
-    expect(source).toContain("const stage = WORKBENCH_STAGE_IDS[Number(key) - 1];");
-    expect(source).toContain("...availableStages.map((item) => ({");
-    expect(source).toContain("id: `stage-${item.stage}`");
-    expect(source).toContain("shortcut: `Cmd ${item.shortcut}`");
-    expect(source).toContain("action: () => onStage(item.stage)");
-    expect(source).toContain("isWorkbenchStageAvailable(workspaceTarget, stage)");
+    expect(source).not.toContain("WORKBENCH_STAGE_IDS");
+    expect(source).not.toContain("stage-${item.stage}");
+    expect(source).not.toMatch(/\["1", "2", "3", "4", "5"\]/);
+    expect(source).toContain('{ id: "settings", label: t("os.settings")');
   });
 
   it("keeps workbench navigation clear of titlebar controls in every sidebar state", () => {

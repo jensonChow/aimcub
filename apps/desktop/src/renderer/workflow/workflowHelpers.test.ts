@@ -216,7 +216,7 @@ describe("intake clarify helpers", () => {
 });
 
 describe("stage routing helpers", () => {
-  it("keeps opened aims on run while unsaved plans route to contracts", () => {
+  it("keeps every non-settings mode on the Journey stage", () => {
     const detail: GoalDetail = {
       goal,
       milestones: [{ ...milestone, status: "completed", completed_at: "2026-07-07T00:00:00.000Z" }],
@@ -238,8 +238,10 @@ describe("stage routing helpers", () => {
       edges: [],
     };
 
-    expect(cockpitStageFor("cockpit", goal, null)).toBe("run");
-    expect(cockpitStageFor("cockpit", null, plan)).toBe("contracts");
+    // Collapsed model: everything except Settings renders on the Journey.
+    expect(cockpitStageFor("cockpit")).toBe("aim");
+    expect(cockpitStageFor("reviewing")).toBe("aim");
+    expect(cockpitStageFor("settings")).toBe("settings");
     expect(progressRows(detail, null)[0]?.completed).toBe(true);
     expect(planNodeForMilestone(plan, milestone)?.key).toBe("launch-proof");
   });
@@ -318,9 +320,9 @@ describe("planning error helpers", () => {
     expect(error.details).toEqual([raw]);
   });
 
-  it("keeps draft and refine failures on retryable Context routes", () => {
-    expect(routeAfterPlanningFailure("draft")).toEqual({ mode: "contexting", stageOverride: "context" });
-    expect(routeAfterPlanningFailure("refine")).toEqual({ mode: "answering", stageOverride: "context" });
-    expect(routeAfterPlanningFailure("save")).toEqual({ mode: "reviewing", stageOverride: "contracts" });
+  it("keeps every planning failure on the Journey with retryable modes", () => {
+    expect(routeAfterPlanningFailure("draft")).toEqual({ mode: "contexting", stageOverride: "aim" });
+    expect(routeAfterPlanningFailure("refine")).toEqual({ mode: "answering", stageOverride: "aim" });
+    expect(routeAfterPlanningFailure("save")).toEqual({ mode: "reviewing", stageOverride: "aim" });
   });
 });

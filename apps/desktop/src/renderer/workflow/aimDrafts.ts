@@ -12,7 +12,6 @@ import type {
 } from "@aimcub/types";
 
 import type { UpsertAimDraftRequest } from "../../shared/ipc";
-import type { CockpitStage } from "../CockpitShell";
 import type { ProductError } from "./planningErrors";
 
 export interface AimDraftBuildInput {
@@ -20,7 +19,6 @@ export interface AimDraftBuildInput {
   title: string;
   description: string;
   parent: { goalId: string; milestoneId: string } | null;
-  activeStage: CockpitStage;
   aimSurface: AimDraftSurface;
   phase: "intake" | "postDraft" | null;
   contextNote: string;
@@ -197,8 +195,12 @@ export function aimDraftStatus(input: Pick<AimDraftBuildInput, "draft" | "finalP
   return "draft";
 }
 
-export function aimDraftStage(input: Pick<AimDraftBuildInput, "activeStage" | "draft" | "finalPlan" | "phase" | "contextNote" | "intakeAnswers" | "clarifyAnswers">): AimDraftStage {
-  if (input.activeStage === "aim" || input.activeStage === "context" || input.activeStage === "contracts") return input.activeStage;
+/**
+ * The persisted draft-stage enum ("aim"/"context"/"contracts") outlives the collapsed
+ * navigation model — it is store-schema vocabulary for legacy drafts, derived from what
+ * the draft actually carries. New composer-only drafts always derive "aim".
+ */
+export function aimDraftStage(input: Pick<AimDraftBuildInput, "draft" | "finalPlan" | "phase" | "contextNote" | "intakeAnswers" | "clarifyAnswers">): AimDraftStage {
   if (input.finalPlan || input.draft) return "contracts";
   if (input.phase || input.contextNote.trim() || input.intakeAnswers.length || input.clarifyAnswers.length) return "context";
   return "aim";

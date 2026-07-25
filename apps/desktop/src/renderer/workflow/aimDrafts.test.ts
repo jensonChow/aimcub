@@ -61,7 +61,6 @@ describe("aim draft persistence helpers", () => {
       title: "Plan a local alpha demo",
       description: "Use an isolated store.",
       parent: null,
-      activeStage: "context",
       aimSurface: "summary",
       phase: "intake",
       contextNote: "Keep AIMCUB_HOME under /tmp.",
@@ -104,7 +103,6 @@ describe("aim draft persistence helpers", () => {
       title: "Blocked save",
       description: "",
       parent: null,
-      activeStage: "contracts",
       aimSurface: "summary",
       phase: "postDraft",
       contextNote: "",
@@ -129,7 +127,6 @@ describe("aim draft persistence helpers", () => {
       title: "Browse a draft",
       description: "",
       parent: null,
-      activeStage: "context",
       aimSurface: "summary",
       phase: null,
       contextNote: "",
@@ -142,7 +139,7 @@ describe("aim draft persistence helpers", () => {
       saveBlock: null,
     });
 
-    expect(req?.currentStage).toBe("context");
+    expect(req?.currentStage).toBe("aim");
     expect(req?.status).toBe("draft");
   });
 
@@ -236,7 +233,6 @@ describe("aim draft persistence helpers", () => {
       title: "Still composing",
       description: "",
       parent: null,
-      activeStage: "aim",
       aimSurface: "compose",
       phase: null,
       contextNote: "",

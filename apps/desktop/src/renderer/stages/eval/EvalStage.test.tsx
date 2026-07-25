@@ -7,7 +7,7 @@ import type { AimProgressReadModel } from "@aimcub/core";
 import type { Evidence, Goal, Memory, Milestone } from "@aimcub/types";
 
 import { I18nProvider } from "../../i18n";
-import { EvalStage } from "./EvalStage";
+import { CompletionRecapPanel, EvaluatorMatchList, EvidenceReviewList } from "./EvalStage";
 
 const OWNER = "00000000-0000-4000-8000-000000000001";
 const GOAL = "00000000-0000-4000-8000-000000000010";
@@ -217,63 +217,50 @@ function progress(options: boolean | ProgressOptions = {}): AimProgressReadModel
   };
 }
 
-function renderEval(progressModel: AimProgressReadModel): string {
+function renderRecap(progressModel: AimProgressReadModel): string {
   return renderToStaticMarkup(
     <I18nProvider>
-      <EvalStage
-        rows={progressModel.milestones}
-        progress={progressModel}
-      />
+      <CompletionRecapPanel progress={progressModel} />
     </I18nProvider>,
   );
 }
 
-describe("EvalStage", () => {
-  it("renders a summary-first overview while keeping evidence details available", () => {
-    const html = renderEval(progress(false));
+function renderReceipts(progressModel: AimProgressReadModel): string {
+  const row = progressModel.milestones[0]!;
+  return renderToStaticMarkup(
+    <I18nProvider>
+      <div>
+        <EvidenceReviewList row={row} />
+        <EvaluatorMatchList row={row} />
+      </div>
+    </I18nProvider>,
+  );
+}
 
-    expect(html).toContain("Evidence and eval review");
-    expect(html).toContain('class="od-stage-metrics od-eval-overview-metrics"');
-    expect(html).toContain("Evidence");
-    expect(html).toContain("Satisfied");
-    expect(html).toContain("Needs review");
-    expect(html).toContain("Low-trust evidence");
-    expect(html).toContain("Context candidates");
-    expect(html).toContain('class="od-eval-detail-section"');
-    expect(html).not.toContain('class="od-eval-detail-section" open');
-    expect(html).toContain("Rule/evaluator matches");
-    expect(html).toContain("Evidence review");
-    expect(html).toContain("Agent self-report needs trusted proof");
+describe("Eval receipts + completion recap (the Eval stage collapsed into the Journey)", () => {
+  it("renders the evidence review with rule matches, trust, and honest review notes", () => {
+    const html = renderReceipts(progress({ contextCandidates: [], firstEvidenceMatched: true }));
+    const matchedTime = new Date(matchedEvidence.occurred_at).toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    expect(html).toContain("Desktop eval evidence row rendered");
+    expect(html).toContain("git commit");
+    expect(html).toContain(matchedTime);
+    expect(html).toContain("trust 92%");
+    expect(html).toContain("Rules: #1 commit_pattern");
+    expect(html).toContain("matched");
+    expect(html).toContain("Matches rule 1 (commit_pattern).");
+    expect(html).toContain("#1 commit_pattern");
     expect(html).toContain("low trust");
-    expect(html).toContain("trust 45%");
-    expect(html).toContain("No acceptance rule match yet.");
     expect(html).toContain("Trust is below the 80% floor");
-    // The Context inbox is no longer duplicated in Eval — triage lives in the Journey Context sheet.
-    expect(html).not.toContain("Context inbox");
   });
 
-  it("does not render a large empty Context Inbox block when no candidates are pending", () => {
-    const html = renderEval(progress({ contextCandidates: [] }));
-
-    expect(html).toContain("Context candidates");
-    expect(html).toContain("<strong>0</strong>");
-    expect(html).not.toContain("Context inbox");
-    expect(html).not.toContain("Pending context candidates");
-    expect(html).not.toContain("No pending context candidates.");
-    expect(html).not.toContain('class="od-eval-context"');
-  });
-
-  it("keeps the Context Inbox out of Eval even when candidates are pending (it moved to the Journey Context sheet)", () => {
-    const html = renderEval(progress({ contextCandidates: [pendingMemory] }));
-
-    // The inbox no longer renders in Eval, but the pending candidate still counts in the metric.
-    expect(html).not.toContain("Context inbox");
-    expect(html).toContain("Context candidates");
-    expect(html).toContain("<strong>1</strong>");
-  });
-
-  it("keeps the completion recap factual and leaves the Context Inbox out of Eval flow", () => {
-    const html = renderEval(progress(true));
+  it("keeps the completion recap factual with no inbox duplication", () => {
+    const html = renderRecap(progress(true));
 
     expect(html).toContain("Completion recap");
     expect(html).toContain("Completed 1/1 sub-aims for");
@@ -285,47 +272,20 @@ describe("EvalStage", () => {
     expect(html).not.toContain("Context inbox");
   });
 
-  it("does not duplicate an empty Context Inbox in the completion recap", () => {
-    const html = renderEval(progress({ complete: true, contextCandidates: [acceptedMemory], learnedContext: [acceptedMemory] }));
+  it("keeps accepted learned context visible in the recap without a pending-candidates block", () => {
+    const html = renderRecap(progress({ complete: true, contextCandidates: [acceptedMemory], learnedContext: [acceptedMemory] }));
 
-    expect(html).toContain("Completion recap");
     expect(html).toContain("Context learned");
     expect(html).toContain("Accepted eval context should stay visible in the completion recap.");
-    expect(html).not.toContain("Context inbox");
     expect(html).not.toContain("Pending context candidates");
     expect(html).not.toContain("No pending context candidates.");
   });
 
-  it("keeps evidence and evaluator details available behind closed disclosures", () => {
-    const html = renderEval(progress({ contextCandidates: [], firstEvidenceMatched: true }));
-    const matchedTime = new Date(matchedEvidence.occurred_at).toLocaleString(undefined, {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-
-    expect(html).toContain('class="od-eval-detail-section"');
-    expect(html).not.toContain('class="od-eval-detail-section" open');
-    expect(html).toContain("<summary><span>Evidence review</span>");
-    expect(html).toContain("<summary><span>Rule/evaluator matches</span>");
-    expect(html).toContain("Desktop eval evidence row rendered");
-    expect(html).toContain("git commit");
-    expect(html).toContain(matchedTime);
-    expect(html).toContain("trust 92%");
-    expect(html).toContain("Rules: #1 commit_pattern");
-    expect(html).toContain("matched");
-    expect(html).toContain("Matches rule 1 (commit_pattern).");
-    expect(html).toContain("#1 commit_pattern");
-  });
-
-  it("keeps Eval CSS scoped to stage content surfaces", () => {
+  it("keeps the receipt disclosures styled as closed bordered sections", () => {
     const css = readFileSync(new URL("../../cockpit.css", import.meta.url), "utf8");
 
-    expect(css).toMatch(/\.od-eval-overview-metrics\s*{[^}]*grid-template-columns:\s*repeat\(5, minmax\(0, 1fr\)\);/s);
     expect(css).toMatch(/\.od-eval-detail-section\s*{[^}]*border:\s*1px solid var\(--od-border-soft\);/s);
     expect(css).toMatch(/\.od-eval-detail-section summary\s*{[^}]*cursor:\s*pointer;/s);
     expect(css).toMatch(/\.od-eval-detail-section > \.od-evidence-review,\s*[\r\n\s]*\.od-eval-detail-section > \.od-evaluator-list/s);
-    expect(css).toMatch(/\.od-eval-overview-metrics,\s*[\r\n\s]*\.od-eval-review-strip,\s*[\r\n\s]*\.od-work-detail-grid/s);
   });
 });

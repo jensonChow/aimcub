@@ -11,7 +11,7 @@ export interface ProductError {
 
 export interface PlanningFailureRoute {
   mode: "contexting" | "answering" | "reviewing";
-  stageOverride: "context" | "contracts";
+  stageOverride: "aim";
 }
 
 const INTERNAL_PLAN_PATH = /\b(nodes|edges|acceptance_rule|clauses|match|decomposition_contract|routing_override)(?:\.\d+|\.[a-z_]+)*\b/i;
@@ -85,8 +85,9 @@ export function formatPlanningFailure(input: {
   };
 }
 
+/** Every planning failure lands back on the Journey; the mode keeps the phase semantics. */
 export function routeAfterPlanningFailure(stage: PlanningFailureStage): PlanningFailureRoute {
-  if (stage === "save") return { mode: "reviewing", stageOverride: "contracts" };
-  if (stage === "refine") return { mode: "answering", stageOverride: "context" };
-  return { mode: "contexting", stageOverride: "context" };
+  if (stage === "save") return { mode: "reviewing", stageOverride: "aim" };
+  if (stage === "refine") return { mode: "answering", stageOverride: "aim" };
+  return { mode: "contexting", stageOverride: "aim" };
 }

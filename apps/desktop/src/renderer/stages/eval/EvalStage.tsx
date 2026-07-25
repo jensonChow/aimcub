@@ -2,16 +2,10 @@ import type { AimProgressReadModel } from "@aimcub/core";
 import type { Evidence } from "@aimcub/types";
 
 import { useI18n, type I18n } from "../../i18n";
-import { pendingContextCandidates } from "../../labels";
 
 export type EvalStageMilestoneRow = AimProgressReadModel["milestones"][number];
 type EvalEvidenceReviewItem = EvalStageMilestoneRow["evidence"][number];
 type EvalState = "passed" | "failed" | "needs_human" | "unsupported" | "error" | "pending";
-
-interface EvalStageProps {
-  rows: EvalStageMilestoneRow[];
-  progress: AimProgressReadModel | null;
-}
 
 function shortText(value: string | undefined | null, max = 120): string {
   const cleaned = (value ?? "").replace(/\s+/g, " ").trim();
@@ -51,18 +45,6 @@ function evidenceReferenceMeta(evidence: Evidence): string {
 function evidenceDisplaySummary(evidence: Evidence): string {
   const proofNote = manualPayloadField(evidence, "proof_note");
   return typeof proofNote === "string" && proofNote.trim() ? proofNote : evidence.summary;
-}
-
-function evalStateOf(row: EvalStageMilestoneRow): EvalState {
-  const statuses = row.evaluator_results.map((result) => result.status);
-  if (row.eval_review.passed) return "passed";
-  if (statuses.includes("error")) return "error";
-  if (statuses.includes("needs_human")) return "needs_human";
-  if (statuses.includes("unsupported")) return "unsupported";
-  if (statuses.includes("failed")) return "failed";
-  if (statuses.length > 0 && statuses.every((status) => status === "passed")) return "passed";
-  if (row.completed) return "passed";
-  return "pending";
 }
 
 function evalToneClass(state: EvalState): string {
@@ -230,7 +212,7 @@ export function EvidenceReviewList(props: {
   );
 }
 
-function EvaluatorMatchList({ row }: { row: EvalStageMilestoneRow }) {
+export function EvaluatorMatchList({ row }: { row: EvalStageMilestoneRow }) {
   const { t } = useI18n();
 
   return (
@@ -257,78 +239,6 @@ function EvaluatorMatchList({ row }: { row: EvalStageMilestoneRow }) {
         );
       })}
     </div>
-  );
-}
-
-function EvalMilestoneReviewCard({ row }: { row: EvalStageMilestoneRow }) {
-  const { t } = useI18n();
-  const state = evalStateOf(row);
-  const matchedIds = [...new Set(row.evaluator_results.flatMap((result) => result.matched_evidence_ids))];
-  const evaluatorReviewCount = row.evaluator_results.filter((result) => result.status !== "passed").length;
-  const evidenceReviewCount = row.evidence.filter((item) => item.status !== "matched").length;
-  const lowTrustCount = row.evidence.filter((item) => item.status === "low_trust").length;
-  const reviewCount = evaluatorReviewCount + evidenceReviewCount;
-
-  return (
-    <article className={`od-work-card od-eval-card${row.completed ? " is-complete" : ""}`}>
-      <div className="od-work-card-main">
-        <div className="od-work-card-head">
-          <div className="od-work-title">
-            <strong>{row.milestone.title}</strong>
-            <span className={`od-pill ${evalToneClass(state)}`}>{evalLabel(t, state)}</span>
-            <span className="od-pill">{t("os.evidenceCount", { n: row.evidence_count })}</span>
-            <span className="od-pill">{t("os.evalTrust", { n: formatTrust(row.eval_review.trust_score) })}</span>
-          </div>
-        </div>
-
-        <div className="od-work-detail-grid od-eval-detail-grid">
-          <div>
-            <span>{t("os.evalRule")}</span>
-            <strong>{row.milestone.acceptance_rule.logic}</strong>
-            <small>{row.milestone.acceptance_rule.completion_mode}</small>
-          </div>
-          <div>
-            <span>{t("os.evalMatchedEvidence")}</span>
-            <strong>{String(matchedIds.length)}</strong>
-            <small>{matchedIds.length ? matchedIds.slice(0, 4).map(shortId).join(", ") : t("os.evalNoMatchedEvidence")}</small>
-          </div>
-          <div>
-            <span>{t("os.evalNeedsReview")}</span>
-            <strong>{String(reviewCount)}</strong>
-            <small>{t("os.evalLowTrustSummary", { n: lowTrustCount })}</small>
-          </div>
-        </div>
-
-        <div className="od-eval-summary">
-          <div>
-            <span>{t("os.evalReason")}</span>
-            <strong>{row.eval_review.reason || t("os.evalNoResults")}</strong>
-          </div>
-          <div>
-            <span>{t("os.evalNextAction")}</span>
-            <strong>{row.eval_review.next_action || row.next_action || t("shell.noNextAction")}</strong>
-          </div>
-        </div>
-
-        <div className="od-eval-detail-list">
-          <details className="od-eval-detail-section">
-            <summary>
-              <span>{t("os.evalEvidenceReview")}</span>
-              <span className="od-pill">{t("os.evidenceCount", { n: row.evidence_count })}</span>
-            </summary>
-            <EvidenceReviewList row={row} />
-          </details>
-
-          <details className="od-eval-detail-section">
-            <summary>
-              <span>{t("os.evalEvaluatorMatches")}</span>
-              <span className="od-pill">{String(row.evaluator_results.length)}</span>
-            </summary>
-            <EvaluatorMatchList row={row} />
-          </details>
-        </div>
-      </div>
-    </article>
   );
 }
 
@@ -468,52 +378,6 @@ export function CompletionRecapPanel(props: {
       <div className="od-recap-reuse">
         <span>{t("completion.futureReuseTitle")}</span>
         <strong>{futureReuse}</strong>
-      </div>
-    </section>
-  );
-}
-
-export function EvalStage(props: EvalStageProps) {
-  const { t } = useI18n();
-  const pendingCandidates = pendingContextCandidates(props.progress?.context_candidates ?? []);
-
-  if (props.progress?.completion_recap?.complete) {
-    return (
-      <div className="od-eval-stage-stack">
-        <CompletionRecapPanel progress={props.progress} />
-      </div>
-    );
-  }
-
-  const evidenceTotal = props.rows.reduce((sum, row) => sum + row.evidence_count, 0);
-  const evaluatorResults = props.rows.flatMap((row) => row.evaluator_results);
-  const satisfiedRows = props.rows.filter((row) => evalStateOf(row) === "passed").length;
-  const evidenceReviewItems = props.rows.flatMap((row) => row.evidence).filter((item) => item.status !== "matched").length;
-  const lowTrustCount = props.rows.flatMap((row) => row.evidence).filter((item) => item.status === "low_trust").length;
-  const reviewItems = evaluatorResults.filter((result) => result.status !== "passed").length + evidenceReviewItems + pendingCandidates.length;
-
-  return (
-    <section className="od-stage-panel od-eval-panel">
-      <div className="od-stage-panel-head">
-        <div>
-          <div className="od-stage-kicker">{t("os.stepEval")}</div>
-          <h2>{t("os.evalHeading")}</h2>
-          <p>{t("os.evalBody")}</p>
-        </div>
-      </div>
-
-      <div className="od-stage-metrics od-eval-overview-metrics" aria-label={t("os.evalHeading")}>
-        <EvalStageMetric label={t("os.evalEvidenceTotal")} value={String(evidenceTotal)} />
-        <EvalStageMetric label={t("os.evalSatisfied")} value={`${satisfiedRows}/${props.rows.length}`} />
-        <EvalStageMetric label={t("os.evalNeedsReview")} value={String(reviewItems)} />
-        <EvalStageMetric label={t("os.evalLowTrustEvidence")} value={String(lowTrustCount)} />
-        <EvalStageMetric label={t("os.evalContextCandidates")} value={String(pendingCandidates.length)} />
-      </div>
-
-      <div className="od-work-list">
-        {props.rows.map((row) => (
-          <EvalMilestoneReviewCard key={row.milestone.id} row={row} />
-        ))}
       </div>
     </section>
   );
