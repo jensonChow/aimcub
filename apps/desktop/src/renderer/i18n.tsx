@@ -84,6 +84,7 @@ export const STRINGS = {
     zh: "研究途中随时补充——约束、偏好、纠正都可以…",
   },
   "planningSession.chatSend": { en: "Send", zh: "发送" },
+  "planningSession.addNote": { en: "Add a note", zh: "补充一句" },
   "planningSession.finishNow": { en: "Draft the plan now", zh: "现在就出方案" },
   "planningSession.cancel": { en: "Stop planning", zh: "停止规划" },
   "planningSession.sendAnswer": { en: "Send answer", zh: "提交回答" },

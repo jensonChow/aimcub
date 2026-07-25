@@ -4,6 +4,27 @@ Last updated: 2026-07-25 (second session)
 Branch: `main` (delete-click fix merged locally, **NOT pushed** — push needs
 founder authorization). Everything before it is on origin (e6d7df78).
 
+## Second session part 6: the live card thinks out loud
+
+Founder: "should show a tree of thoughts instead of just 'Researching', and
+the current screen doesn't need an input box."
+
+1. **Thought trace** — the live card now shows the brain's recent sayable
+   steps in order on a hairline left rail (new `planningActivityTrace`: drops
+   unsayable rows, collapses consecutive duplicate verbs, caps at 6). Older
+   lines recede to meta/faint; the current line is body/ink and carries the
+   aria-live status. Questions and user notes ride in the trace as content.
+2. **No standing input** — the note composer is closed at rest; a quiet
+   "Add a note" action opens it (auto-focused; Escape closes, send closes, a
+   non-empty draft keeps it open across remounts). The interjection channel
+   is unchanged — only the permanent box went.
+
+Verified visually in the harness (trace of 6 mixed events incl. an unknown
+tool id rendering as "Researching…"; note lane closed → opened). Desktop 356
+(+4: two trace unit tests, resting-state and draft-open markup tests).
+Doctrine in design-system.md ("the trace, not a status word" / "no standing
+input on a watching surface").
+
 ## Second session part 5: choice cards equalized
 
 Founder (tarot-aim question with three uneven options): "the choice cards
@@ -119,7 +140,7 @@ that hosts an open popover").
 
 Full gate green after every batch, the delete-click fix, the domain/question
 recalibration, and the surface simplification (build 9/9 · typecheck 17/17 ·
-lint 11/11 · purity · desktop 352 · llm 197 · store 99). Root `Aimcub.app`
+lint 11/11 · purity · desktop 356 · llm 197 · store 99). Root `Aimcub.app`
 repacked + boot-smoked after each change (founder must restart the app to get
 the fixes). Renderer mass after the collapse: ~14.6k non-test LOC, cockpit.css
 6,4xx lines, i18n ~800 keys.

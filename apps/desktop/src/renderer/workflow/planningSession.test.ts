@@ -8,6 +8,7 @@ import {
   embeddedPlanningAgentId,
   planningActivityLine,
   planningActivityNow,
+  planningActivityTrace,
   planningBrainMenu,
   planningModelMenu,
   sessionAnswerRequest,
@@ -301,5 +302,34 @@ describe("planningActivityLine (live-lane product voice)", () => {
     ], t);
     expect(now).toBe("planningSession.now.webSearch");
     expect(planningActivityNow([], t)).toBeNull();
+  });
+
+  it("planningActivityTrace keeps order, drops unsayable rows, and collapses repeat verbs", () => {
+    const trace = planningActivityTrace([
+      { at: "1", kind: "status", label: "", code: "started" },
+      { at: "2", kind: "tool", label: "", tool: "web.search" },
+      { at: "3", kind: "tool", label: "", tool: "web.search" }, // burst → one line
+      { at: "4", kind: "tool", label: "tool", tool: "" }, // unsayable → skipped
+      { at: "5", kind: "research", label: "", count: 3 },
+    ], t);
+    expect(trace).toEqual([
+      "planningSession.now.started",
+      "planningSession.now.webSearch",
+      'planningSession.now.research:{"n":3}',
+    ]);
+  });
+
+  it("planningActivityTrace caps at the limit, keeping the newest lines", () => {
+    const activity = Array.from({ length: 9 }, (_, index) => ({
+      at: String(index),
+      kind: "question" as const,
+      label: `Q${index}`,
+    }));
+    const trace = planningActivityTrace(activity, t, 3);
+    expect(trace).toEqual([
+      'planningSession.now.askedYou:{"q":"Q6"}',
+      'planningSession.now.askedYou:{"q":"Q7"}',
+      'planningSession.now.askedYou:{"q":"Q8"}',
+    ]);
   });
 });
