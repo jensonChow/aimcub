@@ -11,7 +11,7 @@ import type { AcceptanceRule, DecompositionContract, DecompositionOutput, EstEff
 export interface DecomposeRequest {
   title: string;
   description?: string;
-  domain?: GoalDomain;
+  domain?: GoalDomain | null;
 }
 
 const EFFORT_CYCLE: EstEffort[] = ["s", "m", "m", "l", "m"];
@@ -118,7 +118,9 @@ function fallbackContract(step: { title: string; description: string }, index: n
  * Same shape the LLM returns, so downstream code is identical for offline and live.
  */
 export function localDecompose(req: DecomposeRequest): DecompositionOutput {
-  const domain: GoalDomain = req.domain ?? "software";
+  // The offline template has no basis to classify the aim: pass the caller's domain through
+  // or stay honestly null (never stamp a guess).
+  const domain: GoalDomain | null = req.domain ?? null;
   const nodes: PlanNode[] = TEMPLATE_STEPS.map((step, i) => {
     const effort = EFFORT_CYCLE[i % EFFORT_CYCLE.length] ?? "m";
     return {

@@ -124,7 +124,7 @@ export interface ClarifyAnswer {
 export interface ClarifyInput {
   title: string;
   description?: string;
-  domain?: GoalDomain;
+  domain?: GoalDomain | null;
   /** The first-pass plan. We never ask cold — questions are grounded in this draft. */
   draft: DecompositionOutput;
   /** Answers already collected, to ask a second, sharper round (usually empty). */
@@ -985,12 +985,12 @@ function renderOutputLanguageInstruction(language: AimOutputLanguage | undefined
 
 /** Build the per-goal user prompt. */
 function buildClarifyPrompt(input: ClarifyInput, maxQuestions: number): string {
-  const domain = input.domain ?? "software";
   const description = input.description?.trim() ? input.description.trim() : "(no description provided)";
   const review = reviewForClarify(input);
   const lines = [
     `Goal title: ${input.title}`,
-    `Goal domain: ${domain}`,
+    // Never state a guessed domain: a wrong label skews the questions worse than no label.
+    `Goal domain: ${input.domain ?? "(not set — infer from the goal itself)"}`,
     `Goal description: ${description}`,
     "",
     renderOutputLanguageInstruction(input.outputLanguage),

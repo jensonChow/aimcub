@@ -1739,3 +1739,60 @@ describe("createJsonFileStore · run journal + progress summaries", () => {
     expect(running).toMatchObject({ status: "running", running: 1 });
   });
 });
+
+describe("createJsonFileStore · honest goal domain", () => {
+  it("a shell stays domain-null until a plan lands, then adopts the brain's classification", async () => {
+    const store = freshStore();
+    const { goal } = await store.createAimShell({ title: "去伦敦旅行" });
+    // No creation surface asks for a domain, so nothing may invent one.
+    expect(goal.domain).toBeNull();
+
+    const landed = await store.updateGoal({ id: goal.id, plan: PLAN });
+    expect(landed!.goal.domain).toBe("software");
+  });
+
+  it("landing a plan without a domain keeps the goal's existing value", async () => {
+    const store = freshStore();
+    const { goal } = await store.createGoal({ title: "Build a CLI todo app", plan: PLAN });
+    expect(goal.domain).toBe("software");
+
+    const replan = { ...PLAN, domain: null } as unknown as DecompositionOutput;
+    const updated = await store.updateGoal({ id: goal.id, plan: replan });
+    expect(updated!.goal.domain).toBe("software");
+  });
+
+  it("normalizes the legacy always-software default away on plan-less shells at load", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "aimcub-store-"));
+    const legacyGoal = {
+      id: "00000000-0000-4000-8000-00000000aaaa",
+      owner_id: "00000000-0000-4000-8000-000000000001",
+      title: "我想去伦敦旅行",
+      description: "",
+      domain: "software",
+      status: "active",
+      target_date: null,
+      plan_json: null,
+      metadata: {},
+      created_at: "2026-07-25T10:24:03.849Z",
+    };
+    const plannedGoal = {
+      ...legacyGoal,
+      id: "00000000-0000-4000-8000-00000000bbbb",
+      title: "Ship the CLI",
+      plan_json: PLAN,
+    };
+    writeFileSync(
+      join(dir, "store.json"),
+      JSON.stringify({ goals: [legacyGoal, plannedGoal], milestonesByGoal: {}, aimDrafts: [], memories: [], evidence: [], completions: [], actors: [], subAimRelations: [], assignments: [], runs: [], runEvents: [], toolTraces: [], evidenceAttributions: [], contextIntakeSessions: [] }),
+    );
+
+    const store = createJsonFileStore(dir);
+    const goals = await store.listGoals();
+    const shell = goals.find((g) => g.id === legacyGoal.id)!;
+    const planned = goals.find((g) => g.id === plannedGoal.id)!;
+    // The pre-2026-07-25 creation default carried zero signal on a never-planned shell…
+    expect(shell.domain).toBeNull();
+    // …but a landed plan may legitimately be a software aim: planned goals keep their value.
+    expect(planned.domain).toBe("software");
+  });
+});

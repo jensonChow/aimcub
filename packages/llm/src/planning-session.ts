@@ -45,7 +45,8 @@ export type PlanningSessionPhase = "researching" | "waiting_user" | "draft_ready
 export interface PlanningSessionAim {
   title: string;
   description?: string;
-  domain?: GoalDomain;
+  /** Honest classification only: null/absent means "not known yet — the brain infers it". */
+  domain?: GoalDomain | null;
   outputLanguage?: AimOutputLanguage;
 }
 

@@ -1278,6 +1278,18 @@ function requireRows<T>(value: unknown, field: string): T[] {
  * Throwing is the point: it routes "parses as JSON but is not our shape" into the same
  * quarantine + backup-recovery path as unparsable bytes, instead of an invisible empty store.
  */
+/**
+ * Until 2026-07-25 every creation path stamped `domain: "software"` even though no surface ever
+ * asked the user — the value carried zero signal and misled planning research ("plan my London
+ * trip" was presented to the brain as a software goal). Only a landed plan can carry an honestly
+ * inferred domain, so on a still plan-less shell the historical default reads as "not set".
+ * Planned goals are left untouched: from now on landing writes the brain's classification.
+ */
+function normalizeLegacyGoalDomain(goal: Goal): Goal {
+  if (goal.plan_json == null && goal.domain === "software") return { ...goal, domain: null };
+  return goal;
+}
+
 function normalizeLocalStore(raw: unknown): LocalStore {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     throw new Error("store.json does not contain a JSON object");
@@ -1290,7 +1302,7 @@ function normalizeLocalStore(raw: unknown): LocalStore {
   }
   return {
     ownerId: parsed.ownerId ?? DEFAULT_OWNER,
-    goals: requireRows<Goal>(parsed.goals, "goals"),
+    goals: requireRows<Goal>(parsed.goals, "goals").map(normalizeLegacyGoalDomain),
     aimDrafts: requireRows<unknown>(parsed.aimDrafts, "aimDrafts")
       .map(normalizeAimDraftRow)
       .filter((row): row is AimDraftRow => row !== null),
@@ -1446,7 +1458,9 @@ export function createJsonFileStore(dataDir: string = defaultDataDir(), options:
           owner_id: ownerId,
           title: input.title,
           description: input.description ?? "",
-          domain: input.domain ?? "software",
+          // No creation surface asks for a domain; the plan's brain-inferred one is the only
+          // honest source. Absent both, stay null — a wrong label misleads later research.
+          domain: input.domain ?? input.plan.domain ?? null,
           status: "active",
           target_date: null,
           plan_json: input.plan,
@@ -1525,7 +1539,7 @@ export function createJsonFileStore(dataDir: string = defaultDataDir(), options:
           owner_id: ownerId,
           title: input.title,
           description: input.description ?? "",
-          domain: input.domain ?? "software",
+          domain: input.domain ?? null,
           status: "active",
           target_date: null,
           plan_json: null,
@@ -1565,6 +1579,9 @@ export function createJsonFileStore(dataDir: string = defaultDataDir(), options:
         if (title) goal.title = title;
         if (input.description !== undefined) goal.description = input.description;
         goal.plan_json = input.plan;
+        // Plan landing is the only honest domain source: adopt the brain's classification,
+        // keep the existing value when the plan did not commit to one.
+        if (input.plan.domain) goal.domain = input.plan.domain;
         if (input.metadata) goal.metadata = { ...goal.metadata, ...input.metadata };
 
         store.milestonesByGoal[goal.id] = milestones;
@@ -2349,7 +2366,7 @@ export function createJsonFileStore(dataDir: string = defaultDataDir(), options:
       return withWriteLock(() => {
         const incoming: LocalStore = {
           ownerId: snapshot.ownerId ?? DEFAULT_OWNER,
-          goals: snapshot.goals ?? [],
+          goals: (snapshot.goals ?? []).map(normalizeLegacyGoalDomain),
           aimDrafts: (snapshot.aimDrafts ?? []).map(normalizeAimDraftRow).filter((row): row is AimDraftRow => row !== null),
           milestonesByGoal: snapshot.milestonesByGoal ?? {},
           memories: (snapshot.memories ?? []).map(normalizeMemoryRow),
