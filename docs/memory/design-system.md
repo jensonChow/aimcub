@@ -563,6 +563,9 @@ as a working agent, not as a form the user operates.
   when options exist; an options-less question labels its field "Your answer" ("Add a custom
   answer" only against real options). A planning-session answer submits as "Send answer" —
   never the funnel's "Generate plan", which promises the wrong outcome mid-research.
+- Question choice cards are THE SAME SIZE (founder 2026-07-25): the option grid equalizes every
+  row to the tallest card (`grid-auto-rows: 1fr`, cards fill their cell) and content reads from
+  the top edge — uneven tradeoff copy must never produce a ragged grid or mid-card floating text.
 
 ## Accessibility and Localization
 
