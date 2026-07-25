@@ -4,6 +4,17 @@ Last updated: 2026-07-25 (second session)
 Branch: `main` (delete-click fix merged locally, **NOT pushed** — push needs
 founder authorization). Everything before it is on origin (e6d7df78).
 
+## Second session part 4: card-in-card flattened
+
+Founder (new tarot-aim drive): "too many layers I think. could be simplified."
+The live/failed/landed session states rendered a chromed white Panel inside the
+already-carded Journey planning island (the question state was already plain) —
+desk gradient → island → white panel → field, four layers. All session states
+are now `variant="plain"`: gradient → island → field, with the composer as the
+only bordered element. Verified visually in the harness; desktop 351 (+1 test
+pinning the plain variant). Doctrine: design-system.md "One card per moment —
+never card-in-card" with the explicit layer budget.
+
 ## Second session part 3: planning surfaces simplified + integrated
 
 Founder (screenshots of the live re-drive): "screen 1 could be optimized, not
@@ -98,7 +109,7 @@ that hosts an open popover").
 
 Full gate green after every batch, the delete-click fix, the domain/question
 recalibration, and the surface simplification (build 9/9 · typecheck 17/17 ·
-lint 11/11 · purity · desktop 350 · llm 197 · store 99). Root `Aimcub.app`
+lint 11/11 · purity · desktop 351 · llm 197 · store 99). Root `Aimcub.app`
 repacked + boot-smoked after each change (founder must restart the app to get
 the fixes). Renderer mass after the collapse: ~14.6k non-test LOC, cockpit.css
 6,4xx lines, i18n ~800 keys.

@@ -52,6 +52,14 @@ function renderPanel(view: PlanningSessionStateView, chatDraft = "") {
 }
 
 describe("PlanningSessionPanel · live card", () => {
+  it("sits flat on the Journey's planning island — never a chromed card-in-card", () => {
+    // Founder 2026-07-25: "too many layers". The island is the ONE card; every session
+    // state renders a plain panel on it, like the question state always did.
+    const html = renderPanel(liveView());
+    expect(html).toContain('data-od-id="planning-session-live"');
+    expect(html).toMatch(/od-planning-session[^>]*data-variant="plain"/);
+  });
+
   it("renders one integrated composer: quiet send inside the chat container, no primary pill", () => {
     const html = renderPanel(liveView());
     const chat = html.match(/<div class="od-planning-session-chat">[\s\S]*?<\/button><\/div>/)?.[0] ?? "";
