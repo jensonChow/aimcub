@@ -548,11 +548,15 @@ as a working agent, not as a form the user operates.
   deal ("Aimcub researches first, and asks only what research can't answer") instead of the
   motto. Never stack zero-counters or multiple mottos on a working surface.
 - **The trace, not a status word** (founder 2026-07-25: "show a tree of thoughts instead of
-  just 'Researching'"). The card shows the brain's recent sayable steps in order on a hairline
-  left rail — older lines recede to meta/faint, the current line is body/ink and carries the
-  aria-live status. Consecutive duplicate verbs collapse; unsayable rows drop; the trace caps
-  at ~6 lines (`planningActivityTrace`). Questions and user notes appear in the trace as
-  content — it is the working memory of the session, not a log.
+  just 'Researching'", then "polish it"). The card shows the brain's steps as a timeline —
+  a quiet node per line with hairline segments between, the current line at body/ink with an
+  accent node echoing the header pulse, history receded to meta/faint. HISTORY KEEPS ONLY
+  DURABLE EVENTS (findings recorded, questions, answers, notes, plan beats); transient
+  working verbs ("Searching the web", "Researching…") appear only as the living last line and
+  drop once passed — never "Researching… / … / Researching…" interleaving. Unsayable rows
+  drop, duplicates collapse, cap ~6 (`planningActivityTrace`), 160ms entry fade under
+  prefers-reduced-motion. The session receipt is plural-proof label-first metadata
+  ("Findings 8 · Gaps 4 · Questions 1") on the footer's LEFT, balancing the quiet actions.
 - **No standing input on a watching surface** (same feedback: "doesn't need an input box").
   The mid-research note composer is closed at rest and opens from a quiet "Add a note" action
   (Escape closes, send closes, a non-empty draft keeps it open). The interjection CHANNEL

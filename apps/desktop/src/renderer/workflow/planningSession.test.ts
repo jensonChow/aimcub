@@ -304,18 +304,32 @@ describe("planningActivityLine (live-lane product voice)", () => {
     expect(planningActivityNow([], t)).toBeNull();
   });
 
-  it("planningActivityTrace keeps order, drops unsayable rows, and collapses repeat verbs", () => {
+  it("planningActivityTrace keeps durable events; passed working verbs drop from history", () => {
     const trace = planningActivityTrace([
       { at: "1", kind: "status", label: "", code: "started" },
-      { at: "2", kind: "tool", label: "", tool: "web.search" },
-      { at: "3", kind: "tool", label: "", tool: "web.search" }, // burst → one line
-      { at: "4", kind: "tool", label: "tool", tool: "" }, // unsayable → skipped
-      { at: "5", kind: "research", label: "", count: 3 },
+      { at: "2", kind: "tool", label: "", tool: "web.search" }, // transient, superseded
+      { at: "3", kind: "tool", label: "tool", tool: "" }, // unsayable → skipped
+      { at: "4", kind: "research", label: "", count: 3 },
     ], t);
     expect(trace).toEqual([
       "planningSession.now.started",
-      "planningSession.now.webSearch",
       'planningSession.now.research:{"n":3}',
+    ]);
+  });
+
+  it("planningActivityTrace ends on the current working verb, never interleaves it as history", () => {
+    // The founder's screenshot: "Recorded 3 / Researching… / Recorded 5 / Researching…"
+    // read as mechanical noise. Verbs only ever appear as the living last line.
+    const trace = planningActivityTrace([
+      { at: "1", kind: "research", label: "", count: 3 },
+      { at: "2", kind: "tool", label: "", tool: "mystery_tool" },
+      { at: "3", kind: "research", label: "", count: 5 },
+      { at: "4", kind: "tool", label: "", tool: "web.search" },
+    ], t);
+    expect(trace).toEqual([
+      'planningSession.now.research:{"n":3}',
+      'planningSession.now.research:{"n":5}',
+      "planningSession.now.webSearch",
     ]);
   });
 

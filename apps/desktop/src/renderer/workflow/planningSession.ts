@@ -284,9 +284,12 @@ export function planningActivityNow(
 }
 
 /**
- * The live card's thought trace: the last `limit` sayable lines in order, ending on the
- * current one. Unsayable rows drop out and consecutive duplicates collapse (a long research
- * burst emits the same working verb many times — the trace shows progress, not repetition).
+ * The live card's thought trace: what the brain has DONE, ending on what it is doing now.
+ * History keeps only durable events (findings recorded, questions, answers, notes, plan
+ * beats); transient working verbs (tool activity — "Searching the web", "Researching…")
+ * matter only as the CURRENT line and drop out once passed, so the trace never reads
+ * "Researching… / … / Researching…". Unsayable rows drop, consecutive duplicates collapse,
+ * and the trace caps at `limit` lines.
  */
 export function planningActivityTrace(
   activity: readonly PlanningSessionActivityItem[],
@@ -294,11 +297,18 @@ export function planningActivityTrace(
   limit = 6,
 ): string[] {
   const lines: string[] = [];
+  let lastSayableTransient: string | null = null;
   for (const item of activity) {
     const line = planningActivityLine(item, t);
     if (!line) continue;
+    if (item.kind === "tool") {
+      lastSayableTransient = line;
+      continue;
+    }
+    lastSayableTransient = null;
     if (lines[lines.length - 1] === line) continue;
     lines.push(line);
   }
+  if (lastSayableTransient) lines.push(lastSayableTransient);
   return lines.slice(-limit);
 }

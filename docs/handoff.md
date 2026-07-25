@@ -4,6 +4,26 @@ Last updated: 2026-07-25 (second session)
 Branch: `main` (delete-click fix merged locally, **NOT pushed** — push needs
 founder authorization). Everything before it is on origin (e6d7df78).
 
+## Second session part 7: the trace polished
+
+Founder on the live trace: "could be more beautiful, polish it." Four cuts:
+
+1. **History keeps only durable events** — transient working verbs ("Searching
+   the web", "Researching…") appear only as the living last line and drop once
+   passed; the mechanical "Recorded 3 / Researching… / Recorded 5 /
+   Researching…" interleaving is gone (`planningActivityTrace` reworked).
+2. **Timeline nodes** — a quiet 5px node per step with hairline segments
+   between; the current line's node is accent, echoing the header pulse.
+3. **Plural-proof receipt** — "1 questions asked" → label-first metadata
+   ("Findings 8 · Gaps 4 · Questions 1"), moved to the footer's LEFT so the
+   controls row balances (receipt left, quiet actions right).
+4. **Entry motion** — 160ms fade/rise per new line, gated on
+   prefers-reduced-motion.
+
+Verified visually in the harness against the founder's exact noisy sequence.
+Desktop 357 (+1 net: trace-semantics tests reworked). Doctrine updated in
+design-system.md.
+
 ## Second session part 6: the live card thinks out loud
 
 Founder: "should show a tree of thoughts instead of just 'Researching', and
@@ -140,7 +160,7 @@ that hosts an open popover").
 
 Full gate green after every batch, the delete-click fix, the domain/question
 recalibration, and the surface simplification (build 9/9 · typecheck 17/17 ·
-lint 11/11 · purity · desktop 356 · llm 197 · store 99). Root `Aimcub.app`
+lint 11/11 · purity · desktop 357 · llm 197 · store 99). Root `Aimcub.app`
 repacked + boot-smoked after each change (founder must restart the app to get
 the fixes). Renderer mass after the collapse: ~14.6k non-test LOC, cockpit.css
 6,4xx lines, i18n ~800 keys.
