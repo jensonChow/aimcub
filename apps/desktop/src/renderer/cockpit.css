@@ -2172,7 +2172,7 @@ kbd {
 .od-planning-session.od-ui-panel {
   display: grid;
   align-content: start;
-  gap: 16px;
+  gap: 12px;
 }
 
 .od-planning-session-head {
@@ -2222,20 +2222,57 @@ kbd {
   font-variant-numeric: tabular-nums;
 }
 
-/* Temporary chat: one quiet lane (input + send), never the visual center of the card. */
+/* Temporary chat: ONE integrated composer — the container is the field, the send action
+   lives inside it. Never the visual center of the card: single line at rest, quiet send. */
 .od-planning-session-chat {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: end;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 3px 3px 3px 0;
+  border: 1px solid var(--od-border-soft);
+  border-radius: var(--od-radius-sm);
+  background: var(--od-surface-warm);
+}
+
+.od-planning-session-chat:focus-within {
+  border-color: color-mix(in oklab, var(--od-accent), var(--od-bg) 48%);
+  background: var(--od-bg);
+  box-shadow: var(--od-focus);
+}
+
+.od-planning-session-chat-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.od-planning-session-chat .od-ui-textarea {
+  min-height: 0;
+  max-height: 120px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  resize: none;
+  padding: 7px 11px;
+}
+
+.od-planning-session-chat .od-ui-textarea:hover:not(:disabled),
+.od-planning-session-chat .od-ui-textarea:focus-visible {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.od-planning-session-chat-send.od-ui-button {
+  flex-shrink: 0;
 }
 
 .od-planning-session-controls {
   display: flex;
   justify-content: flex-end;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 4px;
   align-items: center;
+  margin-top: -4px;
 }
 
 .od-planning-session-actions {
@@ -2333,7 +2370,8 @@ kbd {
   align-items: center;
   padding-top: 8px;
   border-top: 1px solid var(--od-border-soft);
-  background: var(--od-bg);
+  /* Transparent: an opaque bar reads as a separate slab stuck under the glass card. */
+  background: transparent;
 }
 
 .od-context-clarify-body {

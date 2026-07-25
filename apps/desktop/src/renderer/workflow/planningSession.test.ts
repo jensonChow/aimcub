@@ -268,9 +268,13 @@ describe("planningActivityLine (live-lane product voice)", () => {
     expect(planningActivityLine({ kind: "tool", label: "", tool: "Read" }, t)).toBe("planningSession.now.readLocal");
   });
 
-  it("humanizes unknown tool ids instead of leaking them raw", () => {
+  it("speaks unknown tool ids as the generic researching line, never an interpolated id", () => {
+    // Runtime tool ids are not copy: Codex once emitted an id that rendered as the junk
+    // line "Using tool" (founder screenshot, 2026-07-25). Unknown stays generic.
     expect(planningActivityLine({ kind: "tool", label: "", tool: "mcp__foo__fetch_calendar" }, t))
-      .toBe('planningSession.now.tool:{"tool":"fetch calendar"}');
+      .toBe("planningSession.now.researching");
+    expect(planningActivityLine({ kind: "tool", label: "", tool: "tool" }, t))
+      .toBe("planningSession.now.researching");
   });
 
   it("maps status codes and structured counts to localized lines", () => {

@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { decideChoiceSelection } from "@aimcub/core";
 import type { ClarifyOutput } from "@aimcub/llm";
 
-import { useI18n } from "../../i18n";
+import { useI18n, type StringKey } from "../../i18n";
 import { Button, Panel, Pill, TextArea, TextField } from "../../ui";
 import type { ClarifyPhase, ContextAnswerMap } from "./types";
 
@@ -20,6 +20,8 @@ interface ContextClarifyPanelProps {
   onRefine: () => void;
   onSkip?: () => void;
   onOpenSettings?: () => void;
+  /** Overrides the final intake action's label (a planning session answers, it never "generates"). */
+  primaryLabelKey?: StringKey;
   flowKey?: string;
 }
 
@@ -106,7 +108,7 @@ function ContextClarifyFlow(props: ContextClarifyFlowProps) {
     : hasNextQuestion
       ? t("os.nextQuestion")
       : intake
-        ? t("os.generateFromContext")
+        ? t(props.primaryLabelKey ?? "os.generateFromContext")
         : primaryAcceptsDraft
           ? t("os.acceptDraft")
           : t("os.refineDraft");
@@ -149,10 +151,18 @@ function ContextClarifyFlow(props: ContextClarifyFlowProps) {
       {activeQuestion && activeAnswer ? (
         <>
           <header className="od-context-question-focus">
-            <div className="od-context-question-meta">
-              <span>{t("os.contextQuestionProgress", { current: questionIndex + 1, total: props.questions.length })}</span>
-              <Pill>{t(activeSelectionMode === "multiple" ? "os.multiSelect" : "os.singleSelect")}</Pill>
-            </div>
+            {/* Meta stays out of the way when it says nothing: a lone question needs no
+                "1/1" counter, and a free-text question has no selection mode to explain. */}
+            {props.questions.length > 1 || activeQuestion.options.length > 0 ? (
+              <div className="od-context-question-meta">
+                {props.questions.length > 1 ? (
+                  <span>{t("os.contextQuestionProgress", { current: questionIndex + 1, total: props.questions.length })}</span>
+                ) : <span aria-hidden="true" />}
+                {activeQuestion.options.length > 0 ? (
+                  <Pill>{t(activeSelectionMode === "multiple" ? "os.multiSelect" : "os.singleSelect")}</Pill>
+                ) : null}
+              </div>
+            ) : null}
             <h2 ref={questionHeadingRef} tabIndex={-1}>{activeQuestion.question}</h2>
             <p>{activeQuestion.why_high_impact}</p>
           </header>
@@ -213,14 +223,15 @@ function ContextClarifyFlow(props: ContextClarifyFlowProps) {
             </div>
             {activeQuestion.allow_other ? (
               <TextField
-                label={t("os.otherAnswer")}
+                // Without options there is nothing to be "different" from — the field IS the answer.
+                label={t(activeQuestion.options.length > 0 ? "os.otherAnswer" : "os.yourAnswer")}
                 value={activeAnswer.other}
                 disabled={props.disabled}
                 onChange={(event) => props.onAnswer(
                   activeQuestion.id,
                   setContextOtherAnswer(activeAnswer, event.target.value, activeSelectionMode),
                 )}
-                placeholder={t("os.otherAnswerPlaceholder")}
+                placeholder={t(activeQuestion.options.length > 0 ? "os.otherAnswerPlaceholder" : "os.yourAnswerPlaceholder")}
                 fieldClassName="od-context-other-field"
               />
             ) : null}

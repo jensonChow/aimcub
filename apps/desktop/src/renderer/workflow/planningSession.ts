@@ -247,7 +247,9 @@ export function planningActivityLine(
     const human = humanizeToolId(item.tool ?? "");
     if (!human) return null;
     const key = TOOL_LINE_KEY[human];
-    return key ? t(key) : t("planningSession.now.tool", { tool: human });
+    // Unknown runtime tool ids stay unsayable: a raw id interpolated into copy reads as
+    // debugger noise ("Using tool"), so fall back to the honest generic working line.
+    return key ? t(key) : t("planningSession.now.researching");
   }
   switch (item.code) {
     case "started":
