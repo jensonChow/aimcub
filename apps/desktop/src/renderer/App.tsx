@@ -580,7 +580,9 @@ function AimOsApp() {
       setPlanningDebugTraces([]);
       setPlanningLiveEvents([]);
       clearPlanningRun();
-      setPlanningShellId(null);
+      // Re-tapping the OPEN aim must not detach its live session surface (the re-attach
+      // effect keys on selected.id and will not refire); switching aims still clears.
+      setPlanningShellId((current) => (current === goal.id ? current : null));
       setIntakeClarify(null);
       setIntakeAnswers({});
       setClarifyPhase(null);
@@ -1175,7 +1177,14 @@ function AimOsApp() {
 
   function applySessionView(view: PlanningSessionStateView) {
     setPlanningSession(view);
-    if (view.phase === "draft_ready" && view.landing && planningShellId === view.goalId) {
+    // Main is the authority on whether a session exists: any view for the aim ON SCREEN
+    // re-attaches the surface. openGoal clears planningShellId on every navigation, so
+    // without this the aim greeted its owner with the start card, and one more click
+    // spawned a NEW session once the old one settled ("the whole process restarted",
+    // founder 2026-07-25). Landing gates on the aim the user is looking at for the same
+    // reason: a session that finished off-screen must land the moment the user returns.
+    if (selectedGoalRef.current?.id === view.goalId) setPlanningShellId(view.goalId);
+    if (view.phase === "draft_ready" && view.landing && selectedGoalRef.current?.id === view.goalId) {
       applySessionLanding(view);
     }
   }
