@@ -2159,9 +2159,6 @@ function AimOsApp() {
       goal={selected}
       progress={progress}
       runEvents={journalEvents}
-      researchMemories={memories.filter((memory) => memory.goal_id === selected.id || memory.goal_id === null)}
-      contextLoop={contextLoop}
-      contextReview={contextReview}
       planReview={activePlan ? {
         plan: activePlan,
         quality: planResult?.quality ?? null,

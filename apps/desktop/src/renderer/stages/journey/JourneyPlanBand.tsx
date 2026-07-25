@@ -83,6 +83,8 @@ export interface JourneyPlanBandProps {
   ) => Promise<boolean>;
   onPickEvidenceFiles?: () => Promise<string[]>;
   onBreakDown?: (milestone: Milestone) => void;
+  /** Re-plan the SAME aim with a fresh planning run (was the plan sheet's footer action). */
+  onReplan?: () => void;
 }
 
 export function JourneyPlanBand(props: JourneyPlanBandProps) {
@@ -190,17 +192,23 @@ export function JourneyPlanBand(props: JourneyPlanBandProps) {
     <div className="od-journey-plan-band" data-od-id="journey-plan-band">
       <div className="od-journey-journal-head">
         <span className="od-journey-eyebrow">{t("glass.station.plan")}</span>
-        <span
-          className="od-journey-journal-hint"
-          aria-label={t("shell.progressValue", {
-            done: props.progress.completed_milestones,
-            total: props.progress.total_milestones,
-          })}
-        >
-          {t("shell.progressValue", {
-            done: props.progress.completed_milestones,
-            total: props.progress.total_milestones,
-          })}
+        <span className="od-journey-plan-band-side">
+          {props.onReplan ? (
+            <button
+              className="od-journey-plan-band-replan"
+              type="button"
+              disabled={props.disabled || proofIsActive}
+              onClick={props.onReplan}
+            >
+              {t("glass.journey.replan")}
+            </button>
+          ) : null}
+          <span className="od-journey-journal-hint">
+            {t("shell.progressValue", {
+              done: props.progress.completed_milestones,
+              total: props.progress.total_milestones,
+            })}
+          </span>
         </span>
       </div>
 

@@ -6362,6 +6362,57 @@ kbd {
   gap: 12px;
 }
 
+.od-journey-plan-band-side {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.od-journey-plan-band-replan {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--mut);
+  font-size: var(--od-type-meta);
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.od-journey-plan-band-replan:hover {
+  background: var(--island2);
+  color: var(--ink);
+}
+
+.od-journey-plan-band-replan:focus-visible {
+  outline: 0;
+  box-shadow: var(--od-focus);
+}
+
+.od-journey-plan-band-replan:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+/* Pending context candidates — an inline review band that exists only when they do. */
+.od-journey-inbox {
+  border-radius: 18px;
+  background: var(--island2);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: inset 0 0 0 1px var(--ring);
+  padding: 14px 18px;
+}
+
+.od-journey-inbox .od-context-inbox {
+  border-top: 0;
+  padding-top: 0;
+}
+
 .od-journey-turns {
   border-radius: 18px;
   background: var(--island2);
@@ -6438,6 +6489,26 @@ kbd {
   align-items: baseline;
   justify-content: space-between;
   padding: 0 4px;
+}
+
+/* The journal is a quiet disclosure (Collapse Stage 2): its head doubles as the summary. */
+summary.od-journey-journal-head {
+  cursor: pointer;
+  list-style: none;
+  border-radius: 10px;
+}
+
+summary.od-journey-journal-head::-webkit-details-marker {
+  display: none;
+}
+
+summary.od-journey-journal-head:hover .od-journey-eyebrow {
+  color: var(--mut);
+}
+
+summary.od-journey-journal-head:focus-visible {
+  outline: 0;
+  box-shadow: var(--od-focus);
 }
 
 .od-journey-journal-hint {

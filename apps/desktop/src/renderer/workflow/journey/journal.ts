@@ -3,8 +3,8 @@
  * `AimProgressReadModel` plus the aim's run-lifecycle `RunEvent` stream. Pure, no i18n.
  *
  * Two sources are merged newest-first:
- *  - Appended evidence (station `eval`) — the trust-bearing receipts.
- *  - Run-lifecycle events (station `run`) — start/finish/artifact receipts. Only the
+ *  - Appended evidence — the trust-bearing receipts.
+ *  - Run-lifecycle events — start/finish/artifact receipts. Only the
  *    product-facing lifecycle types are kept; raw `run.log` / `tool.*` traces and the
  *    redundant `run.queued` / `evidence.reported` events are filtered out (evidence rows
  *    already cover reported evidence, and internal traces belong in a developer surface).
@@ -47,7 +47,6 @@ export function buildJourneyJournal(
         at: evidence.occurred_at || evidence.created_at || "",
         who: whoForEvidenceKind(evidence.kind),
         what: evidence.summary || row.milestone.title,
-        stationId: "eval",
       });
     }
   }
@@ -68,7 +67,6 @@ export function buildJourneyJournal(
       who,
       what: event.summary || "",
       detailKey,
-      stationId: "run",
     });
   }
 
