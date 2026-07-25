@@ -2139,15 +2139,27 @@ kbd {
 }
 
 .od-planning-session-head {
-  display: grid;
-  gap: 6px;
-  justify-items: start;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.od-planning-session-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
 }
 
 .od-planning-session-head h2 {
   margin: 0;
   font-size: var(--od-type-title-m);
   font-weight: var(--od-font-weight-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .od-planning-session-sub {
@@ -2156,36 +2168,37 @@ kbd {
   font-size: var(--od-type-sub);
 }
 
-.od-planning-session-activity {
+/* What Aimcub is doing right now — one concrete clause, the card's real content. */
+.od-planning-session-now {
   margin: 0;
-  padding: 0;
-  list-style: none;
-  display: grid;
-  gap: 6px;
-  font-size: var(--od-type-sub);
-}
-
-.od-planning-session-activity li {
-  display: flex;
-  min-width: 0;
-  gap: 8px;
-  color: var(--od-muted);
-}
-
-.od-planning-session-activity li[data-kind="question"],
-.od-planning-session-activity li[data-kind="chat"] {
-  color: inherit;
-}
-
-.od-planning-session-activity-label {
+  color: var(--ink2);
+  font-size: var(--od-type-body);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.od-planning-session-counts {
+  margin: -8px 0 0;
+  color: var(--faint);
+  font-size: var(--od-type-meta);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Temporary chat: one quiet lane (input + send), never the visual center of the card. */
 .od-planning-session-chat {
   display: grid;
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.od-planning-session-controls {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
 }
 
 .od-planning-session-actions {

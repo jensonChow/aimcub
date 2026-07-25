@@ -6,7 +6,13 @@
 import type { ClarifyOutput } from "@aimcub/llm";
 import type { PlanningSessionQuestion } from "@aimcub/llm";
 
-import type { DesktopPreferences, PlanningAgentDetection, PlanningSessionAnswerRequest, PlanningSessionStateView } from "../../shared/ipc";
+import type {
+  DesktopPreferences,
+  PlanningAgentDetection,
+  PlanningSessionActivityItem,
+  PlanningSessionAnswerRequest,
+  PlanningSessionStateView,
+} from "../../shared/ipc";
 import type { ContextAnswerMap } from "../stages/context/types";
 
 /** A runtime that could run a planning session right now: capable, installed, authenticated. */
@@ -184,4 +190,93 @@ export function sessionSurfaceVisible(view: PlanningSessionStateView | null): bo
   if (view.active) return true;
   if (view.failure) return true;
   return view.phase === "draft_ready" && view.landing !== null;
+}
+
+// ── Live-lane activity voice ─────────────────────────────────────────────────
+//
+// Main emits structured activity items; these helpers turn them into localized
+// product-voice lines ("Searching the web"), and return null for anything that
+// cannot be said in product language — a null row is silently dropped, so raw
+// event types and tool ids never reach the surface.
+
+type TranslateFn = (key: string, vars?: Record<string, string | number>) => string;
+
+/** First-party planning tools and common runtime tools → concrete working verbs. */
+const TOOL_LINE_KEY: Record<string, string> = {
+  "ask user": "planningSession.now.askUser",
+  "search memory": "planningSession.now.searchMemory",
+  "report research": "planningSession.now.reportResearch",
+  "propose memory": "planningSession.now.proposeMemory",
+  "submit plan": "planningSession.now.submitPlan",
+  "web search": "planningSession.now.webSearch",
+  "web fetch": "planningSession.now.webFetch",
+  "local read": "planningSession.now.readLocal",
+  "read": "planningSession.now.readLocal",
+  "glob": "planningSession.now.readLocal",
+  "grep": "planningSession.now.readLocal",
+  "context distill": "planningSession.now.reportResearch",
+  "bash": "planningSession.now.probeWorkspace",
+  "shell": "planningSession.now.probeWorkspace",
+};
+
+/** "mcp__aimcub__report_research" → "report research"; "web.search" → "web search". */
+export function humanizeToolId(tool: string): string {
+  const stripped = tool.replace(/^mcp__[a-z0-9-]+__/i, "");
+  return stripped.replace(/[._-]+/g, " ").trim().toLowerCase();
+}
+
+/**
+ * One activity item → one localized line, or null when there is nothing sayable.
+ * Question, chat, and reject-reason text pass through as content; everything
+ * else speaks through i18n keys only.
+ */
+export function planningActivityLine(
+  item: Pick<PlanningSessionActivityItem, "kind" | "label" | "code" | "tool" | "count">,
+  t: TranslateFn,
+): string | null {
+  if (item.kind === "question") {
+    return item.label.trim() ? t("planningSession.now.askedYou", { q: item.label.trim() }) : null;
+  }
+  if (item.kind === "chat") {
+    return item.label.trim() ? t("planningSession.now.chat", { text: item.label.trim() }) : null;
+  }
+  if (item.kind === "research") {
+    return item.count && item.count > 0 ? t("planningSession.now.research", { n: item.count }) : null;
+  }
+  if (item.kind === "tool") {
+    const human = humanizeToolId(item.tool ?? "");
+    if (!human) return null;
+    const key = TOOL_LINE_KEY[human];
+    return key ? t(key) : t("planningSession.now.tool", { tool: human });
+  }
+  switch (item.code) {
+    case "started":
+      return t("planningSession.now.started");
+    case "question_answered":
+      return t("planningSession.now.answered");
+    case "question_skipped":
+      return t("planningSession.now.skipped");
+    case "draft_now":
+      return t("planningSession.now.draftNow");
+    case "plan_accepted":
+      return t("planningSession.now.planAccepted");
+    case "plan_rejected":
+      return t("planningSession.now.planRejected", { n: item.count ?? 1 });
+    case "memory_proposed":
+      return t("planningSession.now.memory");
+    default:
+      return null;
+  }
+}
+
+/** The single "now" line for the live card: the latest sayable activity. */
+export function planningActivityNow(
+  activity: readonly PlanningSessionActivityItem[],
+  t: TranslateFn,
+): string | null {
+  for (let index = activity.length - 1; index >= 0; index -= 1) {
+    const line = planningActivityLine(activity[index]!, t);
+    if (line) return line;
+  }
+  return null;
 }

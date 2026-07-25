@@ -344,7 +344,9 @@ export function JourneyView(props: JourneyViewProps) {
 
   const headerEl = (
     <header className="od-journey-head">
-      {renderAimHead(t("glass.journey.headerSub"))}
+      {renderAimHead(props.planning
+        ? t("glass.journey.planningSub")
+        : t("glass.journey.headerSub"))}
       <div className="od-journey-head-meta">
         {showElsewhere ? (
           <button

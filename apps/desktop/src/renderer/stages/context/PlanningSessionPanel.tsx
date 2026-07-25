@@ -5,12 +5,12 @@
  * surface), or asks it to draft now. Mounted as the Context stage's focused
  * panel, so the focused-question invariants keep holding.
  */
-import { useI18n } from "../../i18n";
+import { useI18n, type StringKey } from "../../i18n";
 import { Button, Panel, Pill, TextArea } from "../../ui";
 import type { ContextAnswerMap } from "./types";
 import type { PlanningSessionStateView } from "../../../shared/ipc";
 import { ContextClarifyPanel } from "./ContextClarifyPanel";
-import { sessionQuestionClarifyOutput } from "../../workflow/planningSession";
+import { planningActivityNow, sessionQuestionClarifyOutput } from "../../workflow/planningSession";
 
 export interface PlanningSessionPanelProps {
   view: PlanningSessionStateView;
@@ -88,36 +88,34 @@ export function PlanningSessionPanel(props: PlanningSessionPanelProps) {
     );
   }
 
-  const recentActivity = view.activity.slice(-8);
+  // One "now" line carries what the brain is doing; counts appear only once they exist.
+  // The chat stays a single quiet lane — optional, never the visual center of the card.
+  const tk = (key: string, vars?: Record<string, string | number>) => t(key as StringKey, vars);
+  const now = planningActivityNow(view.activity, tk) ?? t("planningSession.starting");
+  const hasCounts = view.researchFindingCount + view.researchGapCount + view.questionsAsked > 0;
   return (
     <Panel className="od-planning-session" data-od-id="planning-session-live">
       <header className="od-planning-session-head">
-        <Pill tone="accent">{t("planningSession.livePill")}</Pill>
+        <div className="od-planning-session-title">
+          <i className="od-journey-dot od-journey-dot-active" aria-hidden="true" />
+          <h2>{t("planningSession.liveTitle")}</h2>
+        </div>
         {view.model ? <Pill tone="neutral">{view.model}</Pill> : null}
-        <h2>{t("planningSession.liveTitle")}</h2>
-        <p className="od-planning-session-sub">
+      </header>
+      <p className="od-planning-session-now" role="status" aria-live="polite">{now}</p>
+      {hasCounts ? (
+        <p className="od-planning-session-counts">
           {t("planningSession.liveStatus", {
             findings: view.researchFindingCount,
             gaps: view.researchGapCount,
             questions: view.questionsAsked,
           })}
         </p>
-      </header>
-      {recentActivity.length > 0 ? (
-        <ul className="od-planning-session-activity" aria-label={t("planningSession.activityLabel")}>
-          {recentActivity.map((item, index) => (
-            <li key={`${item.at}-${index}`} data-kind={item.kind}>
-              <span className="od-planning-session-activity-label">{item.label}</span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="od-planning-session-sub">{t("planningSession.starting")}</p>
-      )}
+      ) : null}
       <div className="od-planning-session-chat">
         <TextArea
           value={props.chatDraft}
-          rows={2}
+          rows={1}
           placeholder={t("planningSession.chatPlaceholder")}
           disabled={props.disabled}
           onChange={(event) => props.onChatDraft(event.currentTarget.value)}
@@ -128,21 +126,21 @@ export function PlanningSessionPanel(props: PlanningSessionPanelProps) {
             }
           }}
         />
-        <div className="od-planning-session-actions">
-          <Button
-            variant="primary"
-            disabled={props.disabled || !props.chatDraft.trim()}
-            onClick={props.onChatSend}
-          >
-            {t("planningSession.chatSend")}
-          </Button>
-          <Button variant="ghost" disabled={props.disabled} onClick={props.onFinishNow}>
-            {t("planningSession.finishNow")}
-          </Button>
-          <Button variant="ghost" disabled={props.disabled} onClick={props.onCancel}>
-            {t("planningSession.cancel")}
-          </Button>
-        </div>
+        <Button
+          variant="primary"
+          disabled={props.disabled || !props.chatDraft.trim()}
+          onClick={props.onChatSend}
+        >
+          {t("planningSession.chatSend")}
+        </Button>
+      </div>
+      <div className="od-planning-session-controls">
+        <Button variant="ghost" disabled={props.disabled} onClick={props.onFinishNow}>
+          {t("planningSession.finishNow")}
+        </Button>
+        <Button variant="ghost" disabled={props.disabled} onClick={props.onCancel}>
+          {t("planningSession.cancel")}
+        </Button>
       </div>
     </Panel>
   );
