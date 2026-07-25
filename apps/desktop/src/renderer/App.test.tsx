@@ -791,6 +791,24 @@ describe("App planning state guards", () => {
     expect(confirmFlow).toContain("return false;");
   });
 
+  it("re-attaches a running planning session on aim re-entry instead of restarting it", () => {
+    const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+    const applyView = source.match(/function applySessionView[\s\S]*?applySessionViewRef\.current = applySessionView;/)?.[0] ?? "";
+    const openGoal = source.match(/async function openGoal[\s\S]*?async function refreshGoalState/)?.[0] ?? "";
+
+    // Main is the authority on session existence: any view for the on-screen aim restores
+    // the surface attachment (openGoal clears it on every navigation), and a session that
+    // finished off-screen lands the moment the user returns. Without both, re-entering the
+    // aim showed the start card and one click spawned a brand-new session (founder
+    // 2026-07-25: "every time I retap into the aim, the whole process will restart").
+    expect(applyView).toContain("if (selectedGoalRef.current?.id === view.goalId) setPlanningShellId(view.goalId);");
+    expect(applyView).toContain('view.phase === "draft_ready" && view.landing && selectedGoalRef.current?.id === view.goalId');
+    expect(applyView).not.toContain("planningShellId === view.goalId");
+    // Re-tapping the already-open aim must not detach the live surface either (the
+    // re-attach effect keys on selected.id and will not refire for the same id).
+    expect(openGoal).toContain("setPlanningShellId((current) => (current === goal.id ? current : null));");
+  });
+
   it("keeps accepted or skipped draft refinements on the Journey", () => {
     const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
     const clarifyPanel = source.match(/const clarifyPanel = clarify[\s\S]*?const debugPanel =/)?.[0] ?? "";

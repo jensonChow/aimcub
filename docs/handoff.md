@@ -4,6 +4,27 @@ Last updated: 2026-07-25 (second session)
 Branch: `main` (delete-click fix merged locally, **NOT pushed** — push needs
 founder authorization). Everything before it is on origin (e6d7df78).
 
+## Second session part 8: re-entering an aim re-attaches, never restarts
+
+Founder: "every time I retap into the aim, the whole process will restart."
+Main was never the problem (sessions survive navigation; `startPlanningSession`
+reuses an unsettled session) — the renderer forgot the attachment:
+`openGoal` cleared `planningShellId` on every navigation, the surface gate and
+the landing-apply both required it, so re-entry showed the START CARD over a
+running session, and once the old session settled one more click spawned a
+genuinely new one.
+
+Fix (renderer-only): `applySessionView` now re-attaches against the aim ON
+SCREEN (`selectedGoalRef`) — any session view for the selected aim restores
+`planningShellId` and a `draft_ready` landing applies on return; `openGoal`
+keeps the attachment when re-tapping the already-open aim (updater-guarded
+clear, since the re-attach effect keys on `selected.id` and will not refire).
+
+Verified in the harness against all three gestures: first entry with a running
+session, Home → back, and same-aim re-tap — live card mounted with the full
+trace every time, `startPlanningSession` called ZERO times. Desktop 358 (+1
+source-pinned regression). This closes the re-attach warning parked in part 3.
+
 ## Second session part 7: the trace polished
 
 Founder on the live trace: "could be more beautiful, polish it." Four cuts:
@@ -160,7 +181,7 @@ that hosts an open popover").
 
 Full gate green after every batch, the delete-click fix, the domain/question
 recalibration, and the surface simplification (build 9/9 · typecheck 17/17 ·
-lint 11/11 · purity · desktop 357 · llm 197 · store 99). Root `Aimcub.app`
+lint 11/11 · purity · desktop 358 · llm 197 · store 99). Root `Aimcub.app`
 repacked + boot-smoked after each change (founder must restart the app to get
 the fixes). Renderer mass after the collapse: ~14.6k non-test LOC, cockpit.css
 6,4xx lines, i18n ~800 keys.
