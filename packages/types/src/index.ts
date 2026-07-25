@@ -18,7 +18,11 @@ const DbId = z.string().guid();
 export const GoalStatus = z.enum(["draft", "active", "paused", "achieved", "abandoned"]);
 export type GoalStatus = z.infer<typeof GoalStatus>;
 
-/** Goal domain — the MVP only uses `software`; the rest are reserved for the "developers first, then general" rollout. */
+/**
+ * Goal domain — optional classification. No creation surface asks for it, so it stays null
+ * until a planning brain infers it (submit_plan carries it; plan landing writes it back).
+ * A stated-but-wrong domain misleads research, so absence is always preferred over a guess.
+ */
 export const GoalDomain = z.enum(["software", "career", "learning", "health", "creative", "custom"]);
 export type GoalDomain = z.infer<typeof GoalDomain>;
 
@@ -260,7 +264,7 @@ export const Goal = z.object({
   owner_id: DbId,
   title: z.string().min(1),
   description: z.string().default(""),
-  domain: GoalDomain.default("software"),
+  domain: GoalDomain.nullable().default(null),
   status: GoalStatus.default("draft"),
   target_date: z.string().nullable().default(null),
   /** Snapshot of the current decomposition (replaces a heavyweight milestone_versions table). */
@@ -353,7 +357,8 @@ export type PlanEdge = z.infer<typeof PlanEdge>;
 
 export const DecompositionOutput = z.object({
   goal_summary: z.string().default(""),
-  domain: GoalDomain.default("software"),
+  /** The brain's honest classification of the aim; null when it did not commit to one. */
+  domain: GoalDomain.nullable().default(null),
   rationale: z.string().default(""),
   nodes: z.array(PlanNode).min(1).max(15),
   edges: z.array(PlanEdge).default([]),

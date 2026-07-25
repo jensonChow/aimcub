@@ -72,7 +72,11 @@ export function buildPlanningSessionPrompt(input: PlanningSessionPromptInput): s
     "",
     "## The aim",
     `Title: ${input.aim.title}`,
-    `Domain: ${input.aim.domain ?? "software"}`,
+    // A stated-but-wrong domain misleads research, so absence is stated honestly and the
+    // brain classifies the aim itself (submit_plan's `domain` lands back on the goal).
+    input.aim.domain
+      ? `Domain: ${input.aim.domain}`
+      : "Domain: not set — infer it from the aim itself and record your classification in submit_plan's `domain` field.",
     `Description: ${description}`,
     "",
     renderOutputLanguageInstruction(input.aim.outputLanguage),
@@ -91,12 +95,14 @@ export function buildPlanningSessionPrompt(input: PlanningSessionPromptInput): s
     "",
     "## How to work with the user",
     "- Call search_memory before asking anything the user may already have told Aimcub.",
-    `- ask_user asks ONE blocking question at a time, budget ${budgets.maxQuestions} per session. Spend it only on questions whose answer changes decomposition, routing, research direction, risk controls, evidence, or the definition of done.`,
+    `- ask_user asks ONE blocking question at a time, budget ${budgets.maxQuestions} per session. Spend it on questions whose answer changes decomposition, routing, research direction, risk controls, evidence, or the definition of done.`,
+    "- Sort every unknown by where its answer lives. World facts (options, requirements, prices, comparisons) live in research: never ask the user what your tools can find. Personal facts (dates, budget, who is involved, taste, obligations, experience) live only in the user: research can NEVER answer them — ask, do not guess.",
+    "- When the aim is about the user's own life (a trip, a career move, health, learning, finances), open with the 2-4 personal-fact questions that most shape the plan, then research with the answers in hand. When research can cover most of the aim, research first and ask only what it could not answer.",
     "- Prefer options-with-tradeoffs (hypotheses) over open questions; a free-text escape hatch is always added for you.",
     "- Choice cardinality: single ONLY when answers are mutually exclusive in the same scope or one primary choice is explicitly required; if any pair of options can be true together, use multiple; uncertainty defaults to multiple.",
-    "- Interleave: research first, ask when research cannot answer, let each answer redirect the next research step. Do not front-load a questionnaire.",
+    "- Interleave throughout: let each answer redirect the next research step and each research result sharpen the next question. Do not front-load the full budget as a questionnaire.",
     "- Tool replies may carry user_notes (the user's temporary-chat interjections) and directives. Treat user_notes as fresh user input; a finish_now directive means stop researching and submit the plan with your current understanding.",
-    "- Low-impact unknowns are NOT questions: default them and disclose the default in submit_plan assumptions.",
+    "- Low-impact unknowns are NOT questions: default them and disclose the default in submit_plan assumptions. A personal fact that shapes the plan's structure is never low-impact.",
     "- Durable, reusable facts you discover (stable preferences, constraints, capabilities) go through propose_memory as pending candidates.",
     "",
     "## What to deliver",

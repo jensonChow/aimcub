@@ -223,6 +223,10 @@ export async function startPlanningSession(req: PlanningSessionStartRequest): Pr
     description: req.description,
   });
   const memories = context.memories;
+  // Domain is only ever brain-inferred (landing writes it back): pass it when a prior plan
+  // established one, stay silent otherwise so the prompt never states a guessed domain.
+  const storedGoal = await aimStore.getGoal(req.goalId);
+  const domain = storedGoal?.goal.domain ?? null;
   const workspaceRoot = localContextRoot();
   const cwd = workspaceRoot ?? mkdtempSync(join(tmpdir(), "aimcub-planning-"));
 
@@ -249,7 +253,7 @@ export async function startPlanningSession(req: PlanningSessionStartRequest): Pr
   managed.model = model ?? null;
   const handle = await startEmbeddedPlanningSession({
     agentId,
-    aim: { title: req.title, description: req.description },
+    aim: { title: req.title, description: req.description, domain },
     memories,
     linkedSources: linkedContextSources(),
     workspaceRoots: workspaceRoot ? [workspaceRoot] : [],

@@ -445,6 +445,36 @@ describe("planning session · surface", () => {
     expect(prompt).toContain("submit_plan");
   });
 
+  it("states the aim's domain only when actually known", () => {
+    const known = buildPlanningSessionPrompt({
+      aim: { title: "Ship the beta", domain: "software" },
+      webResearch: { enabled: true, required: false },
+    });
+    expect(known).toContain("Domain: software");
+
+    // A guessed domain misleads research ("plan my London trip" is not a software goal):
+    // when unset, the prompt says so and routes the brain's own classification into
+    // submit_plan, which plan landing writes back onto the goal.
+    const unknown = buildPlanningSessionPrompt({
+      aim: { title: "Plan a trip to London", domain: null },
+      webResearch: { enabled: true, required: true },
+    });
+    expect(unknown).toContain("Domain: not set — infer it from the aim itself");
+    expect(unknown).not.toContain("Domain: software");
+  });
+
+  it("exempts personal facts from question suppression and sanctions an opening set", () => {
+    const prompt = buildPlanningSessionPrompt({
+      aim: { title: "Plan a trip to London" },
+      webResearch: { enabled: true, required: true },
+    });
+    // Personal facts are the one class research can never answer — the doctrine must
+    // order them asked, not defaulted into assumptions.
+    expect(prompt).toContain("research can NEVER answer them — ask, do not guess");
+    expect(prompt).toContain("open with the 2-4 personal-fact questions that most shape the plan");
+    expect(prompt).toContain("A personal fact that shapes the plan's structure is never low-impact.");
+  });
+
   it("serializes a snapshot into the AimDraft planning_session shape", async () => {
     const { session } = makeSession({ memories: [] });
     await expectReply(session.handleToolCall("report_research", {

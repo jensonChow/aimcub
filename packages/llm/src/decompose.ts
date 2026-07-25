@@ -45,7 +45,7 @@ export interface DecomposeInput {
   title: string;
   description?: string;
   /** Defaults to `software` (the only MVP domain). */
-  domain?: GoalDomain;
+  domain?: GoalDomain | null;
   /** Relevant user/org context from prior aims. Used to avoid re-asking and sharpen plans. */
   memories?: readonly PlanningMemory[];
   /** Historical question → memory → plan-impact lineage. Used to write better contracts and gaps on the first pass. */
@@ -338,11 +338,11 @@ export function renderOutputLanguageInstruction(language: AimOutputLanguage | un
 }
 
 function buildUserPrompt(input: DecomposeInput): string {
-  const domain = input.domain ?? "software";
   const description = input.description?.trim() ? input.description.trim() : "(no description provided)";
   return [
     `Goal title: ${input.title}`,
-    `Goal domain: ${domain}`,
+    // Never state a guessed domain: a wrong label skews decomposition worse than no label.
+    `Goal domain: ${input.domain ?? "(not set — infer from the goal itself and record it in the output's domain field)"}`,
     `Goal description: ${description}`,
     "",
     renderOutputLanguageInstruction(input.outputLanguage),

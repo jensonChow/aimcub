@@ -4,7 +4,33 @@ Last updated: 2026-07-25 (second session)
 Branch: `main` (delete-click fix merged locally, **NOT pushed** — push needs
 founder authorization). Everything before it is on origin (e6d7df78).
 
-## Second session: Delete aim actually works now
+## Second session part 2: planning research grounded, questions recalibrated
+
+Founder (driving the collapsed surface): "研究不贴切，选择题总是只有一道" — research
+felt generic and every session asked exactly one question. Two shipped answers:
+
+1. **Honest domain** — every aim was silently stamped `domain: "software"` (store
+   creation default + prompt fallbacks), so the London-trip aim was presented to
+   the brain as a software goal. Now: `Goal.domain`/`DecompositionOutput.domain`
+   are nullable, creation never invents a domain, plan landing writes the brain's
+   `submit_plan.domain` back to the goal (the only writer), session start passes
+   the stored domain, prompts render "not set — infer it" when unknown, and the
+   store normalizes the legacy default to null on plan-less shells at load.
+   Doctrine in `docs/memory/architecture.md`.
+2. **Question economy recalibrated** — the mission prompt now sorts unknowns by
+   where the answer lives: world facts = research (never ask), personal facts
+   (dates, budget, companions, taste) = ask, never guess; personal-life aims get
+   a sanctioned 2-4 question opening set; "low-impact → assumptions" no longer
+   swallows plan-shaping personal facts. One-question-at-a-time blocking and the
+   6-question budget stay. (The one-per-popup mechanic itself is the ask_user
+   contract — a multi-question form would be a contract change, deliberately not
+   done.)
+
+Tests: llm 197 (+2 prompt doctrine), store 99 (+3 domain lifecycle), decompose
+default-domain test rewritten. Full gate green; root `Aimcub.app` repacked +
+boot-smoked (founder must restart the app).
+
+## Second session part 1: Delete aim actually works now
 
 Founder drove Delete aim live and it silently did nothing (menu stayed open,
 focus ring on the item). Root cause was CSS, not the delete pipeline:
@@ -45,11 +71,11 @@ that hosts an open popover").
 
 ## Verification
 
-Full gate green after every batch and after the delete-click fix (build 9/9 ·
-typecheck 17/17 · lint 11/11 · purity · desktop 345 tests). Root `Aimcub.app`
-repacked + boot-smoked after each change (founder must restart the app to get
-the fix). Renderer mass after the collapse: ~14.6k non-test LOC, cockpit.css
-6,4xx lines, i18n ~800 keys.
+Full gate green after every batch, the delete-click fix, and the domain/question
+recalibration (build 9/9 · typecheck 17/17 · lint 11/11 · purity · desktop 345 ·
+llm 197 · store 99). Root `Aimcub.app` repacked + boot-smoked after each change
+(founder must restart the app to get the fixes). Renderer mass after the
+collapse: ~14.6k non-test LOC, cockpit.css 6,4xx lines, i18n ~800 keys.
 
 ## Open items
 

@@ -376,14 +376,17 @@ describe("decompose · happy path", () => {
     expect(gw.calls[0]!.prompt).toContain("Treat eval signals as acceptance inputs");
   });
 
-  it("applies zod defaults and fills domain when omitted from input", async () => {
+  it("states an unset domain honestly instead of defaulting to software", async () => {
     const plan = validPlan();
     const gw = mockGateway(plan);
     const result = await decompose(gw, { title: "Just a title" });
 
     expect(result.validation.ok).toBe(true);
-    // The user prompt should default the domain to `software`.
-    expect((gw.calls[0] as LlmRequest).prompt).toContain("software");
+    // A guessed domain misleads decomposition: the prompt must say "not set" and ask the
+    // model to classify the goal itself, never silently claim `software`.
+    const prompt = (gw.calls[0] as LlmRequest).prompt;
+    expect(prompt).toContain("Goal domain: (not set — infer from the goal itself");
+    expect(prompt).not.toContain("Goal domain: software");
   });
 
   it("normalizes owner/completion-mode confusion from providers", async () => {
