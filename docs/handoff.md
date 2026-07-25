@@ -4,6 +4,16 @@ Last updated: 2026-07-25 (second session)
 Branch: `main` (delete-click fix merged locally, **NOT pushed** — push needs
 founder authorization). Everything before it is on origin (e6d7df78).
 
+## Second session part 5: choice cards equalized
+
+Founder (tarot-aim question with three uneven options): "the choice cards
+should be the same size which looks better." The option grid now equalizes
+every row to the tallest card (`grid-auto-rows: 1fr`, cards fill their cell,
+`height: 100%`) and card content top-aligns (label then tradeoff from the top
+edge) instead of floating mid-card. Verified in the harness with the founder's
+exact three tarot options: all cards measure identical. Desktop 352 (+1 CSS
+assertion). Doctrine added to design-system.md.
+
 ## Second session part 4: card-in-card flattened
 
 Founder (new tarot-aim drive): "too many layers I think. could be simplified."
@@ -109,7 +119,7 @@ that hosts an open popover").
 
 Full gate green after every batch, the delete-click fix, the domain/question
 recalibration, and the surface simplification (build 9/9 · typecheck 17/17 ·
-lint 11/11 · purity · desktop 351 · llm 197 · store 99). Root `Aimcub.app`
+lint 11/11 · purity · desktop 352 · llm 197 · store 99). Root `Aimcub.app`
 repacked + boot-smoked after each change (founder must restart the app to get
 the fixes). Renderer mass after the collapse: ~14.6k non-test LOC, cockpit.css
 6,4xx lines, i18n ~800 keys.

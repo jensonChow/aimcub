@@ -1688,6 +1688,18 @@ describe("CockpitShell", () => {
     expect(css).toContain("width: min(216px, calc(var(--sidebar-content-width) - 20px));");
   });
 
+  it("keeps question choice cards the same size with top-aligned content", () => {
+    const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
+
+    // Founder 2026-07-25: uneven tradeoff lengths made the option grid ragged. Rows
+    // equalize to the tallest card and content reads from the top edge.
+    const choiceList = css.match(/\.od-context-choice-list \{[\s\S]*?\}/)?.[0] ?? "";
+    expect(choiceList).toContain("grid-auto-rows: 1fr;");
+    const choiceCard = css.match(/\.od-context-choice\.od-ui-button \{[\s\S]*?\}/)?.[0] ?? "";
+    expect(choiceCard).toContain("height: 100%;");
+    expect(choiceCard).toContain("justify-content: flex-start;");
+  });
+
   it("renders the sidebar brand row: Aimcub → Home plus a compact New-aim action", () => {
     const html = renderToStaticMarkup(
       <I18nProvider>
