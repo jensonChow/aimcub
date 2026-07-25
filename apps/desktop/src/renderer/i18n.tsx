@@ -74,9 +74,10 @@ export const STRINGS = {
   "os.busy.context": { en: "Checking what Aimcub already knows…", zh: "正在确认 Aimcub 已掌握的上下文…" },
   "planningModel.openSettings": { en: "Change in Settings → Brain", zh: "在设置 → Brain 中更改" },
   "planningSession.liveTitle": { en: "Aimcub is researching this aim", zh: "Aimcub 正在研究这个目标" },
+  // Plural-proof metadata: labels lead, numbers follow ("1 questions asked" read as a bug).
   "planningSession.liveStatus": {
-    en: "{findings} findings · {gaps} gaps · {questions} questions asked",
-    zh: "{findings} 条发现 · {gaps} 个缺口 · 已提问 {questions} 次",
+    en: "Findings {findings} · Gaps {gaps} · Questions {questions}",
+    zh: "发现 {findings} · 缺口 {gaps} · 提问 {questions}",
   },
   "planningSession.starting": { en: "Waking the planning brain…", zh: "正在唤醒规划大脑…" },
   "planningSession.chatPlaceholder": {

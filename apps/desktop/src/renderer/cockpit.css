@@ -2206,18 +2206,20 @@ kbd {
 }
 
 /* The thought trace: what the brain has done so far, ending on the current step.
-   Older lines recede to meta; the current line is the card's living content. */
+   A hairline rail with a node per step — history recedes to meta, the current line
+   is the card's living content and its node echoes the header's active dot. */
 .od-planning-session-trace {
-  margin: 0;
-  padding: 0 0 0 14px;
+  margin: 2px 0 2px 5px;
+  padding: 0;
   list-style: none;
   display: grid;
-  gap: 5px;
-  border-left: 2px solid var(--od-border-soft);
+  gap: 8px;
 }
 
 .od-planning-session-trace li {
+  position: relative;
   min-width: 0;
+  padding-left: 18px;
   color: var(--faint);
   font-size: var(--od-type-meta);
   line-height: var(--od-line-meta);
@@ -2226,14 +2228,67 @@ kbd {
   white-space: nowrap;
 }
 
+/* The rail segment: hairline between this node and the next one's. */
+.od-planning-session-trace li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: calc(50% + 5px);
+  bottom: calc(-50% - 3px);
+  width: 1px;
+  background: var(--od-border-soft);
+}
+
+.od-planning-session-trace li:last-child::before {
+  display: none;
+}
+
+/* The node: a quiet tick per completed step, accent on the living one. */
+.od-planning-session-trace li::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: calc(50% - 2.5px);
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--od-fg), transparent 72%);
+}
+
 .od-planning-session-trace li[data-current="true"] {
   color: var(--ink2);
   font-size: var(--od-type-body);
   line-height: var(--od-line-body);
 }
 
+.od-planning-session-trace li[data-current="true"]::after {
+  background: var(--od-accent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .od-planning-session-trace li {
+    animation: od-trace-enter 160ms ease;
+  }
+}
+
+@keyframes od-trace-enter {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The session receipt: quiet metadata on the footer's left, actions on the right. */
 .od-planning-session-counts {
-  margin: -8px 0 0;
+  margin: 0 auto 0 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--faint);
   font-size: var(--od-type-meta);
   font-variant-numeric: tabular-nums;

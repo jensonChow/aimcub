@@ -142,15 +142,6 @@ function PlanningSessionLiveCard(props: PlanningSessionPanelProps) {
           );
         })}
       </ol>
-      {hasCounts ? (
-        <p className="od-planning-session-counts">
-          {t("planningSession.liveStatus", {
-            findings: view.researchFindingCount,
-            gaps: view.researchGapCount,
-            questions: view.questionsAsked,
-          })}
-        </p>
-      ) : null}
       {noteOpen ? (
         /* One integrated composer: the field is the container, send lives inside it. */
         <div className="od-planning-session-chat">
@@ -184,6 +175,16 @@ function PlanningSessionLiveCard(props: PlanningSessionPanelProps) {
         </div>
       ) : null}
       <div className="od-planning-session-controls">
+        {/* The session receipt balances the footer's left side; actions stay right. */}
+        <span className="od-planning-session-counts">
+          {hasCounts
+            ? t("planningSession.liveStatus", {
+              findings: view.researchFindingCount,
+              gaps: view.researchGapCount,
+              questions: view.questionsAsked,
+            })
+            : null}
+        </span>
         {noteOpen ? null : (
           <Button variant="ghost" disabled={props.disabled} onClick={() => setNoteOpen(true)}>
             {t("planningSession.addNote")}

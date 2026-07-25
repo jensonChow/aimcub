@@ -60,21 +60,23 @@ describe("PlanningSessionPanel · live card", () => {
     expect(html).toMatch(/od-planning-session[^>]*data-variant="plain"/);
   });
 
-  it("shows the thought trace, ending emphasized on the current step", () => {
+  it("shows the thought trace: durable history, ending emphasized on the current verb", () => {
     const html = renderPanel(liveView({
+      researchFindingCount: 3,
       activity: [
         { at: "1", kind: "status", label: "", code: "started" },
-        { at: "2", kind: "tool", label: "", tool: "web.search" },
-        { at: "3", kind: "research", label: "", count: 3 },
+        { at: "2", kind: "research", label: "", count: 3 },
+        { at: "3", kind: "tool", label: "", tool: "web.search" },
       ],
     }));
     const trace = html.match(/<ol class="od-planning-session-trace">[\s\S]*?<\/ol>/)?.[0] ?? "";
     expect(trace).toContain("Reading the aim and your context");
-    expect(trace).toContain("Searching the web");
     expect(trace).toContain("Recorded 3 research findings");
     // The last line is the living one; earlier steps have receded.
-    expect(trace).toMatch(/data-current="true"[^>]*>Recorded 3 research findings/);
-    expect(trace).not.toMatch(/data-current="true"[^>]*>Searching the web/);
+    expect(trace).toMatch(/data-current="true"[^>]*>Searching the web/);
+    expect(trace).not.toMatch(/data-current="true"[^>]*>Recorded 3 research findings/);
+    // The session receipt reads label-first (plural-proof) in the footer.
+    expect(html).toContain("Findings 3 · Gaps 0 · Questions 0");
   });
 
   it("rests without an input box: the note lane opens on demand", () => {
