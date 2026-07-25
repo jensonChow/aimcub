@@ -5,12 +5,14 @@
  * surface), or asks it to draft now. Mounted as the Context stage's focused
  * panel, so the focused-question invariants keep holding.
  */
+import { useState } from "react";
+
 import { useI18n, type StringKey } from "../../i18n";
 import { Button, Panel, Pill, TextArea } from "../../ui";
 import type { ContextAnswerMap } from "./types";
 import type { PlanningSessionStateView } from "../../../shared/ipc";
 import { ContextClarifyPanel } from "./ContextClarifyPanel";
-import { planningActivityNow, sessionQuestionClarifyOutput } from "../../workflow/planningSession";
+import { planningActivityTrace, sessionQuestionClarifyOutput } from "../../workflow/planningSession";
 
 export interface PlanningSessionPanelProps {
   view: PlanningSessionStateView;
@@ -91,11 +93,29 @@ export function PlanningSessionPanel(props: PlanningSessionPanelProps) {
     );
   }
 
-  // One "now" line carries what the brain is doing; counts appear only once they exist.
-  // The chat stays a single quiet lane — optional, never the visual center of the card.
+  return <PlanningSessionLiveCard {...props} />;
+}
+
+function PlanningSessionLiveCard(props: PlanningSessionPanelProps) {
+  const { t } = useI18n();
+  const view = props.view;
+  // The note lane is on-demand (founder: the researching screen needs no standing input
+  // box). A non-empty draft keeps it open across re-renders and re-mounts.
+  const [noteOpen, setNoteOpen] = useState(() => Boolean(props.chatDraft.trim()));
+
+  // The thought trace carries what the brain has been doing, ending on the current step;
+  // counts appear only once they exist.
   const tk = (key: string, vars?: Record<string, string | number>) => t(key as StringKey, vars);
-  const now = planningActivityNow(view.activity, tk) ?? t("planningSession.starting");
+  const trace = planningActivityTrace(view.activity, tk);
+  const lines = trace.length > 0 ? trace : [t("planningSession.starting")];
   const hasCounts = view.researchFindingCount + view.researchGapCount + view.questionsAsked > 0;
+
+  function sendNote() {
+    if (!props.chatDraft.trim()) return;
+    props.onChatSend();
+    setNoteOpen(false);
+  }
+
   // Plain like the question state: the Journey's planning island is the ONE card — a
   // chromed panel inside it reads as a card-in-card (founder: "too many layers").
   return (
@@ -107,7 +127,21 @@ export function PlanningSessionPanel(props: PlanningSessionPanelProps) {
         </div>
         {view.model ? <Pill tone="neutral">{view.model}</Pill> : null}
       </header>
-      <p className="od-planning-session-now" role="status" aria-live="polite">{now}</p>
+      <ol className="od-planning-session-trace">
+        {lines.map((line, index) => {
+          const current = index === lines.length - 1;
+          return (
+            <li
+              key={`${index}-${line}`}
+              data-current={current ? "true" : undefined}
+              role={current ? "status" : undefined}
+              aria-live={current ? "polite" : undefined}
+            >
+              {line}
+            </li>
+          );
+        })}
+      </ol>
       {hasCounts ? (
         <p className="od-planning-session-counts">
           {t("planningSession.liveStatus", {
@@ -117,31 +151,44 @@ export function PlanningSessionPanel(props: PlanningSessionPanelProps) {
           })}
         </p>
       ) : null}
-      {/* One integrated composer: the field is the container, send lives inside it. */}
-      <div className="od-planning-session-chat">
-        <TextArea
-          value={props.chatDraft}
-          rows={1}
-          fieldClassName="od-planning-session-chat-field"
-          placeholder={t("planningSession.chatPlaceholder")}
-          disabled={props.disabled}
-          onChange={(event) => props.onChatDraft(event.currentTarget.value)}
-          onKeyDown={(event) => {
-            if (event.key !== "Enter" || event.shiftKey) return;
-            event.preventDefault();
-            if (props.chatDraft.trim()) props.onChatSend();
-          }}
-        />
-        <Button
-          variant="ghost"
-          className="od-planning-session-chat-send"
-          disabled={props.disabled || !props.chatDraft.trim()}
-          onClick={props.onChatSend}
-        >
-          {t("planningSession.chatSend")}
-        </Button>
-      </div>
+      {noteOpen ? (
+        /* One integrated composer: the field is the container, send lives inside it. */
+        <div className="od-planning-session-chat">
+          <TextArea
+            value={props.chatDraft}
+            rows={1}
+            autoFocus
+            fieldClassName="od-planning-session-chat-field"
+            placeholder={t("planningSession.chatPlaceholder")}
+            disabled={props.disabled}
+            onChange={(event) => props.onChatDraft(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                setNoteOpen(false);
+                return;
+              }
+              if (event.key !== "Enter" || event.shiftKey) return;
+              event.preventDefault();
+              sendNote();
+            }}
+          />
+          <Button
+            variant="ghost"
+            className="od-planning-session-chat-send"
+            disabled={props.disabled || !props.chatDraft.trim()}
+            onClick={sendNote}
+          >
+            {t("planningSession.chatSend")}
+          </Button>
+        </div>
+      ) : null}
       <div className="od-planning-session-controls">
+        {noteOpen ? null : (
+          <Button variant="ghost" disabled={props.disabled} onClick={() => setNoteOpen(true)}>
+            {t("planningSession.addNote")}
+          </Button>
+        )}
         <Button variant="ghost" disabled={props.disabled} onClick={props.onFinishNow}>
           {t("planningSession.finishNow")}
         </Button>

@@ -282,3 +282,23 @@ export function planningActivityNow(
   }
   return null;
 }
+
+/**
+ * The live card's thought trace: the last `limit` sayable lines in order, ending on the
+ * current one. Unsayable rows drop out and consecutive duplicates collapse (a long research
+ * burst emits the same working verb many times — the trace shows progress, not repetition).
+ */
+export function planningActivityTrace(
+  activity: readonly PlanningSessionActivityItem[],
+  t: TranslateFn,
+  limit = 6,
+): string[] {
+  const lines: string[] = [];
+  for (const item of activity) {
+    const line = planningActivityLine(item, t);
+    if (!line) continue;
+    if (lines[lines.length - 1] === line) continue;
+    lines.push(line);
+  }
+  return lines.slice(-limit);
+}

@@ -543,11 +543,20 @@ as a working agent, not as a form the user operates.
   "Researching…" line, never humanized-and-interpolated (Codex once emitted an id that read as
   the junk line "Using tool" — founder screenshot).
 - The live planning card reads top-down as one thought: pulsing dot + working title, the model
-  as one quiet pill, ONE current-activity line, counts only once at least one is non-zero, a
-  single-lane chat composer, and quiet Draft-now/Stop controls. While a session runs, the
-  Journey header sub states the deal ("Aimcub researches first, and asks only what research
-  can't answer") instead of the motto. Never stack zero-counters or multiple mottos on a
-  working surface.
+  as one quiet pill, the THOUGHT TRACE, counts only once at least one is non-zero, and quiet
+  Add-a-note/Draft-now/Stop controls. While a session runs, the Journey header sub states the
+  deal ("Aimcub researches first, and asks only what research can't answer") instead of the
+  motto. Never stack zero-counters or multiple mottos on a working surface.
+- **The trace, not a status word** (founder 2026-07-25: "show a tree of thoughts instead of
+  just 'Researching'"). The card shows the brain's recent sayable steps in order on a hairline
+  left rail — older lines recede to meta/faint, the current line is body/ink and carries the
+  aria-live status. Consecutive duplicate verbs collapse; unsayable rows drop; the trace caps
+  at ~6 lines (`planningActivityTrace`). Questions and user notes appear in the trace as
+  content — it is the working memory of the session, not a log.
+- **No standing input on a watching surface** (same feedback: "doesn't need an input box").
+  The mid-research note composer is closed at rest and opens from a quiet "Add a note" action
+  (Escape closes, send closes, a non-empty draft keeps it open). The interjection CHANNEL
+  stays — only the permanent box goes.
 - **Elements integrate; they never stack as separate blocks** (founder 2026-07-25: "not simple
   enough / not integrated"). The mid-research chat is ONE composer: the bordered container IS
   the field, the quiet Send sits inside it, one line at rest (Enter sends, Shift+Enter breaks),

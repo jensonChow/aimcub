@@ -2205,14 +2205,31 @@ kbd {
   font-size: var(--od-type-sub);
 }
 
-/* What Aimcub is doing right now — one concrete clause, the card's real content. */
-.od-planning-session-now {
+/* The thought trace: what the brain has done so far, ending on the current step.
+   Older lines recede to meta; the current line is the card's living content. */
+.od-planning-session-trace {
   margin: 0;
-  color: var(--ink2);
-  font-size: var(--od-type-body);
+  padding: 0 0 0 14px;
+  list-style: none;
+  display: grid;
+  gap: 5px;
+  border-left: 2px solid var(--od-border-soft);
+}
+
+.od-planning-session-trace li {
+  min-width: 0;
+  color: var(--faint);
+  font-size: var(--od-type-meta);
+  line-height: var(--od-line-meta);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.od-planning-session-trace li[data-current="true"] {
+  color: var(--ink2);
+  font-size: var(--od-type-body);
+  line-height: var(--od-line-body);
 }
 
 .od-planning-session-counts {
