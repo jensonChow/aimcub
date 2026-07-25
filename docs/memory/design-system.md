@@ -553,6 +553,11 @@ as a working agent, not as a form the user operates.
   the field, the quiet Send sits inside it, one line at rest (Enter sends, Shift+Enter breaks),
   never a tall empty textarea with a floating primary pill. Card footers stay transparent — an
   opaque full-width bar reads as a slab stuck under the glass card.
+- **One card per moment — never card-in-card** (founder 2026-07-25: "too many layers"). The
+  Journey's planning island is the ONE chromed surface; everything mounted inside it (session
+  live/failed/landed states, the question flow) renders as a `plain` panel directly on the
+  island. The only bordered element inside a card is a functional field (the composer, an
+  input). Layer budget for a working surface: desk gradient → island → field. Full stop.
 - Blocking questions dress for their actual shape: a lone question shows NO "1/1" counter
   (counters only when a flow really has multiple queued questions); the single/multi pill only
   when options exist; an options-less question labels its field "Your answer" ("Add a custom

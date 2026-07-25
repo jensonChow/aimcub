@@ -54,7 +54,7 @@ export function PlanningSessionPanel(props: PlanningSessionPanelProps) {
 
   if (view.failure) {
     return (
-      <Panel className="od-planning-session" data-od-id="planning-session-failed">
+      <Panel variant="plain" className="od-planning-session" data-od-id="planning-session-failed">
         <header className="od-planning-session-head">
           <Pill tone="warn">{t("planningSession.failedPill")}</Pill>
           <h2>{t("planningSession.failedTitle")}</h2>
@@ -71,7 +71,7 @@ export function PlanningSessionPanel(props: PlanningSessionPanelProps) {
 
   if (!view.active && view.phase === "draft_ready" && view.landing) {
     return (
-      <Panel className="od-planning-session" data-od-id="planning-session-landed">
+      <Panel variant="plain" className="od-planning-session" data-od-id="planning-session-landed">
         <header className="od-planning-session-head">
           <Pill tone="success">{t("planningSession.readyPill")}</Pill>
           <h2>{t("planningSession.readyTitle")}</h2>
@@ -96,8 +96,10 @@ export function PlanningSessionPanel(props: PlanningSessionPanelProps) {
   const tk = (key: string, vars?: Record<string, string | number>) => t(key as StringKey, vars);
   const now = planningActivityNow(view.activity, tk) ?? t("planningSession.starting");
   const hasCounts = view.researchFindingCount + view.researchGapCount + view.questionsAsked > 0;
+  // Plain like the question state: the Journey's planning island is the ONE card — a
+  // chromed panel inside it reads as a card-in-card (founder: "too many layers").
   return (
-    <Panel className="od-planning-session" data-od-id="planning-session-live">
+    <Panel variant="plain" className="od-planning-session" data-od-id="planning-session-live">
       <header className="od-planning-session-head">
         <div className="od-planning-session-title">
           <i className="od-journey-dot od-journey-dot-active" aria-hidden="true" />
