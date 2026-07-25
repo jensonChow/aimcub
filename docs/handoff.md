@@ -1,10 +1,28 @@
 # Aimcub Handoff
 
-Last updated: 2026-07-25
-Branch: `main`, **PUSHED to origin** (founder authorized each push; destination
-jensonChow/aimcub verified; repo still PRIVATE). No unmerged branches.
+Last updated: 2026-07-25 (second session)
+Branch: `main` (delete-click fix merged locally, **NOT pushed** — push needs
+founder authorization). Everything before it is on origin (e6d7df78).
 
-## What shipped today (all on origin)
+## Second session: Delete aim actually works now
+
+Founder drove Delete aim live and it silently did nothing (menu stayed open,
+focus ring on the item). Root cause was CSS, not the delete pipeline:
+`.od-aim-card:active { transform: scale(0.99) }` — pressing inside the popover
+bubbles `:active` to the row card, the transform instantly creates a stacking
+context that traps the z-900 popover under the NEXT sibling row, the sibling
+steals the pointerup, and the item's click never fires (rows 1..n-1 all broken;
+store was never touched). Fix in `cockpit.css`: the card's pressed-scale is
+gated off while its menu is open (`:not(:has(.od-content-entry-more
+[aria-expanded="true"]))`), and the in-sidebar confirm card width is capped to
+the island (`min(216px, calc(var(--sidebar-content-width) - 20px))` — it used
+to clip at the island's left edge). Regression test in App.test.tsx (desktop
+now 345). Verified end-to-end by mounting the real renderer in a browser with a
+stubbed bridge and clicking through: menu → confirm → deleteGoal → row gone.
+Doctrine recorded in design-system.md ("pressed-scale never goes on a container
+that hosts an open popover").
+
+## What shipped earlier today (all on origin)
 
 1. **The UI collapse ("agent + plan")** — founder: the UI was still too
    complicated. The Journey is now the ONE work surface per aim: header → one
@@ -27,9 +45,10 @@ jensonChow/aimcub verified; repo still PRIVATE). No unmerged branches.
 
 ## Verification
 
-Full gate green after every batch (build 9/9 · typecheck 17/17 · lint 11/11 ·
-purity · desktop 344 tests). Root `Aimcub.app` repacked + boot-smoked after
-each batch. Renderer mass after the collapse: ~14.6k non-test LOC, cockpit.css
+Full gate green after every batch and after the delete-click fix (build 9/9 ·
+typecheck 17/17 · lint 11/11 · purity · desktop 345 tests). Root `Aimcub.app`
+repacked + boot-smoked after each change (founder must restart the app to get
+the fix). Renderer mass after the collapse: ~14.6k non-test LOC, cockpit.css
 6,4xx lines, i18n ~800 keys.
 
 ## Open items

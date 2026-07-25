@@ -502,6 +502,13 @@ three-size / ≤500-weight policy).
   a ≥24px target. A plan row is a disclosure button (`aria-expanded`); while a proof draft is open
   the other rows disable and normal navigation blocks until submit or cancel (the Execute stage's
   invariant, kept). The journal summary is a real `<details>` summary with a visible focus ring.
+- Pressed-scale never goes on a container that hosts an open popover. `:active` bubbles to
+  ancestors, and any transform on the popover's ancestor (even scale≈1 mid-transition) creates a
+  stacking context that traps the popover under later sibling rows — the sibling steals the
+  pointerup and the popover's click silently never fires (2026-07-25 "aims could not be deleted").
+  Scale the row's body button (draft-row pattern), or gate the container rule with
+  `:not(:has(... [aria-expanded="true"]))` (aim-card pattern). In-sidebar popover cards also cap
+  their width to `--sidebar-content-width` so the island's rounded clip never cuts them.
 
 ## Voice and Wording
 
