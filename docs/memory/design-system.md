@@ -220,6 +220,12 @@ Reference links:
   covers navigation, drafts keep their labelled rows). Empty list shows one quiet line ("Your aims
   will live here.", sub size, `--faint`). Aim rows carry a small trailing **status dot marker**
   (see Status markers) — a marker, never a status subtitle.
+- Aim rows carry a trailing More Actions menu (founder 2026-07-25: an aim needs a way off the
+  list). The trigger reveals on row hover/focus (and stays while its popover is open); the menu
+  holds one destructive **Delete aim** behind an inline confirmation that names the consequence
+  (plan, runs, evidence, receipts leave the workspace) — never visible row text, never a native
+  dialog. The row body only opens the aim. Archive-with-restore is the designed follow-up if
+  shelving (not destroying) real aims becomes the need.
 - Sidebar aim and draft rows are compact one-line navigation rows: prefer a concise generated
   `goal_summary`, else conservative intent-prefix cleanup with a grapheme-safe bound; keep the
   canonical title for editing/planning/search/CLI/agents. One **32px** line (radius 10, padding

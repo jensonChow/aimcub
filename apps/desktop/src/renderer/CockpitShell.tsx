@@ -7,6 +7,7 @@ import type { WindowChromeState } from "../shared/ipc";
 import { useI18n, type Lang } from "./i18n";
 import { AimDraftSidebarRows } from "./stages/aim/AimDraftRecovery";
 import { setThemePref, useThemePref } from "./theme";
+import { ActionMenu, ActionMenuItem } from "./ui/ActionMenu";
 import { aimNavigationLabels } from "./workflow/aimNavigationTitle";
 import { PROGRESS_STATUS_KEY } from "./workflow/progressSummary";
 import {
@@ -53,6 +54,8 @@ interface CockpitShellProps {
   onHome: () => void;
   onNewAim: () => void;
   onOpenGoal: (goal: Goal) => void;
+  /** Menu-gated hard delete for a saved aim (the row body only opens; destructive stays behind More Actions). */
+  onDeleteGoal?: (goal: Goal) => void;
   onOpenDraft?: (draft: AimDraft) => void;
   onDiscardDraft?: (draft: AimDraft) => void;
   onStage: (stage: CockpitStage) => void;
@@ -98,6 +101,7 @@ export function CockpitShell({
   onHome,
   onNewAim,
   onOpenGoal,
+  onDeleteGoal,
   onOpenDraft,
   onDiscardDraft,
   onStage,
@@ -535,27 +539,31 @@ export function CockpitShell({
                       ? summary.status
                       : null;
                     return (
-                      <button
-                        key={goal.id}
-                        className={`od-aim-card${selectedGoal ? " selected" : ""}`}
-                        type="button"
-                        aria-current={selectedGoal ? "page" : undefined}
-                        aria-label={navigationTitle.fullLabel}
-                        title={navigationTitle.fullLabel}
-                        onClick={() => onOpenGoal(goal)}
-                      >
-                        <span className="od-aim-row-main">
-                          <strong>{navigationTitle.label}</strong>
-                        </span>
-                        {markedStatus ? (
-                          <span
-                            className={`od-aim-progress-dot is-${markedStatus}`}
-                            role="img"
-                            aria-label={t(PROGRESS_STATUS_KEY[markedStatus])}
-                            title={t(PROGRESS_STATUS_KEY[markedStatus])}
-                          />
+                      <div key={goal.id} className={`od-aim-card${selectedGoal ? " selected" : ""}`}>
+                        <button
+                          className="od-aim-card-main"
+                          type="button"
+                          aria-current={selectedGoal ? "page" : undefined}
+                          aria-label={navigationTitle.fullLabel}
+                          title={navigationTitle.fullLabel}
+                          onClick={() => onOpenGoal(goal)}
+                        >
+                          <span className="od-aim-row-main">
+                            <strong>{navigationTitle.label}</strong>
+                          </span>
+                          {markedStatus ? (
+                            <span
+                              className={`od-aim-progress-dot is-${markedStatus}`}
+                              role="img"
+                              aria-label={t(PROGRESS_STATUS_KEY[markedStatus])}
+                              title={t(PROGRESS_STATUS_KEY[markedStatus])}
+                            />
+                          ) : null}
+                        </button>
+                        {onDeleteGoal ? (
+                          <AimRowMenu goal={goal} title={navigationTitle.fullLabel} onDelete={onDeleteGoal} />
                         ) : null}
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -678,6 +686,62 @@ interface SidebarUserMenuProps {
   onMemory?: () => void;
   onSettings: () => void;
   onToggleTheme: () => void;
+}
+
+/**
+ * The aim row's More Actions menu: one destructive item behind an inline, menu-gated
+ * confirmation — the row body only opens the aim. Mirrors the draft rows' discard idiom
+ * (no native dialogs, focus lands on Cancel, Escape/outside closes and resets).
+ */
+function AimRowMenu(props: {
+  goal: Goal;
+  title: string;
+  onDelete: (goal: Goal) => void;
+}) {
+  const { t } = useI18n();
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const cancelRef = useRef<HTMLButtonElement | null>(null);
+
+  function confirmDelete() {
+    setConfirmingDelete(true);
+    window.requestAnimationFrame(() => cancelRef.current?.focus());
+  }
+
+  return (
+    <ActionMenu
+      className="od-content-entry-more"
+      label={t("shell.aimMoreActionsFor", { title: props.title })}
+      title={t("shell.aimMoreActions")}
+      onOpenChange={(open) => {
+        if (!open) setConfirmingDelete(false);
+      }}
+    >
+      {({ closeMenu }) => confirmingDelete ? (
+        <div className="od-action-menu-confirm" role="presentation">
+          <strong>{t("shell.deleteAimConfirmTitle")}</strong>
+          <p>{t("shell.deleteAimConfirm")}</p>
+          <div className="od-action-menu-confirm-actions">
+            <ActionMenuItem ref={cancelRef} onClick={() => closeMenu(true)}>
+              {t("common.cancel")}
+            </ActionMenuItem>
+            <ActionMenuItem
+              danger
+              onClick={() => {
+                closeMenu();
+                props.onDelete(props.goal);
+              }}
+            >
+              {t("shell.deleteAim")}
+            </ActionMenuItem>
+          </div>
+        </div>
+      ) : (
+        <ActionMenuItem danger onClick={confirmDelete}>
+          {t("shell.deleteAim")}
+        </ActionMenuItem>
+      )}
+    </ActionMenu>
+  );
 }
 
 function SidebarUserMenu(props: SidebarUserMenuProps) {
