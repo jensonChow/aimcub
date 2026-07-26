@@ -1,200 +1,64 @@
 # Aimcub Handoff
 
-Last updated: 2026-07-25 (second session)
-Branch: `main` (delete-click fix merged locally, **NOT pushed** — push needs
-founder authorization). Everything before it is on origin (e6d7df78).
+Last updated: 2026-07-25
+Branch: `main`, **PUSHED to origin** (founder authorized; destination
+jensonChow/aimcub; repo still PRIVATE). No unmerged branches.
 
-## Second session part 8: re-entering an aim re-attaches, never restarts
+## What shipped (2026-07-25)
 
-Founder: "every time I retap into the aim, the whole process will restart."
-Main was never the problem (sessions survive navigation; `startPlanningSession`
-reuses an unsettled session) — the renderer forgot the attachment:
-`openGoal` cleared `planningShellId` on every navigation, the surface gate and
-the landing-apply both required it, so re-entry showed the START CARD over a
-running session, and once the old session settled one more click spawned a
-genuinely new one.
+Two sessions, one arc: the founder drove real aims on the collapsed Journey and
+every report became a fix. Durable rules from all of it now live in
+`docs/memory/design-system.md`, `desktop.md`, and `architecture.md` — this
+handoff keeps only the transfer state.
 
-Fix (renderer-only): `applySessionView` now re-attaches against the aim ON
-SCREEN (`selectedGoalRef`) — any session view for the selected aim restores
-`planningShellId` and a `draft_ready` landing applies on return; `openGoal`
-keeps the attachment when re-tapping the already-open aim (updater-guarded
-clear, since the re-attach effect keys on `selected.id` and will not refire).
-
-Verified in the harness against all three gestures: first entry with a running
-session, Home → back, and same-aim re-tap — live card mounted with the full
-trace every time, `startPlanningSession` called ZERO times. Desktop 358 (+1
-source-pinned regression). This closes the re-attach warning parked in part 3.
-
-## Second session part 7: the trace polished
-
-Founder on the live trace: "could be more beautiful, polish it." Four cuts:
-
-1. **History keeps only durable events** — transient working verbs ("Searching
-   the web", "Researching…") appear only as the living last line and drop once
-   passed; the mechanical "Recorded 3 / Researching… / Recorded 5 /
-   Researching…" interleaving is gone (`planningActivityTrace` reworked).
-2. **Timeline nodes** — a quiet 5px node per step with hairline segments
-   between; the current line's node is accent, echoing the header pulse.
-3. **Plural-proof receipt** — "1 questions asked" → label-first metadata
-   ("Findings 8 · Gaps 4 · Questions 1"), moved to the footer's LEFT so the
-   controls row balances (receipt left, quiet actions right).
-4. **Entry motion** — 160ms fade/rise per new line, gated on
-   prefers-reduced-motion.
-
-Verified visually in the harness against the founder's exact noisy sequence.
-Desktop 357 (+1 net: trace-semantics tests reworked). Doctrine updated in
-design-system.md.
-
-## Second session part 6: the live card thinks out loud
-
-Founder: "should show a tree of thoughts instead of just 'Researching', and
-the current screen doesn't need an input box."
-
-1. **Thought trace** — the live card now shows the brain's recent sayable
-   steps in order on a hairline left rail (new `planningActivityTrace`: drops
-   unsayable rows, collapses consecutive duplicate verbs, caps at 6). Older
-   lines recede to meta/faint; the current line is body/ink and carries the
-   aria-live status. Questions and user notes ride in the trace as content.
-2. **No standing input** — the note composer is closed at rest; a quiet
-   "Add a note" action opens it (auto-focused; Escape closes, send closes, a
-   non-empty draft keeps it open across remounts). The interjection channel
-   is unchanged — only the permanent box went.
-
-Verified visually in the harness (trace of 6 mixed events incl. an unknown
-tool id rendering as "Researching…"; note lane closed → opened). Desktop 356
-(+4: two trace unit tests, resting-state and draft-open markup tests).
-Doctrine in design-system.md ("the trace, not a status word" / "no standing
-input on a watching surface").
-
-## Second session part 5: choice cards equalized
-
-Founder (tarot-aim question with three uneven options): "the choice cards
-should be the same size which looks better." The option grid now equalizes
-every row to the tallest card (`grid-auto-rows: 1fr`, cards fill their cell,
-`height: 100%`) and card content top-aligns (label then tradeoff from the top
-edge) instead of floating mid-card. Verified in the harness with the founder's
-exact three tarot options: all cards measure identical. Desktop 352 (+1 CSS
-assertion). Doctrine added to design-system.md.
-
-## Second session part 4: card-in-card flattened
-
-Founder (new tarot-aim drive): "too many layers I think. could be simplified."
-The live/failed/landed session states rendered a chromed white Panel inside the
-already-carded Journey planning island (the question state was already plain) —
-desk gradient → island → white panel → field, four layers. All session states
-are now `variant="plain"`: gradient → island → field, with the composer as the
-only bordered element. Verified visually in the harness; desktop 351 (+1 test
-pinning the plain variant). Doctrine: design-system.md "One card per moment —
-never card-in-card" with the explicit layer budget.
-
-## Second session part 3: planning surfaces simplified + integrated
-
-Founder (screenshots of the live re-drive): "screen 1 could be optimized, not
-simple enough / the elements are not integrated smoothly". Shipped:
-
-1. **Live card** — the mid-research chat is now ONE integrated composer (the
-   bordered container is the field, quiet Send inside it, one line at rest,
-   Enter sends); the junk "Using tool" line is gone (unknown runtime tool ids
-   render the generic "Researching…" line, never an interpolated id); controls
-   stay quiet and tight under the composer.
-2. **Question card** — a lone question no longer shows "Question 1/1"; the
-   single/multi pill only appears when options exist; an options-less question
-   labels its field "Your answer" (not "Add a custom answer / Write a different
-   answer"); a session answer submits as **"Send answer"** (the funnel's
-   "Generate plan" promised the wrong thing mid-research); the footer slab is
-   transparent so the card reads as one surface.
-
-Both states VERIFIED VISUALLY by mounting the real renderer in a browser with
-a stubbed bridge (start planning → live card; parked free-text question →
-question card). Desktop tests 350 (+5 markup tests pinning all of the above).
-Doctrine extended in design-system.md ("elements integrate; questions dress
-for their actual shape"). Note for later: renderer-side session re-attach after
-navigation looks gated off (`planningShellId` is only set on start/create, and
-`openGoal` clears it), worth a dedicated look.
-
-## Second session part 2: planning research grounded, questions recalibrated
-
-Founder (driving the collapsed surface): "研究不贴切，选择题总是只有一道" — research
-felt generic and every session asked exactly one question. Two shipped answers:
-
-1. **Honest domain** — every aim was silently stamped `domain: "software"` (store
-   creation default + prompt fallbacks), so the London-trip aim was presented to
-   the brain as a software goal. Now: `Goal.domain`/`DecompositionOutput.domain`
-   are nullable, creation never invents a domain, plan landing writes the brain's
-   `submit_plan.domain` back to the goal (the only writer), session start passes
-   the stored domain, prompts render "not set — infer it" when unknown, and the
-   store normalizes the legacy default to null on plan-less shells at load.
-   Doctrine in `docs/memory/architecture.md`.
-2. **Question economy recalibrated** — the mission prompt now sorts unknowns by
-   where the answer lives: world facts = research (never ask), personal facts
-   (dates, budget, companions, taste) = ask, never guess; personal-life aims get
-   a sanctioned 2-4 question opening set; "low-impact → assumptions" no longer
-   swallows plan-shaping personal facts. One-question-at-a-time blocking and the
-   6-question budget stay. (The one-per-popup mechanic itself is the ask_user
-   contract — a multi-question form would be a contract change, deliberately not
-   done.)
-
-Tests: llm 197 (+2 prompt doctrine), store 99 (+3 domain lifecycle), decompose
-default-domain test rewritten. Full gate green; root `Aimcub.app` repacked +
-boot-smoked (founder must restart the app).
-
-## Second session part 1: Delete aim actually works now
-
-Founder drove Delete aim live and it silently did nothing (menu stayed open,
-focus ring on the item). Root cause was CSS, not the delete pipeline:
-`.od-aim-card:active { transform: scale(0.99) }` — pressing inside the popover
-bubbles `:active` to the row card, the transform instantly creates a stacking
-context that traps the z-900 popover under the NEXT sibling row, the sibling
-steals the pointerup, and the item's click never fires (rows 1..n-1 all broken;
-store was never touched). Fix in `cockpit.css`: the card's pressed-scale is
-gated off while its menu is open (`:not(:has(.od-content-entry-more
-[aria-expanded="true"]))`), and the in-sidebar confirm card width is capped to
-the island (`min(216px, calc(var(--sidebar-content-width) - 20px))` — it used
-to clip at the island's left edge). Regression test in App.test.tsx (desktop
-now 345). Verified end-to-end by mounting the real renderer in a browser with a
-stubbed bridge and clicking through: menu → confirm → deleteGoal → row gone.
-Doctrine recorded in design-system.md ("pressed-scale never goes on a container
-that hosts an open popover").
-
-## What shipped earlier today (all on origin)
-
-1. **The UI collapse ("agent + plan")** — founder: the UI was still too
-   complicated. The Journey is now the ONE work surface per aim: header → one
-   live-lane card → the plan band (sub-aim rows expanding in place to run
-   consent/proof/receipts) → inline candidate review → journal disclosure.
-   Stations, station sheets, Turns, the standalone Context/Plan/Run/Eval pages,
-   Cmd+1..5, and the last funnel-era save path are deleted (451 i18n keys,
-   ~1,400 CSS lines). The durable model + what must not come back:
-   `docs/memory/design-system.md` and `docs/memory/desktop.md`.
-2. **Planning-lane clarity** — founder: the live card was "not clear enough"
-   (raw "brain started"/"tool" on screen). Now: main emits structured activity
-   only; the renderer speaks localized agent voice and drops the unsayable
-   (`planningActivityLine`). Doctrine recorded in design-system.md ("status
-   streams: main emits structure, the renderer owns every displayed word").
-3. **Delete aim** — founder: "should add a delete or archive action." Sidebar
-   aim rows: hover-revealed More Actions → menu-gated Delete with inline
-   confirm; main cancels the aim's planning session before the store cascade.
-   Delete over archive was deliberate (no archive view = data black hole);
-   archive-with-restore is the designed follow-up.
+1. **The UI collapse ("agent + plan")** — the Journey is the ONE work surface
+   per aim. Stations, station sheets, Turns, the standalone stage pages, and
+   Cmd+1..5 are deleted. What must not come back: design-system.md + desktop.md.
+2. **Planning-lane clarity** — main emits structured activity only; the
+   renderer owns every displayed word.
+3. **Delete aim** — sidebar rows get menu-gated delete with inline confirm…
+   which then silently did nothing: `.od-aim-card:active`'s pressed-scale
+   created a stacking context that trapped the popover under the next row, so
+   the sibling stole the pointerup. Pressed-scale is now suspended while a row's
+   menu is open.
+4. **Planning grounded** — aims were all silently stamped `domain: "software"`,
+   which misled research. Domain is honest-only now (nullable; plan landing is
+   the only writer). The mission prompt sorts unknowns by where the answer
+   lives: world facts = research, personal facts = ask (2-4 opening questions
+   for personal-life aims).
+5. **Planning surfaces** — integrated composer, honest question dress ("Send
+   answer", no 1/1 counter, no mode pill without options), card-in-card
+   flattened, choice cards equalized.
+6. **The live card thinks out loud** — the thought trace replaced the single
+   "Researching" line (timeline nodes, durable-events-only history, transient
+   verbs live only as the current line), and the standing input box became an
+   on-demand "Add a note" lane.
+7. **Re-entry re-attaches, never restarts** — attachment is now derived from
+   the aim on screen, not a start-time flag. Verified 0 `startPlanningSession`
+   calls across first entry, Home→back, and same-aim re-tap.
 
 ## Verification
 
-Full gate green after every batch, the delete-click fix, the domain/question
-recalibration, and the surface simplification (build 9/9 · typecheck 17/17 ·
-lint 11/11 · purity · desktop 358 · llm 197 · store 99). Root `Aimcub.app`
-repacked + boot-smoked after each change (founder must restart the app to get
-the fixes). Renderer mass after the collapse: ~14.6k non-test LOC, cockpit.css
-6,4xx lines, i18n ~800 keys.
+Full gate green after every batch (build 9/9 · typecheck 17/17 · lint 11/11 ·
+purity · desktop 358 · llm 197 · store 99 · core 191). Root `Aimcub.app`
+repacked + boot-smoked after each batch with isolated `AIMCUB_HOME` (the real
+`~/.aimcub` was only ever read).
+
+**Method worth keeping:** UI behavior was verified by mounting the real
+renderer in a browser against a Proxy-stubbed `window.aimcub` and clicking
+through for real. Every bug this session (delete, restart) was invisible to the
+353-test suite because nothing exercised a live pointer. When a change touches
+CSS layering, pointer targets, or navigation state, drive it — a green gate is
+not evidence the gesture works.
 
 ## Open items
 
-1. **Founder drives one real aim end-to-end** on the collapsed surface
-   (create → answer → adopt → run/proof → receipts) and flags what still
-   feels heavy. Candidate follow-ups only if flagged: Settings pane merge,
-   Memory palette entry, renaming `stages/execute|eval` dirs to their new
-   roles, archive-with-restore.
-2. Founder `claude /login` → first Claude-brain live smoke (Codex path is the
-   live-verified one).
+1. **Founder drives one real aim end-to-end** (create → answer → adopt →
+   run/proof → receipts) and flags what still feels heavy. Candidate
+   follow-ups only if flagged: Settings pane merge, Memory palette entry,
+   renaming `stages/execute|eval` dirs, archive-with-restore.
+2. Founder `claude /login` → first Claude-brain live smoke (Codex is the
+   live-verified path).
 3. Settings → Brain effort/reasoning control (proposed follow-up).
 4. Online linked-source connectors actually reading content.
 5. OSS launch checklist (license → npm org → repo settings → gitleaks →
