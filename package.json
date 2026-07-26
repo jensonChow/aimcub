@@ -13,6 +13,7 @@
     "desktop:dev": "pnpm --filter @aimcub/desktop dev",
     "desktop:build": "pnpm --filter @aimcub/desktop build",
     "desktop:pack": "pnpm --filter @aimcub/desktop run pack",
+    "desktop:harness": "pnpm --filter @aimcub/desktop run harness",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",

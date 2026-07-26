@@ -13,6 +13,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",
     "test": "vitest run --passWithNoTests",
+    "harness": "node scripts/renderer-harness.mjs",
     "icon:generate": "node scripts/generate-icon.mjs",
     "notarize:check": "node scripts/check-notarize-env.mjs"
   },

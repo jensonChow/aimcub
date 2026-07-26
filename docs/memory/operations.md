@@ -21,6 +21,25 @@ If pushing the default branch is blocked by permission review or requires explic
 
 After approval, verify the destination before retrying: use `gh auth status` plus `gh repo view --json nameWithOwner,visibility,viewerPermission,defaultBranchRef`, confirm that `origin` matches that repository, and require suitable write permission. A verified authenticated owner/admin repository is materially different from an unidentified remote; record the resolved push state in the handoff.
 
+## Renderer Harness (UI verification a unit test cannot do)
+
+A green suite is not evidence a gesture works. Every founder-reported Desktop bug so far — a Delete button whose `pointerup` was stolen by a stacking context, planning restarting on every re-entry, a "Start planning" card shown for an aim that was already planned — was invisible to a fully green run, because the suite never exercises a live pointer, CSS layering, or navigation state.
+
+So when a change touches those, drive the real renderer:
+
+```bash
+pnpm build && pnpm desktop:harness
+```
+
+It copies the built `out/renderer` to a temp dir, injects `apps/desktop/scripts/renderer-harness-stub.js` **before** the module bundle (so `window.aimcub` exists at first render), and serves it on `127.0.0.1:5599` (`AIMCUB_HARNESS_PORT` overrides). Then use browser tools for real: read the accessibility tree, CLICK, screenshot, resize, toggle dark mode.
+
+- `window.__harnessCalls` — every bridge call in order, as `{ name, args }`. Assert the IPC a click actually produced.
+- `window.__harnessErrors` — render failures captured before the bundle loads. **Check this first when the page is blank**; a missing fixture usually lands here (a partial `AimProgressReadModel` crashes on `progress.runs.some`).
+- Scenario flags on the query string: `/?nopass`, `/?planready`. Add more as data, not as code paths.
+- The stub's fixtures are a floor, not a spec — **extend them** for whatever surface you are verifying. Its first fixture block is load-bearing: without those the app paints nothing at all.
+
+It is deliberately NOT in the verification gate above: it is an interactive tool, not an automated test. Do not use it in place of unit coverage — use it to prove the gesture.
+
 ## Dependency Compatibility
 
 As of 2026-07-06, the newest mutually compatible dependency set keeps Electron 43.0.0, electron-builder 26.15.3, electron-vite 5.0.0, Vite 7.3.6, React 19.2.7, TypeScript 6.0.3, Vitest 4.1.9, ESLint 10.6.0, Zod 4.4.3, Supabase JS 2.110.0, Anthropic SDK 0.110.0, Wrangler 4.107.0, and Turbo 2.10.3.
