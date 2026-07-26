@@ -33,7 +33,9 @@ import {
 } from "@aimcub/core";
 // DecompositionOutput is imported as a VALUE (the Zod schema) so the store can re-validate
 // the SHAPE of any plan it is asked to persist — the gatekeeper for untrusted input.
-import { AcceptanceRule, AimDraft, DecompositionOutput, ManualEvidencePayload } from "@aimcub/types";
+// AimDraftPlanningSession is likewise a VALUE import: `getPlanningPass` re-validates a
+// checkpointed pass read back out of free-form goal metadata.
+import { AcceptanceRule, AimDraft, AimDraftPlanningSession, DecompositionOutput, ManualEvidencePayload } from "@aimcub/types";
 import type {
   ContextCategory,
   Actor,
@@ -43,7 +45,6 @@ import type {
   AimDraftAnswer,
   AimDraftPhase,
   AimDraftQuestion,
-  AimDraftPlanningSession,
   AimDraftSaveBlock,
   AimDraftStage,
   AimDraftStatus,
@@ -179,6 +180,17 @@ export interface RenameGoalInput {
   title?: string;
   /** Omitted keeps the current description (`""` clears it). */
   description?: string;
+}
+
+/**
+ * Checkpoint an in-flight planning pass onto an aim (`metadata.planning_session`).
+ * Works on a plan-less shell, which `updateGoal` cannot — that path requires a
+ * plan, and the whole point of a checkpoint is that no plan exists yet.
+ */
+export interface SavePlanningPassInput {
+  goalId: string;
+  /** The serialized pass, or `null` to forget it (start-over / landed-and-consumed). */
+  pass: AimDraftPlanningSession | null;
 }
 
 export interface UpsertAimDraftInput {
@@ -412,6 +424,17 @@ export interface AimStore {
    * `null` if no aim has that id.
    */
   renameGoal(input: RenameGoalInput): Promise<{ goal: Goal } | null>;
+  /**
+   * Checkpoint (or clear) an aim's in-flight planning pass. Returns the updated goal, or
+   * `null` if no aim has that id — a pass whose aim was deleted mid-flight is dropped,
+   * never resurrected.
+   */
+  savePlanningPass(input: SavePlanningPassInput): Promise<{ goal: Goal } | null>;
+  /**
+   * The aim's last checkpointed planning pass, parsed through `AimDraftPlanningSession`.
+   * Unparseable or absent metadata reads as `null` — a corrupt pass must not break the aim.
+   */
+  getPlanningPass(goalId: string): Promise<AimDraftPlanningSession | null>;
   deleteGoal(id: string): Promise<void>;
   listEvidence(goalId: string): Promise<Evidence[]>;
   addEvidence(input: AddEvidenceInput): Promise<AddEvidenceResult>;
@@ -1623,6 +1646,30 @@ export function createJsonFileStore(dataDir: string = defaultDataDir(), options:
         save(store);
         return { goal };
       });
+    },
+
+    async savePlanningPass(input: SavePlanningPassInput): Promise<{ goal: Goal } | null> {
+      return withWriteLock(() => {
+        const store = load();
+        const goal = store.goals.find((g) => g.id === input.goalId);
+        if (!goal) return null;
+        if (input.pass) goal.metadata = { ...goal.metadata, planning_session: input.pass };
+        else {
+          // Remove the key rather than nulling it: a forgotten pass leaves no trace behind.
+          const remaining = { ...goal.metadata };
+          delete remaining.planning_session;
+          goal.metadata = remaining;
+        }
+        save(store);
+        return { goal };
+      });
+    },
+
+    async getPlanningPass(goalId: string): Promise<AimDraftPlanningSession | null> {
+      const goal = load().goals.find((g) => g.id === goalId);
+      if (!goal) return null;
+      const parsed = AimDraftPlanningSession.safeParse(goal.metadata.planning_session);
+      return parsed.success ? parsed.data : null;
     },
 
     async deleteGoal(id: string): Promise<void> {

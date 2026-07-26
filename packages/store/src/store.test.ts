@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { movePlanNode, splitPlanNode, updatePlanNode } from "@aimcub/core";
-import type { DecompositionOutput } from "@aimcub/types";
+import type { AimDraftPlanningSession, DecompositionOutput } from "@aimcub/types";
 
 import {
   createJsonFileStore,
@@ -160,6 +160,25 @@ const ROUTED_PLAN = {
     PLAN.nodes[1]!,
   ],
 } as DecompositionOutput;
+
+/** A checkpointed planning pass, as `planningSessionDraftState` serializes one. */
+const PASS: AimDraftPlanningSession = {
+  agent_id: "claude",
+  phase: "researching",
+  updated_at: "2026-07-24T10:00:00.000Z",
+  model: "claude-opus-5",
+  started_at: "2026-07-24T09:58:00.000Z",
+  stopped_reason: "",
+  resumed_count: 0,
+  truncated: false,
+  transcript: [{ at: "2026-07-24T10:00:00.000Z", kind: "user_message", text: "budget 200", delivered: true }],
+  research_findings: [{ summary: "finding", source_urls: ["https://a.example"] }],
+  research_gaps: ["no web"],
+  research_summary: "",
+  assumptions: [],
+  open_questions: [],
+  memory_candidates: [],
+};
 
 type PlanAcceptanceRule = DecompositionOutput["nodes"][number]["acceptance_rule"];
 type PlanContract = NonNullable<DecompositionOutput["nodes"][number]["decomposition_contract"]>;
@@ -635,18 +654,7 @@ describe("createJsonFileStore · round-trip", () => {
     const store = freshStore();
     const draft = await store.upsertAimDraft({
       title: "Session draft",
-      planningSession: {
-        agent_id: "claude",
-        phase: "researching",
-        updated_at: "2026-07-24T10:00:00.000Z",
-        transcript: [{ at: "2026-07-24T10:00:00.000Z", kind: "user_message", text: "budget 200", delivered: true }],
-        research_findings: [{ summary: "finding", source_urls: ["https://a.example"] }],
-        research_gaps: ["no web"],
-        research_summary: "",
-        assumptions: [],
-        open_questions: [],
-        memory_candidates: [],
-      },
+      planningSession: PASS,
     });
     expect(draft.planning_session?.agent_id).toBe("claude");
 
@@ -658,6 +666,57 @@ describe("createJsonFileStore · round-trip", () => {
     // Explicit null clears it.
     const cleared = await store.upsertAimDraft({ id: draft.id, planningSession: null });
     expect(cleared.planning_session).toBeNull();
+  });
+
+  it("checkpoints a planning pass onto a plan-less shell and reads it back", async () => {
+    const store = freshStore();
+    const { goal } = await store.createAimShell({ title: "我想做一个塔罗的AI产品" });
+    expect(await store.getPlanningPass(goal.id)).toBeNull();
+
+    const saved = await store.savePlanningPass({ goalId: goal.id, pass: PASS });
+    expect(saved?.goal.metadata.planning_session).toBeTruthy();
+    // The shell must stay a shell: a checkpoint is not a plan.
+    expect(saved?.goal.plan_json).toBeNull();
+
+    const read = await store.getPlanningPass(goal.id);
+    expect(read?.transcript).toHaveLength(1);
+    expect(read?.research_gaps).toEqual(["no web"]);
+    expect(read?.model).toBe("claude-opus-5");
+    expect(read?.started_at).toBe("2026-07-24T09:58:00.000Z");
+
+    // A later checkpoint supersedes the earlier one in place.
+    await store.savePlanningPass({
+      goalId: goal.id,
+      pass: { ...PASS, phase: "waiting_user", stopped_reason: "app_quit", resumed_count: 1 },
+    });
+    const paused = await store.getPlanningPass(goal.id);
+    expect(paused?.phase).toBe("waiting_user");
+    expect(paused?.stopped_reason).toBe("app_quit");
+    expect(paused?.resumed_count).toBe(1);
+
+    // Clearing removes the key rather than leaving a null behind.
+    await store.savePlanningPass({ goalId: goal.id, pass: null });
+    expect(await store.getPlanningPass(goal.id)).toBeNull();
+    const stripped = await store.getGoal(goal.id);
+    expect("planning_session" in (stripped?.goal.metadata ?? {})).toBe(false);
+  });
+
+  it("reads an unparseable or missing planning pass as null instead of throwing", async () => {
+    const store = freshStore();
+    const { goal } = await store.createAimShell({ title: "Corrupt pass" });
+    // Metadata is free-form: anything could be sitting on this key.
+    await store.savePlanningPass({ goalId: goal.id, pass: { nonsense: true } as unknown as AimDraftPlanningSession });
+    expect(await store.getPlanningPass(goal.id)).toBeNull();
+    expect(await store.getPlanningPass("00000000-0000-4000-8000-00000000dead")).toBeNull();
+    expect(await store.savePlanningPass({ goalId: "00000000-0000-4000-8000-00000000dead", pass: PASS })).toBeNull();
+  });
+
+  it("drops a checkpointed pass with its aim", async () => {
+    const store = freshStore();
+    const { goal } = await store.createAimShell({ title: "Doomed shell" });
+    await store.savePlanningPass({ goalId: goal.id, pass: PASS });
+    await store.deleteGoal(goal.id);
+    expect(await store.getPlanningPass(goal.id)).toBeNull();
   });
 
   it("keeps child breakdown drafts recoverable with parent references", async () => {

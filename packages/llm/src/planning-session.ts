@@ -65,6 +65,28 @@ export const DEFAULT_PLANNING_SESSION_BUDGETS: PlanningSessionBudgets = {
   maxResearchReports: 20,
 };
 
+/**
+ * Size bounds for a CHECKPOINTED pass (`planningSessionDraftState`). A pass is now
+ * written to the store while it runs, and the store is one JSON file behind an
+ * advisory lock — an unbounded transcript would grow every checkpoint. Oldest
+ * entries are dropped first (the newest turns are what a resume needs), and the
+ * drop is always declared through `truncated` rather than hidden.
+ */
+export interface PlanningPassBounds {
+  /** Transcript entries kept, newest-first priority. */
+  maxTranscriptEntries: number;
+  /** Research findings kept — the primary fuel for a resumed pass. */
+  maxResearchFindings: number;
+  /** Total serialized budget; oldest transcript entries then findings give way to it. */
+  maxSerializedBytes: number;
+}
+
+export const DEFAULT_PLANNING_PASS_BOUNDS: PlanningPassBounds = {
+  maxTranscriptEntries: 200,
+  maxResearchFindings: 120,
+  maxSerializedBytes: 256 * 1024,
+};
+
 export interface PlanningSessionQuestionOption {
   label: string;
   tradeoff: string;
@@ -785,15 +807,36 @@ export function createPlanningSession(config: PlanningSessionConfig): PlanningSe
 }
 
 /**
- * Serialize a session for AimDraft persistence (`AimDraftPlanningSession` in
- * `@aimcub/types`). Pure projection: the plan itself lands in `draft_plan`,
- * this carries the session's provenance — transcript, research, assumptions,
+ * Provenance a checkpoint carries that the session protocol itself does not know:
+ * which model drove the pass, when the pass first started (preserved across
+ * resumes), why it stopped, and how many times it was resumed.
+ */
+export interface PlanningPassProvenance {
+  model?: string | null;
+  /** ISO start of the pass; defaults to `now` for a first checkpoint. */
+  startedAt?: string;
+  /** "" (still live) | `app_quit` | `failed` | `canceled` | `landed`. */
+  stoppedReason?: string;
+  resumedCount?: number;
+  bounds?: Partial<PlanningPassBounds>;
+}
+
+/**
+ * Serialize a session for persistence (`AimDraftPlanningSession` in
+ * `@aimcub/types`). Pure projection: the plan itself lands in `draft_plan` /
+ * `plan_json`, this carries the pass — transcript, research, assumptions,
  * open questions, and pending memory candidates.
+ *
+ * Callable at ANY phase, which is what makes a mid-flight checkpoint possible:
+ * `outcome` only exists at `draft_ready`, so research and memory candidates fall
+ * back to the transcript. Oversized passes are bounded per
+ * {@link DEFAULT_PLANNING_PASS_BOUNDS} and declare it through `truncated`.
  */
 export function planningSessionDraftState(
   snapshot: PlanningSessionSnapshot,
   agentId: string,
   now: Date,
+  provenance: PlanningPassProvenance = {},
 ): AimDraftPlanningSession {
   const outcome = snapshot.outcome;
   const transcriptResearch = snapshot.transcript.filter(
@@ -810,10 +853,17 @@ export function planningSessionDraftState(
           entry.kind === "memory_candidate",
       )
       .map((entry) => entry.candidate);
-  return {
+  const bounds = { ...DEFAULT_PLANNING_PASS_BOUNDS, ...provenance.bounds };
+  const iso = now.toISOString();
+  const pass: AimDraftPlanningSession = {
     agent_id: agentId,
     phase: snapshot.phase,
-    updated_at: now.toISOString(),
+    updated_at: iso,
+    model: provenance.model ?? "",
+    started_at: provenance.startedAt || iso,
+    stopped_reason: provenance.stoppedReason ?? "",
+    resumed_count: provenance.resumedCount ?? 0,
+    truncated: false,
     transcript: snapshot.transcript.map((entry) => ({ ...entry })),
     research_findings: research.findings.map((finding) => ({ ...finding })),
     research_gaps: [...research.gaps],
@@ -822,4 +872,37 @@ export function planningSessionDraftState(
     open_questions: [...(outcome?.openQuestions ?? [])],
     memory_candidates: memoryCandidates.map((candidate) => ({ ...candidate })),
   };
+  return boundPlanningPass(pass, bounds);
+}
+
+/**
+ * Trim a pass to its size budget, oldest-first, and declare the trim. Count caps
+ * apply before the byte budget so a pass with few but enormous entries still
+ * converges. One entry of each kind always survives: an over-budget pass reports
+ * less history, never an empty one.
+ */
+function boundPlanningPass(
+  pass: AimDraftPlanningSession,
+  bounds: PlanningPassBounds,
+): AimDraftPlanningSession {
+  let truncated = false;
+  if (pass.transcript.length > bounds.maxTranscriptEntries) {
+    pass.transcript = pass.transcript.slice(-bounds.maxTranscriptEntries);
+    truncated = true;
+  }
+  if (pass.research_findings.length > bounds.maxResearchFindings) {
+    pass.research_findings = pass.research_findings.slice(-bounds.maxResearchFindings);
+    truncated = true;
+  }
+  const overBudget = () => Buffer.byteLength(JSON.stringify(pass), "utf8") > bounds.maxSerializedBytes;
+  while (overBudget() && pass.transcript.length > 1) {
+    pass.transcript.shift();
+    truncated = true;
+  }
+  while (overBudget() && pass.research_findings.length > 1) {
+    pass.research_findings.shift();
+    truncated = true;
+  }
+  pass.truncated = truncated;
+  return pass;
 }

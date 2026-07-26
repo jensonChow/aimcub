@@ -2,7 +2,7 @@ import { app, BrowserWindow, nativeTheme, type Point } from "electron";
 import { join } from "node:path";
 
 import { registerIpc } from "./ipc";
-import { cancelAllPlanningSessions } from "./planning-session";
+import { cancelAllPlanningSessions, checkpointAllPlanningSessions } from "./planning-session";
 import { loadContextSourceConfig } from "./context-source-settings";
 import { loadProviderConfig } from "./gateway";
 import { loadWebResearchConfig } from "./web-research-settings";
@@ -158,7 +158,21 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
-// Embedded planning brains are child processes: never orphan them past the app.
-app.on("before-quit", () => {
-  cancelAllPlanningSessions();
+// Embedded planning brains are child processes: never orphan them past the app. Quitting is a
+// PAUSE, not an erasure — each live pass is checkpointed to its aim first, so reopening the app
+// finds planning where it left off instead of an aim that looks like it was never planned. The
+// quit is deferred exactly once for that write; `checkpointAllPlanningSessions` is itself bounded,
+// so a blocked store lock cannot hold the app open.
+let quitCheckpointStarted = false;
+app.on("before-quit", (event) => {
+  if (quitCheckpointStarted) {
+    cancelAllPlanningSessions();
+    return;
+  }
+  quitCheckpointStarted = true;
+  event.preventDefault();
+  void checkpointAllPlanningSessions("app_quit").finally(() => {
+    cancelAllPlanningSessions();
+    app.quit();
+  });
 });

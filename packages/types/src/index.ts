@@ -418,15 +418,31 @@ export const AimDraftSaveBlock = z.object({
 export type AimDraftSaveBlock = z.infer<typeof AimDraftSaveBlock>;
 
 /**
- * Persisted state of an embedded planning-agent session on a draft. The
+ * Persisted state of an embedded planning-agent session — a "planning pass". The
  * transcript entries follow `@aimcub/llm`'s PlanningSessionTranscriptEntry
  * structurally; this schema stays permissive on purpose — the protocol
  * validates at runtime, persistence only needs a faithful round-trip.
+ *
+ * A pass is checkpointed WHILE it runs (not only at landing) so quitting the app
+ * pauses planning instead of erasing it: `Goal.metadata.planning_session` carries
+ * the last checkpoint, and a reopened aim describes and resumes that pass rather
+ * than greeting its owner as if nothing ever happened. Every field below is
+ * defaulted, so passes persisted before checkpointing existed still parse.
  */
 export const AimDraftPlanningSession = z.object({
   agent_id: z.string(),
   phase: z.string(),
   updated_at: z.string().default(""),
+  /** The brain's model for this pass, when the runtime advertised one. */
+  model: z.string().default(""),
+  /** When the pass first started — preserved across resumes. */
+  started_at: z.string().default(""),
+  /** "" while the pass is live; else `app_quit` | `failed` | `canceled` | `landed`. */
+  stopped_reason: z.string().default(""),
+  /** How many times this pass was resumed after being stopped. */
+  resumed_count: z.number().int().nonnegative().default(0),
+  /** True when size bounding dropped the oldest transcript entries or findings. */
+  truncated: z.boolean().default(false),
   transcript: z.array(z.record(z.string(), z.unknown())).default([]),
   research_findings: z.array(z.record(z.string(), z.unknown())).default([]),
   research_gaps: z.array(z.string()).default([]),

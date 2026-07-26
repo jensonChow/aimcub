@@ -20,6 +20,7 @@ import {
   type ClarifyQuestion,
   type PlanningMemory,
   type PlanningSessionEvent,
+  type PlanningSessionSnapshot,
 } from "@aimcub/llm";
 import type { AimDraftPlanningSession } from "@aimcub/types";
 import {
@@ -101,10 +102,78 @@ interface ManagedPlanningSession {
   landing: PlanningSessionLanding | null;
   failure: { code: string; message: string } | null;
   settled: boolean;
+  /** When this pass first started — carried over from a prior checkpoint on resume. */
+  startedAt: string;
+  /** How many times this pass has been resumed after stopping. */
+  resumedCount: number;
+  /** Pending coalesced checkpoint, if one is armed. */
+  checkpointTimer: NodeJS.Timeout | null;
+  /** Serializes this aim's checkpoint writes so two can never interleave. */
+  writeChain: Promise<void>;
 }
 
 const sessions = new Map<string, ManagedPlanningSession>();
 const metadataStash = new Map<string, AimDraftPlanningSession>();
+
+/**
+ * A pass is checkpointed to the store WHILE it runs, so closing the app pauses planning
+ * instead of erasing it (founder 2026-07-26: an aim that Aimcub was already planning must
+ * never greet its owner with "Start planning"). Writes are coalesced because the store is
+ * one JSON file behind an advisory lock and a per-event write of a growing transcript would
+ * thrash it — but every hard boundary flushes immediately: a phase change, a question, the
+ * user's answer or note, settling, and quit. Losing a coalesced tick costs at most the last
+ * ~1.5s of tool activity; losing a user's answer would be unforgivable, so those never wait.
+ */
+const CHECKPOINT_COALESCE_MS = 1500;
+
+/** Quit must stay responsive: the store lock alone can block for seconds. */
+const QUIT_CHECKPOINT_TIMEOUT_MS = 2000;
+
+function passFrom(
+  managed: ManagedPlanningSession,
+  snapshot: PlanningSessionSnapshot,
+  stoppedReason: string,
+): AimDraftPlanningSession {
+  return planningSessionDraftState(snapshot, managed.agentId, new Date(), {
+    model: managed.model,
+    startedAt: managed.startedAt,
+    stoppedReason,
+    resumedCount: managed.resumedCount,
+  });
+}
+
+/** `null` only in the window before the handle is assigned — nothing to checkpoint yet. */
+function passOf(managed: ManagedPlanningSession, stoppedReason: string): AimDraftPlanningSession | null {
+  if (!managed.handle) return null;
+  return passFrom(managed, managed.handle.session.snapshot(), stoppedReason);
+}
+
+function scheduleCheckpoint(managed: ManagedPlanningSession): void {
+  if (managed.checkpointTimer) return;
+  managed.checkpointTimer = setTimeout(() => {
+    managed.checkpointTimer = null;
+    void flushCheckpoint(managed);
+  }, CHECKPOINT_COALESCE_MS);
+  managed.checkpointTimer.unref();
+}
+
+/**
+ * Write the pass now, cancelling any armed coalesce. A failed write is swallowed: the next
+ * checkpoint re-serializes the pass from scratch, so a lost write self-heals, and a store
+ * hiccup must never take down the live planning session.
+ */
+function flushCheckpoint(managed: ManagedPlanningSession, stoppedReason = ""): Promise<void> {
+  if (managed.checkpointTimer) {
+    clearTimeout(managed.checkpointTimer);
+    managed.checkpointTimer = null;
+  }
+  const pass = passOf(managed, stoppedReason);
+  if (!pass) return managed.writeChain;
+  managed.writeChain = managed.writeChain
+    .then(() => aimStore.savePlanningPass({ goalId: managed.goalId, pass }))
+    .then(() => undefined, () => undefined);
+  return managed.writeChain;
+}
 
 type Broadcast = (payload: PlanningSessionEventPayload) => void;
 let broadcast: Broadcast = () => undefined;
@@ -230,6 +299,11 @@ export async function startPlanningSession(req: PlanningSessionStartRequest): Pr
   const workspaceRoot = localContextRoot();
   const cwd = workspaceRoot ?? mkdtempSync(join(tmpdir(), "aimcub-planning-"));
 
+  // A pass this aim already stopped keeps its identity: the resumed session continues the
+  // same pass (original start time, incremented resume count) rather than presenting itself
+  // as the first attempt. Feeding the prior transcript BACK to the brain is separate work;
+  // until then a resume is honest about being a fresh attempt at the same pass.
+  const priorPass = await aimStore.getPlanningPass(req.goalId);
   const managed: ManagedPlanningSession = {
     goalId: req.goalId,
     agentId,
@@ -243,6 +317,10 @@ export async function startPlanningSession(req: PlanningSessionStartRequest): Pr
     landing: null,
     failure: null,
     settled: false,
+    startedAt: priorPass?.started_at || new Date().toISOString(),
+    resumedCount: priorPass ? priorPass.resumed_count + 1 : 0,
+    checkpointTimer: null,
+    writeChain: Promise.resolve(),
   };
 
   const model = resolvePlanningSessionModel(
@@ -272,10 +350,7 @@ export async function startPlanningSession(req: PlanningSessionStartRequest): Pr
       }
       if (event.type === "phase_changed" && event.phase === "draft_ready") {
         managed.landing = landingFromOutcome(managed);
-        metadataStash.set(
-          managed.goalId,
-          planningSessionDraftState(managed.handle.session.snapshot(), managed.agentId, new Date()),
-        );
+        metadataStash.set(managed.goalId, passFrom(managed, managed.handle.session.snapshot(), ""));
       }
       if (event.type === "session_failed") {
         managed.failure = { code: event.failure.code, message: event.failure.message };
@@ -283,12 +358,18 @@ export async function startPlanningSession(req: PlanningSessionStartRequest): Pr
       const item = summarizeSessionEvent(event);
       if (item) pushActivity(managed, item);
       emitView(managed, event);
+      // A phase change, a question, or a failure is a hard boundary — what the aim looks like
+      // on reopen changes at exactly these points, so they never wait on a coalesce.
+      if (event.type === "phase_changed" || event.type === "question_asked") void flushCheckpoint(managed);
+      else if (event.type === "session_failed") void flushCheckpoint(managed, "failed");
+      else scheduleCheckpoint(managed);
     },
     onActivity: (event) => {
       const item = summarizeActivityEvent(event);
       if (!item) return;
       pushActivity(managed, item);
       emitView(managed);
+      scheduleCheckpoint(managed);
     },
   });
   managed.handle = handle;
@@ -301,12 +382,16 @@ export async function startPlanningSession(req: PlanningSessionStartRequest): Pr
     }
     if (result.snapshot.phase === "draft_ready" && !managed.landing) {
       managed.landing = landingFromOutcome(managed);
-      metadataStash.set(
-        managed.goalId,
-        planningSessionDraftState(result.snapshot, managed.agentId, new Date()),
-      );
+      metadataStash.set(managed.goalId, passFrom(managed, result.snapshot, ""));
     }
     emitView(managed);
+    // The brain is gone: this is the pass's final shape until someone resumes it.
+    managed.writeChain = managed.writeChain
+      .then(() => aimStore.savePlanningPass({
+        goalId: managed.goalId,
+        pass: passFrom(managed, result.snapshot, managed.failure ? "failed" : ""),
+      }))
+      .then(() => undefined, () => undefined);
   });
 
   emitView(managed);
@@ -333,6 +418,8 @@ export function answerPlanningQuestion(req: PlanningSessionAnswerRequest): Plann
     ...(req.skipped ? { skipped: true } : {}),
   });
   emitView(managed);
+  // The user's own words: never risk them to a coalesce window.
+  void flushCheckpoint(managed);
   return viewOf(managed);
 }
 
@@ -342,6 +429,7 @@ export function postPlanningChat(goalId: string, text: string): PlanningSessionS
   managed.handle.postUserMessage(text);
   pushActivity(managed, { at: new Date().toISOString(), kind: "chat", label: text });
   emitView(managed);
+  void flushCheckpoint(managed);
   return viewOf(managed);
 }
 
@@ -354,12 +442,44 @@ export function finishPlanningNow(goalId: string): PlanningSessionStateView {
   return viewOf(managed);
 }
 
+/**
+ * Stop the brain and forget the session. No checkpoint: the callers are aim deletion (the
+ * store cascade is about to remove the goal) and quit (which checkpoints deliberately, via
+ * {@link checkpointAllPlanningSessions}, before cancelling). An armed coalesce is dropped so
+ * a canceled session cannot write itself back afterwards.
+ */
 export function cancelPlanningSession(goalId: string): void {
   const managed = sessions.get(goalId);
   if (!managed) return;
+  if (managed.checkpointTimer) {
+    clearTimeout(managed.checkpointTimer);
+    managed.checkpointTimer = null;
+  }
   managed.handle.cancel();
   sessions.delete(goalId);
   metadataStash.delete(goalId);
+}
+
+/**
+ * Flush every live pass before the app goes away, so a quit reads as a pause. Bounded: a
+ * blocked store lock must not hold the app open, and a pass is best-effort by design.
+ */
+export async function checkpointAllPlanningSessions(stoppedReason: string): Promise<void> {
+  const live = [...sessions.values()].filter((managed) => !managed.settled);
+  if (live.length === 0) return;
+  let timer: NodeJS.Timeout | undefined;
+  const deadline = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, QUIT_CHECKPOINT_TIMEOUT_MS);
+    timer.unref();
+  });
+  try {
+    await Promise.race([
+      Promise.all(live.map((managed) => flushCheckpoint(managed, stoppedReason))).then(() => undefined),
+      deadline,
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 /** Consume the serialized session for this aim's metadata at plan landing. */
@@ -380,6 +500,12 @@ export function planningSessionMemoryCandidates(goalId: string): AimDraftPlannin
 export function releasePlanningSession(goalId: string): void {
   const managed = sessions.get(goalId);
   if (!managed) return;
+  // Landing has just written the final pass through `updateGoalPlan`; an armed coalesce would
+  // write a pre-landing snapshot over the top of it.
+  if (managed.checkpointTimer) {
+    clearTimeout(managed.checkpointTimer);
+    managed.checkpointTimer = null;
+  }
   if (!managed.settled) managed.handle.cancel();
   sessions.delete(goalId);
 }

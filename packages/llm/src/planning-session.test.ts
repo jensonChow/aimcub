@@ -509,6 +509,66 @@ describe("planning session · surface", () => {
     expect(state.transcript.map((entry) => entry.kind)).toEqual(["research", "memory_candidate", "plan_attempt"]);
     // Round-trips through the persistence schema unchanged.
     expect(JSON.parse(JSON.stringify(state))).toEqual(state);
+    // Provenance defaults: no model claimed, the pass starts now, still live, never resumed.
+    expect(state.model).toBe("");
+    expect(state.started_at).toBe("2026-07-24T12:00:00.000Z");
+    expect(state.stopped_reason).toBe("");
+    expect(state.resumed_count).toBe(0);
+    expect(state.truncated).toBe(false);
+  });
+
+  it("serializes a MID-FLIGHT pass, so a checkpoint does not need an outcome", async () => {
+    const { session } = makeSession({ memories: [] });
+    await expectReply(session.handleToolCall("report_research", {
+      findings: [{ summary: "Finding A", source_urls: ["https://a.example"] }],
+      gaps: ["no web access"],
+    }));
+
+    const { planningSessionDraftState } = await import("./planning-session");
+    const pass = planningSessionDraftState(session.snapshot(), "codex", new Date("2026-07-26T09:00:00.000Z"), {
+      model: "gpt-5.6-sol",
+      startedAt: "2026-07-25T14:03:09.714Z",
+      stoppedReason: "app_quit",
+      resumedCount: 2,
+    });
+    // No `submit_plan` yet: research still has to survive the quit, which is the whole point.
+    expect(pass.phase).toBe("researching");
+    expect(pass.research_findings).toEqual([{ summary: "Finding A", source_urls: ["https://a.example"] }]);
+    expect(pass.research_gaps).toEqual(["no web access"]);
+    expect(pass.model).toBe("gpt-5.6-sol");
+    // A resumed pass keeps its ORIGINAL start; only `updated_at` moves.
+    expect(pass.started_at).toBe("2026-07-25T14:03:09.714Z");
+    expect(pass.updated_at).toBe("2026-07-26T09:00:00.000Z");
+    expect(pass.stopped_reason).toBe("app_quit");
+    expect(pass.resumed_count).toBe(2);
+  });
+
+  it("bounds an oversized pass oldest-first and declares the trim", async () => {
+    const { session } = makeSession({ memories: [] });
+    for (let i = 0; i < 6; i += 1) {
+      session.postUserMessage(`note ${i}`);
+    }
+
+    const { planningSessionDraftState } = await import("./planning-session");
+    const bounded = planningSessionDraftState(session.snapshot(), "claude", new Date("2026-07-26T09:00:00.000Z"), {
+      bounds: { maxTranscriptEntries: 2 },
+    });
+    expect(bounded.truncated).toBe(true);
+    expect(bounded.transcript).toHaveLength(2);
+    // The NEWEST turns survive — they are what a resumed pass needs most.
+    expect(bounded.transcript.map((entry) => entry.text)).toEqual(["note 4", "note 5"]);
+
+    // A byte budget too small for even one entry still leaves history behind, never nothing.
+    const squeezed = planningSessionDraftState(session.snapshot(), "claude", new Date("2026-07-26T09:00:00.000Z"), {
+      bounds: { maxSerializedBytes: 1 },
+    });
+    expect(squeezed.truncated).toBe(true);
+    expect(squeezed.transcript).toHaveLength(1);
+
+    // Within budget nothing is trimmed and the pass does not claim it was.
+    const whole = planningSessionDraftState(session.snapshot(), "claude", new Date("2026-07-26T09:00:00.000Z"));
+    expect(whole.truncated).toBe(false);
+    expect(whole.transcript).toHaveLength(6);
   });
 
   it("every projected tool has a schema and matching definition lookup", () => {

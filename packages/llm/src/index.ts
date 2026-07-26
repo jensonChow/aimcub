@@ -282,12 +282,15 @@ export type {
 
 // Planning-session protocol: the aim-breakdown loop driven by an embedded brain.
 export {
+  DEFAULT_PLANNING_PASS_BOUNDS,
   DEFAULT_PLANNING_SESSION_BUDGETS,
   PlanningSession,
   createPlanningSession,
   planningSessionDraftState,
 } from "./planning-session";
 export type {
+  PlanningPassBounds,
+  PlanningPassProvenance,
   PlanningSessionAim,
   PlanningSessionAnswer,
   PlanningSessionAssumption,
