@@ -1,9 +1,11 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-26
-Branch: `main`, committed locally, **NOT pushed** (push not authorized this session).
-Previous state (2026-07-25 arc) is on origin at `7e50a898`'s parent line; the four
-commits below are local-only.
+Branch: `main`, **PUSHED to origin/main at `fccbd582`** (founder authorized: "refresh
+memory, commit, push, merge"). Destination verified before pushing per the push protocol:
+`jensonChow/aimcub`, ADMIN, PRIVATE, default branch `main`, and `origin` matches. No
+separate merge was needed — the work happened directly on `main` and there are no
+unmerged branches.
 
 ## What shipped (2026-07-26): planning passes are durable
 
@@ -59,9 +61,15 @@ fixtures that are load-bearing are in `docs/memory/operations.md`.
    (including how a stale thread id fails), but no real planning run has been quit and
    resumed end-to-end. This is the founder's next drive: create an aim → quit mid-
    planning → reopen → Resume → confirm nothing already answered is asked again.
-2. Push authorization for the four commits above.
+2. Two commit messages (`e7da6a63`, `1054f694`) quote Chinese, which the English-only
+   non-negotiable covers. Now pushed, so a rewrite is no longer free — founder's call
+   whether to leave them.
 3. Founder `claude /login` → first Claude-brain live smoke (Codex is the live-verified path).
 4. Settings → Brain effort/reasoning control (proposed follow-up).
 5. Online linked-source connectors actually reading content.
-6. OSS launch checklist (license → npm org → repo settings → gitleaks → public flip) —
+6. `docs/local-agent-adapters.md` predates planning sessions entirely — it documents
+   `buildInvocation`/`parseLine` but not the optional `buildPlanningSessionInvocation`
+   capability or its new `resumeSessionId`. A third-party adapter author would not know
+   the planning path exists. Worth a section before the OSS flip.
+7. OSS launch checklist (license → npm org → repo settings → gitleaks → public flip) —
    founder-owned, unchanged.
