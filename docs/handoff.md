@@ -1,65 +1,63 @@
 # Aimcub Handoff
 
-Last updated: 2026-07-25
-Branch: `main`, **PUSHED to origin** (founder authorized; destination
-jensonChow/aimcub; repo still PRIVATE). No unmerged branches.
+Last updated: 2026-07-26
+Branch: `main`, committed locally, **NOT pushed** (push not authorized this session).
+Previous state (2026-07-25 arc) is on origin at `7e50a898`'s parent line; the four
+commits below are local-only.
 
-## What shipped (2026-07-25)
+## What shipped (2026-07-26): planning passes are durable
 
-Two sessions, one arc: the founder drove real aims on the collapsed Journey and
-every report became a fix. Durable rules from all of it now live in
-`docs/memory/design-system.md`, `desktop.md`, and `architecture.md` — this
-handoff keeps only the transfer state.
+Founder report: an aim Aimcub had been planning greeted him the next day with
+"Your move — start planning". The button was honest — the aim really had no plan, no
+memories, no draft. The bug was underneath: the whole planning session lived in a
+main-process Map, so quitting killed the brain and erased its research, its questions
+and the founder's answers. A memory hole in the core loop, not a button bug.
 
-1. **The UI collapse ("agent + plan")** — the Journey is the ONE work surface
-   per aim. Stations, station sheets, Turns, the standalone stage pages, and
-   Cmd+1..5 are deleted. What must not come back: design-system.md + desktop.md.
-2. **Planning-lane clarity** — main emits structured activity only; the
-   renderer owns every displayed word.
-3. **Delete aim** — sidebar rows get menu-gated delete with inline confirm…
-   which then silently did nothing: `.od-aim-card:active`'s pressed-scale
-   created a stacking context that trapped the popover under the next row, so
-   the sibling stole the pointerup. Pressed-scale is now suspended while a row's
-   menu is open.
-4. **Planning grounded** — aims were all silently stamped `domain: "software"`,
-   which misled research. Domain is honest-only now (nullable; plan landing is
-   the only writer). The mission prompt sorts unknowns by where the answer
-   lives: world facts = research, personal facts = ask (2-4 opening questions
-   for personal-life aims).
-5. **Planning surfaces** — integrated composer, honest question dress ("Send
-   answer", no 1/1 counter, no mode pill without options), card-in-card
-   flattened, choice cards equalized.
-6. **The live card thinks out loud** — the thought trace replaced the single
-   "Researching" line (timeline nodes, durable-events-only history, transient
-   verbs live only as the current line), and the standing input box became an
-   on-demand "Add a note" lane.
-7. **Re-entry re-attaches, never restarts** — attachment is now derived from
-   the aim on screen, not a start-time flag. Verified 0 `startPlanningSession`
-   calls across first entry, Home→back, and same-aim re-tap.
+Durable rules from all of it now live in `docs/memory/architecture.md`,
+`desktop.md`, and `design-system.md` — this handoff keeps only transfer state.
+
+1. **`c46513ee` — the pass becomes durable state.** `planningSessionDraftState` always
+   could serialize any phase; it was only ever called at `draft_ready` and parked in
+   memory. Now it is checkpointed to `Goal.metadata.planning_session` as the pass runs
+   (coalesced ~1.5s, hard boundaries flush at once), and `before-quit` defers the quit
+   once to checkpoint every live pass as `app_quit` BEFORE killing brains.
+2. **`7e50a898` — a returning aim shows its paused pass.** New `PlanningPassPanel` lane
+   with tested precedence (live session > checkpoint > start card; a planned aim ignores
+   both). Found + fixed en route: a `draft_ready` pass did not persist the PLAN, so
+   quitting one click before adopting still lost it; and `commitShellPlan` sourced Q&A
+   only from a live session, so adopting a restored plan would have landed stripped of
+   its interview.
+3. **`e7da6a63` — resume continues the pass.** Runtime thread reopened (Claude
+   `--resume`, Codex `exec resume`, with the read-only policy re-expressed as
+   `-c sandbox_mode` because that subcommand rejects `--sandbox`), plus the pass's own
+   history carried into the session machine. `ask_user` now REFUSES an already-answered
+   question and hands the answer back — a guarantee, not a prompt instruction.
+4. **`1054f694` — planning passes leave Journal receipts.** Derived from the pass, no
+   new event table. The Journal's "every pass leaves a receipt" is now true for planning.
 
 ## Verification
 
-Full gate green after every batch (build 9/9 · typecheck 17/17 · lint 11/11 ·
-purity · desktop 358 · llm 197 · store 99 · core 191). Root `Aimcub.app`
-repacked + boot-smoked after each batch with isolated `AIMCUB_HOME` (the real
-`~/.aimcub` was only ever read).
+Full gate green after every batch (build 9/9 · typecheck 17/17 · lint 11/11 · purity ·
+desktop 382 · llm 204 · local-agent 48 · store 102 · core 191). Root `Aimcub.app`
+repacked and boot-smoked under an isolated `AIMCUB_HOME` after each batch; because quit
+is now deferred for the checkpoint, graceful quit was explicitly re-verified each time.
 
-**Method worth keeping:** UI behavior was verified by mounting the real
-renderer in a browser against a Proxy-stubbed `window.aimcub` and clicking
-through for real. Every bug this session (delete, restart) was invisible to the
-353-test suite because nothing exercised a live pointer. When a change touches
-CSS layering, pointer targets, or navigation state, drive it — a green gate is
-not evidence the gesture works.
+**Method:** UI behavior was driven in a browser against the real renderer bundle with a
+Proxy-stubbed `window.aimcub` — clicking through paused pass, plan-ready pass (Review →
+Adopt, asserting the interview reached `updateGoalPlan`), no-pass, Plan-from-scratch, and
+opening the Journal disclosure to read its rows. Keep doing this: a green suite is not
+evidence a gesture works.
 
 ## Open items
 
-1. **Founder drives one real aim end-to-end** (create → answer → adopt →
-   run/proof → receipts) and flags what still feels heavy. Candidate
-   follow-ups only if flagged: Settings pane merge, Memory palette entry,
-   renaming `stages/execute|eval` dirs, archive-with-restore.
-2. Founder `claude /login` → first Claude-brain live smoke (Codex is the
-   live-verified path).
-3. Settings → Brain effort/reasoning control (proposed follow-up).
-4. Online linked-source connectors actually reading content.
-5. OSS launch checklist (license → npm org → repo settings → gitleaks →
-   public flip) — founder-owned, unchanged.
+1. **NOT VERIFIED LIVE: a real brain continuing a real pass.** Everything above is unit-
+   and renderer-verified; the resume arg forms were checked against the installed CLIs
+   (including how a stale thread id fails), but no real planning run has been quit and
+   resumed end-to-end. This is the founder's next drive: create an aim → quit mid-
+   planning → reopen → Resume → confirm nothing already answered is asked again.
+2. Push authorization for the four commits above.
+3. Founder `claude /login` → first Claude-brain live smoke (Codex is the live-verified path).
+4. Settings → Brain effort/reasoning control (proposed follow-up).
+5. Online linked-source connectors actually reading content.
+6. OSS launch checklist (license → npm org → repo settings → gitleaks → public flip) —
+   founder-owned, unchanged.

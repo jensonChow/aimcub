@@ -557,6 +557,15 @@ as a working agent, not as a form the user operates.
   drop, duplicates collapse, cap ~6 (`planningActivityTrace`), 160ms entry fade under
   prefers-reduced-motion. The session receipt is plural-proof label-first metadata
   ("Findings 8 · Gaps 4 · Questions 1") on the footer's LEFT, balancing the quiet actions.
+- **A paused pass must not imitate a working one** (2026-07-26). The stopped-pass card
+  (`PlanningPassPanel`) reuses the live card's shape deliberately — same island, same trace, same
+  label-first receipt — so returning reads as the same lane at rest. Exactly two things change, and
+  both are honesty, not decoration: the dot is STATIC and muted (`od-journey-dot-idle`, no pulse,
+  no accent), and the last trace line carries NO `data-current` / `role="status"`. Nothing is
+  happening, so nothing may look like it is. Copy owns what happened without alarm ("Planning
+  paused — everything it found is still here"); a closed app is ordinary, not an error. A pass that
+  finished a plan leads with the plan ("A plan is waiting for you" + a success pill), never with an
+  offer to redo research that already succeeded.
 - **No standing input on a watching surface** (same feedback: "doesn't need an input box").
   The mid-research note composer is closed at rest and opens from a quiet "Add a note" action
   (Escape closes, send closes, a non-empty draft keeps it open). The interjection CHANNEL
