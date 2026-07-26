@@ -24,6 +24,7 @@
  */
 import { DecompositionOutput, type AimDraftPlanningSession } from "@aimcub/types";
 import {
+  CHOICE_SELECTION_REASONS,
   critiquePlan,
   decideChoiceSelection,
   validatePlan,
@@ -864,6 +865,8 @@ export function planningSessionDraftState(
     stopped_reason: provenance.stoppedReason ?? "",
     resumed_count: provenance.resumedCount ?? 0,
     truncated: false,
+    // Never bounded away: a finished plan is what the user is one click from adopting.
+    draft_plan: outcome?.plan ?? null,
     transcript: snapshot.transcript.map((entry) => ({ ...entry })),
     research_findings: research.findings.map((finding) => ({ ...finding })),
     research_gaps: [...research.gaps],
@@ -874,6 +877,143 @@ export function planningSessionDraftState(
   };
   return boundPlanningPass(pass, bounds);
 }
+
+/** What a checkpointed pass can be restored INTO without re-running a brain. */
+export interface PlanningPassRestoration {
+  plan: DecompositionOutput;
+  quality: PlanQualityReport;
+  assumptions: PlanningSessionAssumption[];
+  openQuestions: string[];
+  /** The Q&A the pass already collected, paired back up from the transcript. */
+  answers: PlanningSessionQnA[];
+  research: PlanningSessionResearchLog;
+  memoryCandidates: PlanningSessionMemoryCandidate[];
+}
+
+/**
+ * The reverse of {@link planningSessionDraftState}: rebuild an adoptable outcome from a
+ * pass that reached `draft_ready` before the app went away. Returns `null` when the pass
+ * carries no plan — there is nothing to adopt and the aim must resume planning instead.
+ *
+ * Quality is recomputed rather than stored (`critiquePlan` is pure over plan + context), so
+ * the persisted pass stays small and a plan is never judged by a stale report.
+ *
+ * The transcript is deliberately permissive on disk, so every entry read here is guarded:
+ * anything unrecognized is dropped rather than trusted, exactly as the live surface drops
+ * activity it cannot say.
+ */
+export function restorePlanningPass(
+  pass: AimDraftPlanningSession,
+  memories: PlanningMemory[] = [],
+): PlanningPassRestoration | null {
+  const parsed = DecompositionOutput.safeParse(pass.draft_plan);
+  if (!parsed.success) return null;
+  const plan = parsed.data;
+  const research: PlanningSessionResearchLog = {
+    findings: pass.research_findings.flatMap((row) => {
+      const summary = cleanText(row.summary);
+      if (!summary) return [];
+      const urls = Array.isArray(row.source_urls) ? row.source_urls.filter((url): url is string => typeof url === "string") : [];
+      const lane = cleanText(row.lane);
+      return [{ summary, source_urls: urls, ...(lane ? { lane } : {}) }];
+    }),
+    gaps: pass.research_gaps.filter((gap) => Boolean(cleanText(gap))),
+    summary: pass.research_summary,
+  };
+  return {
+    plan,
+    // Judged exactly as the live session judged it (`submitPlan` passes plan + memories and no
+    // research evidence), so a plan's quality cannot change just because the app restarted.
+    quality: critiquePlan({ plan, context: memories }),
+    assumptions: pass.assumptions.map((assumption) => ({
+      statement: assumption.statement,
+      default_value: assumption.default_value,
+    })),
+    openQuestions: [...pass.open_questions],
+    answers: restoreTranscriptAnswers(pass.transcript),
+    research,
+    memoryCandidates: pass.memory_candidates.flatMap((candidate) => {
+      const content = cleanText(candidate.content);
+      if (!content) return [];
+      return [{
+        content,
+        category: cleanText(candidate.category),
+        scope: candidate.scope === "global" ? "global" : "current_aim",
+      }];
+    }),
+  };
+}
+
+/**
+ * Pair persisted `question` entries back to their `answer` entries. A question the user never
+ * answered is left out: the restored Q&A must describe what was actually settled, not imply
+ * an answer that was never given.
+ */
+function restoreTranscriptAnswers(transcript: Record<string, unknown>[]): PlanningSessionQnA[] {
+  const questions = new Map<string, PlanningSessionQuestion>();
+  const answers: PlanningSessionQnA[] = [];
+  for (const entry of transcript) {
+    if (entry.kind === "question") {
+      const question = restoreQuestion(entry.question);
+      if (question) questions.set(question.id, question);
+      continue;
+    }
+    if (entry.kind !== "answer") continue;
+    const requestId = cleanText(entry.request_id);
+    const question = questions.get(requestId);
+    const raw = entry.answer;
+    if (!question || !raw || typeof raw !== "object") continue;
+    const record = raw as Record<string, unknown>;
+    const labels = Array.isArray(record.selected_labels)
+      ? record.selected_labels.filter((label): label is string => typeof label === "string")
+      : [];
+    const otherText = cleanText(record.other_text);
+    if (labels.length === 0 && !otherText) continue;
+    answers.push({
+      question,
+      answer: { selected_labels: labels, other_text: otherText || null },
+    });
+  }
+  return answers;
+}
+
+function restoreQuestion(raw: unknown): PlanningSessionQuestion | null {
+  if (!raw || typeof raw !== "object") return null;
+  const record = raw as Record<string, unknown>;
+  const id = cleanText(record.id);
+  const question = cleanText(record.question);
+  if (!id || !question) return null;
+  const options = Array.isArray(record.options)
+    ? record.options.flatMap((option) => {
+      if (!option || typeof option !== "object") return [];
+      const label = cleanText((option as Record<string, unknown>).label);
+      if (!label) return [];
+      return [{ label, tradeoff: cleanText((option as Record<string, unknown>).tradeoff) }];
+    })
+    : [];
+  const kind = cleanText(record.kind);
+  const mode = record.selection_mode === "multiple" ? "multiple" : "single";
+  const reason = cleanText(record.selection_mode_reason);
+  return {
+    id,
+    question,
+    kind: PLANNING_QUESTION_KINDS.has(kind) ? (kind as ClarifyQuestionKind) : "constraint",
+    why_high_impact: cleanText(record.why_high_impact),
+    allow_other: true,
+    selection_mode: mode,
+    // An unrecognized reason degrades to the honest default for its mode rather than being
+    // cast through: the reason drives what the question surface claims about the choice.
+    selection_mode_reason: (CHOICE_SELECTION_REASONS as readonly string[]).includes(reason)
+      ? (reason as ChoiceSelectionReason)
+      : mode === "multiple" ? "compatible_options" : "mutually_exclusive",
+    capture_scope: record.capture_scope === "global" || record.capture_scope === "none"
+      ? record.capture_scope
+      : "current_aim",
+    options,
+  };
+}
+
+const PLANNING_QUESTION_KINDS = new Set<string>(["scope", "involvement", "assumption", "constraint", "capability"]);
 
 /**
  * Trim a pass to its size budget, oldest-first, and declare the trim. Count caps

@@ -27,6 +27,7 @@ import type {
   PlanningAgentDetection,
   PlanningDebugTrace,
   PlanningLiveEvent,
+  PlanningPassStateView,
   PlanningSessionStateView,
   PlanResult,
   ProviderStatus,
@@ -55,6 +56,7 @@ import { Notice } from "./Notice";
 import { mergePlanningDebugTraces, PlanningDebugPanel } from "./PlanningDebugPanel";
 import { ProviderForm } from "./ProviderForm";
 import { ContextClarifyPanel } from "./stages/context/ContextClarifyPanel";
+import { PlanningPassPanel } from "./stages/context/PlanningPassPanel";
 import { PlanningSessionPanel } from "./stages/context/PlanningSessionPanel";
 import type { ClarifyPhase, ContextAnswerMap } from "./stages/context/types";
 import { applyRunLiveEvent, isTerminalRunEvent, type LiveRunState } from "./stages/execute/liveRun";
@@ -87,6 +89,7 @@ import {
   type AimDraftBuildInput,
   type HydratedAimDraft,
 } from "./workflow/aimDrafts";
+import { planningPassWorthShowing } from "./workflow/planningPass";
 import {
   embeddedPlanningAgentId,
   planningBrainMenu,
@@ -196,6 +199,8 @@ function AimOsApp() {
   const [contextNote, setContextNote] = useState("");
   // Embedded planning session (the local agent as the aim-breaking brain).
   const [planningSession, setPlanningSession] = useState<PlanningSessionStateView | null>(null);
+  // The selected aim's last CHECKPOINTED pass, read only when no session is live for it.
+  const [planningPass, setPlanningPass] = useState<PlanningPassStateView | null>(null);
   const [sessionAnswers, setSessionAnswers] = useState<ContextAnswerMap>({});
   const [sessionChatDraft, setSessionChatDraft] = useState("");
   const sessionLandingAppliedRef = useRef<string | null>(null);
@@ -1190,23 +1195,71 @@ function AimOsApp() {
   }
   applySessionViewRef.current = applySessionView;
 
-  // Re-attach to a session that kept running while this aim was off-screen.
+  // Re-attach to a session that kept running while this aim was off-screen; when none is running,
+  // fall back to the aim's last CHECKPOINTED pass, so an aim Aimcub was planning before the app
+  // closed shows that pass instead of an empty start card. A live session always wins: the
+  // checkpoint is only ever the trailing record of one that stopped.
   useEffect(() => {
     const goalId = selected?.id;
     if (!goalId) {
       setPlanningSession(null);
+      setPlanningPass(null);
       return;
     }
+    // Only a PLAN-LESS aim can be showing a paused pass, and reading one recomputes plan quality —
+    // so a planned aim (which keeps its landed pass in metadata) must not pay for that on every
+    // navigation.
+    const planless = selected?.plan_json === null || selected?.plan_json === undefined;
     let stale = false;
-    void window.aimcub.getPlanningSessionState({ goalId }).then((view) => {
+    void window.aimcub.getPlanningSessionState({ goalId }).then(async (view) => {
       if (stale) return;
-      if (view) applySessionViewRef.current(view);
-      else setPlanningSession(null);
+      if (view) {
+        applySessionViewRef.current(view);
+        setPlanningPass(null);
+        return;
+      }
+      setPlanningSession(null);
+      if (!planless) {
+        setPlanningPass(null);
+        return;
+      }
+      const pass = await window.aimcub.getPlanningPass({ goalId }).catch(() => null);
+      if (stale) return;
+      setPlanningPass(pass && pass.goalId === goalId ? pass : null);
     }).catch(() => undefined);
     return () => {
       stale = true;
     };
   }, [selected?.id]);
+
+  /**
+   * Adopt the plan a stopped pass already drafted — the same review-then-commit path a live
+   * landing takes, so a plan finished before a restart is adopted exactly like one finished in
+   * the moment (and never regenerated at the cost of another brain run).
+   */
+  function reviewPassPlan(pass: PlanningPassStateView): void {
+    if (!pass.landing) return;
+    setPlanningShellId(pass.goalId);
+    sessionLandingAppliedRef.current = null;
+    setDraft(pass.landing.plan);
+    setFinalPlan(pass.landing.plan);
+    setPlanResult({
+      ok: true,
+      output: pass.landing.plan,
+      errors: [],
+      quality: pass.landing.quality,
+      review: pass.landing.review,
+    });
+    setClarifyPhase(null);
+    setMode("reviewing");
+  }
+
+  /** Forget the pass and plan this aim again from nothing. */
+  async function restartPlanningFromScratch(goal: Goal): Promise<void> {
+    setPlanningPass(null);
+    await window.aimcub.discardPlanningPass({ goalId: goal.id }).catch(() => undefined);
+    await startEmbeddedPlanning(goal);
+  }
 
   /** Run the embedded planning brain against a shell aim; the funnel is the fallback. */
   async function startEmbeddedPlanning(goal: Goal) {
@@ -1320,9 +1373,12 @@ function AimOsApp() {
     }
     setBusy(t("os.busy.save"));
     setError(null);
-    // An embedded session carries its own interview: its Q&A and disclosed
-    // assumptions feed the same metadata synthesis the funnel uses.
-    const sessionLanding = planningSession?.goalId === goal.id ? planningSession.landing : null;
+    // An embedded session carries its own interview: its Q&A and disclosed assumptions feed the
+    // same metadata synthesis the funnel uses. A plan adopted from a CHECKPOINTED pass has no live
+    // session behind it, so its restored landing stands in — otherwise a plan finished before a
+    // restart would land stripped of the interview that shaped it.
+    const sessionLanding = (planningSession?.goalId === goal.id ? planningSession.landing : null)
+      ?? (planningPass?.goalId === goal.id ? planningPass.landing : null);
     try {
       const updated = await window.aimcub.updateGoalPlan({
         goalId: goal.id,
@@ -1352,6 +1408,8 @@ function AimOsApp() {
       setPlanningShellId(null);
       resetPlanningForAimUpdate();
       setPlanningSession(null);
+      // The pass has served its purpose: the plan it drafted is now the aim's plan.
+      setPlanningPass(null);
       setSessionAnswers({});
       setSessionChatDraft("");
       sessionLandingAppliedRef.current = null;
@@ -1941,6 +1999,17 @@ function AimOsApp() {
         </button>
       ) : undefined}
       onStartResearch={() => void startShellResearch()}
+      pausedPlanning={!isPlanningShell
+        && planningPassWorthShowing(planningPass)
+        && planningPass.goalId === selected.id ? (
+        <PlanningPassPanel
+          pass={planningPass}
+          disabled={Boolean(busy)}
+          onResume={() => void startEmbeddedPlanning(selected)}
+          onReview={() => reviewPassPlan(planningPass)}
+          onStartOver={() => void restartPlanningFromScratch(selected)}
+        />
+      ) : undefined}
       planning={isPlanningShell ? {
         busy: Boolean(busy),
         clarifyPanel: (sessionPanel && planningSession && (planningSession.active || planningSession.failure !== null))

@@ -560,6 +560,39 @@ export interface PlanningSessionStateView {
   failure: { code: string; message: string } | null;
 }
 
+/**
+ * A planning pass that is NOT running: the last checkpoint of a session that stopped, read back
+ * from the aim. Deliberately separate from {@link PlanningSessionStateView} — there is no brain
+ * behind it, so it carries no `active` flag and no pending question. Answering into a dead pass
+ * is impossible, and a shared shape would invite exactly that mistake.
+ */
+export interface PlanningPassStateView {
+  goalId: string;
+  agentId: string;
+  model: string | null;
+  phase: string;
+  /** `app_quit` | `failed` | `canceled` | "" (stopped without recording why). */
+  stoppedReason: string;
+  resumedCount: number;
+  startedAt: string;
+  updatedAt: string;
+  /** The pass reports less history than it had; the surface should not imply completeness. */
+  truncated: boolean;
+  questionsAsked: number;
+  researchFindingCount: number;
+  researchGapCount: number;
+  /**
+   * The persisted transcript, structure only. The renderer derives its trace rows and every
+   * displayed word from this, exactly as it does for live activity.
+   */
+  transcript: Record<string, unknown>[];
+  /**
+   * Present only when the pass drafted a plan before stopping: the same landing bundle a live
+   * session produces, rebuilt from the pass, so the plan can be adopted without re-running a brain.
+   */
+  landing: PlanningSessionLanding | null;
+}
+
 /** Pushed on every session/activity change, broadcast like `runLiveEvent`. */
 export interface PlanningSessionEventPayload {
   goalId: string;
@@ -666,6 +699,14 @@ export interface AimcubApi {
   startPlanningSession(req: PlanningSessionStartRequest): Promise<PlanningSessionStateView>;
   /** Current session view for an aim, or null when none was ever started this app run. */
   getPlanningSessionState(req: PlanningSessionRef): Promise<PlanningSessionStateView | null>;
+  /**
+   * The aim's last checkpointed planning pass — what a session left behind after it stopped
+   * (typically an app quit). Null when the aim has never been planned. Read AFTER
+   * `getPlanningSessionState` returns null: a live session always outranks its checkpoint.
+   */
+  getPlanningPass(req: PlanningSessionRef): Promise<PlanningPassStateView | null>;
+  /** Forget an aim's checkpointed pass, so planning starts genuinely fresh. */
+  discardPlanningPass(req: PlanningSessionRef): Promise<void>;
   answerPlanningQuestion(req: PlanningSessionAnswerRequest): Promise<PlanningSessionStateView>;
   postPlanningChat(req: PlanningSessionChatRequest): Promise<PlanningSessionStateView>;
   finishPlanningNow(req: PlanningSessionRef): Promise<PlanningSessionStateView>;
@@ -738,6 +779,8 @@ export const IPC = {
   runLiveEvent: "aimcub:runLiveEvent",
   startPlanningSession: "aimcub:startPlanningSession",
   getPlanningSessionState: "aimcub:getPlanningSessionState",
+  getPlanningPass: "aimcub:getPlanningPass",
+  discardPlanningPass: "aimcub:discardPlanningPass",
   answerPlanningQuestion: "aimcub:answerPlanningQuestion",
   postPlanningChat: "aimcub:postPlanningChat",
   finishPlanningNow: "aimcub:finishPlanningNow",

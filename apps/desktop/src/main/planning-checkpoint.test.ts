@@ -219,6 +219,7 @@ describe("planning-pass checkpointing", () => {
       stopped_reason: "app_quit",
       resumed_count: 1,
       truncated: false,
+      draft_plan: null,
       transcript: [],
       research_findings: [],
       research_gaps: [],

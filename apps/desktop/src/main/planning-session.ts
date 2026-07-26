@@ -15,11 +15,13 @@ import { join } from "node:path";
 import { reviewPlan } from "@aimcub/core";
 import {
   planningSessionDraftState,
+  restorePlanningPass,
   selectPlanningContextForStore,
   type ClarifyAnswer,
   type ClarifyQuestion,
   type PlanningMemory,
   type PlanningSessionEvent,
+  type PlanningSessionQnA,
   type PlanningSessionSnapshot,
 } from "@aimcub/llm";
 import type { AimDraftPlanningSession } from "@aimcub/types";
@@ -36,6 +38,7 @@ import {
 
 import type {
   DesktopPreferences,
+  PlanningPassStateView,
   PlanningSessionActivityItem,
   PlanningSessionAnswerRequest,
   PlanningSessionEventPayload,
@@ -216,32 +219,43 @@ function emitView(managed: ManagedPlanningSession, sessionEvent?: PlanningSessio
   });
 }
 
-/** Session Q&A → the funnel's question/answer shapes, so metadata synthesis stays uniform. */
+/**
+ * Session Q&A → the funnel's question/answer shapes, so metadata synthesis stays uniform.
+ * Shared by a live landing and one restored from a checkpointed pass: a plan adopted after a
+ * restart must carry the same shape as one adopted in the moment.
+ */
+function clarifyPair(qna: readonly PlanningSessionQnA[]): {
+  questions: ClarifyQuestion[];
+  answers: ClarifyAnswer[];
+} {
+  return {
+    questions: qna.map((row) => ({
+      id: row.question.id,
+      question: row.question.question,
+      why_high_impact: row.question.why_high_impact,
+      kind: row.question.kind,
+      allow_other: true,
+      selection_mode: row.question.selection_mode,
+      selection_mode_reason: row.question.selection_mode_reason,
+      options: row.question.options.map((option) => ({ label: option.label, tradeoff: option.tradeoff })),
+    })),
+    answers: qna.map((row) => ({
+      question_id: row.question.id,
+      selected_label: row.answer.selected_labels[0] ?? null,
+      selected_labels: row.answer.selected_labels,
+      other_text: row.answer.other_text,
+    })),
+  };
+}
+
 function landingFromOutcome(managed: ManagedPlanningSession): PlanningSessionLanding | null {
   const outcome = managed.handle.session.snapshot().outcome;
   if (!outcome) return null;
-  const questions: ClarifyQuestion[] = outcome.answers.map((qna) => ({
-    id: qna.question.id,
-    question: qna.question.question,
-    why_high_impact: qna.question.why_high_impact,
-    kind: qna.question.kind,
-    allow_other: true,
-    selection_mode: qna.question.selection_mode,
-    selection_mode_reason: qna.question.selection_mode_reason,
-    options: qna.question.options.map((option) => ({ label: option.label, tradeoff: option.tradeoff })),
-  }));
-  const answers: ClarifyAnswer[] = outcome.answers.map((qna) => ({
-    question_id: qna.question.id,
-    selected_label: qna.answer.selected_labels[0] ?? null,
-    selected_labels: qna.answer.selected_labels,
-    other_text: qna.answer.other_text,
-  }));
   return {
     plan: outcome.plan,
     quality: outcome.quality,
     review: reviewPlan({ plan: outcome.plan, context: managed.memories, quality: outcome.quality }),
-    questions,
-    answers,
+    ...clarifyPair(outcome.answers),
     assumptions: outcome.assumptions.map((assumption) => ({
       statement: assumption.statement,
       default_value: assumption.default_value,
@@ -401,6 +415,62 @@ export async function startPlanningSession(req: PlanningSessionStartRequest): Pr
 export function getPlanningSessionState(goalId: string): PlanningSessionStateView | null {
   const managed = sessions.get(goalId);
   return managed ? viewOf(managed) : null;
+}
+
+/**
+ * The aim's last checkpointed pass — what a stopped session left behind. Callers read this only
+ * when {@link getPlanningSessionState} is null: a live session always outranks its checkpoint.
+ *
+ * When the pass got as far as a drafted plan, the returned landing is rebuilt from it (quality and
+ * review recomputed against the aim's current context), so the plan can be adopted without paying
+ * for a brain again. Otherwise the landing is null and the pass is something to resume.
+ */
+export async function getPlanningPassView(goalId: string): Promise<PlanningPassStateView | null> {
+  const pass = await aimStore.getPlanningPass(goalId);
+  if (!pass) return null;
+  const stored = await aimStore.getGoal(goalId);
+  const memories = stored
+    ? (await selectPlanningContextForStore(aimStore, {
+      title: stored.goal.title,
+      description: stored.goal.description || undefined,
+    })).memories
+    : [];
+  const restored = restorePlanningPass(pass, memories);
+  return {
+    goalId,
+    agentId: pass.agent_id,
+    model: pass.model || null,
+    phase: pass.phase,
+    stoppedReason: pass.stopped_reason,
+    resumedCount: pass.resumed_count,
+    startedAt: pass.started_at,
+    updatedAt: pass.updated_at,
+    truncated: pass.truncated,
+    questionsAsked: pass.transcript.filter((entry) => entry.kind === "question").length,
+    researchFindingCount: pass.research_findings.length,
+    researchGapCount: pass.research_gaps.length,
+    transcript: pass.transcript,
+    landing: restored
+      ? {
+        plan: restored.plan,
+        quality: restored.quality,
+        review: reviewPlan({ plan: restored.plan, context: memories, quality: restored.quality }),
+        ...clarifyPair(restored.answers),
+        assumptions: restored.assumptions.map((assumption) => ({
+          statement: assumption.statement,
+          default_value: assumption.default_value,
+        })),
+      }
+      : null,
+  };
+}
+
+/**
+ * Forget an aim's checkpointed pass. Used when the user chooses to plan the aim again from
+ * nothing — the only way a pass is ever deliberately dropped short of the aim itself going away.
+ */
+export async function discardPlanningPass(goalId: string): Promise<void> {
+  await aimStore.savePlanningPass({ goalId, pass: null });
 }
 
 export function answerPlanningQuestion(req: PlanningSessionAnswerRequest): PlanningSessionStateView {

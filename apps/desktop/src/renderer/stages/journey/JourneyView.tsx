@@ -192,6 +192,14 @@ export interface JourneyViewProps {
   /** Start the first-plan research run for a plan-less shell goal. */
   onStartResearch?: () => void;
   /**
+   * The aim's STOPPED planning pass, when it left a checkpoint worth showing (`PlanningPassPanel`).
+   * Takes the live lane ahead of the build-plan card: an aim Aimcub was already planning must never
+   * ask its owner to start planning as though nothing had happened (founder, 2026-07-26). Only
+   * consulted for a plan-less aim with no live session — a live session always outranks a
+   * checkpoint, and a planned aim shows its plan.
+   */
+  pausedPlanning?: ReactNode;
+  /**
    * The in-Journey first-plan surface for a shell goal. When present, the Journey hosts the
    * research/clarify/plan-review interaction in place of the Your-move card (never leaving the
    * Journey): the clarify Q&A element while a clarify phase is active, then the generated plan
@@ -450,6 +458,10 @@ export function JourneyView(props: JourneyViewProps) {
               <div className="od-journey-ambient-title">{t("glass.journey.planningWorking")}</div>
             </div>
           )}
+        </div>
+      ) : progress.total_milestones === 0 && props.pausedPlanning ? (
+        <div className="od-journey-planning" data-od-id="journey-paused-planning">
+          {props.pausedPlanning}
         </div>
       ) : progress.total_milestones === 0 ? (
         <div className="od-journey-move" data-od-id="journey-build-plan">

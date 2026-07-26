@@ -67,6 +67,8 @@ const api: AimcubApi = {
   },
   startPlanningSession: (req) => ipcRenderer.invoke(IPC.startPlanningSession, req),
   getPlanningSessionState: (req) => ipcRenderer.invoke(IPC.getPlanningSessionState, req),
+  getPlanningPass: (req) => ipcRenderer.invoke(IPC.getPlanningPass, req),
+  discardPlanningPass: (req) => ipcRenderer.invoke(IPC.discardPlanningPass, req),
   answerPlanningQuestion: (req) => ipcRenderer.invoke(IPC.answerPlanningQuestion, req),
   postPlanningChat: (req) => ipcRenderer.invoke(IPC.postPlanningChat, req),
   finishPlanningNow: (req) => ipcRenderer.invoke(IPC.finishPlanningNow, req),

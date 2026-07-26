@@ -254,6 +254,44 @@ describe("JourneyView", () => {
     expect(html).not.toContain("Aim is complete.");
   });
 
+  it("shows a stopped pass instead of the start card — an aim already being planned never re-asks", () => {
+    // The founder's 2026-07-26 report: this aim HAD been planned, and the Journey greeted him with
+    // "Start planning" as though nothing had happened.
+    const html = render(progressOf([]), {
+      onStartResearch: noop,
+      pausedPlanning: <div>PAUSED_PASS_MARKER</div>,
+    });
+    expect(html).toContain("journey-paused-planning");
+    expect(html).toContain("PAUSED_PASS_MARKER");
+    expect(html).not.toContain("journey-build-plan");
+    expect(html).not.toContain(">Start planning<");
+  });
+
+  it("keeps the start card for an aim with no pass at all", () => {
+    // No checkpoint means nothing was ever planned: the ordinary start card IS the honest state.
+    const html = render(progressOf([]), { onStartResearch: noop, pausedPlanning: undefined });
+    expect(html).toContain("journey-build-plan");
+    expect(html).not.toContain("journey-paused-planning");
+  });
+
+  it("lets a LIVE session outrank a checkpointed pass", () => {
+    // A pass is the trailing record of a session that stopped; if one is running, it owns the lane.
+    const html = render(progressOf([]), {
+      planning: { busy: true, clarifyPanel: <div>LIVE_MARKER</div>, planReady: false, onCommitPlan: noop },
+      pausedPlanning: <div>PAUSED_PASS_MARKER</div>,
+    });
+    expect(html).toContain("LIVE_MARKER");
+    expect(html).not.toContain("PAUSED_PASS_MARKER");
+  });
+
+  it("ignores a pass once the aim has a plan", () => {
+    const html = render(progressOf([row({ id: "m1", title: "Ship it", human: true })]), {
+      pausedPlanning: <div>PAUSED_PASS_MARKER</div>,
+    });
+    expect(html).not.toContain("PAUSED_PASS_MARKER");
+    expect(html).not.toContain("journey-paused-planning");
+  });
+
   it("links to Settings from the build-plan card when no planning runtime is configured", () => {
     const html = render(progressOf([]), { onStartResearch: noop, planningRuntimeReady: false });
     expect(html).toContain("Connect a planning brain in Settings");

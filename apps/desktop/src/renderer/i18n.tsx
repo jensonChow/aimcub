@@ -110,6 +110,36 @@ export const STRINGS = {
   "planningSession.now.planAccepted": { en: "Plan accepted", zh: "方案已通过" },
   "planningSession.now.planRejected": { en: "Tightening the draft (pass {n})", zh: "正在收紧草稿（第 {n} 轮）" },
   "planningSession.now.memory": { en: "Noted something worth remembering", zh: "记下了值得记住的信息" },
+  // A STOPPED pass, read back from the aim. The voice must own what happened without alarm: the
+  // app closing is ordinary, and the point of the copy is that nothing was thrown away.
+  "planningPass.pausedTitle": { en: "Planning paused", zh: "规划已暂停" },
+  "planningPass.pausedSub": {
+    en: "Aimcub was planning this aim when the app closed. Everything it found is still here.",
+    zh: "上次关闭应用时，Aimcub 正在规划这个目标。它找到的内容都还在。",
+  },
+  "planningPass.failedTitle": { en: "Planning stopped early", zh: "规划提前中断" },
+  "planningPass.failedSub": {
+    en: "The brain stopped before it finished a plan. What it had already found is kept.",
+    zh: "大脑在给出完整方案前就停了。此前已找到的内容都留着。",
+  },
+  "planningPass.readyTitle": { en: "A plan is waiting for you", zh: "有一份方案在等你" },
+  "planningPass.readySub": {
+    en: "Aimcub finished planning this aim before it stopped. Review it and adopt it — no need to plan again.",
+    zh: "Aimcub 在停下前已经把这个目标规划完了。看一下就能采纳，不必重新规划。",
+  },
+  "planningPass.readyPill": { en: "Plan ready", zh: "方案已就绪" },
+  "planningPass.receipt": {
+    en: "Findings {findings} · Gaps {gaps} · Answered {answered}",
+    zh: "发现 {findings} · 缺口 {gaps} · 已回答 {answered}",
+  },
+  "planningPass.trimmed": {
+    en: "Only the most recent steps are shown — the earlier ones were trimmed to stay small.",
+    zh: "这里只显示最近的步骤，较早的部分为控制体积已省略。",
+  },
+  "planningPass.resume": { en: "Resume planning", zh: "继续规划" },
+  "planningPass.retry": { en: "Try planning again", zh: "重试规划" },
+  "planningPass.review": { en: "Review the plan", zh: "查看方案" },
+  "planningPass.startOver": { en: "Plan from scratch", zh: "从头规划" },
   "planningSession.failedPill": { en: "Stopped", zh: "已停止" },
   "planningSession.failedTitle": { en: "The planning session ended without a plan", zh: "规划会话结束但没有产出方案" },
   "planningSession.fallback": { en: "Use standard planning", zh: "改用标准规划" },

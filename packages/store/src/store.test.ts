@@ -171,6 +171,7 @@ const PASS: AimDraftPlanningSession = {
   stopped_reason: "",
   resumed_count: 0,
   truncated: false,
+  draft_plan: null,
   transcript: [{ at: "2026-07-24T10:00:00.000Z", kind: "user_message", text: "budget 200", delivered: true }],
   research_findings: [{ summary: "finding", source_urls: ["https://a.example"] }],
   research_gaps: ["no web"],

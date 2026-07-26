@@ -443,6 +443,14 @@ export const AimDraftPlanningSession = z.object({
   resumed_count: z.number().int().nonnegative().default(0),
   /** True when size bounding dropped the oldest transcript entries or findings. */
   truncated: z.boolean().default(false),
+  /**
+   * The plan the brain drafted, once it reached `draft_ready`. Persisted because quitting one
+   * click before adopting a finished plan must not throw it away: the plan is the most
+   * expensive thing the pass produced, and re-running a brain to regenerate it is not a
+   * recovery. Quality and review are NOT stored — `critiquePlan`/`reviewPlan` recompute them
+   * from this plan plus the aim's memories.
+   */
+  draft_plan: DecompositionOutput.nullable().default(null),
   transcript: z.array(z.record(z.string(), z.unknown())).default([]),
   research_findings: z.array(z.record(z.string(), z.unknown())).default([]),
   research_gaps: z.array(z.string()).default([]),

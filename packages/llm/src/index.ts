@@ -287,10 +287,12 @@ export {
   PlanningSession,
   createPlanningSession,
   planningSessionDraftState,
+  restorePlanningPass,
 } from "./planning-session";
 export type {
   PlanningPassBounds,
   PlanningPassProvenance,
+  PlanningPassRestoration,
   PlanningSessionAim,
   PlanningSessionAnswer,
   PlanningSessionAssumption,

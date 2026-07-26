@@ -5123,6 +5123,15 @@ kbd {
   animation: od-journey-pulse 1.4s ease-in-out infinite;
 }
 
+/*
+ * A stopped planning pass: same dot slot, deliberately at rest. Muted and unanimated, because a
+ * pulsing accent dot would claim a brain is working when none is.
+ */
+.od-journey-dot-idle {
+  display: block;
+  background: color-mix(in oklab, var(--od-fg), transparent 62%);
+}
+
 @keyframes od-journey-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }

@@ -509,6 +509,8 @@ describe("planning session · surface", () => {
     expect(state.transcript.map((entry) => entry.kind)).toEqual(["research", "memory_candidate", "plan_attempt"]);
     // Round-trips through the persistence schema unchanged.
     expect(JSON.parse(JSON.stringify(state))).toEqual(state);
+    // The drafted plan rides along, so quitting before adopting does not discard it.
+    expect(state.draft_plan).toEqual(validPlan());
     // Provenance defaults: no model claimed, the pass starts now, still live, never resumed.
     expect(state.model).toBe("");
     expect(state.started_at).toBe("2026-07-24T12:00:00.000Z");
@@ -533,6 +535,7 @@ describe("planning session · surface", () => {
     });
     // No `submit_plan` yet: research still has to survive the quit, which is the whole point.
     expect(pass.phase).toBe("researching");
+    expect(pass.draft_plan).toBeNull();
     expect(pass.research_findings).toEqual([{ summary: "Finding A", source_urls: ["https://a.example"] }]);
     expect(pass.research_gaps).toEqual(["no web access"]);
     expect(pass.model).toBe("gpt-5.6-sol");
@@ -541,6 +544,77 @@ describe("planning session · surface", () => {
     expect(pass.updated_at).toBe("2026-07-26T09:00:00.000Z");
     expect(pass.stopped_reason).toBe("app_quit");
     expect(pass.resumed_count).toBe(2);
+  });
+
+  it("restores a draft_ready pass into an adoptable plan without a brain", async () => {
+    const { session } = makeSession({ memories: [] });
+    // A question the user answered, and one they never got to.
+    const asked = await session.handleToolCall("ask_user", {
+      question: "What is your budget?",
+      why_high_impact: "It sets the whole scope.",
+      options: [{ label: "Under 200", tradeoff: "tight" }, { label: "Over 200", tradeoff: "roomy" }],
+    });
+    const requestId = asked.kind === "pending_user" ? asked.requestId : "";
+    expect(requestId).not.toBe("");
+    session.provideAnswer(requestId, { selected_labels: ["Under 200"], other_text: null });
+    await expectReply(session.handleToolCall("report_research", {
+      findings: [{ summary: "Finding A", source_urls: ["https://a.example"] }],
+      gaps: ["no web access"],
+    }));
+    await expectReply(session.handleToolCall("propose_memory", {
+      content: "Has an Apple Developer account",
+      category: "capability",
+      scope: "global",
+    }));
+    await expectReply(session.handleToolCall("submit_plan", {
+      plan: validPlan(),
+      assumptions: [{ statement: "English-only launch", default_value: "en" }],
+      open_questions: ["Pricing?"],
+      research_summary: "Two lanes covered.",
+    }));
+
+    const { planningSessionDraftState, restorePlanningPass } = await import("./planning-session");
+    const pass = planningSessionDraftState(session.snapshot(), "codex", new Date("2026-07-26T09:00:00.000Z"), {
+      stoppedReason: "app_quit",
+    });
+    // Through disk and back: persistence is JSON, so the restore must survive a round-trip.
+    const restored = restorePlanningPass(JSON.parse(JSON.stringify(pass)));
+
+    expect(restored).not.toBeNull();
+    expect(restored!.plan).toEqual(validPlan());
+    // Quality is recomputed, never read from disk.
+    expect(restored!.quality).toBeTruthy();
+    expect(restored!.assumptions).toEqual([{ statement: "English-only launch", default_value: "en" }]);
+    expect(restored!.openQuestions).toEqual(["Pricing?"]);
+    expect(restored!.research.findings).toEqual([{ summary: "Finding A", source_urls: ["https://a.example"] }]);
+    expect(restored!.research.gaps).toEqual(["no web access"]);
+    expect(restored!.memoryCandidates).toEqual([
+      { content: "Has an Apple Developer account", category: "capability", scope: "global" },
+    ]);
+    // The answered question is paired back up, with the user's own selection intact.
+    expect(restored!.answers).toHaveLength(1);
+    expect(restored!.answers[0]!.question.question).toBe("What is your budget?");
+    expect(restored!.answers[0]!.question.options.map((option) => option.label)).toEqual(["Under 200", "Over 200"]);
+    expect(restored!.answers[0]!.answer.selected_labels).toEqual(["Under 200"]);
+  });
+
+  it("refuses to restore a pass that never drafted a plan, and tolerates junk on disk", async () => {
+    const { session } = makeSession({ memories: [] });
+    await expectReply(session.handleToolCall("report_research", { findings: [], gaps: ["no web"] }));
+
+    const { planningSessionDraftState, restorePlanningPass } = await import("./planning-session");
+    const midFlight = planningSessionDraftState(session.snapshot(), "codex", new Date("2026-07-26T09:00:00.000Z"));
+    // No plan yet: the aim must resume planning, not be offered something to adopt.
+    expect(restorePlanningPass(midFlight)).toBeNull();
+
+    // The transcript is permissive on disk; garbage entries drop instead of being trusted.
+    const finished = planningSessionDraftState(session.snapshot(), "codex", new Date("2026-07-26T09:00:00.000Z"));
+    const tampered = {
+      ...finished,
+      draft_plan: { nodes: "not a plan" },
+      transcript: [{ kind: "question" }, { kind: "answer", request_id: "missing" }, { kind: "???" }],
+    };
+    expect(restorePlanningPass(tampered as never)).toBeNull();
   });
 
   it("bounds an oversized pass oldest-first and declares the trim", async () => {

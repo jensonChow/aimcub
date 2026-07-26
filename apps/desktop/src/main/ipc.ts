@@ -112,7 +112,9 @@ import {
 import {
   answerPlanningQuestion,
   cancelPlanningSession,
+  discardPlanningPass,
   finishPlanningNow,
+  getPlanningPassView,
   getPlanningSessionState,
   planningSessionMemoryCandidates,
   postPlanningChat,
@@ -1003,6 +1005,8 @@ export function registerIpc(): void {
 
   ipcMain.handle(IPC.startPlanningSession, async (_e, req: PlanningSessionStartRequest) => startPlanningSession(req));
   ipcMain.handle(IPC.getPlanningSessionState, (_e, req: PlanningSessionRef) => getPlanningSessionState(req.goalId));
+  ipcMain.handle(IPC.getPlanningPass, (_e, req: PlanningSessionRef) => getPlanningPassView(req.goalId));
+  ipcMain.handle(IPC.discardPlanningPass, (_e, req: PlanningSessionRef) => discardPlanningPass(req.goalId));
   ipcMain.handle(IPC.answerPlanningQuestion, (_e, req: PlanningSessionAnswerRequest) => answerPlanningQuestion(req));
   ipcMain.handle(IPC.postPlanningChat, (_e, req: PlanningSessionChatRequest) => postPlanningChat(req.goalId, req.text));
   ipcMain.handle(IPC.finishPlanningNow, (_e, req: PlanningSessionRef) => finishPlanningNow(req.goalId));
