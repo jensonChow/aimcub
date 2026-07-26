@@ -70,7 +70,9 @@ describe("PlanningSessionPanel · live card", () => {
       ],
     }));
     const trace = html.match(/<ol class="od-planning-session-trace">[\s\S]*?<\/ol>/)?.[0] ?? "";
-    expect(trace).toContain("Reading the aim and your context");
+    // A passed step reads as done — "read", not "reading" — so the words match its finished tick.
+    expect(trace).toContain("Read the aim and your context");
+    expect(trace).not.toContain("Reading the aim and your context");
     expect(trace).toContain("Recorded 3 research findings");
     // The last line is the living one; earlier steps have receded.
     expect(trace).toMatch(/data-current="true"[^>]*>Searching the web/);

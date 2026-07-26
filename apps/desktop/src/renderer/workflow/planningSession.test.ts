@@ -304,6 +304,20 @@ describe("planningActivityLine (live-lane product voice)", () => {
     expect(planningActivityNow([], t)).toBeNull();
   });
 
+  it("speaks a passed step in its completed form, never as work still in progress", () => {
+    // The founder's screenshot: a finished tick beside "Reading the aim and your context",
+    // which claimed the brain was still reading it. A done row must say "read".
+    expect(planningActivityLine({ kind: "status", label: "", code: "started" }, t, "done"))
+      .toBe("planningSession.done.started");
+    expect(planningActivityLine({ kind: "status", label: "schema", code: "plan_rejected", count: 2 }, t, "done"))
+      .toBe('planningSession.done.planRejected:{"n":2}');
+    // A working verb has no honest completed form, so it cannot be rendered as history at all.
+    expect(planningActivityLine({ kind: "tool", label: "", tool: "web.search" }, t, "done")).toBeNull();
+    // Lines that already record something that happened read the same in either row.
+    expect(planningActivityLine({ kind: "research", label: "", count: 3 }, t, "done"))
+      .toBe('planningSession.now.research:{"n":3}');
+  });
+
   it("planningActivityTrace keeps durable events; passed working verbs drop from history", () => {
     const trace = planningActivityTrace([
       { at: "1", kind: "status", label: "", code: "started" },
@@ -312,7 +326,7 @@ describe("planningActivityLine (live-lane product voice)", () => {
       { at: "4", kind: "research", label: "", count: 3 },
     ], t);
     expect(trace).toEqual([
-      "planningSession.now.started",
+      "planningSession.done.started", // passed → completed wording
       'planningSession.now.research:{"n":3}',
     ]);
   });
@@ -330,6 +344,31 @@ describe("planningActivityLine (live-lane product voice)", () => {
       'planningSession.now.research:{"n":3}',
       'planningSession.now.research:{"n":5}',
       "planningSession.now.webSearch",
+    ]);
+  });
+
+  it("planningActivityTrace speaks only its last row in progress; the rest are history", () => {
+    const trace = planningActivityTrace([
+      { at: "1", kind: "status", label: "", code: "started" },
+      { at: "2", kind: "status", label: "schema", code: "plan_rejected", count: 2 },
+    ], t);
+    expect(trace).toEqual([
+      "planningSession.done.started",
+      'planningSession.now.planRejected:{"n":2}', // still the living step
+    ]);
+  });
+
+  it("planningActivityTrace gives a stopped pass no current row at all", () => {
+    // A pass that ended has nothing in progress, so even its last line is history —
+    // and a working verb left dangling at the end is dropped rather than frozen mid-verb.
+    const trace = planningActivityTrace([
+      { at: "1", kind: "status", label: "", code: "started" },
+      { at: "2", kind: "status", label: "schema", code: "plan_rejected", count: 2 },
+      { at: "3", kind: "tool", label: "", tool: "web.search" },
+    ], t, 6, false);
+    expect(trace).toEqual([
+      "planningSession.done.started",
+      'planningSession.done.planRejected:{"n":2}',
     ]);
   });
 

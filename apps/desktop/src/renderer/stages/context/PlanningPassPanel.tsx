@@ -41,7 +41,8 @@ export function PlanningPassPanel(props: PlanningPassPanelProps) {
     ? "planningPass.readySub"
     : failed ? "planningPass.failedSub" : "planningPass.pausedSub";
 
-  const trace = planningActivityTrace(planningPassActivity(pass), tk, 8);
+  // Not live: nothing is happening now, so every row — including the last — reads as history.
+  const trace = planningActivityTrace(planningPassActivity(pass), tk, 8, false);
   const answered = planningPassAnswered(pass);
 
   return (

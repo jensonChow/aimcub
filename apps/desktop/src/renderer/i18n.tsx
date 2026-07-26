@@ -110,6 +110,12 @@ export const STRINGS = {
   "planningSession.now.planAccepted": { en: "Plan accepted", zh: "方案已通过" },
   "planningSession.now.planRejected": { en: "Tightening the draft (pass {n})", zh: "正在收紧草稿（第 {n} 轮）" },
   "planningSession.now.memory": { en: "Noted something worth remembering", zh: "记下了值得记住的信息" },
+  // Completed forms of the two `now.*` lines that are phrased as work in progress. Every other
+  // line above is already a record of something that happened, so it reads correctly in either
+  // row; these two would claim the brain is still doing it (founder: a finished job should be
+  // "read", not "reading").
+  "planningSession.done.started": { en: "Read the aim and your context", zh: "已读取目标和你的上下文" },
+  "planningSession.done.planRejected": { en: "Tightened the draft (pass {n})", zh: "已收紧草稿（第 {n} 轮）" },
   // A STOPPED pass, read back from the aim. The voice must own what happened without alarm: the
   // app closing is ordinary, and the point of the copy is that nothing was thrown away.
   "planningPass.pausedTitle": { en: "Planning paused", zh: "规划已暂停" },

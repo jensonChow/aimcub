@@ -226,13 +226,26 @@ export function humanizeToolId(tool: string): string {
 }
 
 /**
+ * Where a line sits in the trace: the one step still happening, or a step that is
+ * already history. Tense is derived from this, never hand-written per string — a
+ * history row that said "Reading the aim and your context" under a finished tick
+ * claimed work that had already stopped (founder, 2026-07-26).
+ */
+export type PlanningActivityTense = "now" | "done";
+
+/**
  * One activity item → one localized line, or null when there is nothing sayable.
  * Question, chat, and reject-reason text pass through as content; everything
  * else speaks through i18n keys only.
+ *
+ * `tense` picks the completed wording for a row that has been passed. Most lines
+ * already record something that happened ("Recorded 3 research findings") and read
+ * correctly either way; only `DONE_LINE_KEY` entries change words.
  */
 export function planningActivityLine(
   item: Pick<PlanningSessionActivityItem, "kind" | "label" | "code" | "tool" | "count">,
   t: TranslateFn,
+  tense: PlanningActivityTense = "now",
 ): string | null {
   if (item.kind === "question") {
     return item.label.trim() ? t("planningSession.now.askedYou", { q: item.label.trim() }) : null;
@@ -244,6 +257,10 @@ export function planningActivityLine(
     return item.count && item.count > 0 ? t("planningSession.now.research", { n: item.count }) : null;
   }
   if (item.kind === "tool") {
+    // A tool line is a working verb — it describes the moment, and there is no honest
+    // completed form of it. Refusing to render one as history is what makes "Searching
+    // the web" structurally unable to sit under a finished tick.
+    if (tense === "done") return null;
     const human = humanizeToolId(item.tool ?? "");
     if (!human) return null;
     const key = TOOL_LINE_KEY[human];
@@ -253,7 +270,7 @@ export function planningActivityLine(
   }
   switch (item.code) {
     case "started":
-      return t("planningSession.now.started");
+      return t(tense === "done" ? "planningSession.done.started" : "planningSession.now.started");
     case "question_answered":
       return t("planningSession.now.answered");
     case "question_skipped":
@@ -263,7 +280,10 @@ export function planningActivityLine(
     case "plan_accepted":
       return t("planningSession.now.planAccepted");
     case "plan_rejected":
-      return t("planningSession.now.planRejected", { n: item.count ?? 1 });
+      return t(
+        tense === "done" ? "planningSession.done.planRejected" : "planningSession.now.planRejected",
+        { n: item.count ?? 1 },
+      );
     case "memory_proposed":
       return t("planningSession.now.memory");
     default:
@@ -284,31 +304,44 @@ export function planningActivityNow(
 }
 
 /**
- * The live card's thought trace: what the brain has DONE, ending on what it is doing now.
+ * The card's thought trace: what the brain has DONE, ending on what it is doing now.
  * History keeps only durable events (findings recorded, questions, answers, notes, plan
  * beats); transient working verbs (tool activity — "Searching the web", "Researching…")
  * matter only as the CURRENT line and drop out once passed, so the trace never reads
  * "Researching… / … / Researching…". Unsayable rows drop, consecutive duplicates collapse,
  * and the trace caps at `limit` lines.
+ *
+ * Tense follows position, so the words always agree with the tick beside them: only the
+ * last row of a `live` trace speaks in progress, everything above it is history. Pass
+ * `live: false` for a pass that has stopped — it has no current step at all, so no row
+ * may claim one.
  */
 export function planningActivityTrace(
   activity: readonly PlanningSessionActivityItem[],
   t: TranslateFn,
   limit = 6,
+  live = true,
 ): string[] {
-  const lines: string[] = [];
-  let lastSayableTransient: string | null = null;
+  type TraceItem = Pick<PlanningSessionActivityItem, "kind" | "label" | "code" | "tool" | "count">;
+  const history: TraceItem[] = [];
+  const historyLines: string[] = [];
+  let current: TraceItem | null = null;
   for (const item of activity) {
-    const line = planningActivityLine(item, t);
-    if (!line) continue;
     if (item.kind === "tool") {
-      lastSayableTransient = line;
+      // Working verbs never enter history; a stopped trace drops them entirely.
+      if (live && planningActivityLine(item, t)) current = item;
       continue;
     }
-    lastSayableTransient = null;
-    if (lines[lines.length - 1] === line) continue;
-    lines.push(line);
+    const line = planningActivityLine(item, t, "done");
+    if (!line) continue;
+    current = null;
+    if (historyLines[historyLines.length - 1] === line) continue;
+    history.push(item);
+    historyLines.push(line);
   }
-  if (lastSayableTransient) lines.push(lastSayableTransient);
-  return lines.slice(-limit);
+  const rows = current ? [...history, current] : history;
+  return rows.slice(-limit).flatMap((item, index, kept) => {
+    const line = planningActivityLine(item, t, live && index === kept.length - 1 ? "now" : "done");
+    return line ? [line] : [];
+  });
 }
