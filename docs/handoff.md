@@ -1,13 +1,31 @@
 # Aimcub Handoff
 
 Last updated: 2026-07-26
-Branch: `main`, **PUSHED to origin/main at `fccbd582`** (founder authorized: "refresh
-memory, commit, push, merge"). Destination verified before pushing per the push protocol:
-`jensonChow/aimcub`, ADMIN, PRIVATE, default branch `main`, and `origin` matches. No
-separate merge was needed — the work happened directly on `main` and there are no
-unmerged branches.
+Branch: `main`. Everything through `2c0723fb` is **PUSHED to origin/main** (founder
+authorized: "refresh memory, commit, push, merge"); destination verified per the push
+protocol (`jensonChow/aimcub`, ADMIN, PRIVATE, default `main`, `origin` matches). The two
+commits below sit on `main` **UNPUSHED** — no push authorization was given for them.
 
-## What shipped (2026-07-26): planning passes are durable
+## What shipped after that (2026-07-26): the planning lane reads honestly
+
+Two founder observations on the live planning card, from one screenshot.
+
+1. **`df304e49` — a finished step reads as finished.** "Reading the aim and your context"
+   sat under a grey, finished tick while the brain had long moved on. Tense is now derived
+   from the row's POSITION rather than baked into each string: only the last row of a live
+   trace speaks in progress, a tool line refuses to render as history at all, and a stopped
+   pass gets no current row. Rules in `docs/memory/desktop.md`.
+2. **`HEAD` — the user can hand files to a running brain.** Founder asked whether a
+   step for adding local attachments was missing. It was. The capability existed end-to-end
+   but the only way in was Settings → Research → Manage sources: global, shared by every aim,
+   never offered at the moment you want it. "Attach files" now sits beside "Add a note" on the
+   live card (his chosen placement); the global list stays as a standing default that per-aim
+   attachments add to (also his call). The hard part was that the brain's file sandbox is fixed
+   at SPAWN, so a mid-pass attachment cannot work by naming a path — each session now stages
+   into an empty directory granted before spawn, and a resumed pass re-stages from the original
+   paths recorded on it.
+
+## What shipped earlier (2026-07-26): planning passes are durable
 
 Founder report: an aim Aimcub had been planning greeted him the next day with
 "Your move — start planning". The button was honest — the aim really had no plan, no
@@ -54,22 +72,35 @@ That harness is now COMMITTED (`a7fc0e64`) instead of rebuilt from a scratchpad 
 session: `pnpm build && pnpm desktop:harness`. Usage, the debugging entry points, and the
 fixtures that are load-bearing are in `docs/memory/operations.md`.
 
+It gained a `?live` scenario for the RUNNING planning card, which is what verified both
+items above: `http://127.0.0.1:5599/?live` showed the trace reading "Read the aim and your
+context / Recorded 5 research findings / Searching the web", and a real click on "Attach
+files" drove `pickLocalContextFiles` → `attachPlanningFiles` → "You attached pricing.md"
+with `window.__harnessErrors` empty.
+
 ## Open items
 
-1. **NOT VERIFIED LIVE: a real brain continuing a real pass.** Everything above is unit-
+0. **Push authorization for `df304e49` and the attachments commit at `HEAD`.** Both are
+   gated on the founder's word; the rest of `main` is already on origin.
+1. **NOT VERIFIED LIVE: a real brain actually READING an attachment.** Staging, granting,
+   re-staging and every failure path are unit-tested, and the gesture is verified in the
+   real renderer — but no live brain has been handed a file and observed reading it. Fold
+   this into the resume drive below: attach a file mid-pass, watch the trace, then quit and
+   resume and confirm it still has it.
+2. **NOT VERIFIED LIVE: a real brain continuing a real pass.** Everything above is unit-
    and renderer-verified; the resume arg forms were checked against the installed CLIs
    (including how a stale thread id fails), but no real planning run has been quit and
    resumed end-to-end. This is the founder's next drive: create an aim → quit mid-
    planning → reopen → Resume → confirm nothing already answered is asked again.
-2. Two commit messages (`e7da6a63`, `1054f694`) quote Chinese, which the English-only
+3. Two commit messages (`e7da6a63`, `1054f694`) quote Chinese, which the English-only
    non-negotiable covers. Now pushed, so a rewrite is no longer free — founder's call
    whether to leave them.
-3. Founder `claude /login` → first Claude-brain live smoke (Codex is the live-verified path).
-4. Settings → Brain effort/reasoning control (proposed follow-up).
-5. Online linked-source connectors actually reading content.
-6. `docs/local-agent-adapters.md` predates planning sessions entirely — it documents
+4. Founder `claude /login` → first Claude-brain live smoke (Codex is the live-verified path).
+5. Settings → Brain effort/reasoning control (proposed follow-up).
+6. Online linked-source connectors actually reading content.
+7. `docs/local-agent-adapters.md` predates planning sessions entirely — it documents
    `buildInvocation`/`parseLine` but not the optional `buildPlanningSessionInvocation`
    capability or its new `resumeSessionId`. A third-party adapter author would not know
    the planning path exists. Worth a section before the OSS flip.
-7. OSS launch checklist (license → npm org → repo settings → gitleaks → public flip) —
+8. OSS launch checklist (license → npm org → repo settings → gitleaks → public flip) —
    founder-owned, unchanged.

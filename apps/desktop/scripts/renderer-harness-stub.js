@@ -32,7 +32,7 @@
   const calls = [];
   window.__harnessCalls = calls;
 
-  // Scenario flags, so a reload can pick a state: ?nopass, ?planready.
+  // Scenario flags, so a reload can pick a state: ?nopass, ?planready, ?live.
   const flags = new URLSearchParams(location.search);
   window.__harnessFlags = Object.fromEntries([...flags.keys()].map((key) => [key, true]));
 
@@ -92,6 +92,26 @@
       { at: "2026-07-25T14:26:00.000Z", kind: "user_message", text: "iOS first, no web app", delivered: true },
     ],
     landing: null,
+  };
+
+  /** A session with a brain still working on it (`?live`), mid-trace. */
+  let liveSession = {
+    goalId: GOAL_ID,
+    agentId: "codex",
+    model: "gpt-5.6-sol",
+    active: true,
+    phase: "researching",
+    pendingQuestion: null,
+    questionsAsked: 1,
+    researchFindingCount: 5,
+    researchGapCount: 1,
+    activity: [
+      { at: "2026-07-26T08:04:00.000Z", kind: "status", code: "started", label: "" },
+      { at: "2026-07-26T08:06:00.000Z", kind: "research", label: "", count: 5 },
+      { at: "2026-07-26T08:08:00.000Z", kind: "tool", label: "", tool: "web.search" },
+    ],
+    landing: null,
+    failure: null,
   };
 
   let passLive = !flags.has("nopass");
@@ -191,7 +211,7 @@
     getAppInfo: () => ({ version: "0.0.0-harness", workspacePath: "~/.aimcub" }),
     listAimProgressSummaries: () => [{ goal_id: GOAL_ID, total: 0, completed: 0, blocked: 0, running: 0, status: "planning" }],
 
-    getPlanningSessionState: () => null,
+    getPlanningSessionState: () => (flags.has("live") ? liveSession : null),
     getPlanningPass: () => currentPass(),
     discardPlanningPass: () => {
       passLive = false;
@@ -199,6 +219,18 @@
     startPlanningSession: () => {
       // No brain to spawn in a harness; the renderer's fallback path is what gets exercised.
       throw new Error("harness: no planning brain");
+    },
+    // `?live` drives the running card: the note lane, the attach control, the thought trace.
+    pickLocalContextFiles: () => ({ canceled: false, paths: ["/Users/harness/notes/pricing.md"] }),
+    attachPlanningFiles: () => {
+      liveSession = {
+        ...liveSession,
+        activity: [
+          ...liveSession.activity,
+          { at: "2026-07-26T08:12:00.000Z", kind: "status", code: "files_attached", label: "pricing.md", count: 1 },
+        ],
+      };
+      return liveSession;
     },
   };
 

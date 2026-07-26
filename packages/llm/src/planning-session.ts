@@ -897,6 +897,11 @@ export interface PlanningPassProvenance {
   resumedCount?: number;
   /** The runtime's own session/thread id, so a later resume can reopen that conversation. */
   runtimeSessionId?: string;
+  /**
+   * Files the user attached, by their original location. The session machine never sees these —
+   * staging them is platform I/O — but the pass has to carry them or a resume loses them.
+   */
+  attachments?: readonly { path: string; name?: string; at?: string }[];
   bounds?: Partial<PlanningPassBounds>;
 }
 
@@ -944,6 +949,12 @@ export function planningSessionDraftState(
     resumed_count: provenance.resumedCount ?? 0,
     runtime_session_id: provenance.runtimeSessionId ?? "",
     truncated: false,
+    // Never bounded away either: these are few, tiny, and the user's own contribution.
+    attachments: (provenance.attachments ?? []).map((file) => ({
+      path: file.path,
+      name: file.name ?? "",
+      at: file.at ?? "",
+    })),
     // Never bounded away: a finished plan is what the user is one click from adopting.
     draft_plan: outcome?.plan ?? null,
     transcript: snapshot.transcript.map((entry) => ({ ...entry })),

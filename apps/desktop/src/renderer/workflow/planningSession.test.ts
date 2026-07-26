@@ -287,6 +287,19 @@ describe("planningActivityLine (live-lane product voice)", () => {
       .toBe('planningSession.now.research:{"n":3}');
   });
 
+  it("says what happened to files the user handed over, including the ones that never landed", () => {
+    expect(planningActivityLine({ kind: "status", label: "spec.md, notes.md", code: "files_attached", count: 2 }, t))
+      .toBe('planningSession.now.filesAttached:{"files":"spec.md, notes.md"}');
+    // Silence here would leave the user believing the research is grounded in material the brain
+    // never received, so a file that did not make it says so on the lane.
+    expect(planningActivityLine({ kind: "status", label: "huge.bin", code: "file_rejected" }, t))
+      .toBe('planningSession.now.fileRejected:{"file":"huge.bin"}');
+    expect(planningActivityLine({ kind: "status", label: "moved.md", code: "file_lost" }, t))
+      .toBe('planningSession.now.fileLost:{"file":"moved.md"}');
+    // A file row with nothing to name says nothing at all.
+    expect(planningActivityLine({ kind: "status", label: "  ", code: "files_attached", count: 1 }, t)).toBeNull();
+  });
+
   it("passes question and chat content through as content", () => {
     expect(planningActivityLine({ kind: "question", label: "Launch privately?" }, t))
       .toBe('planningSession.now.askedYou:{"q":"Launch privately?"}');

@@ -450,6 +450,18 @@ export const AimDraftPlanningSession = z.object({
   /** True when size bounding dropped the oldest transcript entries or findings. */
   truncated: z.boolean().default(false),
   /**
+   * Files the user handed to this pass, by their ORIGINAL location on disk.
+   *
+   * A session reads attachments from a temp directory that dies with its process, so only the
+   * source path is durable. Recording it here is what lets a resumed pass re-stage the same
+   * material instead of continuing without files the user believes it still has.
+   */
+  attachments: z.array(z.object({
+    path: z.string(),
+    name: z.string().default(""),
+    at: z.string().default(""),
+  })).default([]),
+  /**
    * The plan the brain drafted, once it reached `draft_ready`. Persisted because quitting one
    * click before adopting a finished plan must not throw it away: the plan is the most
    * expensive thing the pass produced, and re-running a brain to regenerate it is not a

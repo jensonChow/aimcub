@@ -172,6 +172,7 @@ const PASS: AimDraftPlanningSession = {
   resumed_count: 0,
   runtime_session_id: "thread-abc",
   truncated: false,
+  attachments: [],
   draft_plan: null,
   transcript: [{ at: "2026-07-24T10:00:00.000Z", kind: "user_message", text: "budget 200", delivered: true }],
   research_findings: [{ summary: "finding", source_urls: ["https://a.example"] }],

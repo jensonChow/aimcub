@@ -70,6 +70,7 @@ import {
   type PlanningLiveSummary,
   type PlanningAgentDetection,
   type PlanningSessionAnswerRequest,
+  type PlanningSessionAttachRequest,
   type PlanningSessionChatRequest,
   type PlanningPassRequest,
   type PlanningSessionRef,
@@ -112,6 +113,7 @@ import {
 } from "./run-queue";
 import {
   answerPlanningQuestion,
+  attachPlanningFiles,
   cancelPlanningSession,
   discardPlanningPass,
   finishPlanningNow,
@@ -1010,6 +1012,7 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.discardPlanningPass, (_e, req: PlanningSessionRef) => discardPlanningPass(req.goalId));
   ipcMain.handle(IPC.answerPlanningQuestion, (_e, req: PlanningSessionAnswerRequest) => answerPlanningQuestion(req));
   ipcMain.handle(IPC.postPlanningChat, (_e, req: PlanningSessionChatRequest) => postPlanningChat(req.goalId, req.text));
+  ipcMain.handle(IPC.attachPlanningFiles, (_e, req: PlanningSessionAttachRequest) => attachPlanningFiles(req.goalId, req.paths));
   ipcMain.handle(IPC.finishPlanningNow, (_e, req: PlanningSessionRef) => finishPlanningNow(req.goalId));
   ipcMain.handle(IPC.cancelPlanningSession, (_e, req: PlanningSessionRef) => {
     cancelPlanningSession(req.goalId);

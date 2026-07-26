@@ -503,6 +503,12 @@ export interface PlanningSessionChatRequest {
   text: string;
 }
 
+/** Local files the user hands to a running planning brain, by absolute path. */
+export interface PlanningSessionAttachRequest {
+  goalId: string;
+  paths: string[];
+}
+
 export interface PlanningSessionRef {
   goalId: string;
 }
@@ -536,10 +542,16 @@ export interface PlanningSessionActivityItem {
     | "draft_now"
     | "plan_accepted"
     | "plan_rejected"
-    | "memory_proposed";
+    | "memory_proposed"
+    /** Files reached the brain; `label` names them, `count` says how many. */
+    | "files_attached"
+    /** A picked file could not be staged (unreadable, a folder, too large). `label` is its name. */
+    | "file_rejected"
+    /** A resumed pass could not re-stage a file the user attached earlier; it has since moved. */
+    | "file_lost";
   /** Tool id as reported by the runtime (e.g. "web.search", "mcp__aimcub__report_research"). */
   tool?: string;
-  /** Count hint: research findings recorded, or plan repair attempt. */
+  /** Count hint: research findings recorded, plan repair attempt, or files attached. */
   count?: number;
 }
 
@@ -719,6 +731,7 @@ export interface AimcubApi {
   discardPlanningPass(req: PlanningSessionRef): Promise<void>;
   answerPlanningQuestion(req: PlanningSessionAnswerRequest): Promise<PlanningSessionStateView>;
   postPlanningChat(req: PlanningSessionChatRequest): Promise<PlanningSessionStateView>;
+  attachPlanningFiles(req: PlanningSessionAttachRequest): Promise<PlanningSessionStateView>;
   finishPlanningNow(req: PlanningSessionRef): Promise<PlanningSessionStateView>;
   cancelPlanningSession(req: PlanningSessionRef): Promise<void>;
   onWindowChromeState(handler: (state: WindowChromeState) => void): () => void;
@@ -793,6 +806,7 @@ export const IPC = {
   discardPlanningPass: "aimcub:discardPlanningPass",
   answerPlanningQuestion: "aimcub:answerPlanningQuestion",
   postPlanningChat: "aimcub:postPlanningChat",
+  attachPlanningFiles: "aimcub:attachPlanningFiles",
   finishPlanningNow: "aimcub:finishPlanningNow",
   cancelPlanningSession: "aimcub:cancelPlanningSession",
   planningSessionEvent: "aimcub:planningSessionEvent",

@@ -7,14 +7,19 @@
  * fake brain and assert what reaches the store — the coalescing, the hard-boundary flushes, and
  * the quit path — because "the pass survives" is a claim about persisted bytes, not about state.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { LocalAgentDetection, LocalAgentEvent } from "@aimcub/local-agent";
 import type { PlanningSessionEvent, PlanningSessionSnapshot } from "@aimcub/llm";
 import type { AimDraftPlanningSession } from "@aimcub/types";
 
 const savedPasses: { goalId: string; pass: AimDraftPlanningSession | null }[] = [];
-const startRequests: { resume?: unknown }[] = [];
+const startRequests: { resume?: unknown; workspaceRoots?: readonly string[] }[] = [];
+/** Everything the fake brain was told, so an attachment's delivery is observable. */
+const postedMessages: string[] = [];
 let priorPass: AimDraftPlanningSession | null = null;
 let snapshot: PlanningSessionSnapshot;
 let sessionEvent: (event: PlanningSessionEvent) => void = () => undefined;
@@ -86,7 +91,7 @@ vi.mock("@aimcub/local-agent", async (importOriginal) => {
     ...actual,
     planningCapableAgentId: vi.fn(() => "codex"),
     preferredPlanningModel: vi.fn(() => "gpt-5.6-sol"),
-    startEmbeddedPlanningSession: vi.fn(async (request: { resume?: unknown }, options: {
+    startEmbeddedPlanningSession: vi.fn(async (request: { resume?: unknown; workspaceRoots?: readonly string[] }, options: {
       onSessionEvent: (event: PlanningSessionEvent) => void;
       onActivity: (event: LocalAgentEvent) => void;
     }) => {
@@ -96,7 +101,9 @@ vi.mock("@aimcub/local-agent", async (importOriginal) => {
       return {
         session: { snapshot: () => snapshot, state: () => ({ phase: snapshot.phase, pendingQuestion: null }) },
         mcpUrl: "http://127.0.0.1:0",
-        postUserMessage: vi.fn(),
+        postUserMessage: vi.fn((text: string) => {
+          postedMessages.push(text);
+        }),
         requestFinishNow: vi.fn(),
         provideAnswer: vi.fn(() => true),
         cancel: vi.fn(() => {
@@ -124,6 +131,7 @@ function pausedPass(overrides: Partial<AimDraftPlanningSession> = {}): AimDraftP
     resumed_count: 1,
     runtime_session_id: "",
     truncated: false,
+    attachments: [],
     draft_plan: null,
     transcript: [
       { at: "2026-07-25T14:06:00.000Z", kind: "question", question: { id: "q1", question: "谁是你的第一批用户？" } },
@@ -160,6 +168,7 @@ describe("planning-pass checkpointing", () => {
     vi.resetModules();
     savedPasses.length = 0;
     startRequests.length = 0;
+    postedMessages.length = 0;
     priorPass = null;
     snapshot = freshSnapshot();
     canceled = false;
@@ -320,5 +329,125 @@ describe("planning-pass checkpointing", () => {
     await vi.advanceTimersByTimeAsync(3000);
     await settleWrites();
     expect(savedPasses).toHaveLength(0);
+  });
+});
+
+/**
+ * Files the user hands to a running brain.
+ *
+ * The brain's file sandbox is fixed at spawn, so these tests assert the two things that make an
+ * attachment real rather than merely announced: the staging directory is GRANTED before the
+ * process starts, and the pass carries the originals so a resume can re-stage them.
+ */
+describe("planning-session attachments", () => {
+  let source: string;
+
+  beforeEach(() => {
+    vi.useRealTimers();
+    vi.resetModules();
+    savedPasses.length = 0;
+    startRequests.length = 0;
+    postedMessages.length = 0;
+    priorPass = null;
+    snapshot = freshSnapshot();
+    canceled = false;
+    resolveDone = null;
+    source = mkdtempSync(join(tmpdir(), "aimcub-attach-flow-"));
+  });
+
+  afterEach(() => {
+    rmSync(source, { recursive: true, force: true });
+  });
+
+  function sourceFile(name: string, contents = "material"): string {
+    const path = join(source, name);
+    writeFileSync(path, contents);
+    return path;
+  }
+
+  it("grants the staging directory at spawn, before anything is attached", async () => {
+    await start();
+    // Created empty and granted up front: this is the session's only chance to widen the sandbox,
+    // so it cannot wait until the user actually picks a file.
+    const roots = startRequests[0]!.workspaceRoots ?? [];
+    expect(roots).toHaveLength(1);
+    expect(existsSync(roots[0]!)).toBe(true);
+    expect(readdirSync(roots[0]!)).toEqual([]);
+  });
+
+  it("stages the file into that granted directory and tells the brain where it is", async () => {
+    const module = await start();
+    const stage = startRequests[0]!.workspaceRoots![0]!;
+
+    const view = module.attachPlanningFiles(GOAL_ID, [sourceFile("spec.md", "the real contents")]);
+
+    // The brain reads the COPY: naming the user's own path would land outside its sandbox.
+    expect(readFileSync(join(stage, "spec.md"), "utf8")).toBe("the real contents");
+    expect(postedMessages.at(-1)).toContain(join(stage, "spec.md"));
+    expect(view.activity.at(-1)).toMatchObject({ kind: "status", code: "files_attached", label: "spec.md", count: 1 });
+  });
+
+  it("checkpoints the attachment immediately, by original path", async () => {
+    const module = await start();
+    module.attachPlanningFiles(GOAL_ID, [sourceFile("spec.md")]);
+    await settleWrites();
+
+    // The user's own contribution never waits on a coalesce window.
+    expect(savedPasses.at(-1)!.pass?.attachments).toEqual([
+      { path: join(source, "spec.md"), name: "spec.md", at: expect.any(String) },
+    ]);
+  });
+
+  it("re-stages a resumed pass's files, so quitting does not silently strip them", async () => {
+    const original = sourceFile("spec.md", "carried across the restart");
+    priorPass = pausedPass({
+      attachments: [{ path: original, name: "spec.md", at: "2026-07-25T14:20:00.000Z" }],
+    });
+
+    const module = await start();
+    const stage = startRequests[0]!.workspaceRoots![0]!;
+
+    // The previous session's staging directory died with its process; only the original survived.
+    expect(readFileSync(join(stage, "spec.md"), "utf8")).toBe("carried across the restart");
+    // And the resumed brain is told the NEW paths — its briefing points at a directory that is gone.
+    expect(postedMessages.at(-1)).toContain(join(stage, "spec.md"));
+    expect(module.getPlanningSessionState(GOAL_ID)!.activity).toContainEqual(
+      expect.objectContaining({ code: "files_attached", label: "spec.md" }),
+    );
+  });
+
+  it("says so when a resumed pass's file has since moved, instead of planning without it", async () => {
+    priorPass = pausedPass({
+      attachments: [{ path: join(source, "gone.md"), name: "gone.md", at: "2026-07-25T14:20:00.000Z" }],
+    });
+
+    const module = await start();
+
+    expect(module.getPlanningSessionState(GOAL_ID)!.activity).toContainEqual(
+      expect.objectContaining({ code: "file_lost", label: "gone.md" }),
+    );
+    // Nothing was staged, so nothing may claim to be attached.
+    expect(postedMessages).toHaveLength(0);
+  });
+
+  it("reports a file it could not take without losing the rest of the selection", async () => {
+    const module = await start();
+    const view = module.attachPlanningFiles(GOAL_ID, [join(source, "missing.md"), sourceFile("good.md")]);
+
+    const codes = view.activity.map((item) => item.code);
+    expect(codes).toContain("file_rejected");
+    expect(codes).toContain("files_attached");
+    expect(view.activity.find((item) => item.code === "file_rejected")?.label).toBe("missing.md");
+    expect(view.activity.find((item) => item.code === "files_attached")?.label).toBe("good.md");
+  });
+
+  it("removes the staged copies when the session is canceled", async () => {
+    const module = await start();
+    const stage = startRequests[0]!.workspaceRoots![0]!;
+    module.attachPlanningFiles(GOAL_ID, [sourceFile("spec.md")]);
+    expect(existsSync(stage)).toBe(true);
+
+    module.cancelPlanningSession(GOAL_ID);
+    expect(existsSync(stage)).toBe(false);
   });
 });

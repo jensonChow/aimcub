@@ -286,6 +286,13 @@ export function planningActivityLine(
       );
     case "memory_proposed":
       return t("planningSession.now.memory");
+    // File rows carry their own names as content; a row with nothing to name says nothing.
+    case "files_attached":
+      return item.label.trim() ? t("planningSession.now.filesAttached", { files: item.label.trim() }) : null;
+    case "file_rejected":
+      return item.label.trim() ? t("planningSession.now.fileRejected", { file: item.label.trim() }) : null;
+    case "file_lost":
+      return item.label.trim() ? t("planningSession.now.fileLost", { file: item.label.trim() }) : null;
     default:
       return null;
   }

@@ -30,7 +30,12 @@ function liveView(overrides: Partial<PlanningSessionStateView> = {}): PlanningSe
   };
 }
 
-function renderPanel(view: PlanningSessionStateView, chatDraft = "") {
+function renderPanel(
+  view: PlanningSessionStateView,
+  chatDraft = "",
+  // `null` means "no picker wired"; a default of `undefined` would be filled in by the default.
+  onAttachFiles: (() => Promise<void>) | null = async () => undefined,
+) {
   return renderToStaticMarkup(
     <I18nProvider>
       <PlanningSessionPanel
@@ -42,6 +47,7 @@ function renderPanel(view: PlanningSessionStateView, chatDraft = "") {
         onSubmitAnswer={noop}
         onChatDraft={noop}
         onChatSend={noop}
+        {...(onAttachFiles ? { onAttachFiles } : {})}
         onFinishNow={noop}
         onCancel={noop}
         onFallback={noop}
@@ -85,6 +91,27 @@ describe("PlanningSessionPanel · live card", () => {
     const html = renderPanel(liveView());
     expect(html).not.toContain("<textarea");
     expect(html).toContain("Add a note");
+  });
+
+  it("offers files beside the note — the same act, at the moment you think 'it should read this'", () => {
+    const html = renderPanel(liveView());
+    expect(html).toContain('data-od-id="planning-session-attach"');
+    expect(html).toContain("Attach files");
+  });
+
+  it("hides the attach control when no picker is wired, rather than offering a dead button", () => {
+    expect(renderPanel(liveView(), "", null)).not.toContain('data-od-id="planning-session-attach"');
+  });
+
+  it("shows what reached the brain and what did not", () => {
+    const html = renderPanel(liveView({
+      activity: [
+        { at: "1", kind: "status", label: "spec.md", code: "files_attached", count: 1 },
+        { at: "2", kind: "status", label: "huge.bin", code: "file_rejected" },
+      ],
+    }));
+    expect(html).toContain("You attached spec.md");
+    expect(html).toContain("Could not attach huge.bin");
   });
 
   it("an unsent draft keeps the note lane open as one integrated composer, no primary pill", () => {

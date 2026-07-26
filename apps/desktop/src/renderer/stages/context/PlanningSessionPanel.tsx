@@ -23,6 +23,8 @@ export interface PlanningSessionPanelProps {
   onSubmitAnswer: () => void;
   onChatDraft: (text: string) => void;
   onChatSend: () => void;
+  /** Hand local files to the running brain. Absent when the platform offers no file picker. */
+  onAttachFiles?: () => Promise<void>;
   onFinishNow: () => void;
   onCancel: () => void;
   onFallback: () => void;
@@ -102,6 +104,8 @@ function PlanningSessionLiveCard(props: PlanningSessionPanelProps) {
   // The note lane is on-demand (founder: the researching screen needs no standing input
   // box). A non-empty draft keeps it open across re-renders and re-mounts.
   const [noteOpen, setNoteOpen] = useState(() => Boolean(props.chatDraft.trim()));
+  // The native picker is modal and slow enough to double-click through; the button owns that wait.
+  const [attaching, setAttaching] = useState(false);
 
   // The thought trace carries what the brain has been doing, ending on the current step;
   // counts appear only once they exist.
@@ -114,6 +118,16 @@ function PlanningSessionLiveCard(props: PlanningSessionPanelProps) {
     if (!props.chatDraft.trim()) return;
     props.onChatSend();
     setNoteOpen(false);
+  }
+
+  async function attachFiles() {
+    if (!props.onAttachFiles || attaching) return;
+    setAttaching(true);
+    try {
+      await props.onAttachFiles();
+    } finally {
+      setAttaching(false);
+    }
   }
 
   // Plain like the question state: the Journey's planning island is the ONE card — a
@@ -190,6 +204,18 @@ function PlanningSessionLiveCard(props: PlanningSessionPanelProps) {
             {t("planningSession.addNote")}
           </Button>
         )}
+        {/* Beside the note, because handing over a file is the same act as telling it something:
+            this is the moment you are watching it research and think "it should read this". */}
+        {props.onAttachFiles ? (
+          <Button
+            variant="ghost"
+            data-od-id="planning-session-attach"
+            disabled={props.disabled || attaching}
+            onClick={() => void attachFiles()}
+          >
+            {t("planningSession.attach")}
+          </Button>
+        ) : null}
         <Button variant="ghost" disabled={props.disabled} onClick={props.onFinishNow}>
           {t("planningSession.finishNow")}
         </Button>

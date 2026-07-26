@@ -86,6 +86,7 @@ export const STRINGS = {
   },
   "planningSession.chatSend": { en: "Send", zh: "发送" },
   "planningSession.addNote": { en: "Add a note", zh: "补充一句" },
+  "planningSession.attach": { en: "Attach files", zh: "添加附件" },
   "planningSession.finishNow": { en: "Draft the plan now", zh: "现在就出方案" },
   "planningSession.cancel": { en: "Stop planning", zh: "停止规划" },
   "planningSession.sendAnswer": { en: "Send answer", zh: "提交回答" },
@@ -110,6 +111,11 @@ export const STRINGS = {
   "planningSession.now.planAccepted": { en: "Plan accepted", zh: "方案已通过" },
   "planningSession.now.planRejected": { en: "Tightening the draft (pass {n})", zh: "正在收紧草稿（第 {n} 轮）" },
   "planningSession.now.memory": { en: "Noted something worth remembering", zh: "记下了值得记住的信息" },
+  "planningSession.now.filesAttached": { en: "You attached {files}", zh: "你添加了附件：{files}" },
+  // A file that never reached the brain says so on the lane. Staying quiet would leave the user
+  // believing the research is grounded in material the brain never received.
+  "planningSession.now.fileRejected": { en: "Could not attach {file}", zh: "无法添加附件：{file}" },
+  "planningSession.now.fileLost": { en: "{file} has moved — it is no longer attached", zh: "{file} 已移动，附件已失效" },
   // Completed forms of the two `now.*` lines that are phrased as work in progress. Every other
   // line above is already a record of something that happened, so it reads correctly in either
   // row; these two would claim the brain is still doing it (founder: a finished job should be

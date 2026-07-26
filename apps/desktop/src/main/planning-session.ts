@@ -10,7 +10,7 @@
  */
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 import { reviewPlan } from "@aimcub/core";
 import {
@@ -51,6 +51,13 @@ import type {
 } from "../shared/ipc";
 import { loadDesktopPreferences } from "./app-settings";
 import { listLocalAgents } from "./local-agents";
+import {
+  attachmentMessage,
+  createAttachmentStage,
+  removeAttachmentStage,
+  stageAttachments,
+  type StagedAttachment,
+} from "./planning-attachments";
 import { aimStore } from "./store";
 import { aimRequiresWebResearch, embeddedWebResearchEnabled, linkedContextSources, localContextRoot } from "./tools";
 
@@ -122,6 +129,13 @@ interface ManagedPlanningSession {
    * after that point keeps it.
    */
   runtimeSessionId: string;
+  /**
+   * The directory this session's attached files are copied into. Created before spawn and granted
+   * through `workspaceRoots`, because the brain's file sandbox cannot be widened afterwards.
+   */
+  attachmentDir: string;
+  /** Everything the user has handed this pass, in the order they handed it over. */
+  attachments: (StagedAttachment & { at: string })[];
   /** Pending coalesced checkpoint, if one is armed. */
   checkpointTimer: NodeJS.Timeout | null;
   /** Serializes this aim's checkpoint writes so two can never interleave. */
@@ -156,6 +170,8 @@ function passFrom(
     stoppedReason,
     resumedCount: managed.resumedCount,
     runtimeSessionId: managed.runtimeSessionId,
+    // Original paths only: the staged copies live in a temp directory that dies with the process.
+    attachments: managed.attachments.map((file) => ({ path: file.originalPath, name: file.name, at: file.at })),
   });
 }
 
@@ -348,6 +364,36 @@ function planningResumeInput(
   };
 }
 
+/**
+ * Copy a resumed pass's attachments into the new session's staging directory.
+ *
+ * Every session stages into a fresh temp directory, so on resume the previous copies are already
+ * gone; only the user's original paths survived, in the pass. Re-staging from them is what keeps
+ * "quitting pauses the pass" true for files as well as for research and answers.
+ *
+ * A source the user has since moved or deleted is REPORTED, never skipped in silence — the pass
+ * would otherwise keep planning against material it no longer has.
+ */
+function restageAttachments(managed: ManagedPlanningSession, priorPass: AimDraftPlanningSession | null): void {
+  const recorded = priorPass?.attachments ?? [];
+  if (recorded.length === 0) return;
+  const result = stageAttachments(managed.attachmentDir, recorded.map((file) => file.path));
+  const at = new Date().toISOString();
+  for (const file of result.staged) managed.attachments.push({ ...file, at });
+  if (result.staged.length > 0) {
+    pushActivity(managed, {
+      at,
+      kind: "status",
+      code: "files_attached",
+      label: result.staged.map((file) => file.name).join(", "),
+      count: result.staged.length,
+    });
+  }
+  for (const failure of result.rejected) {
+    pushActivity(managed, { at, kind: "status", code: "file_lost", label: basename(failure.path) });
+  }
+}
+
 export async function startPlanningSession(req: PlanningSessionStartRequest): Promise<PlanningSessionStateView> {
   const existing = sessions.get(req.goalId);
   if (existing && !existing.settled) return viewOf(existing);
@@ -369,6 +415,9 @@ export async function startPlanningSession(req: PlanningSessionStartRequest): Pr
   const domain = storedGoal?.goal.domain ?? null;
   const workspaceRoot = localContextRoot();
   const cwd = workspaceRoot ?? mkdtempSync(join(tmpdir(), "aimcub-planning-"));
+  // Created empty, BEFORE spawn, because the grant below is the session's last chance to widen
+  // the brain's file sandbox — everything the user attaches later lands in here.
+  const attachmentDir = createAttachmentStage();
 
   // A pass this aim already stopped is CONTINUED, not replaced: it keeps its original start time,
   // its transcript, its answered questions and its research, and only the resume count moves. The
@@ -393,9 +442,15 @@ export async function startPlanningSession(req: PlanningSessionStartRequest): Pr
     startedAt: priorPass?.started_at || new Date().toISOString(),
     resumedCount: priorPass ? priorPass.resumed_count + 1 : 0,
     runtimeSessionId: "",
+    attachmentDir,
+    attachments: [],
     checkpointTimer: null,
     writeChain: Promise.resolve(),
   };
+  // A resumed pass re-stages what the user already handed over: the previous session's staging
+  // directory died with its process, so without this, quitting would silently strip the files
+  // from the pass while its transcript still claimed they were attached.
+  restageAttachments(managed, priorPass);
 
   const model = resolvePlanningSessionModel(
     loadDesktopPreferences().planningModel,
@@ -408,7 +463,7 @@ export async function startPlanningSession(req: PlanningSessionStartRequest): Pr
     aim: { title: req.title, description: req.description, domain },
     memories,
     linkedSources: linkedContextSources(),
-    workspaceRoots: workspaceRoot ? [workspaceRoot] : [],
+    workspaceRoots: workspaceRoot ? [workspaceRoot, attachmentDir] : [attachmentDir],
     webResearch: {
       enabled: embeddedWebResearchEnabled(),
       required: aimRequiresWebResearch({ title: req.title, description: req.description }),
@@ -456,8 +511,16 @@ export async function startPlanningSession(req: PlanningSessionStartRequest): Pr
   managed.handle = handle;
   sessions.set(req.goalId, managed);
 
+  // Re-staged files live at NEW paths, so the resumed brain has to be told where they are; its
+  // briefing was written against a directory that no longer exists.
+  if (managed.attachments.length > 0) {
+    handle.postUserMessage(attachmentMessage(managed.attachmentDir, managed.attachments));
+  }
+
   void handle.done.then((result) => {
     managed.settled = true;
+    // The brain that could read them is gone; the pass keeps the original paths to re-stage from.
+    removeAttachmentStage(managed.attachmentDir);
     if (result.processFailure && !managed.failure && result.snapshot.phase !== "draft_ready") {
       managed.failure = { code: result.processFailure.code, message: result.processFailure.message };
     }
@@ -565,6 +628,41 @@ export function answerPlanningQuestion(req: PlanningSessionAnswerRequest): Plann
   return viewOf(managed);
 }
 
+/**
+ * Hand files to the running brain.
+ *
+ * Staging is what makes this possible mid-pass (see `planning-attachments`); the brain then hears
+ * about them over the ordinary user-message channel, so an attachment lands exactly like a typed
+ * note — delivered on the next turn, or folded into the reply to a question already waiting.
+ *
+ * Rejections are surfaced on the lane rather than thrown: attaching four files and getting an
+ * error because one was a 2 GB disk image would lose the other three.
+ */
+export function attachPlanningFiles(goalId: string, paths: readonly string[]): PlanningSessionStateView {
+  const managed = sessions.get(goalId);
+  if (!managed) throw new Error("No planning session is active for this aim.");
+  const result = stageAttachments(managed.attachmentDir, paths);
+  const at = new Date().toISOString();
+  for (const failure of result.rejected) {
+    pushActivity(managed, { at, kind: "status", code: "file_rejected", label: basename(failure.path) });
+  }
+  if (result.staged.length > 0) {
+    for (const file of result.staged) managed.attachments.push({ ...file, at });
+    managed.handle.postUserMessage(attachmentMessage(managed.attachmentDir, result.staged));
+    pushActivity(managed, {
+      at,
+      kind: "status",
+      code: "files_attached",
+      label: result.staged.map((file) => file.name).join(", "),
+      count: result.staged.length,
+    });
+  }
+  emitView(managed);
+  // The user's own contribution: never risk it to a coalesce window.
+  void flushCheckpoint(managed);
+  return viewOf(managed);
+}
+
 export function postPlanningChat(goalId: string, text: string): PlanningSessionStateView {
   const managed = sessions.get(goalId);
   if (!managed) throw new Error("No planning session is active for this aim.");
@@ -598,6 +696,7 @@ export function cancelPlanningSession(goalId: string): void {
     managed.checkpointTimer = null;
   }
   managed.handle.cancel();
+  removeAttachmentStage(managed.attachmentDir);
   sessions.delete(goalId);
   metadataStash.delete(goalId);
 }

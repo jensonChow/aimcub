@@ -1308,6 +1308,22 @@ function AimOsApp() {
     }
   }
 
+  /**
+   * Hand local files to the running brain. Main stages and reports them, so a canceled picker or
+   * a file it could not take changes nothing here — the returned view already says what happened.
+   */
+  async function attachSessionFiles() {
+    const view = planningSession;
+    if (!view) return;
+    try {
+      const picked = await window.aimcub.pickLocalContextFiles();
+      if (picked.canceled || picked.paths.length === 0) return;
+      applySessionView(await window.aimcub.attachPlanningFiles({ goalId: view.goalId, paths: picked.paths }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   async function finishSessionNow() {
     const view = planningSession;
     if (!view) return;
@@ -1875,6 +1891,7 @@ function AimOsApp() {
       onSubmitAnswer={() => void submitSessionAnswer()}
       onChatDraft={setSessionChatDraft}
       onChatSend={() => void sendSessionChat()}
+      onAttachFiles={attachSessionFiles}
       onFinishNow={() => void finishSessionNow()}
       onCancel={() => void cancelSession()}
       onFallback={() => void sessionFallbackToFunnel()}

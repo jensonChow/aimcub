@@ -71,6 +71,7 @@ const api: AimcubApi = {
   discardPlanningPass: (req) => ipcRenderer.invoke(IPC.discardPlanningPass, req),
   answerPlanningQuestion: (req) => ipcRenderer.invoke(IPC.answerPlanningQuestion, req),
   postPlanningChat: (req) => ipcRenderer.invoke(IPC.postPlanningChat, req),
+  attachPlanningFiles: (req) => ipcRenderer.invoke(IPC.attachPlanningFiles, req),
   finishPlanningNow: (req) => ipcRenderer.invoke(IPC.finishPlanningNow, req),
   cancelPlanningSession: (req) => ipcRenderer.invoke(IPC.cancelPlanningSession, req),
   onPlanningLiveEvent: (handler) => {
