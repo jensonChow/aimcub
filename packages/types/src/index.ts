@@ -441,6 +441,12 @@ export const AimDraftPlanningSession = z.object({
   stopped_reason: z.string().default(""),
   /** How many times this pass was resumed after being stopped. */
   resumed_count: z.number().int().nonnegative().default(0),
+  /**
+   * The RUNTIME's own session/thread id (Claude `session_id`, Codex `thread_id`), so a resume can
+   * reopen the brain's own conversation instead of only replaying Aimcub's reconstruction of it.
+   * The process is gone either way; this restores its memory of the work.
+   */
+  runtime_session_id: z.string().default(""),
   /** True when size bounding dropped the oldest transcript entries or findings. */
   truncated: z.boolean().default(false),
   /**

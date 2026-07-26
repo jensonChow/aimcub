@@ -54,6 +54,10 @@ function encodeClaudeUserTurn(text: string): string {
  */
 function buildClaudePlanningInvocation(request: PlanningSessionInvocationRequest): LocalAgentInvocation {
   const args = ["-p", "--output-format", "stream-json", "--input-format", "stream-json", "--verbose"];
+  // Resuming a stopped pass: `--resume` restores the brain's own conversation (it requires
+  // `--print`, which `-p` above already supplies). Every permission flag below still applies —
+  // a resumed session is not a more trusted one.
+  if (request.resumeSessionId?.trim()) args.push("--resume", request.resumeSessionId.trim());
   if (request.model && request.model !== "default") args.push("--model", request.model);
   if (request.reasoning && request.reasoning !== "default") args.push("--effort", request.reasoning);
   for (const dir of request.extraAllowedDirs ?? []) {

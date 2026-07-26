@@ -206,6 +206,15 @@ export interface PlanningSessionConfig {
   now?: () => Date;
   /** Deterministic id source for tests; defaults to `ask_1`, `ask_2`, … */
   idFactory?: () => string;
+  /**
+   * History from a pass this session RESUMES: the transcript is carried forward so the pass
+   * accumulates instead of restarting, and `questionsAsked` continues counting — a resumed pass
+   * does not get a fresh question budget to spend on the user.
+   */
+  resume?: {
+    transcript: readonly PlanningSessionTranscriptEntry[];
+    questionsAsked: number;
+  };
 }
 
 /** What the host must do with one tool call. */
@@ -227,6 +236,16 @@ export interface PlanningSessionSnapshot {
 
 function cleanText(value: unknown): string {
   return typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
+}
+
+/**
+ * Question text folded to its comparable core: lowercase, no whitespace, no punctuation. Latin and
+ * CJK both survive (CJK carries no spaces of its own, so whitespace removal is safe).
+ */
+function foldQuestion(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[\s\p{P}\p{S}]+/gu, "");
 }
 
 function cleanMultiline(value: unknown): string {
@@ -364,6 +383,36 @@ export class PlanningSession {
   constructor(private readonly config: PlanningSessionConfig) {
     this.budgets = { ...DEFAULT_PLANNING_SESSION_BUDGETS, ...config.budgets };
     this.searchMemoryHandler = config.searchMemory ?? defaultMemorySearch(config.memories ?? []);
+    if (config.resume) this.adoptResumedHistory(config.resume);
+  }
+
+  /**
+   * Carry a stopped pass's history into this session, so a resume continues one pass rather than
+   * starting a second. The transcript, the research log and the answered questions are all
+   * restored — the answers matter most: `ask_user` dedupes against them, which is the mechanism
+   * that stops a resumed brain from asking the user something they already answered.
+   */
+  private adoptResumedHistory(resume: NonNullable<PlanningSessionConfig["resume"]>): void {
+    for (const entry of resume.transcript) {
+      this.transcript.push(entry);
+      if (entry.kind === "research") {
+        this.research.findings.push(...entry.findings);
+        this.research.gaps.push(...entry.gaps);
+        this.researchReports += 1;
+      }
+      if (entry.kind === "memory_candidate") this.memoryCandidates.push(entry.candidate);
+    }
+    // Pair restored questions with their answers, same rule as `restorePlanningPass`: an
+    // unanswered question is not an answer.
+    const questions = new Map<string, PlanningSessionQuestion>();
+    for (const entry of resume.transcript) {
+      if (entry.kind === "question") questions.set(entry.question.id, entry.question);
+      if (entry.kind !== "answer") continue;
+      const question = questions.get(entry.request_id);
+      if (question) this.answers.push({ question, answer: entry.answer });
+    }
+    // A resumed pass does not get a fresh budget to spend on the user.
+    this.questionsAsked = Math.max(0, Math.trunc(resume.questionsAsked));
   }
 
   // ── Host surface ──────────────────────────────────────────────────────────
@@ -503,6 +552,18 @@ export class PlanningSession {
 
   // ── Tool handlers ─────────────────────────────────────────────────────────
 
+  /**
+   * An answered question that means the same thing as `questionText`, or null. The comparison is
+   * deliberately shallow — case, spacing and punctuation folded away — because it must never
+   * REJECT a genuinely new question: a false match would silence a question the plan needs, which
+   * is worse than letting one near-duplicate through.
+   */
+  private findAnswered(questionText: string): PlanningSessionQnA | null {
+    const needle = foldQuestion(questionText);
+    if (!needle) return null;
+    return this.answers.find((row) => foldQuestion(row.question.question) === needle) ?? null;
+  }
+
   private handleAskUser(row: Record<string, unknown>): PlanningSessionToolDisposition {
     if (this.pendingQuestion) {
       return this.reply({ asked: false, reason: "another_question_pending" });
@@ -525,6 +586,21 @@ export class PlanningSession {
     const questionText = cleanText(row.question);
     if (!questionText) {
       return this.reply({ asked: false, reason: "invalid_question", guidance: "Provide one non-empty question." });
+    }
+    // Already answered ⇒ refuse and hand the answer straight back. The mission prompt also tells a
+    // resumed brain not to re-ask, but an instruction is a request; this is the guarantee. Asking
+    // twice is the one failure that tells a user their earlier answers were thrown away.
+    const answered = this.findAnswered(questionText);
+    if (answered) {
+      const picked = answered.answer.selected_labels.filter((label) => label.trim());
+      const other = answered.answer.other_text?.trim();
+      return this.reply({
+        asked: false,
+        reason: "already_answered",
+        question: answered.question.question,
+        answer: { selected_labels: picked, other_text: other || null },
+        guidance: "The user already answered this. Use the answer above and move on to something it does not settle.",
+      });
     }
     const options = uniqueOptions(row.options);
     const selection = decideChoiceSelection({
@@ -819,6 +895,8 @@ export interface PlanningPassProvenance {
   /** "" (still live) | `app_quit` | `failed` | `canceled` | `landed`. */
   stoppedReason?: string;
   resumedCount?: number;
+  /** The runtime's own session/thread id, so a later resume can reopen that conversation. */
+  runtimeSessionId?: string;
   bounds?: Partial<PlanningPassBounds>;
 }
 
@@ -864,6 +942,7 @@ export function planningSessionDraftState(
     started_at: provenance.startedAt || iso,
     stopped_reason: provenance.stoppedReason ?? "",
     resumed_count: provenance.resumedCount ?? 0,
+    runtime_session_id: provenance.runtimeSessionId ?? "",
     truncated: false,
     // Never bounded away: a finished plan is what the user is one click from adopting.
     draft_plan: outcome?.plan ?? null,
@@ -909,17 +988,7 @@ export function restorePlanningPass(
   const parsed = DecompositionOutput.safeParse(pass.draft_plan);
   if (!parsed.success) return null;
   const plan = parsed.data;
-  const research: PlanningSessionResearchLog = {
-    findings: pass.research_findings.flatMap((row) => {
-      const summary = cleanText(row.summary);
-      if (!summary) return [];
-      const urls = Array.isArray(row.source_urls) ? row.source_urls.filter((url): url is string => typeof url === "string") : [];
-      const lane = cleanText(row.lane);
-      return [{ summary, source_urls: urls, ...(lane ? { lane } : {}) }];
-    }),
-    gaps: pass.research_gaps.filter((gap) => Boolean(cleanText(gap))),
-    summary: pass.research_summary,
-  };
+  const research = planningPassResearch(pass);
   return {
     plan,
     // Judged exactly as the live session judged it (`submitPlan` passes plan + memories and no
@@ -930,7 +999,7 @@ export function restorePlanningPass(
       default_value: assumption.default_value,
     })),
     openQuestions: [...pass.open_questions],
-    answers: restoreTranscriptAnswers(pass.transcript),
+    answers: planningPassAnswers(pass),
     research,
     memoryCandidates: pass.memory_candidates.flatMap((candidate) => {
       const content = cleanText(candidate.content);
@@ -942,6 +1011,38 @@ export function restorePlanningPass(
       }];
     }),
   };
+}
+
+/**
+ * The pass's research log, rebuilt from disk. Independent of whether a plan was ever drafted — a
+ * pass that stopped mid-research still has findings worth not repeating.
+ */
+export function planningPassResearch(pass: AimDraftPlanningSession): PlanningSessionResearchLog {
+  return {
+    findings: pass.research_findings.flatMap((row) => {
+      const summary = cleanText(row.summary);
+      if (!summary) return [];
+      const urls = Array.isArray(row.source_urls)
+        ? row.source_urls.filter((url): url is string => typeof url === "string")
+        : [];
+      const lane = cleanText(row.lane);
+      return [{ summary, source_urls: urls, ...(lane ? { lane } : {}) }];
+    }),
+    gaps: pass.research_gaps.filter((gap) => Boolean(cleanText(gap))),
+    summary: pass.research_summary,
+  };
+}
+
+/**
+ * The questions this pass actually got answered, paired back up from the transcript.
+ *
+ * Deliberately NOT gated on the pass having drafted a plan: the most common stopped pass is one
+ * interrupted mid-interview, and its answers are exactly what a resumed brain must be handed so it
+ * does not ask again. (`restorePlanningPass` is about adopting a finished PLAN, which is a
+ * different question and correctly returns nothing when there is no plan.)
+ */
+export function planningPassAnswers(pass: AimDraftPlanningSession): PlanningSessionQnA[] {
+  return restoreTranscriptAnswers(pass.transcript);
 }
 
 /**

@@ -445,6 +445,81 @@ describe("planning session · surface", () => {
     expect(prompt).toContain("submit_plan");
   });
 
+  it("briefs a resumed brain with what the earlier pass settled", () => {
+    const prompt = buildPlanningSessionPrompt({
+      aim: { title: "我想做一个塔罗的AI产品" },
+      webResearch: { enabled: true, required: false },
+      priorPass: {
+        answers: [{
+          question: {
+            id: "q1",
+            question: "谁是你的第一批用户？",
+            kind: "scope",
+            why_high_impact: "",
+            allow_other: true,
+            selection_mode: "single",
+            selection_mode_reason: "mutually_exclusive",
+            capture_scope: "current_aim",
+            options: [],
+          },
+          answer: { selected_labels: ["小红书上的塔罗爱好者"], other_text: null },
+        }],
+        research: {
+          findings: [{ summary: "Tarot apps cluster around daily-draw retention", source_urls: ["https://a.example"] }],
+          gaps: ["pricing unknown"],
+          summary: "Two lanes covered.",
+        },
+        assumptions: [{ statement: "English-only launch", default_value: "en" }],
+        openQuestions: ["Pricing?"],
+        notes: ["先做 iOS，别做网页"],
+        planDrafted: false,
+        truncated: false,
+      },
+    });
+
+    expect(prompt).toContain("You are resuming an unfinished pass");
+    expect(prompt).toContain("CONTINUES it");
+    // The user's own answer, verbatim, under an instruction that cannot be misread.
+    expect(prompt).toContain("NEVER ask these again");
+    expect(prompt).toContain("谁是你的第一批用户？");
+    expect(prompt).toContain("小红书上的塔罗爱好者");
+    // Research already done, gaps to pick up at, and mid-pass instructions that still bind.
+    expect(prompt).toContain("do not redo it");
+    expect(prompt).toContain("Tarot apps cluster around daily-draw retention");
+    expect(prompt).toContain("pricing unknown");
+    expect(prompt).toContain("先做 iOS，别做网页");
+    expect(prompt).toContain("English-only launch");
+    // The briefing lands before the research/question doctrine it modifies.
+    expect(prompt.indexOf("resuming an unfinished pass")).toBeLessThan(prompt.indexOf("## How to research"));
+
+    // A pass that already drafted a plan is refined, not restarted.
+    const drafted = buildPlanningSessionPrompt({
+      aim: { title: "x" },
+      webResearch: { enabled: false, required: false },
+      priorPass: {
+        answers: [],
+        research: { findings: [], gaps: [], summary: "" },
+        assumptions: [],
+        openQuestions: [],
+        notes: [],
+        planDrafted: true,
+        truncated: true,
+      },
+    });
+    expect(drafted).toContain("refine and resubmit, do not start over");
+    expect(drafted).toContain("this record is partial");
+    expect(drafted).toContain("(no questions were answered before the pass stopped)");
+  });
+
+  it("omits the resume briefing entirely for a first pass", () => {
+    const prompt = buildPlanningSessionPrompt({
+      aim: { title: "x" },
+      webResearch: { enabled: false, required: false },
+    });
+    expect(prompt).not.toContain("resuming an unfinished pass");
+    expect(prompt).not.toContain("NEVER ask these again");
+  });
+
   it("states the aim's domain only when actually known", () => {
     const known = buildPlanningSessionPrompt({
       aim: { title: "Ship the beta", domain: "software" },
@@ -615,6 +690,78 @@ describe("planning session · surface", () => {
       transcript: [{ kind: "question" }, { kind: "answer", request_id: "missing" }, { kind: "???" }],
     };
     expect(restorePlanningPass(tampered as never)).toBeNull();
+  });
+
+  it("resumes a pass: history carried, and an answered question can no longer be re-asked", async () => {
+    // Pass one: the user answers a question, research is recorded, then the app "closes".
+    const first = makeSession({ memories: [] });
+    const asked = await first.session.handleToolCall("ask_user", {
+      question: "谁是你的第一批用户？",
+      why_high_impact: "It sets the whole scope.",
+      options: [{ label: "小红书上的塔罗爱好者", tradeoff: "" }],
+    });
+    const requestId = asked.kind === "pending_user" ? asked.requestId : "";
+    first.session.provideAnswer(requestId, { selected_labels: ["小红书上的塔罗爱好者"], other_text: null });
+    await expectReply(first.session.handleToolCall("report_research", {
+      findings: [{ summary: "Finding A", source_urls: ["https://a.example"] }],
+      gaps: ["pricing unknown"],
+    }));
+
+    const { planningSessionDraftState, createPlanningSession } = await import("./planning-session");
+    const pass = planningSessionDraftState(first.session.snapshot(), "codex", new Date("2026-07-26T09:00:00.000Z"), {
+      stoppedReason: "app_quit",
+    });
+
+    // Pass two resumes it, exactly as main does: transcript + questions-asked carried across.
+    const resumed = createPlanningSession({
+      aim: { title: "我想做一个塔罗的AI产品" },
+      memories: [],
+      resume: {
+        transcript: JSON.parse(JSON.stringify(pass.transcript)),
+        questionsAsked: 1,
+      },
+    });
+
+    // The pass continues rather than restarting: prior history is present from the first breath.
+    const snapshot = resumed.snapshot();
+    expect(snapshot.questionsAsked).toBe(1);
+    expect(snapshot.transcript.map((entry) => entry.kind)).toEqual(["question", "answer", "research"]);
+
+    // Asking the same thing again is REFUSED, and the answer is handed straight back.
+    const again = await expectReply(resumed.handleToolCall("ask_user", {
+      question: "谁是你的第一批用户？",
+      why_high_impact: "I forgot.",
+      options: [],
+    }));
+    expect(again.asked).toBe(false);
+    expect(again.reason).toBe("already_answered");
+    expect(again.answer).toEqual({ selected_labels: ["小红书上的塔罗爱好者"], other_text: null });
+
+    // Punctuation, case and spacing differences do not sneak a re-ask through.
+    const reworded = await expectReply(resumed.handleToolCall("ask_user", {
+      question: "  谁是你的第一批用户  ？ ",
+      why_high_impact: "I really forgot.",
+      options: [],
+    }));
+    expect(reworded.reason).toBe("already_answered");
+
+    // A genuinely NEW question still gets through — the guard must not silence the plan.
+    const fresh = await resumed.handleToolCall("ask_user", {
+      question: "你的预算是多少？",
+      why_high_impact: "Budget shapes the whole build.",
+      options: [{ label: "Under 200", tradeoff: "tight" }, { label: "Over 200", tradeoff: "roomy" }],
+    });
+    expect(fresh.kind).toBe("pending_user");
+    // And it counts against the pass's remaining budget, not a fresh one.
+    expect(resumed.snapshot().questionsAsked).toBe(2);
+
+    // Research from the earlier pass is part of this session's log, so it need not be redone.
+    const finalPass = planningSessionDraftState(resumed.snapshot(), "codex", new Date("2026-07-26T10:00:00.000Z"), {
+      resumedCount: 1,
+    });
+    expect(finalPass.research_findings).toEqual([{ summary: "Finding A", source_urls: ["https://a.example"] }]);
+    expect(finalPass.research_gaps).toEqual(["pricing unknown"]);
+    expect(finalPass.resumed_count).toBe(1);
   });
 
   it("bounds an oversized pass oldest-first and declares the trim", async () => {

@@ -14,7 +14,10 @@ import type { ContextLinkedSource } from "./tool-contract";
 import {
   DEFAULT_PLANNING_SESSION_BUDGETS,
   type PlanningSessionAim,
+  type PlanningSessionAssumption,
   type PlanningSessionBudgets,
+  type PlanningSessionQnA,
+  type PlanningSessionResearchFinding,
 } from "./planning-session";
 
 export interface PlanningSessionPromptInput {
@@ -25,6 +28,104 @@ export interface PlanningSessionPromptInput {
   workspaceRoots?: readonly string[];
   webResearch: { enabled: boolean; required: boolean };
   budgets?: Partial<PlanningSessionBudgets>;
+  /**
+   * A pass on this aim that stopped before finishing (almost always because the app was closed).
+   * Present ⇒ this session RESUMES that pass, and the prompt hands back what it already
+   * established so the user is never asked the same thing twice.
+   */
+  priorPass?: PlanningPassBriefing;
+}
+
+/** What a resumed brain is told about the pass it is continuing. */
+export interface PlanningPassBriefing {
+  /** Questions already answered, with the user's own words. */
+  answers: readonly PlanningSessionQnA[];
+  research: { findings: readonly PlanningSessionResearchFinding[]; gaps: readonly string[]; summary?: string };
+  assumptions: readonly PlanningSessionAssumption[];
+  openQuestions: readonly string[];
+  /** Free-text the user sent mid-pass (temporary chat), which shaped the work. */
+  notes: readonly string[];
+  /** True when a plan was already drafted and is being refined rather than started. */
+  planDrafted: boolean;
+  /** Size bounding dropped some history; say so instead of implying completeness. */
+  truncated: boolean;
+}
+
+/** Bounds so a long pass cannot crowd the aim, the context, or the rules out of the prompt. */
+const BRIEFING_LIMITS = {
+  findings: 40,
+  gaps: 15,
+  notes: 10,
+  openQuestions: 10,
+} as const;
+
+function renderAnsweredQuestions(answers: readonly PlanningSessionQnA[]): string {
+  if (answers.length === 0) return "- (no questions were answered before the pass stopped)";
+  return answers
+    .map((row) => {
+      const picked = row.answer.selected_labels.filter((label) => label.trim());
+      const other = row.answer.other_text?.trim();
+      const reply = [picked.join(" + "), other].filter(Boolean).join(" — ") || "(skipped)";
+      return `- Q: ${row.question.question}\n  A: ${reply}`;
+    })
+    .join("\n");
+}
+
+function renderPriorPass(pass: PlanningPassBriefing): string {
+  const lines: string[] = [];
+  lines.push(
+    pass.planDrafted
+      ? "You already drafted a plan for this aim in an earlier pass; this session continues that work — refine and resubmit, do not start over."
+      : "An earlier pass on this aim stopped before it finished. This session CONTINUES it — you are not starting from nothing.",
+  );
+  if (pass.truncated) {
+    lines.push("Only the most recent part of that pass survived size limits, so this record is partial.");
+  }
+  lines.push("");
+  lines.push("### Already answered by the user — NEVER ask these again");
+  lines.push(renderAnsweredQuestions(pass.answers));
+  const findings = pass.research.findings.slice(0, BRIEFING_LIMITS.findings);
+  if (findings.length > 0) {
+    lines.push("");
+    lines.push("### Research already recorded — do not redo it");
+    lines.push(...findings.map((finding) => {
+      const urls = finding.source_urls.filter((url) => url.trim()).join(" ");
+      return `- ${finding.summary}${urls ? ` [${urls}]` : ""}`;
+    }));
+  }
+  const summary = (pass.research.summary ?? "").trim();
+  if (summary) {
+    lines.push("");
+    lines.push(`### Research summary so far\n${summary}`);
+  }
+  const gaps = pass.research.gaps.slice(0, BRIEFING_LIMITS.gaps);
+  if (gaps.length > 0) {
+    lines.push("");
+    lines.push("### Known gaps — where this pass was heading next");
+    lines.push(...gaps.map((gap) => `- ${gap}`));
+  }
+  const notes = pass.notes.slice(-BRIEFING_LIMITS.notes);
+  if (notes.length > 0) {
+    lines.push("");
+    lines.push("### What the user said mid-pass (still binding)");
+    lines.push(...notes.map((note) => `- ${note}`));
+  }
+  if (pass.assumptions.length > 0) {
+    lines.push("");
+    lines.push("### Assumptions already disclosed");
+    lines.push(...pass.assumptions.map((row) => `- ${row.statement} (default: ${row.default_value || "unstated"})`));
+  }
+  const open = pass.openQuestions.slice(0, BRIEFING_LIMITS.openQuestions);
+  if (open.length > 0) {
+    lines.push("");
+    lines.push("### Still open");
+    lines.push(...open.map((question) => `- ${question}`));
+  }
+  lines.push("");
+  lines.push("Continue from here: pick up at the gaps and open questions above. Re-asking something the");
+  lines.push("user already answered is the worst thing you can do in this session — it tells them their");
+  lines.push("earlier answers were thrown away. The question budget below counts what was already asked.");
+  return lines.join("\n");
 }
 
 function renderLinkedSources(sources: readonly ContextLinkedSource[] | undefined): string {
@@ -84,6 +185,9 @@ export function buildPlanningSessionPrompt(input: PlanningSessionPromptInput): s
     "## What Aimcub already knows (durable context from prior aims)",
     renderPlanningContext(input.memories),
     "",
+    // Placed BEFORE the research and question doctrine: a resumed brain must know what is already
+    // settled before it reads instructions about what to research and ask.
+    ...(input.priorPass ? ["## You are resuming an unfinished pass", renderPriorPass(input.priorPass), ""] : []),
     "## Linked context sources",
     renderLinkedSources(input.linkedSources),
     "",

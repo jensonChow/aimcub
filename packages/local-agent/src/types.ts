@@ -178,6 +178,18 @@ export interface PlanningSessionInvocationRequest {
   /** Directories the brain may read for local context research. */
   extraAllowedDirs?: string[];
   mcp: PlanningSessionMcpConfig;
+  /**
+   * The runtime's OWN session/thread id from an earlier pass on this aim. When set, the adapter
+   * should resume that thread so the brain regains its own reasoning history rather than only the
+   * briefing Aimcub reconstructs for it. The child process itself is long gone — this restores the
+   * conversation, not the process.
+   *
+   * An adapter that cannot resume may ignore this: the session then starts fresh but still carries
+   * the prior-pass briefing in its prompt, so no answered question is asked twice. The permission
+   * contract still binds — a resumed invocation must map `sandbox`/`network` exactly as a fresh one
+   * does, whatever flag form the resume path requires.
+   */
+  resumeSessionId?: string;
 }
 
 /**

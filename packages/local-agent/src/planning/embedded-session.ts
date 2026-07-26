@@ -29,6 +29,7 @@ import {
   type PlanningSessionConfig,
   type PlanningSessionEvent,
   type PlanningSessionFailure,
+  type PlanningPassBriefing,
   type PlanningSessionOutcome,
   type PlanningSessionSnapshot,
 } from "@aimcub/llm";
@@ -112,6 +113,18 @@ export interface EmbeddedPlanningSessionRequest {
   searchMemory?: PlanningSessionConfig["searchMemory"];
   /** Active-thinking budget; the clock pauses while a question waits on the user. */
   activeTimeoutMs?: number;
+  /**
+   * Resume an unfinished pass on this aim rather than starting a new one. Both halves matter:
+   * `history` carries the pass's transcript into the session machine (so the pass accumulates and
+   * answered questions can no longer be re-asked), and `runtimeSessionId` asks the runtime to
+   * resume its OWN thread so the brain regains its reasoning history too. A runtime that cannot
+   * resume degrades to a fresh thread that still holds the briefing.
+   */
+  resume?: {
+    history: NonNullable<PlanningSessionConfig["resume"]>;
+    briefing?: PlanningPassBriefing;
+    runtimeSessionId?: string;
+  };
 }
 
 export interface EmbeddedPlanningSessionOptions {
@@ -254,6 +267,7 @@ export async function startEmbeddedPlanningSession(
     memories: request.memories,
     budgets: request.budgets,
     searchMemory: request.searchMemory,
+    ...(request.resume ? { resume: request.resume.history } : {}),
     onEvent: (event) => {
       if (event.type === "phase_changed") {
         if (event.phase === "waiting_user") pauseActiveClock();
@@ -280,6 +294,7 @@ export async function startEmbeddedPlanningSession(
     workspaceRoots: request.workspaceRoots,
     webResearch: request.webResearch,
     budgets: request.budgets,
+    ...(request.resume?.briefing ? { priorPass: request.resume.briefing } : {}),
   });
 
   const invocation = buildInvocation({
@@ -290,6 +305,9 @@ export async function startEmbeddedPlanningSession(
     network: request.webResearch.enabled,
     extraAllowedDirs: [...(request.workspaceRoots ?? [])],
     mcp: { serverName: bridge.serverName, url: bridge.url, authToken: bridge.authToken },
+    ...(request.resume?.runtimeSessionId?.trim()
+      ? { resumeSessionId: request.resume.runtimeSessionId.trim() }
+      : {}),
   });
 
   const spawned = runner.spawn(executable, invocation.args, {

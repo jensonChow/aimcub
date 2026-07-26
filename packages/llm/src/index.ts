@@ -286,6 +286,8 @@ export {
   DEFAULT_PLANNING_SESSION_BUDGETS,
   PlanningSession,
   createPlanningSession,
+  planningPassAnswers,
+  planningPassResearch,
   planningSessionDraftState,
   restorePlanningPass,
 } from "./planning-session";
@@ -326,7 +328,7 @@ export type {
   PlanningSessionToolName,
 } from "./planning-session-tools";
 export { buildPlanningSessionPrompt } from "./planning-session-prompt";
-export type { PlanningSessionPromptInput } from "./planning-session-prompt";
+export type { PlanningPassBriefing, PlanningSessionPromptInput } from "./planning-session-prompt";
 
 // Clarifying-questions step (the planning "feedback step").
 export {

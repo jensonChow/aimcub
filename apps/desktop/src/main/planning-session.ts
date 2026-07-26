@@ -14,6 +14,8 @@ import { join } from "node:path";
 
 import { reviewPlan } from "@aimcub/core";
 import {
+  planningPassAnswers,
+  planningPassResearch,
   planningSessionDraftState,
   restorePlanningPass,
   selectPlanningContextForStore,
@@ -23,6 +25,7 @@ import {
   type PlanningSessionEvent,
   type PlanningSessionQnA,
   type PlanningSessionSnapshot,
+  type PlanningSessionTranscriptEntry,
 } from "@aimcub/llm";
 import type { AimDraftPlanningSession } from "@aimcub/types";
 import {
@@ -109,6 +112,16 @@ interface ManagedPlanningSession {
   startedAt: string;
   /** How many times this pass has been resumed after stopping. */
   resumedCount: number;
+  /**
+   * The runtime's own session/thread id, learned from `agent.run.started`.
+   *
+   * Deliberately NOT seeded from the prior pass, which makes a stale id self-healing: if a resumed
+   * thread cannot be reopened the runtime never announces one, so the checkpoint written at settle
+   * carries no id and the next attempt starts a clean thread with the briefing instead of retrying
+   * an id that will fail again. An id that IS announced proves the thread was found, so a failure
+   * after that point keeps it.
+   */
+  runtimeSessionId: string;
   /** Pending coalesced checkpoint, if one is armed. */
   checkpointTimer: NodeJS.Timeout | null;
   /** Serializes this aim's checkpoint writes so two can never interleave. */
@@ -142,6 +155,7 @@ function passFrom(
     startedAt: managed.startedAt,
     stoppedReason,
     resumedCount: managed.resumedCount,
+    runtimeSessionId: managed.runtimeSessionId,
   });
 }
 
@@ -291,6 +305,49 @@ function summarizeActivityEvent(event: LocalAgentEvent): PlanningSessionActivity
   return null;
 }
 
+/**
+ * Build the resume input for a pass this aim already stopped: the pass's own history (transcript,
+ * answered questions, research) plus a briefing for the brain, and — only when the SAME runtime is
+ * about to run it — that runtime's thread id, so the brain reopens its own conversation.
+ *
+ * A thread id from a different brain is meaningless to this one (a Codex thread means nothing to
+ * Claude), so it is dropped rather than passed and rejected.
+ *
+ * A pass with no history at all is not a resume: returning null lets the session start clean rather
+ * than carrying an empty briefing that claims prior work.
+ */
+function planningResumeInput(
+  pass: AimDraftPlanningSession | null,
+  agentId: LocalAgentId,
+): NonNullable<Parameters<typeof startEmbeddedPlanningSession>[0]["resume"]> | null {
+  if (!pass) return null;
+  // Q&A and research are read with the plan-INDEPENDENT helpers: the usual stopped pass was
+  // interrupted mid-interview and has no plan, yet its answers are the whole point of a briefing.
+  const research = planningPassResearch(pass);
+  const answers = planningPassAnswers(pass);
+  const transcript = pass.transcript as unknown as PlanningSessionTranscriptEntry[];
+  const notes = pass.transcript
+    .filter((entry) => entry.kind === "user_message" || entry.kind === "note")
+    .map((entry) => (typeof entry.text === "string" ? entry.text.trim() : ""))
+    .filter(Boolean);
+  const questionsAsked = pass.transcript.filter((entry) => entry.kind === "question").length;
+  if (transcript.length === 0 && pass.research_findings.length === 0 && !pass.draft_plan) return null;
+  const sameBrain = pass.agent_id === agentId && Boolean(pass.runtime_session_id.trim());
+  return {
+    history: { transcript, questionsAsked },
+    briefing: {
+      answers,
+      research,
+      assumptions: pass.assumptions,
+      openQuestions: pass.open_questions,
+      notes,
+      planDrafted: Boolean(pass.draft_plan),
+      truncated: pass.truncated,
+    },
+    ...(sameBrain ? { runtimeSessionId: pass.runtime_session_id.trim() } : {}),
+  };
+}
+
 export async function startPlanningSession(req: PlanningSessionStartRequest): Promise<PlanningSessionStateView> {
   const existing = sessions.get(req.goalId);
   if (existing && !existing.settled) return viewOf(existing);
@@ -313,11 +370,11 @@ export async function startPlanningSession(req: PlanningSessionStartRequest): Pr
   const workspaceRoot = localContextRoot();
   const cwd = workspaceRoot ?? mkdtempSync(join(tmpdir(), "aimcub-planning-"));
 
-  // A pass this aim already stopped keeps its identity: the resumed session continues the
-  // same pass (original start time, incremented resume count) rather than presenting itself
-  // as the first attempt. Feeding the prior transcript BACK to the brain is separate work;
-  // until then a resume is honest about being a fresh attempt at the same pass.
+  // A pass this aim already stopped is CONTINUED, not replaced: it keeps its original start time,
+  // its transcript, its answered questions and its research, and only the resume count moves. The
+  // resume is built below from both halves — the pass's own history and the runtime's thread id.
   const priorPass = await aimStore.getPlanningPass(req.goalId);
+  const resume = planningResumeInput(priorPass, agentId);
   const managed: ManagedPlanningSession = {
     goalId: req.goalId,
     agentId,
@@ -325,14 +382,17 @@ export async function startPlanningSession(req: PlanningSessionStartRequest): Pr
     handle: null as unknown as EmbeddedPlanningSessionHandle,
     memories,
     activity: [],
-    questionsAsked: 0,
-    researchFindingCount: 0,
-    researchGapCount: 0,
+    // Continuing a pass means continuing its counters, so the live surface and the question budget
+    // both reflect the whole pass rather than restarting at zero.
+    questionsAsked: resume?.history.questionsAsked ?? 0,
+    researchFindingCount: priorPass?.research_findings.length ?? 0,
+    researchGapCount: priorPass?.research_gaps.length ?? 0,
     landing: null,
     failure: null,
     settled: false,
     startedAt: priorPass?.started_at || new Date().toISOString(),
     resumedCount: priorPass ? priorPass.resumed_count + 1 : 0,
+    runtimeSessionId: "",
     checkpointTimer: null,
     writeChain: Promise.resolve(),
   };
@@ -355,6 +415,7 @@ export async function startPlanningSession(req: PlanningSessionStartRequest): Pr
     },
     cwd,
     ...(model ? { model } : {}),
+    ...(resume ? { resume } : {}),
   }, {
     onSessionEvent: (event) => {
       if (event.type === "question_asked") managed.questionsAsked += 1;
@@ -379,6 +440,12 @@ export async function startPlanningSession(req: PlanningSessionStartRequest): Pr
       else scheduleCheckpoint(managed);
     },
     onActivity: (event) => {
+      // The runtime announces its own session/thread id when it starts. Recording it is what makes
+      // a later resume able to reopen the brain's conversation rather than only replay a briefing.
+      if (event.type === "agent.run.started" && event.sessionId?.trim()) {
+        managed.runtimeSessionId = event.sessionId.trim();
+        void flushCheckpoint(managed);
+      }
       const item = summarizeActivityEvent(event);
       if (!item) return;
       pushActivity(managed, item);

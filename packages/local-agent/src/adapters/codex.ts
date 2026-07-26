@@ -94,16 +94,26 @@ function quoteConfigString(value: string): string {
  * chat reaches the brain on the next projected-tool reply.
  */
 function buildCodexPlanningInvocation(request: PlanningSessionInvocationRequest): LocalAgentInvocation {
+  const resumeId = request.resumeSessionId?.trim();
   const args = [
     ...(request.network ? ["--search"] : []),
     "exec",
+    ...(resumeId ? ["resume"] : []),
     "--json",
     "--skip-git-repo-check",
-    ...codexSandboxArgs("read-only", false),
-    "-C", request.cwd,
   ];
-  for (const dir of request.extraAllowedDirs ?? []) {
-    if (dir.trim()) args.push("--add-dir", dir.trim());
+  if (resumeId) {
+    // `codex exec resume` accepts neither `--sandbox`, `-C`, nor `--add-dir`. The sandbox therefore
+    // travels as a config override — the SAME read-only policy, spelled differently, because the
+    // permission contract does not relax for a resumed thread. The working root comes from the
+    // spawned process cwd (the engine always sets it), and `--add-dir` is no loss: on Codex it
+    // grants WRITABLE directories, which a read-only planning sandbox never has.
+    args.push("-c", `sandbox_mode=${quoteConfigString("read-only")}`);
+  } else {
+    args.push(...codexSandboxArgs("read-only", false), "-C", request.cwd);
+    for (const dir of request.extraAllowedDirs ?? []) {
+      if (dir.trim()) args.push("--add-dir", dir.trim());
+    }
   }
   if (request.model && request.model !== "default") args.push("--model", request.model);
   if (request.reasoning && request.reasoning !== "default") {
@@ -113,6 +123,9 @@ function buildCodexPlanningInvocation(request: PlanningSessionInvocationRequest)
   args.push("-c", `mcp_servers.${request.mcp.serverName}.url=${quoteConfigString(bridgeUrl)}`);
   args.push("-c", `mcp_servers.${request.mcp.serverName}.tool_timeout_sec=604800`);
   args.push("-c", `mcp_servers.${request.mcp.serverName}.startup_timeout_sec=20`);
+  // SESSION_ID is positional and must follow the options; the prompt stays on stdin, which
+  // `codex exec resume` reads when no prompt argument is given.
+  if (resumeId) args.push(resumeId);
   return { args, stdin: request.prompt };
 }
 

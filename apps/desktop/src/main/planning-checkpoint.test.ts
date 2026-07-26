@@ -14,6 +14,7 @@ import type { PlanningSessionEvent, PlanningSessionSnapshot } from "@aimcub/llm"
 import type { AimDraftPlanningSession } from "@aimcub/types";
 
 const savedPasses: { goalId: string; pass: AimDraftPlanningSession | null }[] = [];
+const startRequests: { resume?: unknown }[] = [];
 let priorPass: AimDraftPlanningSession | null = null;
 let snapshot: PlanningSessionSnapshot;
 let sessionEvent: (event: PlanningSessionEvent) => void = () => undefined;
@@ -85,10 +86,11 @@ vi.mock("@aimcub/local-agent", async (importOriginal) => {
     ...actual,
     planningCapableAgentId: vi.fn(() => "codex"),
     preferredPlanningModel: vi.fn(() => "gpt-5.6-sol"),
-    startEmbeddedPlanningSession: vi.fn(async (_request: unknown, options: {
+    startEmbeddedPlanningSession: vi.fn(async (request: { resume?: unknown }, options: {
       onSessionEvent: (event: PlanningSessionEvent) => void;
       onActivity: (event: LocalAgentEvent) => void;
     }) => {
+      startRequests.push(request);
       sessionEvent = options.onSessionEvent;
       activityEvent = options.onActivity;
       return {
@@ -110,6 +112,34 @@ vi.mock("@aimcub/local-agent", async (importOriginal) => {
 
 const GOAL_ID = "82e331b1-4ed7-47f5-9a1b-18dd098d265a";
 
+/** A pass that stopped mid-flight with real history on it, as a quit would leave one. */
+function pausedPass(overrides: Partial<AimDraftPlanningSession> = {}): AimDraftPlanningSession {
+  return {
+    agent_id: "codex",
+    phase: "waiting_user",
+    updated_at: "2026-07-25T14:30:00.000Z",
+    model: "gpt-5.6-sol",
+    started_at: "2026-07-25T14:03:09.714Z",
+    stopped_reason: "app_quit",
+    resumed_count: 1,
+    runtime_session_id: "",
+    truncated: false,
+    draft_plan: null,
+    transcript: [
+      { at: "2026-07-25T14:06:00.000Z", kind: "question", question: { id: "q1", question: "谁是你的第一批用户？" } },
+      { at: "2026-07-25T14:12:00.000Z", kind: "answer", request_id: "q1", answer: { selected_labels: ["小红书上的塔罗爱好者"], other_text: null } },
+      { at: "2026-07-25T14:26:00.000Z", kind: "user_message", text: "先做 iOS，别做网页", delivered: true },
+    ],
+    research_findings: [{ summary: "Finding A", source_urls: ["https://a.example"] }],
+    research_gaps: ["pricing unknown"],
+    research_summary: "",
+    assumptions: [],
+    open_questions: [],
+    memory_candidates: [],
+    ...overrides,
+  };
+}
+
 /** Let the checkpoint write-chain (a promise chain, not a timer) settle. */
 async function settleWrites(): Promise<void> {
   await Promise.resolve();
@@ -129,6 +159,7 @@ describe("planning-pass checkpointing", () => {
     vi.useRealTimers();
     vi.resetModules();
     savedPasses.length = 0;
+    startRequests.length = 0;
     priorPass = null;
     snapshot = freshSnapshot();
     canceled = false;
@@ -210,30 +241,74 @@ describe("planning-pass checkpointing", () => {
   });
 
   it("continues a prior pass: original start time kept, resume counted", async () => {
-    priorPass = {
-      agent_id: "codex",
-      phase: "waiting_user",
-      updated_at: "2026-07-25T14:30:00.000Z",
-      model: "gpt-5.6-sol",
-      started_at: "2026-07-25T14:03:09.714Z",
-      stopped_reason: "app_quit",
-      resumed_count: 1,
-      truncated: false,
-      draft_plan: null,
-      transcript: [],
-      research_findings: [],
-      research_gaps: [],
-      research_summary: "",
-      assumptions: [],
-      open_questions: [],
-      memory_candidates: [],
-    };
+    priorPass = pausedPass();
     await start();
     sessionEvent({ type: "phase_changed", phase: "researching" } as PlanningSessionEvent);
     await settleWrites();
 
     expect(savedPasses.at(-1)!.pass?.started_at).toBe("2026-07-25T14:03:09.714Z");
     expect(savedPasses.at(-1)!.pass?.resumed_count).toBe(2);
+  });
+
+  it("resumes with BOTH halves: the pass's history and the runtime's own thread", async () => {
+    priorPass = pausedPass({ runtime_session_id: "thread-7" });
+    await start();
+
+    const resume = startRequests.at(-1)!.resume as {
+      history: { transcript: unknown[]; questionsAsked: number };
+      briefing: { answers: unknown[]; notes: string[]; planDrafted: boolean };
+      runtimeSessionId?: string;
+    };
+    // Half one: the pass's own history, so the session machine can refuse a repeat question.
+    expect(resume.history.transcript).toHaveLength(3);
+    expect(resume.history.questionsAsked).toBe(1);
+    expect(resume.briefing.answers).toHaveLength(1);
+    expect(resume.briefing.notes).toEqual(["先做 iOS，别做网页"]);
+    expect(resume.briefing.planDrafted).toBe(false);
+    // Half two: the runtime reopens its own thread.
+    expect(resume.runtimeSessionId).toBe("thread-7");
+    // Counters continue rather than restarting at zero.
+    const view = await (await import("./planning-session")).getPlanningSessionState(GOAL_ID);
+    expect(view?.questionsAsked).toBe(1);
+    expect(view?.researchFindingCount).toBe(1);
+  });
+
+  it("drops a thread id from a DIFFERENT brain instead of handing it to this one", async () => {
+    // A Codex thread means nothing to Claude; passing it would fail the spawn for no reason.
+    priorPass = pausedPass({ agent_id: "claude", runtime_session_id: "claude-thread-1" });
+    await start();
+
+    const resume = startRequests.at(-1)!.resume as { runtimeSessionId?: string; briefing: unknown };
+    expect(resume.runtimeSessionId).toBeUndefined();
+    // The briefing still goes: continuity of the WORK never depends on the runtime's thread.
+    expect(resume.briefing).toBeTruthy();
+  });
+
+  it("treats an empty pass as no resume at all", async () => {
+    // Checkpointed before the brain achieved anything: there is nothing to continue, and a briefing
+    // would claim prior work that does not exist.
+    priorPass = pausedPass({ transcript: [], research_findings: [], research_gaps: [] });
+    await start();
+    expect(startRequests.at(-1)!.resume).toBeUndefined();
+  });
+
+  it("does not seed the runtime thread id, so a thread that cannot reopen self-heals", async () => {
+    priorPass = pausedPass({ runtime_session_id: "stale-thread" });
+    await start();
+    // The runtime never announced a session (it could not find the thread), so the checkpoint
+    // carries no id and the next attempt starts clean instead of retrying a doomed id.
+    sessionEvent({
+      type: "session_failed",
+      failure: { code: "no_plan_submitted", message: "resume failed", lastErrors: [] },
+    });
+    await settleWrites();
+    expect(savedPasses.at(-1)!.pass?.runtime_session_id).toBe("");
+
+    // When the runtime DOES announce one, the thread was found — so it is kept.
+    savedPasses.length = 0;
+    activityEvent({ type: "agent.run.started", summary: "started", sessionId: "live-thread" } as LocalAgentEvent);
+    await settleWrites();
+    expect(savedPasses.at(-1)!.pass?.runtime_session_id).toBe("live-thread");
   });
 
   it("drops an armed checkpoint when the session is canceled, so a dead pass cannot write back", async () => {
