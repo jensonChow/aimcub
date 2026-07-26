@@ -48,6 +48,10 @@ Adopt, asserting the interview reached `updateGoalPlan`), no-pass, Plan-from-scr
 opening the Journal disclosure to read its rows. Keep doing this: a green suite is not
 evidence a gesture works.
 
+That harness is now COMMITTED (`a7fc0e64`) instead of rebuilt from a scratchpad every
+session: `pnpm build && pnpm desktop:harness`. Usage, the debugging entry points, and the
+fixtures that are load-bearing are in `docs/memory/operations.md`.
+
 ## Open items
 
 1. **NOT VERIFIED LIVE: a real brain continuing a real pass.** Everything above is unit-
