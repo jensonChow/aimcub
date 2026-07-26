@@ -492,17 +492,22 @@ export function getPlanningSessionState(goalId: string): PlanningSessionStateVie
  * review recomputed against the aim's current context), so the plan can be adopted without paying
  * for a brain again. Otherwise the landing is null and the pass is something to resume.
  */
-export async function getPlanningPassView(goalId: string): Promise<PlanningPassStateView | null> {
+export async function getPlanningPassView(
+  goalId: string,
+  withLanding = true,
+): Promise<PlanningPassStateView | null> {
   const pass = await aimStore.getPlanningPass(goalId);
   if (!pass) return null;
-  const stored = await aimStore.getGoal(goalId);
+  // Context selection and the landing rebuild are only worth their cost when the plan could
+  // actually be adopted. A planned aim reads its pass purely for Journal receipts.
+  const stored = withLanding ? await aimStore.getGoal(goalId) : null;
   const memories = stored
     ? (await selectPlanningContextForStore(aimStore, {
       title: stored.goal.title,
       description: stored.goal.description || undefined,
     })).memories
     : [];
-  const restored = restorePlanningPass(pass, memories);
+  const restored = withLanding ? restorePlanningPass(pass, memories) : null;
   return {
     goalId,
     agentId: pass.agent_id,

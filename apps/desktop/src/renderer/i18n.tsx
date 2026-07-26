@@ -1214,6 +1214,17 @@ export const STRINGS = {
   "glass.journal.event.failed": { en: "a run failed", zh: "一次运行失败" },
   "glass.journal.event.cancelled": { en: "a run was cancelled", zh: "一次运行已取消" },
   "glass.journal.event.artifact": { en: "produced an artifact", zh: "产出一个工件" },
+  // Planning-pass receipts. The Journal used to hold nothing about planning at all, even though it
+  // promises every pass leaves a receipt; these rows are the pass's milestones, not its every step.
+  "glass.journal.event.planning.started": { en: "started planning this aim", zh: "开始规划这个目标" },
+  "glass.journal.event.planning.answered": { en: "answered: {q}", zh: "回答了:{q}" },
+  "glass.journal.event.planning.research": {
+    en: "recorded research — findings {findings}, gaps {gaps}",
+    zh: "记录了调研——发现 {findings},缺口 {gaps}",
+  },
+  "glass.journal.event.planning.drafted": { en: "drafted the plan", zh: "起草了方案" },
+  "glass.journal.event.planning.paused": { en: "paused planning when the app closed", zh: "应用关闭时暂停了规划" },
+  "glass.journal.event.planning.failed": { en: "planning stopped early", zh: "规划提前中断" },
   "glass.journey.headerSub": { en: "an aim moves by turns — yours and your agents'", zh: "目标靠一轮轮推进——你和你的 agent 交替出手" },
   "glass.journey.planningSub": {
     en: "Aimcub researches first, and asks only what research can't answer.",

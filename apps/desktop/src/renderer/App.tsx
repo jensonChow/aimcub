@@ -89,7 +89,7 @@ import {
   type AimDraftBuildInput,
   type HydratedAimDraft,
 } from "./workflow/aimDrafts";
-import { planningPassWorthShowing } from "./workflow/planningPass";
+import { planningPassJournal, planningPassWorthShowing } from "./workflow/planningPass";
 import {
   embeddedPlanningAgentId,
   planningBrainMenu,
@@ -1206,9 +1206,9 @@ function AimOsApp() {
       setPlanningPass(null);
       return;
     }
-    // Only a PLAN-LESS aim can be showing a paused pass, and reading one recomputes plan quality —
-    // so a planned aim (which keeps its landed pass in metadata) must not pay for that on every
-    // navigation.
+    // Every aim reads its pass, because a PLANNED aim still owes the Journal the receipts of the
+    // pass that produced its plan. Only a plan-less aim asks for the landing rebuild, which costs a
+    // plan-quality recomputation and would be pure waste where nothing can be adopted.
     const planless = selected?.plan_json === null || selected?.plan_json === undefined;
     let stale = false;
     void window.aimcub.getPlanningSessionState({ goalId }).then(async (view) => {
@@ -1219,11 +1219,7 @@ function AimOsApp() {
         return;
       }
       setPlanningSession(null);
-      if (!planless) {
-        setPlanningPass(null);
-        return;
-      }
-      const pass = await window.aimcub.getPlanningPass({ goalId }).catch(() => null);
+      const pass = await window.aimcub.getPlanningPass({ goalId, withLanding: planless }).catch(() => null);
       if (stale) return;
       setPlanningPass(pass && pass.goalId === goalId ? pass : null);
     }).catch(() => undefined);
@@ -1408,8 +1404,12 @@ function AimOsApp() {
       setPlanningShellId(null);
       resetPlanningForAimUpdate();
       setPlanningSession(null);
-      // The pass has served its purpose: the plan it drafted is now the aim's plan.
-      setPlanningPass(null);
+      // The pass is re-read rather than dropped: the plan it drafted is now the aim's plan, but the
+      // pass is still the Journal's receipt for how that plan came to be. No landing this time —
+      // there is nothing left to adopt.
+      void window.aimcub.getPlanningPass({ goalId: updated.goal.id, withLanding: false })
+        .then((pass) => setPlanningPass(pass && pass.goalId === updated.goal.id ? pass : null))
+        .catch(() => setPlanningPass(null));
       setSessionAnswers({});
       setSessionChatDraft("");
       sessionLandingAppliedRef.current = null;
@@ -1999,6 +1999,7 @@ function AimOsApp() {
         </button>
       ) : undefined}
       onStartResearch={() => void startShellResearch()}
+      planningJournal={planningPass?.goalId === selected.id ? planningPassJournal(planningPass) : undefined}
       pausedPlanning={!isPlanningShell
         && planningPassWorthShowing(planningPass)
         && planningPass.goalId === selected.id ? (

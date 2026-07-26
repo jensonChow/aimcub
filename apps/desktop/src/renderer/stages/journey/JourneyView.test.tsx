@@ -133,6 +133,39 @@ describe("JourneyView", () => {
     expect(html).not.toContain("<details class=\"od-journey-journal\" open");
   });
 
+  it("puts the planning pass's receipts in the journal — the ledger's own promise, finally kept", () => {
+    // The journal reads runs and evidence; planning is neither, so a planning pass used to leave no
+    // receipt at all under a subtitle that promises every pass leaves one.
+    const html = render(progressOf([row({ id: "m1", title: "Ship it", human: true })]), {
+      planningJournal: [
+        { id: "pp:start:g1", at: "2026-07-25T14:03:00.000Z", who: "cub", what: "", detailKey: "planning.started" },
+        {
+          id: "pp:ans:g1:1",
+          at: "2026-07-25T14:12:00.000Z",
+          who: "you",
+          what: "",
+          detailKey: "planning.answered",
+          detailVars: { q: "Who are your first users?" },
+        },
+        {
+          id: "pp:research:g1",
+          at: "2026-07-25T14:20:00.000Z",
+          who: "cub",
+          what: "",
+          detailKey: "planning.research",
+          detailVars: { findings: 12, gaps: 2 },
+        },
+      ],
+    });
+    expect(html).toContain("started planning this aim");
+    // Interpolated vars reach the row (a detailKey alone could not say this).
+    expect(html).toContain("Who are your first users?");
+    expect(html).toContain("findings 12");
+    expect(html).toContain("gaps 2");
+    // Newest-first ordering holds across the merged sources.
+    expect(html.indexOf("findings 12")).toBeLessThan(html.indexOf("started planning this aim"));
+  });
+
   it("surfaces pending context candidates as an inline review band only when they exist", () => {
     const candidate: Memory = {
       id: "c1", owner_id: OWNER, goal_id: "g1", kind: "semantic", category: "preference",

@@ -32,12 +32,19 @@ const LIFECYCLE_EVENT_KEY: Partial<Record<RunEventType, string>> = {
   "artifact.created": "artifact",
 };
 
-/** Newest-first ledger. Entries with no timestamp are dropped (cannot be placed). */
+/**
+ * Newest-first ledger. Entries with no timestamp are dropped (cannot be placed).
+ *
+ * `extra` merges in receipts from sources outside the run/evidence streams — today the planning
+ * pass, which is not a run and so had no receipt at all despite the Journal's own promise that
+ * every pass leaves one.
+ */
 export function buildJourneyJournal(
   progress: AimProgressReadModel,
   runEvents: readonly RunEvent[] = [],
+  extra: readonly JourneyJournalEntry[] = [],
 ): JourneyJournalEntry[] {
-  const entries: JourneyJournalEntry[] = [];
+  const entries: JourneyJournalEntry[] = [...extra];
 
   for (const row of progress.milestones) {
     for (const item of row.evidence) {

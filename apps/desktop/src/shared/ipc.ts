@@ -507,6 +507,16 @@ export interface PlanningSessionRef {
   goalId: string;
 }
 
+export interface PlanningPassRequest {
+  goalId: string;
+  /**
+   * Rebuild the adoptable landing from the pass's drafted plan. Costs a plan-quality recomputation,
+   * so ask only when the plan could actually be adopted — a plan-less aim. A planned aim reads its
+   * pass purely for receipts and passes `false`.
+   */
+  withLanding?: boolean;
+}
+
 /**
  * One compact activity row from the brain, for the live planning surface. Main emits
  * STRUCTURE, never display copy: the renderer maps kind/code/tool to localized
@@ -704,7 +714,7 @@ export interface AimcubApi {
    * (typically an app quit). Null when the aim has never been planned. Read AFTER
    * `getPlanningSessionState` returns null: a live session always outranks its checkpoint.
    */
-  getPlanningPass(req: PlanningSessionRef): Promise<PlanningPassStateView | null>;
+  getPlanningPass(req: PlanningPassRequest): Promise<PlanningPassStateView | null>;
   /** Forget an aim's checkpointed pass, so planning starts genuinely fresh. */
   discardPlanningPass(req: PlanningSessionRef): Promise<void>;
   answerPlanningQuestion(req: PlanningSessionAnswerRequest): Promise<PlanningSessionStateView>;

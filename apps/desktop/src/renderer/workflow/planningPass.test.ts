@@ -4,6 +4,7 @@ import type { PlanningPassStateView } from "../../shared/ipc";
 import {
   planningPassActivity,
   planningPassAnswered,
+  planningPassJournal,
   planningPassOffer,
   planningPassWorthShowing,
 } from "./planningPass";
@@ -115,6 +116,66 @@ describe("planningPassOffer", () => {
         assumptions: [],
       },
     }))).toBe("review_plan");
+  });
+});
+
+describe("planningPassJournal", () => {
+  const withHistory = pass({
+    startedAt: "2026-07-25T14:03:00.000Z",
+    updatedAt: "2026-07-25T14:31:00.000Z",
+    researchFindingCount: 12,
+    researchGapCount: 2,
+    transcript: [
+      { at: "2026-07-25T14:04:00.000Z", kind: "research", findings: [{ summary: "a" }], gaps: [] },
+      { at: "2026-07-25T14:06:00.000Z", kind: "question", question: { id: "q1", question: "Who are your first users?" } },
+      { at: "2026-07-25T14:12:00.000Z", kind: "answer", request_id: "q1", answer: { selected_labels: ["Tarot hobbyists"] } },
+      { at: "2026-07-25T14:20:00.000Z", kind: "question", question: { id: "q2", question: "Never answered?" } },
+    ],
+  });
+
+  it("gives the pass its milestones — start, the user's answers, research, and how it stopped", () => {
+    const rows = planningPassJournal(withHistory);
+    expect(rows.map((row) => row.detailKey)).toEqual([
+      "planning.started",
+      "planning.answered",
+      "planning.research",
+      "planning.paused",
+    ]);
+    // The user's own answer is attributed to THEM, and carries the question it settled.
+    const answer = rows.find((row) => row.detailKey === "planning.answered")!;
+    expect(answer.who).toBe("you");
+    expect(answer.detailVars).toEqual({ q: "Who are your first users?" });
+    expect(answer.at).toBe("2026-07-25T14:12:00.000Z");
+    // A question the user never answered is NOT a receipt: nothing happened.
+    expect(rows.filter((row) => row.detailKey === "planning.answered")).toHaveLength(1);
+    // Research is one aggregate row placed at the last research moment, not one row per finding.
+    const research = rows.find((row) => row.detailKey === "planning.research")!;
+    expect(research.detailVars).toEqual({ findings: 12, gaps: 2 });
+    expect(research.at).toBe("2026-07-25T14:04:00.000Z");
+    // Every row can be placed in time, which is what the ledger sorts on.
+    expect(rows.every((row) => Boolean(row.at))).toBe(true);
+  });
+
+  it("reports a drafted plan, and a failure as a failure", () => {
+    const drafted = planningPassJournal(pass({
+      startedAt: "2026-07-25T14:03:00.000Z",
+      updatedAt: "2026-07-25T14:40:00.000Z",
+      stoppedReason: "",
+      transcript: [{ at: "2026-07-25T14:38:00.000Z", kind: "plan_attempt", attempt: 1, accepted: true, errors: [] }],
+    }));
+    expect(drafted.map((row) => row.detailKey)).toEqual(["planning.started", "planning.drafted"]);
+    expect(drafted[1]!.at).toBe("2026-07-25T14:38:00.000Z");
+
+    const failed = planningPassJournal(pass({ stoppedReason: "failed" }));
+    expect(failed.map((row) => row.detailKey)).toContain("planning.failed");
+    expect(failed.map((row) => row.detailKey)).not.toContain("planning.paused");
+  });
+
+  it("says nothing about a live pass's ending, and nothing at all without a pass", () => {
+    const live = planningPassJournal(pass({ stoppedReason: "" }));
+    expect(live.map((row) => row.detailKey)).not.toContain("planning.paused");
+    expect(live.map((row) => row.detailKey)).not.toContain("planning.failed");
+    expect(planningPassJournal(null)).toEqual([]);
   });
 });
 

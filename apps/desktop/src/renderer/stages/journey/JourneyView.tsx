@@ -24,6 +24,7 @@ import {
   buildJourneyJournal,
   buildJourneyYourMove,
   type JourneyActorKind,
+  type JourneyJournalEntry,
 } from "../../workflow/journey";
 import type { CockpitStage } from "../../workflow/workspaceNavigation";
 import { CompletionRecapPanel } from "../eval/EvalStage";
@@ -200,6 +201,12 @@ export interface JourneyViewProps {
    */
   pausedPlanning?: ReactNode;
   /**
+   * Receipts from the aim's planning pass, merged into the Journal. Supplied for a PLANNED aim too
+   * (not just a paused one): the pass that produced the plan is exactly the receipt the Journal was
+   * missing.
+   */
+  planningJournal?: JourneyJournalEntry[];
+  /**
    * The in-Journey first-plan surface for a shell goal. When present, the Journey hosts the
    * research/clarify/plan-review interaction in place of the Your-move card (never leaving the
    * Journey): the clarify Q&A element while a clarify phase is active, then the generated plan
@@ -320,7 +327,7 @@ export function JourneyView(props: JourneyViewProps) {
 
   const move = buildJourneyYourMove(progress, t);
   const ambient = buildJourneyAmbient(progress);
-  const journal = buildJourneyJournal(progress, props.runEvents ?? []);
+  const journal = buildJourneyJournal(progress, props.runEvents ?? [], props.planningJournal ?? []);
   // The header meta reads as the design's completion percent; the exact fraction stays
   // on the accessible name/tooltip.
   const headMeta = progress.total_milestones > 0
@@ -407,7 +414,7 @@ export function JourneyView(props: JourneyViewProps) {
             <span className="od-journey-journal-time">{formatClock(entry.at)}</span>
             <span className={`od-journey-chip od-journey-chip-${entry.who}`}>{tk(ACTOR_KEY[entry.who])}</span>
             <span className="od-journey-journal-what">
-              {entry.what || (entry.detailKey ? tk(`glass.journal.event.${entry.detailKey}`) : "")}
+              {entry.what || (entry.detailKey ? tk(`glass.journal.event.${entry.detailKey}`, entry.detailVars) : "")}
             </span>
           </div>
         ))

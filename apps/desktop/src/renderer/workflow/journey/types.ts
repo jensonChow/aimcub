@@ -40,4 +40,9 @@ export interface JourneyJournalEntry {
   what: string;
   /** Suffix under the `glass.journal.event.*` namespace, for run-lifecycle rows with no raw summary. */
   detailKey?: string;
+  /**
+   * Interpolation values for `detailKey`. Receipts that carry counts or the user's own question
+   * text need them; raw `what` text stays the escape hatch for anything already user-authored.
+   */
+  detailVars?: Record<string, string | number>;
 }

@@ -12,6 +12,7 @@
  * guessed at, mirroring how unsayable live rows drop instead of leaking raw ids.
  */
 import type { PlanningPassStateView, PlanningSessionActivityItem } from "../../shared/ipc";
+import type { JourneyJournalEntry } from "./journey";
 
 function text(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -93,6 +94,84 @@ export type PlanningPassOffer = "review_plan" | "resume";
 
 export function planningPassOffer(pass: Pick<PlanningPassStateView, "landing">): PlanningPassOffer {
   return pass.landing ? "review_plan" : "resume";
+}
+
+/**
+ * The pass's receipts for the Journal.
+ *
+ * The Journal reads run events and evidence, and planning is neither — so a planning pass left no
+ * receipt at all, in a ledger whose own subtitle promises "every pass leaves a receipt". These rows
+ * close that gap without a new event table: they are derived from the pass already on the aim.
+ *
+ * Milestones only, not every breath. The thought trace on the card is where step-by-step belongs;
+ * a ledger that reprinted forty tool calls would bury the run receipts beside them. What earns a
+ * row: the pass starting, each question the user actually answered (their own contribution, and
+ * attributed to them), the research total, the plan being drafted, and how the pass stopped.
+ */
+export function planningPassJournal(pass: PlanningPassStateView | null): JourneyJournalEntry[] {
+  if (!pass) return [];
+  const rows: JourneyJournalEntry[] = [];
+  if (pass.startedAt) {
+    rows.push({ id: `pp:start:${pass.goalId}`, at: pass.startedAt, who: "cub", what: "", detailKey: "planning.started" });
+  }
+
+  let answered = 0;
+  let lastResearchAt = "";
+  let draftedAt = "";
+  const questions = new Map<string, string>();
+  for (const entry of pass.transcript) {
+    if (entry.kind === "question") {
+      const question = entry.question;
+      const id = text((question as Record<string, unknown> | undefined)?.id);
+      const label = text((question as Record<string, unknown> | undefined)?.question);
+      if (id && label) questions.set(id, label);
+      continue;
+    }
+    if (entry.kind === "answer") {
+      const label = questions.get(text(entry.request_id));
+      if (!label) continue;
+      answered += 1;
+      rows.push({
+        id: `pp:ans:${pass.goalId}:${answered}`,
+        at: at(entry),
+        who: "you",
+        what: "",
+        detailKey: "planning.answered",
+        detailVars: { q: label },
+      });
+      continue;
+    }
+    if (entry.kind === "research") lastResearchAt = at(entry) || lastResearchAt;
+    if (entry.kind === "plan_attempt" && entry.accepted === true) draftedAt = at(entry) || draftedAt;
+  }
+
+  if (pass.researchFindingCount > 0 || pass.researchGapCount > 0) {
+    rows.push({
+      id: `pp:research:${pass.goalId}`,
+      at: lastResearchAt || pass.updatedAt,
+      who: "cub",
+      what: "",
+      detailKey: "planning.research",
+      detailVars: { findings: pass.researchFindingCount, gaps: pass.researchGapCount },
+    });
+  }
+  if (draftedAt || pass.landing) {
+    rows.push({
+      id: `pp:drafted:${pass.goalId}`,
+      at: draftedAt || pass.updatedAt,
+      who: "cub",
+      what: "",
+      detailKey: "planning.drafted",
+    });
+  }
+  // How it ended, only when it actually stopped: a live pass has nothing to report here.
+  const stoppedKey = pass.stoppedReason === "failed"
+    ? "planning.failed"
+    : pass.stoppedReason === "app_quit" ? "planning.paused" : "";
+  if (stoppedKey && pass.updatedAt) {
+    rows.push({ id: `pp:stop:${pass.goalId}`, at: pass.updatedAt, who: "cub", what: "", detailKey: stoppedKey });
+  }
+  return rows;
 }
 
 /**
