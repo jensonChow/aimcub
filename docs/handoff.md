@@ -7,18 +7,27 @@ Branch: `main`, **PUSHED to origin/main through `9a1a1851`** (founder authorized
 all remote branches are 0 commits ahead of `main`). One later commit sits on `main`
 **UNPUSHED**, awaiting authorization.
 
-## What shipped after the push (2026-08-02): no scrollbar anywhere
+## What shipped after the push (2026-08-02): the desk stays clean
 
-Founder, off a screenshot of the plan review: "no scroll bar at all in the whole app."
-Global rule in `cockpit.css`, not per-surface styling: `* { scrollbar-width: none }` (so
-layout never reserves a gutter) plus `::-webkit-scrollbar { display: none }` (so no rail
-paints in any overlay mode). Scrolling itself is untouched. The old thumb styling, its
-`--od-scrollbar-thumb` token (all three theme blocks), and the now-inert
-`scrollbar-gutter` reservations are deleted; an App.test.tsx guard bans all of them from
-returning. Verified in the harness on the exact surface he screenshotted (`?planready` →
-Review the plan): the workspace scroller had 78px of overflow, consumed 0px of gutter,
-and still scrolled (scrollTop 0 → 60). Durable rule recorded in
-`docs/memory/design-system.md` → Layout Rules.
+Two founder screenshots of the plan review, two global rules — both are token/rule-level
+fixes, both recorded as durable rules in `docs/memory/design-system.md`:
+
+1. **No scrollbar anywhere** ("no scroll bar at all in the whole app"). Global in
+   `cockpit.css`: `* { scrollbar-width: none }` (layout never reserves a gutter) plus
+   `::-webkit-scrollbar { display: none }` (no rail paints in any overlay mode). Scrolling
+   itself is untouched. The old thumb styling, its `--od-scrollbar-thumb` token (all three
+   theme blocks), and the now-inert `scrollbar-gutter` reservations are deleted; an
+   App.test.tsx guard bans them from returning. Harness-verified on the exact surface: 78px
+   of overflow, 0px of gutter, still scrolls (Layout Rules).
+2. **Elevation hugs the card** ("unproper shadow which is not clean"). The band under the
+   island was its own `--sh-lg` — `0 10px 28px` at 10% navy is a wide gray smudge under an
+   820px card. Both surface-shadow tokens now carry a negative spread that pulls the
+   silhouette inside the element (`--sh-lg: 0 16px 36px -16px`, `--sh-md: 0 6px 16px -8px`,
+   dark alphas retuned to match), so only soft falloff escapes. A/B'd live in the harness
+   before baking, then re-verified from source in light AND dark on the exact founder crop
+   (island bottom + JOURNAL). A glassTokens.test.ts guard asserts the negative-spread shape
+   in all three theme blocks — values may be retuned, the hug must stay (Radius, Borders,
+   and Elevation). Overrides the imported reference values, like the AA contrast decision.
 
 ## What shipped after that (2026-07-26): the planning lane reads honestly
 

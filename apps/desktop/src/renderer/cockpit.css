@@ -103,8 +103,11 @@
   --warndot: #febc2e;
   --warn: #8a6517;
   --danger: #dc2626;
-  --sh-lg: 0 10px 28px rgba(30, 40, 70, 0.1);
-  --sh-md: 0 3px 12px rgba(30, 40, 70, 0.06);
+  /* Elevation hugs the card: the negative spread pulls the shadow's silhouette inside the
+     element, so only soft falloff escapes — never the wide gray band a plain offset+blur
+     paints under an 820px island (founder, 2026-08-02: "unproper shadow, not clean"). */
+  --sh-lg: 0 16px 36px -16px rgba(30, 40, 70, 0.18);
+  --sh-md: 0 6px 16px -8px rgba(30, 40, 70, 0.1);
   --sh-btn: 0 2px 8px rgba(0, 113, 227, 0.2);
   --dim: rgba(30, 36, 52, 0.38);
 }
@@ -165,8 +168,8 @@
     --warndot: #ffd60a;
     --warn: #e8c25a;
     --danger: #ff453a;
-    --sh-lg: 0 10px 28px rgba(0, 0, 0, 0.25);
-    --sh-md: 0 3px 12px rgba(0, 0, 0, 0.18);
+    --sh-lg: 0 16px 36px -16px rgba(0, 0, 0, 0.45);
+    --sh-md: 0 6px 16px -8px rgba(0, 0, 0, 0.3);
     --sh-btn: 0 2px 8px rgba(64, 156, 255, 0.22);
     --dim: rgba(6, 8, 16, 0.55);
   }
@@ -226,8 +229,8 @@
   --warndot: #ffd60a;
   --warn: #e8c25a;
   --danger: #ff453a;
-  --sh-lg: 0 10px 28px rgba(0, 0, 0, 0.25);
-  --sh-md: 0 3px 12px rgba(0, 0, 0, 0.18);
+  --sh-lg: 0 16px 36px -16px rgba(0, 0, 0, 0.45);
+  --sh-md: 0 6px 16px -8px rgba(0, 0, 0, 0.3);
   --sh-btn: 0 2px 8px rgba(64, 156, 255, 0.22);
   --dim: rgba(6, 8, 16, 0.55);
 }

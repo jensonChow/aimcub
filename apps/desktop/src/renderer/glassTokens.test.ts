@@ -86,4 +86,17 @@ describe("Glass token layer in cockpit.css", () => {
     expect(light["--desk"]).not.toBe(dark["--desk"]);
     expect(light["--ink"]).not.toBe(dark["--ink"]);
   });
+
+  it("keeps elevation hugging the card: every surface shadow carries a negative spread", () => {
+    // Founder 2026-08-02: "unproper shadow, not clean". A plain offset+blur under an 820px
+    // island paints a wide gray band on the desk; the negative spread pulls the shadow's
+    // silhouette inside the element so only soft falloff escapes. Shape, not exact values:
+    // offset/blur/alpha may be retuned, the hug must stay.
+    for (const block of [lightBlock, mediaDarkBlock, hasDarkBlock]) {
+      const declarations = glassDeclarations(block);
+      for (const token of ["--sh-lg", "--sh-md"] as const) {
+        expect(declarations[token], `${token} must declare a negative spread`).toMatch(/-\d+px rgba\(/);
+      }
+    }
+  });
 });

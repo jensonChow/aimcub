@@ -438,6 +438,14 @@ three-size / ≤500-weight policy).
   Active/selected list items change background (translucent `--field`) rather than only text
   color, with no visible border/outline; the only sanctioned selected-shadow is the sidebar row's
   soft `0 1px 3px rgba(30,40,70,.08)` lift from the reference design.
+- **Elevation hugs the card — shadows must never paint a band on the desk** (founder, 2026-08-02:
+  "unproper shadow, not clean", off the plan review's bottom edge). Every surface shadow token
+  (`--sh-lg`, `--sh-md`, in all three theme blocks) carries a **negative spread** roughly equal to
+  its offset (e.g. `0 16px 36px -16px`), which pulls the shadow's silhouette inside the element so
+  only soft falloff escapes; a plain offset+blur under an 820px island reads as a dirty gray smudge
+  on the light gradient desk. This overrides the imported reference's `0 10px 28px` values, like
+  the AA contrast overrides. Offsets/blur/alpha may be retuned, the hug shape must stay (guarded in
+  `glassTokens.test.ts`); don't add per-surface hardcoded shadows — new elevation uses the tokens.
 - Elevation is soft and shallow: `--sh-md` for resting cards, `--sh-lg` on hover/overlays,
   `--sh-btn` for the accent primary. Reserve stronger elevation for overlays, popovers, the
   station sheet, and modal-like layers. Non-primary controls converge on the shared quiet
