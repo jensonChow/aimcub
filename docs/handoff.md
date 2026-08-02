@@ -1,10 +1,11 @@
 # Aimcub Handoff
 
-Last updated: 2026-07-26
-Branch: `main`. Everything through `2c0723fb` is **PUSHED to origin/main** (founder
-authorized: "refresh memory, commit, push, merge"); destination verified per the push
-protocol (`jensonChow/aimcub`, ADMIN, PRIVATE, default `main`, `origin` matches). The two
-commits below sit on `main` **UNPUSHED** — no push authorization was given for them.
+Last updated: 2026-08-02
+Branch: `main`, **PUSHED to origin/main through `44477185`** plus this docs commit
+(founder authorized 2026-08-02: "refresh memory, push, merge"). Destination re-verified
+per the push protocol before pushing: `jensonChow/aimcub`, ADMIN, PRIVATE, default
+branch `main`, and `origin` matches. No merge was needed — all remote branches
+(`codex/*`, `v0-foundation`) are 0 commits ahead of `main`.
 
 ## What shipped after that (2026-07-26): the planning lane reads honestly
 
@@ -15,7 +16,7 @@ Two founder observations on the live planning card, from one screenshot.
    from the row's POSITION rather than baked into each string: only the last row of a live
    trace speaks in progress, a tool line refuses to render as history at all, and a stopped
    pass gets no current row. Rules in `docs/memory/desktop.md`.
-2. **`HEAD` — the user can hand files to a running brain.** Founder asked whether a
+2. **`44477185` — the user can hand files to a running brain.** Founder asked whether a
    step for adding local attachments was missing. It was. The capability existed end-to-end
    but the only way in was Settings → Research → Manage sources: global, shared by every aim,
    never offered at the moment you want it. "Attach files" now sits beside "Add a note" on the
@@ -80,8 +81,6 @@ with `window.__harnessErrors` empty.
 
 ## Open items
 
-0. **Push authorization for `df304e49` and the attachments commit at `HEAD`.** Both are
-   gated on the founder's word; the rest of `main` is already on origin.
 1. **NOT VERIFIED LIVE: a real brain actually READING an attachment.** Staging, granting,
    re-staging and every failure path are unit-tested, and the gesture is verified in the
    real renderer — but no live brain has been handed a file and observed reading it. Fold
