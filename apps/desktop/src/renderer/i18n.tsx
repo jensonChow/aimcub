@@ -6,7 +6,7 @@
  * Keys, code, and comments stay English (per the project rule); only the `zh` VALUES are
  * Chinese, which is inherent to bilingual UI.
  */
-import { createContext, useCallback, useContext, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
 export type Lang = "en" | "zh";
@@ -1444,6 +1444,12 @@ export function useI18n(): I18n {
 
 export function I18nProvider(props: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>(detectLang);
+  // The document must say which language it is actually in: `index.html` ships a static
+  // lang="en", which misreports a zh session to the OS text stack, assistive tech, and CSS —
+  // the `:lang(zh)` typography rules (zh titles at 500, not 600) key off this attribute.
+  useEffect(() => {
+    document.documentElement.lang = lang;
+  }, [lang]);
   const setLang = useCallback((l: Lang) => {
     setLangState(l);
     persistLang(l);

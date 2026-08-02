@@ -393,6 +393,14 @@ three-size / ≤500-weight policy).
   button labels, and quiet emphasis; semibold is for true titles and selected hierarchy; heavy is
   ONLY for the brand "A" marks and ALL-CAPS kicker tags. Avoid heavier-than-600 running text and
   avoid 600+ on Chinese UI text where 500 reads better.
+- **The zh weight rule is structural, not advisory (2026-08-02, founder: 排版布局).** In a zh
+  session the semibold step itself relaxes to 500 via `:root:lang(zh)
+  { --od-font-weight-semibold: 500; }` (`strong` follows through its alias; heavy stays for the
+  Latin-only brand/caps marks), so every title inherits the zh-appropriate weight with no
+  per-surface rules. This requires the document to say its real language: `I18nProvider` stamps
+  `document.documentElement.lang` on every language change (index.html's `lang="en"` is only the
+  boot value). Both halves are guarded in App.test.tsx — do not add per-component zh weight
+  overrides, and do not let a new provider path skip the stamp.
 - **Tracking (tokens):** `--od-ls-title` −0.01em on title/title-m/title-l, `--od-ls-display`
   −0.015em on display/hero, `--od-ls-caps` +0.06em on ALL-CAPS tags (with CSS
   `text-transform: uppercase` so `zh` strings are unaffected). Everything else stays at 0. Do not
@@ -573,6 +581,14 @@ as a working agent, not as a form the user operates.
   drop, duplicates collapse, cap ~6 (`planningActivityTrace`), 160ms entry fade under
   prefers-reduced-motion. The session receipt is plural-proof label-first metadata
   ("Findings 8 · Gaps 4 · Questions 1") on the footer's LEFT, balancing the quiet actions.
+- **Card head and trace typography (2026-08-02, founder: 排版布局).** Trace rows sit at `sub`,
+  not `meta` — on a stopped pass every row is history, so the trace IS the card's content, and
+  question text (often Chinese) at footnote size read as squint material; only the receipt stays
+  meta, and the current row still steps up to body. Head pills always CLUSTER on the right edge:
+  the title element owns the head's free space (`flex: 1 1 auto`), never `space-between`, which
+  scattered a middle pill ("Plan ready") into the card's center detached from the model pill. A
+  head that carries its own sub-line (ready/failed states: badge → title → message) stacks
+  top-to-bottom instead of rowing. All three are guarded in App.test.tsx.
 - **A paused pass must not imitate a working one** (2026-07-26). The stopped-pass card
   (`PlanningPassPanel`) reuses the live card's shape deliberately — same island, same trace, same
   label-first receipt — so returning reads as the same lane at rest. Exactly two things change, and

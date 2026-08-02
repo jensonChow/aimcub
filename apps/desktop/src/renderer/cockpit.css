@@ -112,6 +112,15 @@
   --dim: rgba(30, 36, 52, 0.38);
 }
 
+/* Chinese UI text reads better at 500 than 600+ (the ramp's own note, now structural): in a
+   zh session the semibold step itself relaxes to medium, so every title inherits the right
+   weight with no per-surface rules. `strong` aliases semibold and follows along; heavy (700)
+   stays — it marks only the brand "A" and Latin ALL-CAPS kickers. The app stamps the real
+   language onto <html> from I18nProvider; the static index.html value is just the boot state. */
+:root:lang(zh) {
+  --od-font-weight-semibold: 500;
+}
+
 @media (prefers-color-scheme: dark) {
   /* Yield to an explicit in-app light override so the theme toggle can force light on a dark OS. */
   :root:not(:has(.od-app[data-system-appearance="light"])) {
@@ -2180,10 +2189,12 @@ kbd {
   gap: 12px;
 }
 
+/* The title owns the head's free space, so pills CLUSTER on the right edge no matter how
+   many there are. space-between once scattered a middle pill ("Plan ready") into the card's
+   center, detached from the model pill beside it (founder screenshot, 2026-08-02). */
 .od-planning-session-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   min-width: 0;
 }
@@ -2191,8 +2202,18 @@ kbd {
 .od-planning-session-title {
   display: flex;
   align-items: center;
+  flex: 1 1 auto;
   gap: 10px;
   min-width: 0;
+}
+
+/* A head that carries its own sub-line (the ready/failed states: badge → title → message)
+   stacks top-to-bottom — three unrelated lengths spread across one row was the same
+   scatter as the pill float. */
+.od-planning-session-head:has(> .od-planning-session-sub) {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
 }
 
 .od-planning-session-head h2 {
@@ -2226,8 +2247,11 @@ kbd {
   min-width: 0;
   padding-left: 18px;
   color: var(--faint);
-  font-size: var(--od-type-meta);
-  line-height: var(--od-line-meta);
+  /* Sub, not meta: on a stopped pass every row is history, so the trace IS the card's
+     content — question text (often Chinese) at footnote size read as squint material
+     (founder, 2026-08-02). The current row still steps up to body. */
+  font-size: var(--od-type-sub);
+  line-height: var(--od-line-sub);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -5014,8 +5038,10 @@ kbd {
 }
 
 .od-journey-sub {
-  margin: 2px 0 0;
-  font-size: var(--od-type-meta);
+  /* Sub is the ramp's step for descriptions; meta had this reading as a footnote to its
+     own page title, and 2px of air tied it too tightly to the title above. */
+  margin: 4px 0 0;
+  font-size: var(--od-type-sub);
   color: var(--faint);
 }
 

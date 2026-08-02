@@ -28,6 +28,20 @@ fixes, both recorded as durable rules in `docs/memory/design-system.md`:
    (island bottom + JOURNAL). A glassTokens.test.ts guard asserts the negative-spread shape
    in all three theme blocks — values may be retuned, the hug must stay (Radius, Borders,
    and Elevation). Overrides the imported reference values, like the AA contrast decision.
+3. **Typography/layout pass on the planning card + Journey header** (founder screenshot of
+   his real paused pass: 优化排版布局 — font, size, weight, layout, alignment). Four fixes,
+   all system-level: (a) head pills CLUSTER right — the title owns the head's free space
+   (`flex: 1 1 auto`); `space-between` had floated "Plan ready" detached mid-card; heads
+   that carry a sub-line (ready/failed states) now stack instead of rowing. (b) Trace rows
+   meta → sub: on a stopped pass the trace is the card's content, and zh question text at
+   11.5px was squint material; the current row still steps to body, the receipt stays meta.
+   (c) The document now says its real language — `I18nProvider` stamps
+   `document.documentElement.lang` (index.html's `lang="en"` was permanent before) — which
+   enables (d) `:root:lang(zh) { --od-font-weight-semibold: 500 }`: the ramp's "Chinese
+   reads better at 500" note made structural; verified live (title weight 600 → 500 on
+   switching the document to zh). Journey subtitle also moved meta → sub per the ramp's
+   role table. Guards in App.test.tsx; durable rules in design-system.md (Typography + the
+   live-card contract).
 
 ## What shipped after that (2026-07-26): the planning lane reads honestly
 

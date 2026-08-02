@@ -1915,6 +1915,28 @@ describe("CockpitShell", () => {
     expect(css).toContain("--od-ls-caps: 0.06em;");
   });
 
+  it("speaks the session's real language to the OS and relaxes zh titles to medium", () => {
+    // index.html ships lang="en" as a boot value only; the provider must stamp the live
+    // language, because the zh weight rule (semibold reads as 500 in Chinese — the ramp's
+    // own note, made structural) keys off :lang(zh) and dies silently without it.
+    const i18nSource = readFileSync(new URL("./i18n.tsx", import.meta.url), "utf8");
+    expect(i18nSource).toContain("document.documentElement.lang = lang;");
+    const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
+    expect(css).toMatch(/:root:lang\(zh\)\s*{[^}]*--od-font-weight-semibold:\s*var\(--od-font-weight-medium\)|:root:lang\(zh\)\s*{[^}]*--od-font-weight-semibold:\s*500;/s);
+  });
+
+  it("keeps the planning card's typography at content size and its pills clustered", () => {
+    // Founder 2026-08-02 (排版布局): "Plan ready" floated detached in the card's middle
+    // (space-between with three head children), and the trace — the card's actual content
+    // on a stopped pass — sat at footnote size.
+    const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
+    expect(css).toMatch(/\.od-planning-session-head\s*{[^}]*}/s);
+    expect(css).not.toMatch(/\.od-planning-session-head\s*{[^}]*justify-content:\s*space-between/s);
+    expect(css).toMatch(/\.od-planning-session-title\s*{[^}]*flex:\s*1 1 auto;/s);
+    expect(css).toMatch(/\.od-planning-session-trace li\s*{[^}]*font-size:\s*var\(--od-type-sub\);/s);
+    expect(css).toMatch(/\.od-journey-sub\s*{[^}]*font-size:\s*var\(--od-type-sub\);/s);
+  });
+
   it("keeps sidebar Aim rows compact, single-line, and free of status subtitles", () => {
     const verboseDraftTitle = "Coordinate the entire desktop application layout and ensure every workbench surface shares a coherent alignment system";
     const goalWithSummary: Goal = {
