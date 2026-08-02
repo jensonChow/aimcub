@@ -1937,6 +1937,21 @@ describe("CockpitShell", () => {
     expect(css).toMatch(/\.od-journey-sub\s*{[^}]*font-size:\s*var\(--od-type-sub\);/s);
   });
 
+  it("lets no element fall back to the UA's 700 and keeps the contract card composed", () => {
+    // Founder 2026-08-02, plan-review screenshot: "Execution contracts" and the stat values
+    // rendered UA-bold (700 — a weight the ramp reserves for brand/caps marks) because bare
+    // h2/strong never chose a weight; field labels shouted at semibold; the meta label and
+    // body value in a contract row never shared a baseline; and "Contract details" — a
+    // disclosure — read as a dead label because nothing said it opens.
+    const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
+    expect(css).toMatch(/^h1,\nh2,\nh3,\nh4 {\n {2}font-weight: var\(--od-font-weight-semibold\);\n}/m);
+    expect(css).toMatch(/^strong,\nb {\n {2}font-weight: var\(--od-font-weight-strong\);\n}/m);
+    expect(css).toMatch(/\.od-contract-text-row\s*{[^}]*align-items:\s*baseline;/s);
+    expect(css).toMatch(/\.od-contract-text-row span,[^{]*{[^}]*font-weight:\s*var\(--od-font-weight-medium\);/s);
+    expect(css).toMatch(/\.od-plan-edit-details summary::after,[^{]*{[^}]*border-right:[^}]*rotate\(-45deg\)/s);
+    expect(css).toMatch(/\.od-plan-edit-details\[open\] > summary::after,[^{]*{[^}]*rotate\(45deg\)/s);
+  });
+
   it("keeps sidebar Aim rows compact, single-line, and free of status subtitles", () => {
     const verboseDraftTitle = "Coordinate the entire desktop application layout and ensure every workbench surface shares a coherent alignment system";
     const goalWithSummary: Goal = {

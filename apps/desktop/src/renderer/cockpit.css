@@ -272,6 +272,23 @@ button {
   border: 0;
 }
 
+/* Base weight discipline: nothing falls back to the UA's 700. Headings are semibold and
+   bold runs are the strong token (600; 500 in zh via the :lang relax) — the ramp allows
+   700 only through the explicit heavy token on brand/caps marks. Class rules still win;
+   this only catches elements that never chose a weight and silently rendered heavy
+   ("Execution contracts", the stat values "8" / "warn - 90" — founder, 2026-08-02). */
+h1,
+h2,
+h3,
+h4 {
+  font-weight: var(--od-font-weight-semibold);
+}
+
+strong,
+b {
+  font-weight: var(--od-font-weight-strong);
+}
+
 /* No scrollbar renders anywhere in the app (founder, 2026-08-02): scrolling stays —
    wheel, trackpad, keys, drag all work — only the rail is gone. Both declarations are
    needed: `scrollbar-width` is the standard Chromium honors for layout (no gutter is
@@ -2633,6 +2650,7 @@ kbd {
   color: var(--od-fg);
   font-size: var(--od-type-title);
   line-height: 1.25;
+  font-variant-numeric: tabular-nums;
 }
 
 .od-routing-alert {
@@ -3171,7 +3189,7 @@ kbd {
 .od-plan-contract-selector > span {
   color: var(--od-muted);
   font-size: var(--od-type-meta);
-  font-weight: var(--od-font-weight-strong);
+  font-weight: var(--od-font-weight-medium);
   line-height: 1.35;
 }
 
@@ -3263,7 +3281,7 @@ kbd {
 .od-plan-readonly-title span {
   color: var(--od-muted);
   font-size: var(--od-type-meta);
-  font-weight: var(--od-font-weight-strong);
+  font-weight: var(--od-font-weight-medium);
 }
 
 .od-plan-route-chips {
@@ -3344,6 +3362,35 @@ kbd {
   line-height: var(--od-line-meta);
   font-weight: var(--od-font-weight-medium);
   cursor: pointer;
+  list-style: none;
+}
+
+.od-plan-edit-details summary::-webkit-details-marker,
+.od-plan-routing-details summary::-webkit-details-marker,
+.od-plan-structure-details summary::-webkit-details-marker {
+  display: none;
+}
+
+/* The disclosure says it opens: without a caret, "Contract details" read as a dead label
+   dangling under the card (founder screenshot, 2026-08-02). Quiet chevron, right of the
+   words, turning down when open. */
+.od-plan-edit-details summary::after,
+.od-plan-routing-details summary::after,
+.od-plan-structure-details summary::after {
+  content: "";
+  width: 5px;
+  height: 5px;
+  margin-left: 7px;
+  border-right: 1.5px solid currentcolor;
+  border-bottom: 1.5px solid currentcolor;
+  transform: translateY(-1px) rotate(-45deg);
+  transition: transform 120ms ease;
+}
+
+.od-plan-edit-details[open] > summary::after,
+.od-plan-routing-details[open] > summary::after,
+.od-plan-structure-details[open] > summary::after {
+  transform: translateY(-2px) rotate(45deg);
 }
 
 .od-plan-edit-details summary:hover,
@@ -3486,6 +3533,9 @@ kbd {
   display: grid;
   grid-template-columns: 136px minmax(0, 1fr);
   gap: 12px;
+  /* The meta label and the body value differ two ramp steps; without a shared baseline the
+     label floats above its value's first line and every row reads slightly off-kilter. */
+  align-items: baseline;
   border-bottom: 1px solid var(--od-border-soft);
   padding: 8px 0;
 }
@@ -3499,7 +3549,9 @@ kbd {
 .od-plan-rule-summary span {
   color: var(--od-muted);
   font-size: var(--od-type-meta);
-  font-weight: var(--od-font-weight-strong);
+  /* Field labels are quiet emphasis, not titles: medium, per the ramp's weight roles. At
+     semibold every kicker on the card shouted at the same volume as the real title. */
+  font-weight: var(--od-font-weight-medium);
 }
 
 .od-contract-text-row p,

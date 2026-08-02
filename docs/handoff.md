@@ -42,6 +42,17 @@ fixes, both recorded as durable rules in `docs/memory/design-system.md`:
    switching the document to zh). Journey subtitle also moved meta → sub per the ramp's
    role table. Guards in App.test.tsx; durable rules in design-system.md (Typography + the
    live-card contract).
+4. **Same pass on the plan-review surface** (founder's follow-up screenshot: Execution
+   contracts). Root find: bare `h2`/`strong` fell back to UA-700 — a weight the ramp
+   reserves for brand/caps marks — so "Execution contracts" and the stat values shipped
+   heavier than every deliberate title in the app. New BASE rules pin `h1–h4` to semibold
+   and `strong`/`b` to the strong token (class rules still win; the zh relax flows
+   through). On the contract card: field labels semibold → medium (kickers had the
+   title's volume), label/value rows share a baseline, stat values get tabular-nums, and
+   the three `<details>` summaries ("Contract details" etc.) get a quiet caret — a
+   disclosure with no affordance read as a dead label. All measured from source in the
+   harness (h2/stat 700 → 600, labels 500, baseline, caret transform). Guards in
+   App.test.tsx; rules in design-system.md (Typography + the contract-card bullet).
 
 ## What shipped after that (2026-07-26): the planning lane reads honestly
 

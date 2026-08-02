@@ -393,6 +393,12 @@ three-size / ≤500-weight policy).
   button labels, and quiet emphasis; semibold is for true titles and selected hierarchy; heavy is
   ONLY for the brand "A" marks and ALL-CAPS kicker tags. Avoid heavier-than-600 running text and
   avoid 600+ on Chinese UI text where 500 reads better.
+- **No element may fall back to the UA's 700 (2026-08-02).** Base rules pin bare elements to
+  ramp tokens: `h1–h4` are semibold, `strong`/`b` are the strong token — class rules still win.
+  Before this, any heading or `<strong>` without an explicit weight silently rendered 700 (a
+  weight the ramp reserves for the brand "A" and caps marks): "Execution contracts" and the plan
+  stat values shipped that way. Guarded in App.test.tsx. When adding a new title or bold run,
+  rely on the base rules or a token — never on the element's UA default.
 - **The zh weight rule is structural, not advisory (2026-08-02, founder: 排版布局).** In a zh
   session the semibold step itself relaxes to 500 via `:root:lang(zh)
   { --od-font-weight-semibold: 500; }` (`strong` follows through its alias; heavy stays for the
@@ -598,6 +604,15 @@ as a working agent, not as a form the user operates.
   paused — everything it found is still here"); a closed app is ordinary, not an error. A pass that
   finished a plan leads with the plan ("A plan is waiting for you" + a success pill), never with an
   offer to redo research that already succeeded.
+- **The plan-review contract card reads as a table, not a shout (2026-08-02, founder: 排版布局
+  on the Execution-contracts surface).** Field labels ("Done when", "Sub-aim title", "Current
+  contract", routing-context/rule-summary kickers) are meta + MEDIUM — quiet emphasis, never
+  semibold, which had every kicker shouting at the title's volume. Label and value share a
+  BASELINE (`align-items: baseline` on `od-contract-text-row` — two ramp steps apart, they
+  drift visibly otherwise). Stat values are tabular-nums at semibold (they were UA-700). Every
+  `<details>` summary on the card ("Contract details", routing, structure) carries the quiet
+  caret that turns down when open — a disclosure without an affordance reads as a dead label.
+  Guarded in App.test.tsx.
 - **No standing input on a watching surface** (same feedback: "doesn't need an input box").
   The mid-research note composer is closed at rest and opens from a quiet "Add a note" action
   (Escape closes, send closes, a non-empty draft keeps it open). The interjection CHANNEL
