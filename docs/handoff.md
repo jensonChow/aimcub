@@ -1,13 +1,14 @@
 # Aimcub Handoff
 
 Last updated: 2026-08-02
-Branch: `main`, **PUSHED to origin/main through `9a1a1851`** (founder authorized
-2026-08-02: "refresh memory, push, merge"; destination re-verified per the push protocol:
-`jensonChow/aimcub`, ADMIN, PRIVATE, default `main`, `origin` matches; no merge needed —
-all remote branches are 0 commits ahead of `main`). One later commit sits on `main`
-**UNPUSHED**, awaiting authorization.
+Branch: `main`, **everything PUSHED to origin/main** (founder authorized twice on
+2026-08-02: "refresh memory, push, merge" — the second authorization covered the four
+UI-polish commits `e9ad3aaf`/`dfabb924`/`cce533e9`/`be581c68` plus this docs commit).
+Destination re-verified per the push protocol each time: `jensonChow/aimcub`, ADMIN,
+PRIVATE, default `main`, `origin` matches. No merge needed — every remote branch
+(`codex/*`, `v0-foundation`) is 0 commits ahead of `main`.
 
-## What shipped after the push (2026-08-02): the desk stays clean
+## What shipped 2026-08-02 (afternoon): the desk stays clean
 
 Two founder screenshots of the plan review, two global rules — both are token/rule-level
 fixes, both recorded as durable rules in `docs/memory/design-system.md`:
