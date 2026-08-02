@@ -2207,6 +2207,17 @@ describe("CockpitShell", () => {
     expect(css).toMatch(/\.od-user-menu-anchor,\s*\.od-user-menu-anchor \*,\s*\.od-user-menu-popover,\s*\.od-user-menu-popover \*,\s*\.od-action-menu-anchor,\s*\.od-action-menu-anchor \*\s*{[^}]*app-region:\s*no-drag;[^}]*-webkit-app-region:\s*no-drag;/s);
   });
 
+  it("renders no scrollbar anywhere — scrolling is a gesture, not chrome", () => {
+    // Founder 2026-08-02: no scroll bar at all in the whole app. Both halves are required —
+    // `scrollbar-width: none` stops layout from reserving a gutter, the `::-webkit-scrollbar`
+    // block stops the rail from painting — and no rule may quietly reintroduce either.
+    const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
+    expect(css).toMatch(/^\*\s*{[^}]*scrollbar-width:\s*none;/ms);
+    expect(css).toMatch(/::-webkit-scrollbar\s*{[^}]*display:\s*none;/s);
+    expect(css).not.toMatch(/scrollbar-gutter/);
+    expect(css).not.toMatch(/::-webkit-scrollbar-thumb/);
+  });
+
   it("leaves macOS traffic lights to native window chrome", () => {
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
     const main = readFileSync(new URL("../main/index.ts", import.meta.url), "utf8");

@@ -1,11 +1,24 @@
 # Aimcub Handoff
 
 Last updated: 2026-08-02
-Branch: `main`, **PUSHED to origin/main through `44477185`** plus this docs commit
-(founder authorized 2026-08-02: "refresh memory, push, merge"). Destination re-verified
-per the push protocol before pushing: `jensonChow/aimcub`, ADMIN, PRIVATE, default
-branch `main`, and `origin` matches. No merge was needed — all remote branches
-(`codex/*`, `v0-foundation`) are 0 commits ahead of `main`.
+Branch: `main`, **PUSHED to origin/main through `9a1a1851`** (founder authorized
+2026-08-02: "refresh memory, push, merge"; destination re-verified per the push protocol:
+`jensonChow/aimcub`, ADMIN, PRIVATE, default `main`, `origin` matches; no merge needed —
+all remote branches are 0 commits ahead of `main`). One later commit sits on `main`
+**UNPUSHED**, awaiting authorization.
+
+## What shipped after the push (2026-08-02): no scrollbar anywhere
+
+Founder, off a screenshot of the plan review: "no scroll bar at all in the whole app."
+Global rule in `cockpit.css`, not per-surface styling: `* { scrollbar-width: none }` (so
+layout never reserves a gutter) plus `::-webkit-scrollbar { display: none }` (so no rail
+paints in any overlay mode). Scrolling itself is untouched. The old thumb styling, its
+`--od-scrollbar-thumb` token (all three theme blocks), and the now-inert
+`scrollbar-gutter` reservations are deleted; an App.test.tsx guard bans all of them from
+returning. Verified in the harness on the exact surface he screenshotted (`?planready` →
+Review the plan): the workspace scroller had 78px of overflow, consumed 0px of gutter,
+and still scrolled (scrollTop 0 → 60). Durable rule recorded in
+`docs/memory/design-system.md` → Layout Rules.
 
 ## What shipped after that (2026-07-26): the planning lane reads honestly
 

@@ -335,6 +335,14 @@ Reference links:
   content (a full Journey, a long saved-aims Home) anchors to the scrollable start edge instead of
   being clipped above `scrollTop: 0` and made unreachable at small window heights. The aim-stage
   workspace base (`.od-workspace-aim`) centers safely for this reason; verify at 640×520.
+- **No scrollbar renders anywhere in the app** (founder, 2026-08-02: "no scroll bar at all in the
+  whole app"). Scrolling itself is untouched — wheel, trackpad, keys, drag-select all still scroll —
+  only the rail is gone. Implemented globally in `cockpit.css` (`* { scrollbar-width: none }` for
+  layout so no gutter is ever reserved, plus a `::-webkit-scrollbar { display: none }` block for the
+  painted rail) and guarded by an App.test.tsx assertion that also bans `scrollbar-gutter` and
+  thumb styling from returning. Do not restyle scrollbars per-surface; do not "fix" an overflow by
+  revealing one. If a surface ever needs a can-scroll affordance, the Glass answer is a content cue
+  (a fade/cut edge), never the rail.
 - Sidebar width: default **224px** (the reference island width; the persisted-width storage key
   was bumped to `aimcub.sidebarWidth.v2` so pre-island widths don't mask it), stable bounds
   ~216–360px, transparent resize hot zone with the native cursor (not a permanent divider). The

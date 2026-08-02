@@ -19,7 +19,6 @@
   --od-warn-fg: #8a6517;
   --od-disabled-bg: #aeb8bf;
   --od-disabled-fg: #ffffff;
-  --od-scrollbar-thumb: rgba(31, 35, 40, 0.28);
   --od-hit-region: rgba(255, 255, 255, 0.001);
   --od-overlay-backdrop: rgba(245, 245, 247, 0.58);
   --od-popover-bg: rgba(255, 255, 255, 0.96);
@@ -133,7 +132,6 @@
     --od-warn-fg: #ffd60a;
     --od-disabled-bg: #4a4a4f;
     --od-disabled-fg: #a1a1a6;
-    --od-scrollbar-thumb: rgba(235, 235, 245, 0.28);
     --od-hit-region: rgba(0, 0, 0, 0.001);
     --od-overlay-backdrop: rgba(28, 28, 30, 0.72);
     --od-popover-bg: rgba(36, 36, 38, 0.96);
@@ -195,7 +193,6 @@
   --od-warn-fg: #ffd60a;
   --od-disabled-bg: #4a4a4f;
   --od-disabled-fg: #a1a1a6;
-  --od-scrollbar-thumb: rgba(235, 235, 245, 0.28);
   --od-hit-region: rgba(0, 0, 0, 0.001);
   --od-overlay-backdrop: rgba(28, 28, 30, 0.72);
   --od-popover-bg: rgba(36, 36, 38, 0.96);
@@ -263,11 +260,18 @@ button {
   border: 0;
 }
 
-::-webkit-scrollbar-thumb {
-  background: var(--od-scrollbar-thumb);
-  background-clip: content-box;
-  border: 3px solid transparent;
-  border-radius: 999px;
+/* No scrollbar renders anywhere in the app (founder, 2026-08-02): scrolling stays —
+   wheel, trackpad, keys, drag all work — only the rail is gone. Both declarations are
+   needed: `scrollbar-width` is the standard Chromium honors for layout (no gutter is
+   ever reserved), `::-webkit-scrollbar` kills the painted rail in every overlay mode. */
+* {
+  scrollbar-width: none;
+}
+
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 button:focus-visible,
@@ -1408,7 +1412,6 @@ kbd {
   margin: 0 auto;
   /* Bottom inset lives inside the scrollport so content clears the shell gutter when scrolled. */
   padding-bottom: 24px;
-  scrollbar-gutter: stable;
 }
 
 .od-workspace-aim {
@@ -1418,7 +1421,6 @@ kbd {
      the scrollable start edge instead of being clipped above scrollTop:0 and made unreachable. */
   align-content: safe center;
   justify-items: center;
-  scrollbar-gutter: stable both-edges;
 }
 
 /* The Journey is a workbench surface, not a reading column — give it the wider 820px rail it
@@ -2495,7 +2497,6 @@ kbd {
   gap: 16px;
   overflow: auto;
   padding-right: 4px;
-  scrollbar-gutter: stable;
 }
 
 .od-context-choice-list {
