@@ -256,9 +256,17 @@ body,
   margin: 0;
 }
 
+/* A desktop workbench, not a web page (founder, 2026-08-06: moving the mouse flashed
+   arrow↔I-beam over every label, and a drag painted selection across chrome): static
+   surfaces keep the arrow cursor and never select. Editing keeps its affordances — the
+   UA's text cursor on fields survives inheritance, their content is re-marked selectable
+   below — and pre/code stay copyable because they are the app's static VALUES (workspace
+   paths, error details, rule code) per the static-semantics rule. */
 body {
   font-family: var(--od-font-sans);
   letter-spacing: 0;
+  cursor: default;
+  user-select: none;
 }
 
 button,
@@ -266,6 +274,17 @@ input,
 textarea,
 select {
   font: inherit;
+}
+
+input,
+textarea {
+  user-select: text;
+}
+
+pre,
+code {
+  user-select: text;
+  cursor: text;
 }
 
 button {
@@ -309,6 +328,29 @@ textarea:focus-visible,
 select:focus-visible {
   outline: 0;
   box-shadow: var(--od-focus);
+}
+
+/* …except text entry: Chromium grants every editable field :focus-visible on ANY focus,
+   a pointer click included, so the keyboard halo flashed on each click into a field
+   (founder, 2026-08-06: "a weird blue shadow"). A field says "focused" with its own
+   accent chrome (the primitives' border, the composer underline, the rename editor) plus
+   the caret; the halo stays for controls whose :focus-visible really is keyboard-only.
+   Checkbox-like inputs keep it via the :where() carve-out (zero specificity added, so
+   any component rule still wins). */
+input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="button"], [type="submit"], [type="reset"], [type="file"], [type="color"])):focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  box-shadow: none;
+}
+
+/* A heading focused from script (tabindex="-1") is an announce/scroll target for
+   assistive tech, never a tab stop — the UA ring painted a stray blue rectangle
+   around each arriving question title. */
+h1[tabindex="-1"],
+h2[tabindex="-1"],
+h3[tabindex="-1"],
+h4[tabindex="-1"] {
+  outline: 0;
 }
 
 .od-window {
@@ -2352,10 +2394,11 @@ kbd {
   background: var(--od-surface-warm);
 }
 
+/* Focus is the container's own accent hairline — same idiom as the field primitives;
+   :focus-within fires on pointer focus, so the keyboard halo would flash on every click. */
 .od-planning-session-chat:focus-within {
-  border-color: color-mix(in oklab, var(--od-accent), var(--od-bg) 48%);
+  border-color: var(--od-accent);
   background: var(--od-bg);
-  box-shadow: var(--od-focus);
 }
 
 .od-planning-session-chat-field {

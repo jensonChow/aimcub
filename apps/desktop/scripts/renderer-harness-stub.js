@@ -32,7 +32,7 @@
   const calls = [];
   window.__harnessCalls = calls;
 
-  // Scenario flags, so a reload can pick a state: ?nopass, ?planready, ?live.
+  // Scenario flags, so a reload can pick a state: ?nopass, ?planready, ?live, ?question.
   const flags = new URLSearchParams(location.search);
   window.__harnessFlags = Object.fromEntries([...flags.keys()].map((key) => [key, true]));
 
@@ -112,6 +112,19 @@
     ],
     landing: null,
     failure: null,
+  };
+
+  /** `?question`: the brain is blocked on a free-text question (the focused answer surface). */
+  const pendingQuestion = {
+    id: "q-travel-window",
+    question: "What is your intended Tokyo travel window—exact departure/return dates if known, or the month/season plus approximate trip length?",
+    kind: "context",
+    why_high_impact: "Dates and duration determine seasonal risks, booking deadlines, opening calendars, and how many geographic areas fit without overpacking the itinerary.",
+    allow_other: true,
+    selection_mode: "single",
+    selection_mode_reason: "default",
+    capture_scope: "current_aim",
+    options: [],
   };
 
   let passLive = !flags.has("nopass");
@@ -211,7 +224,10 @@
     getAppInfo: () => ({ version: "0.0.0-harness", workspacePath: "~/.aimcub" }),
     listAimProgressSummaries: () => [{ goal_id: GOAL_ID, total: 0, completed: 0, blocked: 0, running: 0, status: "planning" }],
 
-    getPlanningSessionState: () => (flags.has("live") ? liveSession : null),
+    getPlanningSessionState: () => {
+      if (flags.has("question")) return { ...liveSession, phase: "waiting_user", pendingQuestion };
+      return flags.has("live") ? liveSession : null;
+    },
     getPlanningPass: () => currentPass(),
     discardPlanningPass: () => {
       passLive = false;

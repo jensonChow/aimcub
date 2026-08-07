@@ -1,6 +1,6 @@
 # Design System Memory
 
-Last updated: 2026-07-13
+Last updated: 2026-08-06
 
 ## Scope
 
@@ -480,8 +480,9 @@ three-size / ≤500-weight policy).
   destructive item states). Review rows may show Accept/Reject; editor rows Submit/Cancel.
 - Inputs: 36px minimum for compact search, 44–56px for main task forms; labels above inputs, not
   only placeholders (command-composer is the one exception — accessible label + clear
-  placeholder). Textareas ≥140–160px for aim/context input. Static values use static semantics
-  (text/output/selectable code), not inert buttons or disabled inputs.
+  placeholder). Textareas ≥140–160px for aim/context input. Focused fields show their own
+  accent-hairline chrome, never the keyboard halo (see Interaction and State). Static values use
+  static semantics (text/output/selectable code), not inert buttons or disabled inputs.
 - Progress: thin **6px** bars for passive progress plus explicit text for milestone/evidence
   status. Chips/pills for compact status, filters, and lightweight commands — avoid long labels
   and stacked chip rows in the main task area.
@@ -515,10 +516,31 @@ three-size / ≤500-weight policy).
 - Sidebar peek is transient and hover/focus driven with symmetric enter/exit motion; manual
   toggle actions take precedence over peek. Draggable chrome must not cover the toggle or reveal
   hit targets; window drag surfaces stay stable across focus/activation cycles.
-- Keyboard focus stays visible (a 4px accent-tinted ring). Core commands are keyboard-first; add
-  command-palette entries alongside visible controls for top-level or frequent actions. Pointer
-  targets ≥24×24 CSS px (practically 32–44px). Do not interrupt recoverable actions with modal
-  dialogs — prefer inline banners, undo, or a review surface.
+- Keyboard focus stays visible (a 4px accent-tinted ring) on controls whose `:focus-visible`
+  genuinely means keyboard — buttons, checkboxes, radios, summaries. Text entry is the exception
+  (next bullet). Core commands are keyboard-first; add command-palette entries alongside visible
+  controls for top-level or frequent actions. Pointer targets ≥24×24 CSS px (practically
+  32–44px). Do not interrupt recoverable actions with modal dialogs — prefer inline banners,
+  undo, or a review surface.
+- **Text entry never wears the keyboard halo** (founder 2026-08-06: "a weird blue shadow" on
+  choosing the answer box). Chromium grants editable fields `:focus-visible` on ANY focus — a
+  pointer click included — so the 4px ring on fields flashed on every click. A field says
+  "focused" with its own chrome: a full-accent hairline border + `--od-bg` fill + the caret
+  (the New-Aim headline underline and the Journey rename editor were already this idiom; the
+  `od-ui-*` primitives and the session chat composer's `:focus-within` now follow). Hover chrome
+  never applies to a focused field — the old hover rule outranked focus and flashed the border
+  gray↔accent as the pointer crossed it. A script-focused heading (`tabindex="-1"`, each
+  arriving question title) is an announce target, never a tab stop, and never wears the UA
+  ring. Guarded in App.test.tsx.
+- **The pointer is a desktop pointer, not a web caret** (founder 2026-08-06: "the cursor would
+  always blink and flash"). Static chrome keeps the arrow cursor and never text-selects
+  (`body { cursor: default; user-select: none }`), so the pointer stops flickering arrow↔I-beam
+  over every label and a drag never paints selection across a card. Editing keeps its
+  affordances: fields stay selectable (`user-select: text`; the UA text cursor on fields
+  survives), and `pre`/`code` stay selectable with the I-beam because they are the app's static
+  VALUES (workspace paths, error details, rule code) per the static-semantics rule. A new
+  copyable value must render as `pre`/`code` — never as a bare span that silently became
+  unselectable. Guarded in App.test.tsx.
 - Manual proof confirmation opens an evidence submission surface before recording confirmation
   (proof note, URL, local files, required-evidence checklist). Normal navigation must not silently
   discard an open proof draft: block navigation with concise recovery copy until submit or cancel,

@@ -2255,6 +2255,38 @@ describe("CockpitShell", () => {
     expect(css).not.toMatch(/::-webkit-scrollbar-thumb/);
   });
 
+  it("keeps web defaults off the desktop surface — no pointer-focus halo, no selectable chrome", () => {
+    // Founder 2026-08-06: clicking a text field summoned the keyboard halo ("a weird blue
+    // shadow") and the pointer flashed arrow↔I-beam over every label. Text entry says
+    // "focused" with its own accent chrome (Chromium grants fields :focus-visible on pointer
+    // focus, so the halo is reserved for controls where :focus-visible means keyboard); chrome
+    // text is not a selection surface, while fields and pre/code (the app's static values)
+    // stay selectable.
+    const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
+    const primitives = readFileSync(new URL("./ui/primitives.css", import.meta.url), "utf8");
+
+    // The base carve-out strips the halo from every text-entry control.
+    expect(css).toMatch(
+      /input:where\(:not\(\[type="checkbox"\][^)]*\)\):focus-visible,\s*textarea:focus-visible,\s*select:focus-visible\s*{[^}]*box-shadow:\s*none;/s,
+    );
+    // The field indicates focus with its own accent chrome instead — and hover chrome
+    // may not stomp it (the old hover rule outranked focus, flashing the border).
+    expect(primitives).toMatch(
+      /\.od-ui-input:focus-visible,\s*\.od-ui-textarea:focus-visible,\s*\.od-ui-select:focus-visible\s*{[^}]*border-color:\s*var\(--od-accent\);/s,
+    );
+    expect(primitives).not.toMatch(/\.od-ui-input:focus-visible[^{]*{[^}]*var\(--od-focus\)/s);
+    expect(primitives).toMatch(/\.od-ui-input:hover:where\(:not\(:disabled\)\):where\(:not\(:focus-visible\)\)/);
+    // The integrated chat composer follows the same idiom on :focus-within.
+    expect(css).toMatch(/\.od-planning-session-chat:focus-within\s*{[^}]*border-color:\s*var\(--od-accent\);/s);
+    expect(css).not.toMatch(/\.od-planning-session-chat:focus-within\s*{[^}]*var\(--od-focus\)/s);
+    // A script-focused heading (each arriving question title) never wears the UA ring.
+    expect(css).toMatch(/h2\[tabindex="-1"\],\s*h3\[tabindex="-1"\],\s*h4\[tabindex="-1"\]\s*{\s*outline:\s*0;/s);
+    // The workbench pointer/selection policy, with editing and static values carved back in.
+    expect(css).toMatch(/\nbody\s*{[^}]*cursor:\s*default;[^}]*user-select:\s*none;/s);
+    expect(css).toMatch(/\ninput,\s*textarea\s*{[^}]*user-select:\s*text;/s);
+    expect(css).toMatch(/\npre,\s*code\s*{[^}]*user-select:\s*text;/s);
+  });
+
   it("leaves macOS traffic lights to native window chrome", () => {
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
     const main = readFileSync(new URL("../main/index.ts", import.meta.url), "utf8");

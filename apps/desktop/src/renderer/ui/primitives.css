@@ -230,19 +230,26 @@
   color: var(--od-meta);
 }
 
-.od-ui-input:hover:not(:disabled),
-.od-ui-textarea:hover:not(:disabled),
-.od-ui-select:hover:not(:disabled) {
+/* Hover chrome never applies to a focused field: without the :focus-visible carve-out the
+   hover rule's higher specificity overrode the focus border, so a focused field flashed
+   gray↔accent as the pointer crossed it. The :where() keeps specificity at the focus
+   rule's level so the later focus rule wins while both match. */
+.od-ui-input:hover:where(:not(:disabled)):where(:not(:focus-visible)),
+.od-ui-textarea:hover:where(:not(:disabled)):where(:not(:focus-visible)),
+.od-ui-select:hover:where(:not(:disabled)):where(:not(:focus-visible)) {
   border-color: var(--od-border);
   background: var(--od-bg);
 }
 
+/* Focus is the field's own chrome — a full-accent hairline and the caret, never the
+   keyboard halo: text fields match :focus-visible on pointer focus too, so the halo
+   read as "a weird blue shadow" on every click into a field (founder, 2026-08-06).
+   Same idiom as the New Aim headline underline and the Journey rename editor. */
 .od-ui-input:focus-visible,
 .od-ui-textarea:focus-visible,
 .od-ui-select:focus-visible {
-  border-color: color-mix(in oklab, var(--od-accent), var(--od-bg) 48%);
+  border-color: var(--od-accent);
   background: var(--od-bg);
-  box-shadow: var(--od-focus);
 }
 
 .od-ui-input:disabled,

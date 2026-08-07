@@ -1,12 +1,48 @@
 # Aimcub Handoff
 
-Last updated: 2026-08-02
-Branch: `main`, **everything PUSHED to origin/main** (founder authorized twice on
-2026-08-02: "refresh memory, push, merge" — the second authorization covered the four
-UI-polish commits `e9ad3aaf`/`dfabb924`/`cce533e9`/`be581c68` plus this docs commit).
-Destination re-verified per the push protocol each time: `jensonChow/aimcub`, ADMIN,
-PRIVATE, default `main`, `origin` matches. No merge needed — every remote branch
-(`codex/*`, `v0-foundation`) is 0 commits ahead of `main`.
+Last updated: 2026-08-06
+Branch: `main`, ONE local commit ahead of origin/main (this session's focus/cursor fix —
+**push NOT yet authorized for it**; everything through `a220f5bf` was pushed under the
+2026-08-02 authorizations). Ask before pushing; destination protocol unchanged
+(`jensonChow/aimcub`, ADMIN, PRIVATE, default `main`).
+
+## What shipped 2026-08-06: web defaults stop leaking through the glass
+
+Founder screenshot of the planning question card ("Plan a trip to Tokyo") + two symptoms,
+one problem class — browser defaults reaching the product surface:
+
+1. **"A weird blue shadow when I chose the input box."** Chromium grants every editable
+   field `:focus-visible` on ANY focus — a pointer click included — so the 4px `--od-focus`
+   keyboard halo fired on every click into a field (the base cockpit rule applied it to all
+   `input/textarea/select`). Now a `:where()` carve-out strips the halo from text entry
+   (checkbox-likes keep it; buttons/summaries never changed), and a field says "focused"
+   with its own chrome: full-accent hairline + `--od-bg` fill + caret — the idiom the
+   New-Aim headline and rename editor had already chosen individually while the base rule
+   stomped them. The session chat composer's `:focus-within` follows. Two adjacent leaks
+   fixed in the same class: the primitives' hover rule OUTRANKED focus, so a focused
+   field's border flashed gray↔accent as the pointer crossed it (hover now excludes
+   `:focus-visible`); and the arriving question's `tabindex="-1"` h2 caught the UA ring
+   under keyboard modality (script-focused headings now carry no outline).
+2. **"The cursor would always blink and flash."** The whole app had web-page pointer
+   behavior: I-beam + text selection over every label and title, so the pointer flickered
+   arrow↔I-beam constantly and a drag painted selection across chrome. New policy:
+   `body { cursor: default; user-select: none }`; fields restored to `user-select: text`
+   (UA text cursor survives; typing, caret, in-field drag/double-click selection all
+   verified); `pre`/`code` stay selectable + I-beam — they are the app's static VALUES
+   (workspace path, error details, rule code) per the static-semantics rule.
+
+Durable rules + guards: two new bullets in `docs/memory/design-system.md` (Interaction
+and State) and one App.test.tsx guard ("keeps web defaults off the desktop surface").
+Harness gained a `?question` scenario (free-text pending question — the founder's exact
+surface) in `renderer-harness-stub.js`.
+
+**Verification:** full gate green (desktop 411 tests). Driven in the real renderer via
+`pnpm desktop:harness` at `/?question` and `/?live`: real pointer click into the answer
+field (accent hairline, no halo, border stable while hovered), h2 focus under keyboard
+modality (no UA ring), static text arrow-cursor/unselectable, in-field selection intact,
+note composer focus-within accent, light AND dark, `__harnessErrors` empty. Root
+`Aimcub.app` repacked and boot-smoked under isolated `AIMCUB_HOME` (main + renderer
+alive, clean quit).
 
 ## What shipped 2026-08-02 (afternoon): the desk stays clean
 
