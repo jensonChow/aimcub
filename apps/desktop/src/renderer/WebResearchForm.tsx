@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { WebResearchConfig, WebResearchStatus } from "../shared/ipc";
 
 import { useI18n } from "./i18n";
-import { C, TYPE, WEIGHT, inputStyle, labelStyle, primaryButton, secondaryButton } from "./styles";
+import { C, TYPE, WEIGHT, labelStyle, primaryButton, secondaryButton } from "./styles";
 
 interface WebResearchFormProps {
   status: WebResearchStatus | null;
@@ -98,7 +98,7 @@ export function WebResearchForm({ status, localAgentReady = false, onSaved }: We
         onChange={(e) => setApiKey(e.target.value)}
         placeholder={hasStoredKey ? t("wf.keyKeep") : t("wf.keyPlaceholder")}
         type="password"
-        style={inputStyle()}
+        className="od-ui-input"
       />
 
       <label style={{ ...labelStyle(), display: "flex", gap: 8, alignItems: "center", marginTop: 14 }}>

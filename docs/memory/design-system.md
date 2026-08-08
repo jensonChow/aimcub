@@ -532,6 +532,20 @@ three-size / ≤500-weight policy).
   gray↔accent as the pointer crossed it. A script-focused heading (`tabindex="-1"`, each
   arriving question title) is an announce target, never a tab stop, and never wears the UA
   ring. Guarded in App.test.tsx.
+- **Every text field gets the accent hairline even if its surface never wrote a focus rule**
+  (2026-08-06 sweep). A late `cockpit.css` fallback (`border-color: var(--od-accent)` on
+  text-entry `:focus-visible`; kept LAST in the file — it wins over element-level field rest
+  rules by cascade order, and component focus rules out-rank it) covers bare-classed fields
+  (the proof form's textareas, the bare plan/context `<select>`s). Do not style a field with an
+  inline `style={}` island — it blocks every stylesheet focus rule; the one legacy case
+  (WebResearchForm's key input) was migrated to `od-ui-input`, and a guard keeps it there.
+- **A focus ring outside a `<button>` must bring its own outline reset** (2026-08-06 sweep).
+  The base `outline: 0` reset lives on `button:focus-visible`; summaries, `pre[tabindex]`, and
+  other non-button focus targets that show the `--od-focus` / `--od-interaction-focus-shadow`
+  ring must pair it with `outline: 0` in the same rule, or the UA rectangle paints alongside
+  the ring (the contract-card "Contract details"/routing/structure summaries and the error
+  notice's "Developer details" summary shipped with the raw UA ring; the acceptance-rule `pre`
+  double-painted). Guarded in App.test.tsx.
 - **The pointer is a desktop pointer, not a web caret** (founder 2026-08-06: "the cursor would
   always blink and flash"). Static chrome keeps the arrow cursor and never text-selects
   (`body { cursor: default; user-select: none }`), so the pointer stops flickering arrow↔I-beam

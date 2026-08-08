@@ -1556,6 +1556,13 @@ kbd {
   color: var(--od-fg);
 }
 
+/* Same UA-ring leak as the plan-card summaries: not a button, so no base outline reset. */
+.od-notice-details summary:focus-visible {
+  outline: 0;
+  border-radius: var(--od-radius-sm);
+  box-shadow: var(--od-interaction-focus-shadow);
+}
+
 .od-notice-details pre {
   max-height: 140px;
   overflow: auto;
@@ -3445,6 +3452,15 @@ kbd {
   color: var(--od-fg);
 }
 
+/* Summaries sit outside the base button outline reset, so without an explicit ring they
+   wore the raw UA rectangle on keyboard focus (same idiom as the execution summary). */
+.od-plan-edit-details summary:focus-visible,
+.od-plan-routing-details summary:focus-visible,
+.od-plan-structure-details summary:focus-visible {
+  outline: 0;
+  box-shadow: var(--od-interaction-focus-shadow);
+}
+
 .od-plan-edit-details .od-plan-contract-grid,
 .od-plan-edit-details .od-plan-contract-review,
 .od-plan-routing-details .od-routing-controls {
@@ -3688,6 +3704,9 @@ kbd {
 }
 
 .od-plan-rule-code:focus-visible {
+  /* Not a button, so the base outline reset never reaches it — without this the UA ring
+     and the halo painted together on keyboard focus. */
+  outline: 0;
   box-shadow: var(--od-focus);
 }
 
@@ -6697,4 +6716,18 @@ summary.od-journey-journal-head:focus-visible {
   .od-run-timeline-rows {
     max-height: 220px;
   }
+}
+
+/* ── Text-entry focus fallback — keep this section LAST in the file ────────────────────
+   The other half of the no-halo-on-text-entry rule (see the base carve-out): every text
+   field falls back to the accent hairline on focus, so a field whose surface never wrote
+   a :focus-visible rule (the proof form's textareas, the bare plan/context selects) still
+   says "focused". It shares specificity with element-level field rest rules, so it must
+   sit after them and win by order; component focus rules (od-ui-*, the New Aim underline,
+   the rename editor's --acc) out-rank it and keep their own chrome. Guarded in
+   App.test.tsx. */
+input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="button"], [type="submit"], [type="reset"], [type="file"], [type="color"])):focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  border-color: var(--od-accent);
 }

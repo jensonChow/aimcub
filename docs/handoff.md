@@ -1,10 +1,42 @@
 # Aimcub Handoff
 
-Last updated: 2026-08-06
-Branch: `main`, ONE local commit ahead of origin/main (this session's focus/cursor fix —
-**push NOT yet authorized for it**; everything through `a220f5bf` was pushed under the
-2026-08-02 authorizations). Ask before pushing; destination protocol unchanged
-(`jensonChow/aimcub`, ADMIN, PRIVATE, default `main`).
+Last updated: 2026-08-08
+Branch: `main`, TWO local commits ahead of origin/main (`09b4bb2e` focus/cursor fix +
+this session's follow-up sweep — **push NOT yet authorized for either**; everything
+through `a220f5bf` was pushed under the 2026-08-02 authorizations). Ask before pushing;
+destination protocol unchanged (`jensonChow/aimcub`, ADMIN, PRIVATE, default `main`).
+
+## What shipped 2026-08-08: the same-class sweep
+
+Founder: "check if there is any similar problem and solve it." Swept the whole app for
+the 2026-08-06 class (UA defaults leaking through the surface) and fixed four more:
+
+1. **Fields with no focus chrome at all.** The base halo used to be the only focus
+   indicator for fields outside the `od-ui-*` primitives; removing it left them with
+   nothing. A late `cockpit.css` fallback now gives EVERY text-entry control the accent
+   hairline on `:focus-visible` (kept last in the file; wins over element-level rest
+   rules by order, loses to component focus rules) — covers the proof form's textareas
+   and the bare plan/context `<select>`s. Verified live: the "Current contract" select
+   now shows the hairline on click where it previously haloed.
+2. **The one inline-styled field.** WebResearchForm's key input was the app's only
+   `style={inputStyle()}` field — inline styles block every stylesheet focus rule, so
+   it could never show focus chrome. Migrated to `od-ui-input`; a guard bans the
+   pattern from returning.
+3. **UA rings on non-button focus targets.** The base `outline: 0` reset only covers
+   buttons. The contract-card summaries ("Contract details" / routing / structure) and
+   the error notice's summary had NO ring of their own → raw UA rectangle on keyboard
+   focus; the acceptance-rule `pre[tabindex=0]` had the halo WITHOUT the reset → both
+   painted. All now pair `outline: 0` with the sanctioned ring.
+4. Confirmed non-issues, checked live or by cascade: `ContextSourcesPanel` inputs
+   already use `od-ui-input`; scrollers with focusable children don't get Chromium's
+   implicit keyboard focus; evidence URLs only exist in editable fields (nothing
+   copyable was lost to `user-select: none`); the composer-details textarea keeps its
+   own inset-ring focus (later in cascade than the halo carve-out).
+
+Durable rules: two new bullets in design-system.md (the fallback contract + the
+outline-reset pairing rule). Guards extended in App.test.tsx (rule presence AND the
+fallback's position after the last field rest rule). Full gate green (desktop 411),
+root `Aimcub.app` repacked + boot-smoked (graceful quit re-verified).
 
 ## What shipped 2026-08-06: web defaults stop leaking through the glass
 

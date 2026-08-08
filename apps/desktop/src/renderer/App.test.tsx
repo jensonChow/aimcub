@@ -2285,6 +2285,26 @@ describe("CockpitShell", () => {
     expect(css).toMatch(/\nbody\s*{[^}]*cursor:\s*default;[^}]*user-select:\s*none;/s);
     expect(css).toMatch(/\ninput,\s*textarea\s*{[^}]*user-select:\s*text;/s);
     expect(css).toMatch(/\npre,\s*code\s*{[^}]*user-select:\s*text;/s);
+    // Non-button focus targets sit outside the base button outline reset, so each must
+    // pair its ring with its own reset or the UA rectangle paints alongside it: the
+    // keyboard-scrollable rule <pre> and every disclosure summary that shows a ring.
+    expect(css).toMatch(/\.od-plan-rule-code:focus-visible\s*{[^}]*outline:\s*0;[^}]*var\(--od-focus\)/s);
+    expect(css).toMatch(
+      /\.od-plan-edit-details summary:focus-visible,\s*\.od-plan-routing-details summary:focus-visible,\s*\.od-plan-structure-details summary:focus-visible\s*{[^}]*outline:\s*0;[^}]*var\(--od-interaction-focus-shadow\)/s,
+    );
+    expect(css).toMatch(/\.od-notice-details summary:focus-visible\s*{[^}]*outline:\s*0;[^}]*var\(--od-interaction-focus-shadow\)/s);
+    // The text-entry focus FALLBACK: a field whose surface never wrote a focus rule still
+    // shows the accent hairline. It shares specificity with element-level field rest
+    // rules, so it must stay after the last of them (cascade order is the mechanism).
+    const fallbackAt = css.search(
+      /input:where\(:not\(\[type="checkbox"\][^)]*\)\):focus-visible,\s*textarea:focus-visible,\s*select:focus-visible\s*{\s*border-color:\s*var\(--od-accent\);/s,
+    );
+    expect(fallbackAt).toBeGreaterThan(css.lastIndexOf(".od-proof-field textarea"));
+    // No text field may lean on an inline style island with no focus chrome at all: the
+    // one legacy case (WebResearchForm's key input) now uses the od-ui-input primitive.
+    const webResearch = readFileSync(new URL("./WebResearchForm.tsx", import.meta.url), "utf8");
+    expect(webResearch).toContain('className="od-ui-input"');
+    expect(webResearch).not.toContain("style={inputStyle()}");
   });
 
   it("leaves macOS traffic lights to native window chrome", () => {
