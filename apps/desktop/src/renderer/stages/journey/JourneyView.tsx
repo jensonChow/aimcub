@@ -392,7 +392,6 @@ export function JourneyView(props: JourneyViewProps) {
     <div className="od-journey-inbox" data-od-id="journey-inbox">
       <ContextInbox
         candidates={pendingCandidates}
-        currentAimTitle={goal.title}
         disabled={Boolean(props.disabled)}
         onAccept={acceptCandidate}
         onReject={rejectCandidate}

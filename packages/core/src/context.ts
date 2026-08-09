@@ -316,10 +316,12 @@ export function extractMemoryCandidatesFromAssumptions(input: ExtractMemoryCandi
     const statement = cleanText(assumption.statement);
     if (!statement || isExistingContextAssumption(assumption)) continue;
     const defaultValue = cleanText(assumption.default_value ?? "");
+    // The content is the assumption itself, nothing more: category, source, and the owning
+    // aim are structured fields the review surface renders as provenance. The old composed
+    // prefix ("Project fact: Planning assumption for "<aim>": …") duplicated all three into
+    // the durable text and followed it into accepted memory (founder, 2026-08-09).
     addUnique(candidates, {
-      content: defaultValue
-        ? `Project fact: Planning assumption for "${input.goal.title}": ${statement} (${defaultValue})`
-        : `Project fact: Planning assumption for "${input.goal.title}": ${statement}`,
+      content: defaultValue ? `${statement} (${defaultValue})` : statement,
       kind: "semantic",
       category: "project_fact",
       source: "agent_inferred",
@@ -328,6 +330,21 @@ export function extractMemoryCandidatesFromAssumptions(input: ExtractMemoryCandi
     });
   }
   return candidates;
+}
+
+/** Matches the legacy machine-composed assumption prefix (any category label, any aim title). */
+const LEGACY_ASSUMPTION_PREFIX =
+  /^(?:Capability|Constraint|Eval signal|Preference|Procedure|Project fact):\s*Planning assumption for "[^"]*":\s*/;
+
+/**
+ * Display form of a stored candidate: rows written before 2026-08-09 carry the composed
+ * provenance prefix above. Provenance is chrome, not content — presentation strips it, and
+ * because the review surface accepts what it presents, an accepted legacy row is stored
+ * clean. Already-clean content passes through unchanged.
+ */
+export function presentContextCandidateContent(content: string): string {
+  const cleaned = cleanText(content);
+  return cleaned.replace(LEGACY_ASSUMPTION_PREFIX, "") || cleaned;
 }
 
 export function reviewContextHealth(input: ReviewContextHealthInput): ContextHealthRow[] {

@@ -74,6 +74,14 @@ ELECTRON_BUILDER_CACHE=/private/tmp/aimcub-electron-builder-cache pnpm --filter 
 
 For any repo-changing session, `pnpm build` is not enough because it updates build output but not the project-root `Aimcub.app` bundle. Run `pnpm desktop:pack`, copy `apps/desktop/dist/mac-arm64/Aimcub.app` to root `Aimcub.app`, and restart/open that exact bundle when the user needs to inspect visible app behavior.
 
+## macOS TCC (folder-permission) Discipline
+
+The repo (and therefore root `Aimcub.app`) lives on the Desktop, a TCC-protected folder, and the packed app is only ad-hoc signed, so macOS treats every rebuilt bundle as a new app for consent purposes. Three rules (learned 2026-08-09, when an orphaned "access files in your Desktop folder" dialog wedged the founder's session):
+
+- The packaged main process chdirs to `$HOME` at startup (`main/index.ts`) so a shell-inherited cwd inside Desktop/Documents/Downloads never triggers the folder-consent prompt. Do not remove this for cwd-relative features; nothing may resolve against cwd.
+- Launch boot smokes with the shell cwd OUTSIDE protected folders anyway (e.g. `cd /tmp`), and never kill a smoke while a consent dialog could be up: a prompt whose owning process died becomes an unanswerable orphan. If one is stuck: `killall tccd` (user-level; the daemon respawns), or log out/in; `tccutil reset All com.jensonchow.aimcub` clears stale grants keyed to old ad-hoc signatures.
+- Until real code signing lands (founder checklist), a rebuilt bundle may legitimately re-prompt for folders the user actually attached files from — that prompt is answerable and fine; only the boot-time/orphaned class is a bug.
+
 Every Desktop runtime dependency among the `@aimcub/*` library packages currently exports raw TypeScript and must be listed in `bundleFromSource` in `apps/desktop/electron.vite.config.ts`. Desktop build, pack, and dist run `scripts/verify-bundled-core.mjs`; do not bypass that check. A successful electron-builder run is not sufficient startup evidence: after refreshing the root bundle, launch that exact `Aimcub.app` with isolated `AIMCUB_HOME` and Electron user data, and confirm that both the main process and a renderer process remain alive.
 
 ## Packaged Desktop Visual QA

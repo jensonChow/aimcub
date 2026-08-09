@@ -11,6 +11,21 @@ import { IPC, type WindowChromeState } from "../shared/ipc";
 app.setName("Aimcub");
 nativeTheme.themeSource = "system";
 
+// A packaged app launched from a shell inherits that shell's working directory. When that
+// directory sits inside a macOS-protected folder (Desktop/Documents/Downloads — this repo
+// lives on the Desktop), Chromium's cwd-relative startup reads trip the TCC consent prompt
+// ("Aimcub would like to access files in your Desktop folder") for an app that never needs
+// the folder — and a prompt owned by a short-lived process (a boot smoke) survives it as an
+// unanswerable orphan (founder, 2026-08-09). Aimcub's real state lives under AIMCUB_HOME;
+// nothing resolves against cwd, so park cwd somewhere unprotected before any fs activity.
+if (app.isPackaged) {
+  try {
+    process.chdir(app.getPath("home"));
+  } catch {
+    // A missing/denied home directory only means cwd stays where the shell put it.
+  }
+}
+
 let mainWindow: BrowserWindow | null = null;
 
 const MAC_TRAFFIC_LIGHT_X = 16;

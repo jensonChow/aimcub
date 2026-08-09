@@ -1,10 +1,51 @@
 # Aimcub Handoff
 
-Last updated: 2026-08-08
-Branch: `main`, TWO local commits ahead of origin/main (`09b4bb2e` focus/cursor fix +
-this session's follow-up sweep — **push NOT yet authorized for either**; everything
-through `a220f5bf` was pushed under the 2026-08-02 authorizations). Ask before pushing;
-destination protocol unchanged (`jensonChow/aimcub`, ADMIN, PRIVATE, default `main`).
+Last updated: 2026-08-09
+Branch: `main`, THREE local commits ahead of origin/main (`09b4bb2e` focus/cursor fix,
+`10e52ad3` same-class sweep, + this session's context-review redesign — **push NOT yet
+authorized for any**; everything through `a220f5bf` was pushed under the 2026-08-02
+authorizations). Ask before pushing; destination protocol unchanged
+(`jensonChow/aimcub`, ADMIN, PRIVATE, default `main`).
+
+## What shipped 2026-08-09: the context inbox becomes a decision surface + the TCC fix
+
+Founder screenshot of the Context inbox ("设计不明晰…有bug…UI/UX、feature 都不好") plus a
+STUCK macOS consent dialog ("Aimcub would like to access files in your Desktop folder"
+that could be neither accepted nor closed).
+
+1. **Context review redesigned end-to-end.** Root finds: the machine-composed candidate
+   text (`Project fact: Planning assumption for "<aim>": …`) baked provenance into
+   durable content — it re-stated the category chip and origin chip, followed the row
+   into ACCEPTED memory, and made every card read broken; six metadata chips per card
+   (raw candidate id, "65% confidence", "Agent inferred"); a standing resizable editor
+   per card; ~300px × 9 cards burying the Journal. Now: core composes the bare
+   statement (`extractMemoryCandidatesFromAssumptions`), a new pure
+   `presentContextCandidateContent` strips the legacy prefix at display (inbox + Memory
+   page), and keeping stores the presented text — so his existing polluted rows come
+   clean the moment they are kept. The band is retitled "Context to review" with the
+   deal stated in the body; each candidate is one hairline row (statement · one
+   product-words provenance line · This aim | Global · Keep/Discard); editing is opt-in
+   (Escape reverts), question-shaped rows force the edit gate; the band caps at 4 rows
+   behind "Show all n". Verbs renamed accept/reject → Keep/Discard (en+zh). Durable
+   contract in design-system.md; guards in ContextInbox.test.tsx + context.test.ts.
+   NOT a bug after investigation: accept/reject/scope IPC, store dedupe
+   (`findDuplicateMemory`), and the refresh loop are all correct — verified live in the
+   harness (new `?inbox` scenario, light+dark; Keep on a legacy row stored clean text).
+2. **The stuck permission dialog, root-caused and prevented.** The repo lives on the
+   Desktop; a packaged app launched with a shell cwd inside a TCC-protected folder
+   trips the Desktop consent prompt at boot, and prior sessions' boot smokes killed the
+   app while the prompt was up — an orphaned dialog cannot be answered. Fix: packaged
+   main now `process.chdir(home)` before any fs activity (verified via lsof: cwd is
+   `/Users/jenson` even when launched from elsewhere), smokes launch from `/tmp`, and
+   the discipline is recorded in operations.md (incl. the ad-hoc-signature re-prompt
+   caveat until real signing). The founder still needs to clear the CURRENT orphan
+   himself: `killall tccd` (or log out/in), optionally
+   `tccutil reset All com.jensonchow.aimcub`.
+
+**Verification:** full gate green (core 193, desktop 413). Harness-driven on `?inbox`:
+cap + Show all, Edit autofocus + Escape revert, Keep carrying clean content + aim/global
+scope, list refresh, zero harness errors, both themes. Root `Aimcub.app` repacked and
+boot-smoked from `/tmp` (main + renderer alive; cwd verified at `$HOME`).
 
 ## What shipped 2026-08-08: the same-class sweep
 

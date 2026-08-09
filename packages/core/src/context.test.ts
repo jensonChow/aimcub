@@ -7,6 +7,7 @@ import {
   extractMemoryCandidatesFromEvidence,
   extractMemoryCandidatesFromReview,
   isPromptLikeContextCandidate,
+  presentContextCandidateContent,
   recommendContextScope,
   reviewContextHealth,
   reviewContextProfile,
@@ -332,18 +333,23 @@ describe("extractMemoryCandidatesFromReview", () => {
 });
 
 describe("extractMemoryCandidatesFromAssumptions", () => {
-  it("turns disclosed planning assumptions into pending project-fact candidates", () => {
+  it("stores the assumption itself — category, source, and aim stay structured fields", () => {
     const candidates = extractMemoryCandidatesFromAssumptions({
       goal,
       assumptions: [
         { statement: "Assumed GitHub + CI as the evidence source.", default_value: "github" },
         { statement: "Assumed TypeScript.", default_value: "typescript" },
+        { statement: "Assumed a single workspace.", default_value: "" },
       ],
     });
 
+    // The old composed prefix ("Project fact: Planning assumption for "<aim>": …")
+    // duplicated the structured fields into durable text and followed the candidate into
+    // accepted memory (founder, 2026-08-09) — content must carry no provenance.
     expect(candidates.map((c) => c.content)).toEqual([
-      'Project fact: Planning assumption for "Ship Aimcub CLI": Assumed GitHub + CI as the evidence source. (github)',
-      'Project fact: Planning assumption for "Ship Aimcub CLI": Assumed TypeScript. (typescript)',
+      "Assumed GitHub + CI as the evidence source. (github)",
+      "Assumed TypeScript. (typescript)",
+      "Assumed a single workspace.",
     ]);
     expect(candidates.every((c) => c.category === "project_fact")).toBe(true);
     expect(candidates.every((c) => c.source === "agent_inferred")).toBe(true);
@@ -362,6 +368,27 @@ describe("extractMemoryCandidatesFromAssumptions", () => {
     });
 
     expect(candidates).toEqual([]);
+  });
+});
+
+describe("presentContextCandidateContent", () => {
+  it("strips the legacy composed prefix from stored candidates", () => {
+    expect(presentContextCandidateContent(
+      'Project fact: Planning assumption for "我想要研究coding agent related router": 核心研究对象 (优先 Cursor Router)',
+    )).toBe("核心研究对象 (优先 Cursor Router)");
+    expect(presentContextCandidateContent(
+      'Constraint: Planning assumption for "Ship it": Ship dark mode first.',
+    )).toBe("Ship dark mode first.");
+  });
+
+  it("passes clean content through unchanged and never strips to empty", () => {
+    expect(presentContextCandidateContent("Assumed TypeScript. (typescript)"))
+      .toBe("Assumed TypeScript. (typescript)");
+    // A question-shaped gap candidate keeps its prompt shape (the edit gate depends on it).
+    const gap = 'Procedure: For "Ship it", pending answer needed: Which registry?';
+    expect(presentContextCandidateContent(gap)).toBe(gap);
+    expect(presentContextCandidateContent('Project fact: Planning assumption for "X": '))
+      .toBe('Project fact: Planning assumption for "X":');
   });
 });
 

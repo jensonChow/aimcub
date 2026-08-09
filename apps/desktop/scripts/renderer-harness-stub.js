@@ -32,7 +32,7 @@
   const calls = [];
   window.__harnessCalls = calls;
 
-  // Scenario flags, so a reload can pick a state: ?nopass, ?planready, ?live, ?question.
+  // Scenario flags, so a reload can pick a state: ?nopass, ?planready, ?live, ?question, ?inbox.
   const flags = new URLSearchParams(location.search);
   window.__harnessFlags = Object.fromEntries([...flags.keys()].map((key) => [key, true]));
 
@@ -113,6 +113,30 @@
     landing: null,
     failure: null,
   };
+
+  /** `?inbox`: pending context candidates on the Journey (mirrors the founder's 2026-08-09
+      screenshot — planning assumptions turned into project-fact candidates). Accept/reject
+      mutate the list so the refresh loop can be exercised for real. */
+  const candidateStatements = [
+    "核心研究对象 (优先 Cursor Router、Not Diamond Code、Weave Router、Tokenless、Conifer 与 ACRouter；TwinRouterBench 作为评测框架。)",
+    "实验范围 (48 小时内不把新跑完整付费 benchmark 设为必需项，依赖一手公开证据、动态页复核和严格缺口标注。)",
+    "报告语言 (正文中文，术语与产品名保留英文原文。)",
+    "评测口径 (对每个 router 记录路由策略、支持模型池、定价与已公开的质量信号。)",
+    "交付格式 (一份对比矩阵加一页结论摘要，Markdown。)",
+  ];
+  let contextCandidates = !flags.has("inbox") ? [] : candidateStatements.map((statement, index) => ({
+    id: `c0000000-0000-4000-8000-00000000000${index + 1}`,
+    owner_id: OWNER,
+    goal_id: GOAL_ID,
+    kind: "semantic",
+    category: "project_fact",
+    content: `Project fact: Planning assumption for "我想要研究coding agent related router": ${statement}`,
+    confidence: 0.65,
+    source: "agent_inferred",
+    status: "pending",
+    superseded_by: null,
+    created_at: "2026-08-09T08:00:00.000Z",
+  }));
 
   /** `?question`: the brain is blocked on a free-text question (the focused answer surface). */
   const pendingQuestion = {
@@ -214,7 +238,13 @@
       reasoningOptions: [], diagnostics: [],
     }],
     getGoal: () => ({ goal, milestones: [] }),
-    getAimProgress: () => progress,
+    getAimProgress: () => ({ ...progress, context_candidates: contextCandidates }),
+    acceptContextCandidate: (req) => {
+      contextCandidates = contextCandidates.filter((row) => row.id !== req.id);
+    },
+    rejectContextCandidate: (id) => {
+      contextCandidates = contextCandidates.filter((row) => row.id !== id);
+    },
 
     listGoals: () => [goal],
     listAimDrafts: () => [],

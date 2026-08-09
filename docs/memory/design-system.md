@@ -1,6 +1,6 @@
 # Design System Memory
 
-Last updated: 2026-08-06
+Last updated: 2026-08-09
 
 ## Scope
 
@@ -477,7 +477,8 @@ three-size / ≤500-weight policy).
   active state. Toggles/checkboxes for binary settings.
 - Content-entry and navigation rows use one primary row action; secondary/destructive actions go
   behind a trailing More Actions menu (Escape/outside-close, keyboard nav, focus return,
-  destructive item states). Review rows may show Accept/Reject; editor rows Submit/Cancel.
+  destructive item states). Review rows may show Accept/Reject (memory candidates say
+  Keep/Discard — the user's memory verbs); editor rows Submit/Cancel.
 - Inputs: 36px minimum for compact search, 44–56px for main task forms; labels above inputs, not
   only placeholders (command-composer is the one exception — accessible label + clear
   placeholder). Textareas ≥140–160px for aim/context input. Focused fields show their own
@@ -649,6 +650,22 @@ as a working agent, not as a form the user operates.
   `<details>` summary on the card ("Contract details", routing, structure) carries the quiet
   caret that turns down when open — a disclosure without an affordance reads as a dead label.
   Guarded in App.test.tsx.
+- **The context-review band reads as decisions, not a queue of machine records** (founder
+  2026-08-09: the inbox was "设计不明晰" — unclear purpose, bad UI/UX). The band title says its
+  function ("Context to review") and the body states the deal in one breath: what you keep
+  guides this aim's planning; Global picks carry into future aims. Each candidate is ONE quiet
+  hairline row, never a bordered editor card: the statement as readable static text, ONE
+  provenance line in product words ("Project fact · Noted by Aimcub · 2026-08-09"), then
+  This aim | Global (recommendation marked, meaning in the pill tooltips — no per-row helper
+  line) and Keep / Discard. Machine fields stay structured and NEVER render raw: no candidate
+  ids, no confidence percentages, no "Agent inferred", no "From aim" chip on the aim's own
+  Journey. Editing is opt-in (quiet Edit action, Escape reverts); a question-shaped candidate
+  opens editing with the "still a question" warning and a blocked Keep. The band shows at most
+  4 rows plus one "Show all n" control so a big extraction never buries the Journal. Candidate
+  CONTENT carries no provenance: core composes the bare statement, presentation strips the
+  legacy machine prefix (`presentContextCandidateContent`, also on the Memory page), and
+  keeping stores the presented text — memory never learns the wrapper. Guarded in
+  ContextInbox.test.tsx and context.test.ts.
 - **No standing input on a watching surface** (same feedback: "doesn't need an input box").
   The mid-research note composer is closed at rest and opens from a quiet "Add a note" action
   (Escape closes, send closes, a non-empty draft keeps it open). The interjection CHANNEL

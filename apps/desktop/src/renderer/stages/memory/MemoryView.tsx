@@ -6,6 +6,7 @@
  * `listMemories` IPC and "Forget" reuses the existing `archiveContextMemory` path;
  * both are threaded in from App as props so this view stays render-only.
  */
+import { presentContextCandidateContent } from "@aimcub/core";
 import type { ContextCategory, Goal, Memory } from "@aimcub/types";
 
 import { useI18n, type StringKey } from "../../i18n";
@@ -70,10 +71,13 @@ export function MemoryView(props: MemoryViewProps) {
               const scope = memory.goal_id
                 ? goalTitleById.get(memory.goal_id) ?? t("glass.memory.scopeAim")
                 : t("glass.memory.scopeGlobal");
+              // Rows accepted before 2026-08-09 carry the machine-composed provenance
+              // prefix in their stored text; presentation strips it here too.
+              const content = presentContextCandidateContent(memory.content);
               return (
                 <div className="od-memory-row" key={memory.id}>
                   <div className="od-memory-row-main">
-                    <div className="od-memory-content">{memory.content}</div>
+                    <div className="od-memory-content">{content}</div>
                     <div className="od-memory-source">
                       {t(SOURCE_KEY[memory.source])} · {scope}
                     </div>
@@ -82,7 +86,7 @@ export function MemoryView(props: MemoryViewProps) {
                     className="od-memory-forget"
                     type="button"
                     disabled={props.disabled}
-                    aria-label={`${t("glass.memory.forget")}: ${memory.content}`}
+                    aria-label={`${t("glass.memory.forget")}: ${content}`}
                     title={t("glass.memory.forget")}
                     onClick={() => props.onForget(memory)}
                   >
