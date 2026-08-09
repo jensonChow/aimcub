@@ -120,14 +120,52 @@ describe("plan editing transformations", () => {
     expect(validateExecutablePlan(split)).toEqual({ ok: true, errors: [] });
   });
 
-  it("reorders sub-aims and rewrites dependencies to match the new order", () => {
+  it("reorders independent sub-aims without touching the dependency graph", () => {
+    // c is independent of a and b, so it may be presented anywhere.
+    const base = plan(
+      [mkNode("a", "Draft"), mkCiNode("b", "Verify"), mkNode("c", "Announce")],
+      [{ from: "a", to: "b" }],
+    );
+
+    const moved = movePlanNode(base, "c", 0);
+
+    expect(moved.nodes.map((node) => node.key)).toEqual(["c", "a", "b"]);
+    expect(moved.edges).toEqual([{ from: "a", to: "b" }]); // dependencies are facts, not order
+    expect(validateExecutablePlan(moved)).toEqual({ ok: true, errors: [] });
+  });
+
+  it("refuses to express an order its dependencies forbid, instead of rewriting them", () => {
+    // Dragging "Verify" above the "Draft" it depends on cannot change what must happen first
+    // (that was the old behaviour, which silently destroyed the plan's real shape).
     const base = plan([mkNode("a", "Draft"), mkCiNode("b", "Verify")], [{ from: "a", to: "b" }]);
 
     const moved = movePlanNode(base, "b", 0);
 
-    expect(moved.nodes.map((node) => node.key)).toEqual(["b", "a"]);
-    expect(moved.edges).toEqual([{ from: "b", to: "a" }]);
+    expect(moved.nodes.map((node) => node.key)).toEqual(["a", "b"]);
+    expect(moved.edges).toEqual([{ from: "a", to: "b" }]);
     expect(validateExecutablePlan(moved)).toEqual({ ok: true, errors: [] });
+  });
+
+  it("keeps parallel branches parallel across merge and split", () => {
+    // Diamond: two independent branches between a root and a join.
+    const base = plan(
+      [mkNode("root", "Set up"), mkNode("x", "Branch A"), mkNode("y", "Branch B"), mkCiNode("join", "Verify both")],
+      [{ from: "root", to: "x" }, { from: "root", to: "y" }, { from: "x", to: "join" }, { from: "y", to: "join" }],
+    );
+
+    // Splitting one branch keeps the OTHER branch independent of it.
+    const split = splitPlanNode(base, "x");
+    expect(split.edges).toContainEqual({ from: "x", to: "x-split" });
+    expect(split.edges).toContainEqual({ from: "x-split", to: "join" });
+    expect(split.edges).toContainEqual({ from: "root", to: "y" });
+    expect(split.edges).not.toContainEqual({ from: "y", to: "x" });
+    expect(validateExecutablePlan(split)).toEqual({ ok: true, errors: [] });
+
+    // Merging the two branches yields ONE branch that still sits between root and join.
+    const merged = mergePlanNodes(base, "x", "y");
+    expect(merged.nodes.map((node) => node.key)).toEqual(["root", "x", "join"]);
+    expect(merged.edges).toEqual([{ from: "root", to: "x" }, { from: "x", to: "join" }]);
+    expect(validateExecutablePlan(merged)).toEqual({ ok: true, errors: [] });
   });
 
   it("reports schema errors for edited payloads that are not saveable plans", () => {

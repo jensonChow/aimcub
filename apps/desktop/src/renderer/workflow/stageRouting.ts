@@ -1,3 +1,4 @@
+import { unmetPrerequisiteIds } from "@aimcub/core";
 import type { AimProgressReadModel } from "@aimcub/core";
 import type { DecompositionOutput, Milestone } from "@aimcub/types";
 
@@ -28,23 +29,35 @@ export function cockpitStageFor(mode: AppMode): CockpitStage {
 }
 
 export function progressRows(detail: GoalDetail, progress: AimProgressReadModel | null): ProgressMilestoneRow[] {
-  return progress?.milestones ?? detail.milestones.map((milestone): ProgressMilestoneRow => ({
-    milestone,
-    assignment: null,
-    latest_run: null,
-    child_relations: [],
-    eval_review: {
-      passed: milestone.status === "completed",
-      matched_evidence_ids: [],
-      trust_score: 0,
-      reason: "",
+  if (progress?.milestones) return progress.milestones;
+  // Readiness is derived here too rather than defaulted to true: this fallback renders before
+  // the read model arrives, and claiming everything is startable would flash waiting work as
+  // an available move. Same rule as core's read model — a settled prerequisite is one that
+  // completed or was skipped.
+  const byId = new Map(detail.milestones.map((row) => [row.id, row]));
+  const completedIds = new Set<string>();
+  return detail.milestones.map((milestone): ProgressMilestoneRow => {
+    const waitingOn = unmetPrerequisiteIds(milestone, byId, completedIds);
+    return {
+      milestone,
+      assignment: null,
+      latest_run: null,
+      child_relations: [],
+      eval_review: {
+        passed: milestone.status === "completed",
+        matched_evidence_ids: [],
+        trust_score: 0,
+        reason: "",
+        next_action: "",
+      },
+      evaluator_results: [],
+      evidence: [],
+      evidence_count: 0,
+      completed: milestone.status === "completed",
+      blocked: milestone.status === "blocked",
+      ready: waitingOn.length === 0,
+      waiting_on: waitingOn,
       next_action: "",
-    },
-    evaluator_results: [],
-    evidence: [],
-    evidence_count: 0,
-    completed: milestone.status === "completed",
-    blocked: milestone.status === "blocked",
-    next_action: "",
-  }));
+    };
+  });
 }

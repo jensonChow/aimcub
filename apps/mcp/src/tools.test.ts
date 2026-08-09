@@ -100,7 +100,7 @@ const milestone: Milestone = {
   description: "",
   status: "in_progress",
   order_index: 0,
-  depends_on_id: null,
+  depends_on_ids: [],
   acceptance_rule: {
     logic: "all",
     clauses: [{ evaluator: "commit_pattern", auto_verifiable: true, match: { message_pattern: "feat" } }],
@@ -244,7 +244,7 @@ describe("summarizeMilestones", () => {
       description: "",
       status: over.status ?? "pending",
       order_index: over.order_index ?? 0,
-      depends_on_id: null,
+      depends_on_ids: [],
       acceptance_rule: { logic: "all", clauses: [{ evaluator: "commit_pattern", auto_verifiable: true, match: {} }], threshold: 1, completion_mode: "auto_then_confirm" },
       xp_reward: 10,
       completed_at: null,

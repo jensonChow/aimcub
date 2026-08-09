@@ -26,6 +26,9 @@ interface RowOverride {
   nextAction?: string;
   evidence?: AimProgressMilestoneRead["evidence"];
   evidenceCount?: number;
+  /** Defaults to ready; set false to model work still waiting on a prerequisite. */
+  ready?: boolean;
+  waitingOn?: string[];
 }
 
 function mkRow(o: RowOverride): AimProgressMilestoneRead {
@@ -38,7 +41,7 @@ function mkRow(o: RowOverride): AimProgressMilestoneRead {
       description: "",
       status: (o.status ?? (o.completed ? "completed" : "pending")) as never,
       order_index: 0,
-      depends_on_id: null,
+      depends_on_ids: [],
       acceptance_rule: { logic: "all", clauses: [], threshold: 1, completion_mode: "manual" },
       xp_reward: 10,
       completed_at: null,
@@ -55,6 +58,8 @@ function mkRow(o: RowOverride): AimProgressMilestoneRead {
     evidence_count: o.evidenceCount ?? (o.evidence?.length ?? 0),
     completed: Boolean(o.completed),
     blocked: Boolean(o.blocked),
+    ready: o.ready ?? true,
+    waiting_on: o.waitingOn ?? [],
     next_action: o.nextAction ?? "",
   } as AimProgressMilestoneRead;
 }
@@ -159,6 +164,21 @@ describe("buildJourneyYourMove / Ambient", () => {
     const queued = mkRow({ id: "m1", title: "Queued" });
     queued.latest_run = mkRun({ id: "r1", milestoneId: "m1", status: "queued" });
     expect(buildJourneyYourMove(mkProgress([queued]), t)).toBeNull();
+  });
+
+  it("skips work still waiting on a prerequisite and picks the ready row instead", () => {
+    // Plan order alone used to decide the move, so a blocked-by-dependency row at index 0
+    // was offered while genuinely startable work sat below it — the 1-by-1 feel.
+    const rows = [
+      mkRow({ id: "m1", title: "Join", ready: false, waitingOn: ["m2"] }),
+      mkRow({ id: "m2", title: "Branch B", human: true }),
+    ];
+    expect(buildJourneyYourMove(mkProgress(rows), t)).toMatchObject({ milestoneId: "m2" });
+  });
+
+  it("returns null when every remaining row is waiting on something unfinished", () => {
+    const rows = [mkRow({ id: "m1", title: "Join", ready: false, waitingOn: ["m2"] })];
+    expect(buildJourneyYourMove(mkProgress(rows), t)).toBeNull();
   });
 
   it("returns null when everything is complete", () => {

@@ -41,7 +41,8 @@ export interface OrchestratorMilestone {
   description: string;
   status: string;
   order_index: number;
-  depends_on_id: string | null;
+  /** Every milestone that must finish first; empty = nothing blocks it. See `Milestone`. */
+  depends_on_ids: readonly string[];
   metadata: Record<string, unknown>;
 }
 
@@ -198,14 +199,23 @@ function resolveMilestoneRef(ref: string, milestones: readonly OrchestratorMiles
   return matches.length === 1 ? matches[0] ?? null : null;
 }
 
+/**
+ * Ready = EVERY prerequisite is settled (complete, or skipped so it can never complete).
+ * One unmet prerequisite blocks the row, so this is `every`, not `some`.
+ *
+ * Mirrors `milestoneIsReady` in `@aimcub/core` (the canonical definition every surface reads);
+ * duplicated here only because this package deliberately depends on no store or domain kernel —
+ * it states the shape it needs. Keep the two in step.
+ */
 function dependencyReady(
   row: OrchestratorProgress["milestones"][number],
   rows: readonly OrchestratorProgress["milestones"][number][],
 ): boolean {
-  const dependencyId = row.milestone.depends_on_id;
-  if (!dependencyId) return true;
-  const dependency = rows.find((candidate) => candidate.milestone.id === dependencyId);
-  return Boolean(dependency?.completed || dependency?.milestone.status === "skipped");
+  return row.milestone.depends_on_ids.every((dependencyId) => {
+    const dependency = rows.find((candidate) => candidate.milestone.id === dependencyId);
+    // An unknown prerequisite id cannot be proven settled — treat it as still blocking.
+    return Boolean(dependency?.completed || dependency?.milestone.status === "skipped");
+  });
 }
 
 function selectableRow(
@@ -480,7 +490,7 @@ export class RunArtifactLedger {
         entry.touches += 1;
         if (!entry.kinds.includes(artifact.kind)) entry.kinds.push(artifact.kind);
       }
-      const key = `${artifact.path} ${artifact.kind}`;
+      const key = `${artifact.path}\u0000${artifact.kind}`;
       if (this.announced.has(key)) continue;
       this.announced.add(key);
       fresh.push(artifact);

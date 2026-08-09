@@ -306,10 +306,37 @@ describe("materialize", () => {
   it("turns a plan into a linear milestone chain", () => {
     const ms = materialize(PLAN, "goal-1", "owner-1");
     expect(ms).toHaveLength(2);
-    expect(ms[0]!.depends_on_id).toBeNull();
-    expect(ms[1]!.depends_on_id).toBe(ms[0]!.id);
+    expect(ms[0]!.depends_on_ids).toEqual([]);
+    expect(ms[1]!.depends_on_ids).toEqual([ms[0]!.id]);
     expect(ms[0]!.goal_id).toBe("goal-1");
     expect(ms[0]!.metadata.decomposition_contract).toEqual(CONTRACT);
+  });
+
+  it("keeps EVERY prerequisite when parallel branches join", () => {
+    // Diamond: m1 fans out to two independent branches that both feed the join. The old
+    // single-parent field kept only the last edge, so the join looked ready while a branch
+    // was still running — the plan's real shape never reached the product.
+    const branchNode = (key: string, title: string) => ({ ...PLAN.nodes[1]!, key, title });
+    const diamond = {
+      ...PLAN,
+      nodes: [PLAN.nodes[0]!, branchNode("m2", "Branch A"), branchNode("m3", "Branch B"), branchNode("m4", "Join")],
+      edges: [
+        { from: "m1", to: "m2" },
+        { from: "m1", to: "m3" },
+        { from: "m2", to: "m4" },
+        { from: "m3", to: "m4" },
+      ],
+    };
+
+    const ms = materialize(diamond, "goal-1", "owner-1");
+    const byTitle = (title: string) => ms.find((m) => m.title === title)!;
+
+    expect(byTitle("Scaffold").depends_on_ids).toEqual([]);
+    // Fan-out: both branches depend only on the root, so they are independent of each other.
+    expect(byTitle("Branch A").depends_on_ids).toEqual([byTitle("Scaffold").id]);
+    expect(byTitle("Branch B").depends_on_ids).toEqual([byTitle("Scaffold").id]);
+    // Fan-in: the join carries BOTH branches, not just the last edge seen.
+    expect(byTitle("Join").depends_on_ids).toEqual([byTitle("Branch A").id, byTitle("Branch B").id]);
   });
 });
 
@@ -335,12 +362,12 @@ describe("mergeMilestones · re-plan invariants", () => {
     const polish = byTitle("Polish")!;
     expect(polish.status).toBe("pending");
     expect(polish.id).not.toBe(existing[1]!.id);
-    expect(polish.depends_on_id).toBe(scaffold.id); // edge a->b rethreaded onto stable ids
+    expect(polish.depends_on_ids).toEqual([scaffold.id]); // edge a->b rethreaded onto stable ids
 
     const implement = byTitle("Implement")!;
     expect(implement.id).toBe(existing[1]!.id); // soft-deleted, not physically removed
     expect(implement.status).toBe("skipped");
-    expect(implement.depends_on_id).toBeNull();
+    expect(implement.depends_on_ids).toEqual([]);
   });
 
   it("updates an unfinished matched milestone in place (new content, stable id)", () => {
@@ -627,6 +654,46 @@ describe("createJsonFileStore · round-trip", () => {
     expect(legacy?.aim_surface).toBeNull();
   });
 
+  it("lifts a pre-DAG milestone's single prerequisite into the list on load", async () => {
+    // A store written before 2026-08-09 holds `depends_on_id`. Dropping it on load would make
+    // waiting work look ready, so the value is carried into `depends_on_ids`.
+    const dir = mkdtempSync(join(tmpdir(), "aimcub-store-"));
+    const goalId = "00000000-0000-4000-8000-0000000000a0";
+    const first = "00000000-0000-4000-8000-0000000000a1";
+    const second = "00000000-0000-4000-8000-0000000000a2";
+    const row = (id: string, title: string, dependsOnId: string | null) => ({
+      id,
+      goal_id: goalId,
+      owner_id: "00000000-0000-4000-8000-000000000001",
+      title,
+      description: "",
+      status: "pending",
+      order_index: 0,
+      depends_on_id: dependsOnId,
+      acceptance_rule: { logic: "all", threshold: 1, completion_mode: "manual", clauses: [] },
+      xp_reward: 10,
+      completed_at: null,
+      metadata: {},
+    });
+    writeFileSync(join(dir, "store.json"), JSON.stringify({
+      goals: [{
+        id: goalId,
+        owner_id: "00000000-0000-4000-8000-000000000001",
+        title: "Legacy planned aim",
+        description: "",
+        status: "active",
+        plan_json: null,
+        metadata: {},
+      }],
+      milestonesByGoal: { [goalId]: [row(first, "Scaffold", null), row(second, "Implement", first)] },
+    }), "utf8");
+
+    const loaded = await createJsonFileStore(dir).getGoal(goalId);
+    const milestones = loaded?.milestones ?? [];
+    expect(milestones.map((m) => m.depends_on_ids)).toEqual([[], [first]]);
+    expect(milestones.every((m) => !("depends_on_id" in m))).toBe(true);
+  });
+
   it("keeps generated plans and save-blocked state recoverable until explicit discard", async () => {
     const store = freshStore();
     const draft = await store.upsertAimDraft({
@@ -768,6 +835,9 @@ describe("createJsonFileStore · round-trip", () => {
         description: "Confirm the saved payload drives the final milestone.",
       },
     });
+    // Splitting m2 states "Implement, then Verify". Moving Verify above Implement asks for an
+    // order the split's own dependency forbids, so the plan keeps the legal order — it does NOT
+    // rewrite the dependency to match the drag, which is what silently inverted plans before.
     const edited = movePlanNode(splitPlan, "m2-split", 1);
 
     const { goal, milestones } = await store.createGoal({
@@ -778,14 +848,14 @@ describe("createJsonFileStore · round-trip", () => {
     expect(goal.plan_json).toEqual(edited);
     expect(milestones.map((milestone) => milestone.title)).toEqual([
       "Scope edited release",
-      "Verify edited release",
       "Implement edited release",
+      "Verify edited release",
     ]);
     expect(milestones[0]!.description).toBe("Capture the exact edited release scope.");
     expect(milestones[0]!.acceptance_rule).toEqual(manualRule);
-    expect(milestones[1]!.depends_on_id).toBe(milestones[0]!.id);
-    expect(milestones[2]!.depends_on_id).toBe(milestones[1]!.id);
-    expect(milestones[1]!.metadata.plan_key).toBe("m2-split");
+    expect(milestones[1]!.depends_on_ids).toEqual([milestones[0]!.id]);
+    expect(milestones[2]!.depends_on_ids).toEqual([milestones[1]!.id]);
+    expect(milestones[2]!.metadata.plan_key).toBe("m2-split");
   });
 
   it("persists routing overrides into the plan, milestone metadata, and assignments", async () => {
@@ -1279,6 +1349,13 @@ describe("local alpha demo seed", () => {
     expect(humanIncomplete.assignment).toMatchObject({ actor_kind: "human" });
     expect(humanIncomplete.evidence_count).toBe(0);
     expect(humanIncomplete.next_action).toBe("Collect human proof and confirm completion.");
+
+    // The seed is a graph, not a chain: agent work and human work are ready AT THE SAME TIME
+    // off the finished contract, and the review that consumes the agent's output waits.
+    expect(agentIncomplete.ready).toBe(true);
+    expect(humanIncomplete.ready).toBe(true);
+    expect(lowTrust.ready).toBe(false);
+    expect(lowTrust.waiting_on).toEqual([agentIncomplete.milestone.id]);
 
     expect(lowTrust.completed).toBe(false);
     expect(lowTrust.assignment).toMatchObject({ actor_kind: "agent" });

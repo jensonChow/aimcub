@@ -169,7 +169,14 @@ export const decompositionJsonSchema = {
     },
     edges: {
       type: "array",
-      description: "Dependency edges; {from,to} means `to` depends on `from`. Must be acyclic.",
+      description:
+        "Dependency edges; {from,to} means `to` cannot START until `from` is done. Must be acyclic. "
+        + "Add an edge ONLY for a real constraint — `to` needs an output, artifact, decision, or "
+        + "access that `from` produces. Do NOT add edges merely to express a preferred order, a "
+        + "reading sequence, or the order you happened to list the milestones in: work with no "
+        + "edge between it can proceed at the same time, and inventing sequence needlessly "
+        + "serializes work that could have run in parallel. Milestones that only share a theme, "
+        + "or that a single person would happen to do one after another, are independent.",
       items: planEdgeSchema,
     },
   },

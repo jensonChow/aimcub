@@ -129,7 +129,7 @@ describe("server path uses the service_role client (bypasses RLS)", () => {
         description: "",
         status: "pending",
         order_index: 0,
-        depends_on_id: null,
+        depends_on_ids: [],
         acceptance_rule: {
           logic: "all",
           clauses: [{ evaluator: "ci_status", auto_verifiable: true, match: { conclusion: "success" } }],

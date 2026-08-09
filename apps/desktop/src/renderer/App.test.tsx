@@ -33,7 +33,7 @@ const milestone: Milestone = {
   description: "Human approval is required.",
   status: "pending",
   order_index: 0,
-  depends_on_id: null,
+  depends_on_ids: [],
   acceptance_rule: {
     logic: "all",
     threshold: 1,
@@ -315,6 +315,8 @@ function executeRow(input: {
     evidence_count: lowTrust || completed ? 1 : 0,
     completed,
     blocked: false,
+    ready: true,
+    waiting_on: [],
     next_action: completed ? "Completed." : lowTrust ? "Review low-trust evidence." : "Run the next work.",
   };
 }
@@ -639,6 +641,8 @@ describe("LocalAgentExecutionSummary", () => {
       evidence_count: 1,
       completed: false,
       blocked: false,
+      ready: true,
+      waiting_on: [],
       next_action: "Review low-trust evidence.",
     };
 

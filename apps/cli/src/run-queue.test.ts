@@ -233,7 +233,7 @@ const ARTIFACT_RUN: ScriptedRun = {
 };
 
 describe("local agent run queue", () => {
-  it("drains queued sub-aims serially in plan order and persists every event", async () => {
+  it("drains every queued sub-aim and persists every event", async () => {
     const { store, goal, milestones, workspace } = await seedAim();
     const queue = createRunQueue(store, queueDependencies([OK_RUN, OK_RUN]));
 
@@ -249,7 +249,10 @@ describe("local agent run queue", () => {
     });
 
     const drained = await queue.drain({ goalId: goal.id });
-    expect(drained.map((entry) => entry.executed.row.milestone.id)).toEqual([milestones[0]!.id, milestones[1]!.id]);
+    // Independent runs execute concurrently, so completion order is not a contract — that
+    // every claimed run is executed exactly once, and every event persisted, still is.
+    expect(drained.map((entry) => entry.executed.row.milestone.id).sort())
+      .toEqual([milestones[0]!.id, milestones[1]!.id].sort());
     expect(drained.every((entry) => entry.executed.result.ok)).toBe(true);
 
     const runs = await store.listRuns(goal.id);
@@ -280,6 +283,65 @@ describe("local agent run queue", () => {
     const progress = await store.getAimProgress(goal.id);
     expect(progress?.milestones.map((row) => row.latest_run?.status)).toEqual(["completed", "completed"]);
     expect(progress?.completed_milestones).toBe(0);
+  });
+
+  it("starts independent sub-aims at the same time instead of waiting for the previous one", async () => {
+    const { store, goal, milestones, workspace } = await seedAim();
+    let activeWhenSecondStarted = 0;
+    let cancelHangingRun = () => {};
+    let activeRunIds: () => string[] = () => [];
+    // The first run HANGS. Under the old serial drain (claim → await → claim) the second run
+    // could never start at all, which is exactly what made an aim move one sub-aim at a time.
+    const dependencies = queueDependencies([{ hang: true }, OK_RUN], (index) => {
+      if (index !== 1) return;
+      activeWhenSecondStarted = activeRunIds().length;
+      cancelHangingRun();
+    });
+    const queue = createRunQueue(store, dependencies);
+    activeRunIds = () => queue.activeRunIds();
+
+    const hanging = await queue.enqueue({ goalId: goal.id, workspace, sandbox: "workspace-write", network: false });
+    await queue.enqueue({
+      goalId: goal.id,
+      milestoneRef: milestones[1]!.id,
+      workspace,
+      sandbox: "workspace-write",
+      network: false,
+    });
+    cancelHangingRun = () => queue.cancel(hanging.run.id);
+
+    const drained = await queue.drain({ goalId: goal.id });
+
+    // The second process started while the first was still executing — genuine overlap.
+    expect(activeWhenSecondStarted).toBe(2);
+    expect(drained).toHaveLength(2);
+    const healthy = drained.find((entry) => entry.executed.row.milestone.id === milestones[1]!.id)!;
+    expect(healthy.executed.result.ok).toBe(true);
+    expect(queue.activeRunIds()).toEqual([]);
+  });
+
+  it("honours a maxConcurrentRuns of 1 — the queue stays strictly serial when asked", async () => {
+    const { store, goal, milestones, workspace } = await seedAim();
+    let peakActive = 0;
+    let activeRunIds: () => string[] = () => [];
+    const dependencies = queueDependencies([OK_RUN, OK_RUN], () => {
+      peakActive = Math.max(peakActive, activeRunIds().length);
+    });
+    const queue = createRunQueue(store, dependencies, { maxConcurrentRuns: 1 });
+    activeRunIds = () => queue.activeRunIds();
+
+    await queue.enqueue({ goalId: goal.id, workspace, sandbox: "workspace-write", network: false });
+    await queue.enqueue({
+      goalId: goal.id,
+      milestoneRef: milestones[1]!.id,
+      workspace,
+      sandbox: "workspace-write",
+      network: false,
+    });
+
+    const drained = await queue.drain({ goalId: goal.id });
+    expect(drained).toHaveLength(2);
+    expect(peakActive).toBe(1);
   });
 
   it("streams every normalized event live, not only the persisted flushes", async () => {
@@ -340,14 +402,11 @@ describe("local agent run queue", () => {
   it("cancels the executing run, never retries it, and keeps draining the rest", async () => {
     const { store, goal, milestones, workspace } = await seedAim();
     // Cancel the first run once its process exists; the second must still execute.
-    let cancelActiveRuns = () => {};
+    let cancelHangingRun = () => {};
     const dependencies = queueDependencies([{ hang: true }, OK_RUN], (index) => {
-      if (index === 0) cancelActiveRuns();
+      if (index === 0) cancelHangingRun();
     });
     const queue = createRunQueue(store, dependencies);
-    cancelActiveRuns = () => {
-      for (const runId of queue.activeRunIds()) queue.cancel(runId);
-    };
 
     const first = await queue.enqueue({ goalId: goal.id, workspace, sandbox: "workspace-write", network: false });
     const second = await queue.enqueue({
@@ -357,12 +416,19 @@ describe("local agent run queue", () => {
       sandbox: "workspace-write",
       network: false,
     });
+    // Cancel exactly the hanging run, by id. Independent runs now execute concurrently, so
+    // cancelling "every active run" would take the healthy sibling down with it.
+    cancelHangingRun = () => queue.cancel(first.run.id);
 
     const drained = await queue.drain({ goalId: goal.id });
     expect(drained).toHaveLength(2);
-    expect(drained[0]!.executed.result.failure).toMatchObject({ code: "canceled", retryable: false });
-    expect(drained[0]!.retriedInto).toBeNull();
-    expect(drained[1]!.executed.result.ok).toBe(true);
+    // Indexed by milestone, not by position: with concurrent execution the hung run settles
+    // whenever its process dies, which need not be before the healthy run finishes.
+    const canceled = drained.find((entry) => entry.executed.row.milestone.id === milestones[0]!.id)!;
+    const healthy = drained.find((entry) => entry.executed.row.milestone.id === milestones[1]!.id)!;
+    expect(canceled.executed.result.failure).toMatchObject({ code: "canceled", retryable: false });
+    expect(canceled.retriedInto).toBeNull();
+    expect(healthy.executed.result.ok).toBe(true);
 
     const runs = await store.listRuns(goal.id);
     expect(runs.find((run) => run.id === first.run.id)?.status).toBe("failed");

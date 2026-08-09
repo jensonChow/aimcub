@@ -43,7 +43,7 @@ export {
   RUN_EVENT_RAW_CHAR_CAP,
   RUN_RAW_CHAR_BUDGET,
 } from "./orchestrator";
-export { createRunQueue, DEFAULT_MAX_ATTEMPTS } from "./run-queue";
+export { createRunQueue, DEFAULT_MAX_ATTEMPTS, DEFAULT_MAX_CONCURRENT_RUNS } from "./run-queue";
 export {
   artifactKindFromWord,
   artifactPathFromToolInput,

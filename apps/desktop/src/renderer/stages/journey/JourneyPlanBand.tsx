@@ -32,6 +32,7 @@ import {
   executePrimaryAction,
   executeRouteLabel,
   executeRowStatus,
+  executeWaitingLine,
   isHumanExecuteRoute,
   type ExecuteMilestoneRow,
   type ExecutePrimaryActionKind,
@@ -188,11 +189,23 @@ export function JourneyPlanBand(props: JourneyPlanBandProps) {
 
   if (rows.length === 0) return null;
 
+  const titleById = new Map(rows.map((row) => [row.milestone.id, row.milestone.title]));
+  // How much can move at once. Shown only when it is genuinely more than one — on a plan that
+  // really is sequential the count would just be noise (and "1 ready now" says nothing).
+  const readyCount = rows.filter((row) =>
+    row.ready && !row.completed && !row.blocked && row.milestone.status !== "skipped",
+  ).length;
+
   return (
     <div className="od-journey-plan-band" data-od-id="journey-plan-band">
       <div className="od-journey-journal-head">
         <span className="od-journey-eyebrow">{t("glass.station.plan")}</span>
         <span className="od-journey-plan-band-side">
+          {readyCount > 1 ? (
+            <span className="od-journey-planrow-ready" data-od-id="journey-ready-count">
+              {t("execute.readyNow", { n: readyCount })}
+            </span>
+          ) : null}
           {props.onReplan ? (
             <button
               className="od-journey-plan-band-replan"
@@ -233,7 +246,9 @@ export function JourneyPlanBand(props: JourneyPlanBandProps) {
                 <span className="od-journey-planrow-main">
                   <span className="od-journey-planrow-title">{shortText(row.milestone.title, 96)}</span>
                   <span className="od-journey-planrow-meta">
-                    {[executeRouteLabel(row, t), executeEvidenceLine(row, t)].filter(Boolean).join(" · ")}
+                    {[executeRouteLabel(row, t), executeEvidenceLine(row, t), executeWaitingLine(row, titleById, t)]
+                      .filter(Boolean)
+                      .join(" · ")}
                   </span>
                 </span>
                 <span className={`od-journey-chip od-journey-chip-${ownerChip}`}>

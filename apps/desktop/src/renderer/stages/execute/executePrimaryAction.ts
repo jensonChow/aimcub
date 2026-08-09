@@ -24,7 +24,27 @@ export function executeRowStatus(row: ExecuteMilestoneRow, t: I18n["t"]): { labe
   if (row.completed) return { label: t("os.done"), tone: "success" };
   if (row.blocked) return { label: t("os.blocked"), tone: "danger" };
   if (executeRowNeedsEval(row)) return { label: t("execute.needsEvalReview"), tone: "warn" };
+  // Waiting on a prerequisite is a QUIET state, never danger: nothing is wrong, this work
+  // simply is not up yet. Blocked means something failed and needs a person.
+  if (!row.ready && row.milestone.status !== "skipped") return { label: t("execute.waiting"), tone: "" };
   return { label: row.milestone.status, tone: "" };
+}
+
+/**
+ * What a waiting row is waiting for, in product words. Named prerequisites when few enough to
+ * read; a count otherwise. Empty when the row is ready — a ready row says nothing about waiting.
+ */
+export function executeWaitingLine(
+  row: ExecuteMilestoneRow,
+  titleById: ReadonlyMap<string, string>,
+  t: I18n["t"],
+): string {
+  if (row.ready || row.waiting_on.length === 0) return "";
+  const named = row.waiting_on.map((id) => titleById.get(id)).filter((title): title is string => Boolean(title));
+  if (named.length === 1 && named.length === row.waiting_on.length) {
+    return t("execute.waitingOnOne", { title: named[0]! });
+  }
+  return t("execute.waitingOnMany", { n: row.waiting_on.length });
 }
 
 export function executeEvidenceLine(row: ExecuteMilestoneRow, t: I18n["t"]): string {

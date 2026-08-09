@@ -159,7 +159,7 @@ function milestone(goalId: string, ownerId: string, title: string, order: number
     description: "",
     status: "pending" as const,
     order_index: order,
-    depends_on_id: null,
+    depends_on_ids: [],
     acceptance_rule: {
       logic: "all" as const,
       clauses: [

@@ -650,6 +650,16 @@ as a working agent, not as a form the user operates.
   `<details>` summary on the card ("Contract details", routing, structure) carries the quiet
   caret that turns down when open — a disclosure without an affordance reads as a dead label.
   Guarded in App.test.tsx.
+- **The Journey shows everything that can move at once** (founder 2026-08-09: "并行/顺序的任务
+  关系探索不够，产品只会 1by1"). The plan band head carries an accent "{n} ready now" count, shown
+  ONLY when more than one sub-aim is startable — on a genuinely sequential plan the count would
+  state the obvious. A row waiting on an unfinished prerequisite gets a QUIET "Waiting" pill (no
+  tone) and a meta clause naming what it waits for ("waiting on Survey Cursor Router", or
+  "waiting on 2 sub-aims" when several). Waiting must never read as `danger`: blocked means
+  something failed and needs a person, waiting means nothing is wrong and the work is not up
+  yet. "Your move" only ever offers a READY row — picking the first pending row in plan order
+  was what made a multi-branch plan feel strictly one-at-a-time. No graph/lane view and no new
+  surface: the Journey stays the one work surface, and the plan band stays one row per sub-aim.
 - **The context-review band reads as decisions, not a queue of machine records** (founder
   2026-08-09: the inbox was "设计不明晰" — unclear purpose, bad UI/UX). The band title says its
   function ("Context to review") and the body states the deal in one breath: what you keep

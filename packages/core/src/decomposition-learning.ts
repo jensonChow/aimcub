@@ -103,6 +103,7 @@ const QUALITY_ISSUES = new Set<PlanQualityIssueCode>([
   "weak_commit_pattern",
   "empty_commit_pattern",
   "missing_dependency_shape",
+  "fully_sequential_plan",
 ]);
 
 const QUALITY_DIMENSIONS = new Set<PlanQualityDimension>([
@@ -139,6 +140,7 @@ function qualityDimensionForIssue(code: PlanQualityIssueCode): PlanQualityDimens
     case "oversized_milestone":
     case "compound_milestone":
     case "missing_dependency_shape":
+    case "fully_sequential_plan":
       return "granularity";
     case "duplicate_acceptance_rule":
     case "indistinct_acceptance_rule":
@@ -164,6 +166,7 @@ function recommendationForIssue(code: PlanQualityIssueCode): DecompositionLearni
     case "duplicate_acceptance_rule":
     case "indistinct_acceptance_rule":
     case "missing_dependency_shape":
+    case "fully_sequential_plan":
       return "reconsider_granularity";
     case "missing_decomposition_contract":
     case "missing_contract_evidence":

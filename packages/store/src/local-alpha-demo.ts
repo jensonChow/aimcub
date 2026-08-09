@@ -144,10 +144,14 @@ export function localAlphaDemoPlan(): DecompositionOutput {
         routing_override: null,
       },
     ],
+    // Not a chain: the seed exists to exercise real read-model states, and "everything waits
+    // for the previous row" can only ever show ONE actionable sub-aim. Branching the human
+    // review off the finished contract puts agent work and human work in flight AT THE SAME
+    // TIME, and leaves one genuinely waiting row so the waiting state is demoable too.
     edges: [
       { from: "context-contract", to: "agent-seed-fixture" },
-      { from: "agent-seed-fixture", to: "human-demo-review" },
-      { from: "human-demo-review", to: "low-trust-proof-review" },
+      { from: "context-contract", to: "human-demo-review" },
+      { from: "agent-seed-fixture", to: "low-trust-proof-review" },
     ],
   };
 }

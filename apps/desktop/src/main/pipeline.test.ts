@@ -225,7 +225,7 @@ describe("desktop planner · with a gateway (real @aimcub/llm pipeline)", () => 
     });
     const milestones = materialize(d.output!, "goal-1", "owner-1");
     expect(milestones).toHaveLength(d.output!.nodes.length);
-    expect(milestones[0]!.depends_on_id).toBeNull();
+    expect(milestones[0]!.depends_on_ids).toEqual([]);
   });
 
   it("emits live model run hooks while drafting", async () => {

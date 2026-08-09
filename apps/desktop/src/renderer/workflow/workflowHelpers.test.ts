@@ -39,7 +39,7 @@ const milestone: Milestone = {
   description: "Add the evidence the launch is complete.",
   status: "pending",
   order_index: 0,
-  depends_on_id: null,
+  depends_on_ids: [],
   acceptance_rule: {
     logic: "all",
     threshold: 1,

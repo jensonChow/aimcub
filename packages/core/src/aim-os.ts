@@ -681,6 +681,7 @@ function nextActionForMilestone(input: {
   childRelations: readonly SubAimRelation[];
   completed: boolean;
   blocked: boolean;
+  waitingOnCount: number;
 }): string {
   if (input.completed) return "Completed.";
   if (input.childRelations.some((relation) => relation.status === "completed")) {
@@ -688,6 +689,12 @@ function nextActionForMilestone(input: {
   }
   if (input.childRelations.length > 0) return "Continue the child aim breakdown.";
   if (input.blocked) return "Resolve the blocked assignment or run.";
+  // Waiting is not the same as blocked: nothing is wrong, the prerequisite just is not done.
+  if (input.waitingOnCount > 0) {
+    return input.waitingOnCount === 1
+      ? "Waiting on 1 earlier sub-aim."
+      : `Waiting on ${input.waitingOnCount} earlier sub-aims.`;
+  }
   if (!input.assignment) return "Assign this sub-aim to a human or agent.";
   if (!input.latestRun && input.assignment.actor_kind === "agent") return "Run the assigned agent.";
   if (!input.latestRun && input.assignment.actor_kind === "human") return "Collect human proof and confirm completion.";
@@ -785,12 +792,56 @@ export function buildAimCompletionRecap(input: {
   };
 }
 
+/**
+ * A milestone is SETTLED when it can never gate anything again: it completed, or it was
+ * skipped (retired by a re-plan, so waiting on it would wait forever).
+ */
+function milestoneIsSettled(
+  milestone: Pick<Milestone, "status">,
+  completedIds: ReadonlySet<string>,
+  id: string,
+): boolean {
+  return milestone.status === "completed" || milestone.status === "skipped" || completedIds.has(id);
+}
+
+/**
+ * The prerequisites still standing between this milestone and its start — the canonical
+ * readiness rule every surface reads (`@aimcub/local-agent`'s orchestrator mirrors it for its
+ * own store port; keep the two in step).
+ *
+ * `every`, not `some`: one unmet prerequisite is enough to block. An id naming a milestone that
+ * no longer exists cannot be proven settled, so it keeps blocking rather than silently freeing
+ * the work — a plan that lost a row should stall visibly, not race ahead.
+ */
+export function unmetPrerequisiteIds(
+  milestone: Pick<Milestone, "depends_on_ids">,
+  byId: ReadonlyMap<string, Pick<Milestone, "status">>,
+  completedIds: ReadonlySet<string>,
+): string[] {
+  return milestone.depends_on_ids.filter((id) => {
+    const prerequisite = byId.get(id);
+    return !prerequisite || !milestoneIsSettled(prerequisite, completedIds, id);
+  });
+}
+
+/** True when nothing is left to wait for. See {@link unmetPrerequisiteIds}. */
+export function milestoneIsReady(
+  milestone: Pick<Milestone, "depends_on_ids">,
+  byId: ReadonlyMap<string, Pick<Milestone, "status">>,
+  completedIds: ReadonlySet<string>,
+): boolean {
+  return unmetPrerequisiteIds(milestone, byId, completedIds).length === 0;
+}
+
 export function buildAimProgressReadModel(input: BuildAimProgressInput): AimProgressReadModel {
   const evidence = input.evidence ?? [];
   const completions = input.completions ?? [];
   const assignments = input.assignments ?? [];
   const runs = input.runs ?? [];
   const relationRows = input.subAimRelations ?? [];
+  // Readiness needs the whole set: a prerequisite is any other milestone of this aim.
+  const milestoneById = new Map(input.milestones.map((row) => [row.id, row]));
+  const completedIds = new Set(completions.map((completion) => completion.milestone_id));
   const milestones = input.milestones.map((milestone) => {
     const milestoneEvidence = evidence.filter((row) =>
       row.goal_id === milestone.goal_id && (row.milestone_id === null || row.milestone_id === milestone.id),
@@ -803,6 +854,7 @@ export function buildAimProgressReadModel(input: BuildAimProgressInput): AimProg
     const evaluation = evaluateWithRuntimeReport(milestone.acceptance_rule, milestoneEvidence);
     const completed = milestone.status === "completed" || completions.some((completion) => completion.milestone_id === milestone.id);
     const blocked = milestone.status === "blocked" || assignment?.status === "blocked" || latestRun?.status === "blocked";
+    const waitingOn = unmetPrerequisiteIds(milestone, milestoneById, completedIds);
     return {
       milestone,
       assignment,
@@ -814,6 +866,8 @@ export function buildAimProgressReadModel(input: BuildAimProgressInput): AimProg
       evidence_count: milestoneEvidence.length,
       completed,
       blocked,
+      ready: waitingOn.length === 0,
+      waiting_on: waitingOn,
       next_action: nextActionForMilestone({
         milestone,
         assignment,
@@ -821,10 +875,16 @@ export function buildAimProgressReadModel(input: BuildAimProgressInput): AimProg
         childRelations,
         completed,
         blocked,
+        waitingOnCount: waitingOn.length,
       }),
     };
   });
-  const incomplete = milestones.find((row) => !row.completed && !row.blocked) ?? milestones.find((row) => !row.completed);
+  // The aim's headline next action names work that can actually start: ready and unblocked
+  // first, then anything unblocked, then anything at all. Picking the first pending row in plan
+  // order was what made a multi-branch plan feel strictly 1-by-1.
+  const incomplete = milestones.find((row) => !row.completed && !row.blocked && row.ready)
+    ?? milestones.find((row) => !row.completed && !row.blocked)
+    ?? milestones.find((row) => !row.completed);
   const completionRecap = buildAimCompletionRecap({
     goal: input.goal,
     milestones,

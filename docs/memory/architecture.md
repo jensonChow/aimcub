@@ -34,7 +34,18 @@ Execution progress read models must expose evidence review details from core, no
 
 ## Lean Defaults
 
-Stay lean until concrete triggers demand more: use a jobs table plus pg_cron, linear milestones rather than DAGs, and single-table memory rather than vector infrastructure.
+Stay lean until concrete triggers demand more: use a jobs table plus pg_cron and single-table memory rather than vector infrastructure.
+
+The "linear milestones rather than DAGs" default was RETIRED on 2026-08-09 (see Plan Shape) — the trigger arrived: the product could only ever move one sub-aim at a time.
+
+## Plan Shape: a graph, not a chain (2026-08-09)
+
+A plan is a DAG and every layer must carry it. Founder trigger: "并行/顺序的任务关系探索不够，产品只会 1by1". The brain had always emitted `nodes[] + edges[]`, and four separate layers destroyed it:
+
+- **`Milestone.depends_on_ids` is a LIST.** The old single-parent `depends_on_id` silently kept only the last edge, so fan-in — the join where parallel branches merge — was corrupted at plan time. Both materialize paths (`materialize`, `mergeMilestones`) now resolve every edge; pre-2026-08-09 stores lift their single value on load. The hosted Supabase `milestones.depends_on_id` column is deliberately untouched (local-store-first) and is a known divergence to reconcile at sync parity.
+- **Plan edits preserve the graph.** `withLinearOrder` used to overwrite the brain's edges with `n1→n2→n3…` on every merge/split/reorder. Merge now rewires both sides' edges onto the survivor, split inserts the new node inside the original's slot, and reorder is presentation only. Node order is kept a legal execution order by a stable topological sort, so a drag can arrange independent work but cannot rewrite what must happen first.
+- **Readiness is DERIVED, never stored** — like completion. `unmetPrerequisiteIds` / `milestoneIsReady` in `@aimcub/core` are canonical: ready = every prerequisite settled (completed, or skipped so it can never complete); an unknown prerequisite id keeps blocking rather than freeing the work. `AimProgressMilestoneRead` carries `ready` + `waiting_on`. Waiting is NOT blocked: blocked means something failed, waiting means the work is not up yet. `@aimcub/local-agent`'s orchestrator mirrors the rule for its own store port (that package depends on no store or domain kernel) — keep the two in step.
+- **Independent work runs concurrently.** `drainPass` was `for(;;) { claim; await executeOne(); }`, so even two unrelated queued runs went one after the other. It now runs `DEFAULT_MAX_CONCURRENT_RUNS` (3, `maxConcurrentRuns` to override, clamped ≥1) workers over the same atomic claim. Runs that depend on each other are never both claimable, so concurrency only ever widens work the plan already said could proceed together. Drain result ORDER is no longer a contract.
 
 ## Planning Tools
 

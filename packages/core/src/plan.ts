@@ -181,16 +181,73 @@ function applyNodePatch(node: PlanNode, patch: PlanNodePatch): PlanNode {
   };
 }
 
-function linearEdgesFor(nodes: readonly PlanNode[]): PlanEdge[] {
-  const edges: PlanEdge[] = [];
-  for (let i = 1; i < nodes.length; i += 1) {
-    edges.push({ from: nodes[i - 1]!.key, to: nodes[i]!.key });
+/**
+ * Drop self-edges, de-duplicate, and discard edges pointing at keys the plan no longer has.
+ * An edit must leave the graph parseable — `parseDecomposition` rejects a dangling edge.
+ */
+function tidyEdges(edges: readonly PlanEdge[], nodes: readonly PlanNode[]): PlanEdge[] {
+  const keys = new Set(nodes.map((node) => node.key));
+  const seen = new Set<string>();
+  const out: PlanEdge[] = [];
+  for (const edge of edges) {
+    if (edge.from === edge.to) continue;
+    if (!keys.has(edge.from) || !keys.has(edge.to)) continue;
+    const id = `${edge.from}\u0000${edge.to}`;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push(edge);
   }
-  return edges;
+  return out;
 }
 
-function withLinearOrder(plan: DecompositionOutput, nodes: PlanNode[]): DecompositionOutput {
-  return { ...plan, nodes, edges: linearEdgesFor(nodes) };
+/**
+ * Order the nodes so the list is always a legal execution order, keeping the caller's order
+ * wherever the graph allows it (stable: at each step take the EARLIEST placeable node).
+ *
+ * Node order is presentation; the edges are the facts. Sorting here means a user reordering
+ * rows can freely arrange independent work, while an arrangement the dependencies forbid simply
+ * settles back — instead of silently rewriting what must happen before what.
+ */
+function topologicalOrder(nodes: readonly PlanNode[], edges: readonly PlanEdge[]): PlanNode[] {
+  const prerequisites = new Map<string, Set<string>>(nodes.map((node) => [node.key, new Set<string>()]));
+  for (const edge of edges) prerequisites.get(edge.to)?.add(edge.from);
+
+  const placed = new Set<string>();
+  const ordered: PlanNode[] = [];
+  const remaining = nodes.slice();
+  while (remaining.length > 0) {
+    const index = remaining.findIndex((node) =>
+      [...(prerequisites.get(node.key) ?? [])].every((key) => placed.has(key)));
+    // Nothing placeable means a cycle; `parseDecomposition` rejects those, but take the head
+    // rather than spin forever if a caller hands us one mid-edit.
+    const [next] = remaining.splice(index >= 0 ? index : 0, 1);
+    if (!next) break;
+    placed.add(next.key);
+    ordered.push(next);
+  }
+  return ordered;
+}
+
+/**
+ * Rebuild a plan around an edited node set and edge list: tidy the edges, then present the
+ * nodes in a legal order.
+ *
+ * Editing a plan must PRESERVE its dependency shape. The previous helper replaced the whole
+ * edge list with a strict `n1→n2→n3…` chain, so one merge/split/reorder silently destroyed
+ * whatever parallelism the brain found — and manufactured sequential constraints that nobody
+ * had asserted (founder, 2026-08-09).
+ */
+function withGraph(plan: DecompositionOutput, nodes: PlanNode[], edges: readonly PlanEdge[]): DecompositionOutput {
+  const tidied = tidyEdges(edges, nodes);
+  return { ...plan, nodes: topologicalOrder(nodes, tidied), edges: tidied };
+}
+
+function withRemappedEdges(
+  plan: DecompositionOutput,
+  nodes: PlanNode[],
+  remap: (key: string) => string,
+): DecompositionOutput {
+  return withGraph(plan, nodes, plan.edges.map((edge) => ({ from: remap(edge.from), to: remap(edge.to) })));
 }
 
 function uniquePlanKey(existing: ReadonlySet<string>, preferred: string): string {
@@ -237,7 +294,9 @@ export function mergePlanNodes(plan: DecompositionOutput, targetKey: string, sou
     if (node.key === sourceKey) return [];
     return [node];
   });
-  return withLinearOrder(plan, nodes);
+  // The merged node inherits both sides' dependencies: everything that pointed at either now
+  // points at the survivor (self-edges from the pair's own link are dropped by tidyEdges).
+  return withRemappedEdges(plan, nodes, (key) => (key === sourceKey ? targetKey : key));
 }
 
 export function splitPlanNode(plan: DecompositionOutput, key: string, input: SplitPlanNodeInput = {}): DecompositionOutput {
@@ -262,7 +321,11 @@ export function splitPlanNode(plan: DecompositionOutput, key: string, input: Spl
   };
 
   const nodes = [...plan.nodes.slice(0, index), first, second, ...plan.nodes.slice(index + 1)];
-  return withLinearOrder(plan, nodes);
+  // Splitting inserts `second` AFTER `first` in the same slot in the graph: what the original
+  // depended on still gates `first`, what depended on the original now waits for `second`,
+  // and `second` waits for `first`.
+  const rewired = plan.edges.map((edge) => (edge.from === key ? { from: secondKey, to: edge.to } : edge));
+  return withGraph(plan, nodes, [{ from: key, to: secondKey }, ...rewired]);
 }
 
 export function movePlanNode(plan: DecompositionOutput, key: string, toIndex: number): DecompositionOutput {
@@ -273,7 +336,10 @@ export function movePlanNode(plan: DecompositionOutput, key: string, toIndex: nu
   nextNodes.splice(fromIndex, 1);
   const clamped = Math.max(0, Math.min(toIndex, nextNodes.length));
   nextNodes.splice(clamped, 0, node);
-  return withLinearOrder(plan, nextNodes);
+  // Reordering is presentation only: which work must precede which is a fact about the work,
+  // not about list position, and the old chain-rebuild let a move silently rewrite it. Moves
+  // among independent sub-aims take effect; one the dependencies forbid settles back.
+  return withGraph(plan, nextNodes, plan.edges);
 }
 
 // ── re-plan merge ──────────────────────────────────────────────────────────

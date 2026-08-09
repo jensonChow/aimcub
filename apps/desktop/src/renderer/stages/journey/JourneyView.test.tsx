@@ -21,7 +21,17 @@ const goal: Goal = {
   metadata: {},
 };
 
-function row(o: { id: string; title: string; human?: boolean; completed?: boolean; running?: boolean }): AimProgressMilestoneRead {
+function row(o: {
+  id: string;
+  title: string;
+  human?: boolean;
+  completed?: boolean;
+  running?: boolean;
+  /** Defaults to ready; set false to model work still waiting on a prerequisite. */
+  ready?: boolean;
+  waitingOn?: string[];
+  nextAction?: string;
+}): AimProgressMilestoneRead {
   return {
     milestone: {
       id: o.id,
@@ -31,7 +41,7 @@ function row(o: { id: string; title: string; human?: boolean; completed?: boolea
       description: "",
       status: (o.completed ? "completed" : "pending") as never,
       order_index: 0,
-      depends_on_id: null,
+      depends_on_ids: [],
       acceptance_rule: { logic: "all", clauses: [], threshold: 1, completion_mode: "manual" },
       xp_reward: 10,
       completed_at: null,
@@ -52,7 +62,9 @@ function row(o: { id: string; title: string; human?: boolean; completed?: boolea
     evidence_count: 0,
     completed: Boolean(o.completed),
     blocked: false,
-    next_action: "",
+    ready: o.ready ?? true,
+    waiting_on: o.waitingOn ?? [],
+    next_action: o.nextAction ?? "",
   } as AimProgressMilestoneRead;
 }
 

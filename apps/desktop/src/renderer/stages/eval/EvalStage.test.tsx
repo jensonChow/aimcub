@@ -37,7 +37,7 @@ const milestone: Milestone = {
   description: "Render rule matching and low-trust proof.",
   status: "in_progress",
   order_index: 0,
-  depends_on_id: null,
+  depends_on_ids: [],
   acceptance_rule: {
     logic: "all",
     threshold: 1,
@@ -163,6 +163,8 @@ function progress(options: boolean | ProgressOptions = {}): AimProgressReadModel
       evidence_count: 2,
       completed: complete,
       blocked: false,
+      ready: true,
+      waiting_on: [],
       next_action: complete ? "Completed." : "Review run evidence against the eval rule.",
     }],
     actors: [],

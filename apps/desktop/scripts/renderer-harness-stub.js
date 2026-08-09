@@ -32,7 +32,7 @@
   const calls = [];
   window.__harnessCalls = calls;
 
-  // Scenario flags, so a reload can pick a state: ?nopass, ?planready, ?live, ?question, ?inbox.
+  // Scenario flags: ?nopass, ?planready, ?live, ?question, ?inbox, ?parallel.
   const flags = new URLSearchParams(location.search);
   window.__harnessFlags = Object.fromEntries([...flags.keys()].map((key) => [key, true]));
 
@@ -56,17 +56,70 @@
    * A FULL `AimProgressReadModel`. Every array matters: a partial object crashes the Journey on
    * `progress.runs.some(...)`, which surfaces only as a blank page.
    */
+  /**
+   * `?parallel`: a DIAMOND plan — a finished root, two independent branches ready at the same
+   * time, and a join that waits for both. The shape the product could not express before.
+   */
+  const MS = (n) => `00000000-0000-4000-8000-0000000000${n}`;
+  function planRow(input) {
+    return {
+      milestone: {
+        id: input.id,
+        goal_id: GOAL_ID,
+        owner_id: OWNER,
+        title: input.title,
+        description: "",
+        status: input.completed ? "completed" : "pending",
+        order_index: input.order,
+        depends_on_ids: input.dependsOn ?? [],
+        acceptance_rule: { logic: "all", threshold: 1, completion_mode: "manual", clauses: [] },
+        xp_reward: 10,
+        completed_at: null,
+        metadata: {},
+      },
+      assignment: {
+        id: `a-${input.id}`, owner_id: OWNER, goal_id: GOAL_ID, milestone_id: input.id,
+        actor_kind: input.human ? "human" : "agent", actor_id: null,
+        status: "assigned", source: "routing", reason: "", capability_tags: [],
+      },
+      latest_run: null,
+      child_relations: [],
+      eval_review: { passed: Boolean(input.completed), matched_evidence_ids: [], trust_score: 0, reason: "", next_action: "" },
+      evaluator_results: [],
+      evidence: [],
+      evidence_count: 0,
+      completed: Boolean(input.completed),
+      blocked: false,
+      ready: (input.waitingOn ?? []).length === 0,
+      waiting_on: input.waitingOn ?? [],
+      next_action: "",
+    };
+  }
+  const parallelMilestones = [
+    planRow({ id: MS("c1"), title: "Agree the comparison criteria", order: 0, completed: true }),
+    planRow({ id: MS("c2"), title: "Survey Cursor Router", order: 1, dependsOn: [MS("c1")] }),
+    planRow({ id: MS("c3"), title: "Survey Not Diamond Code", order: 2, dependsOn: [MS("c1")] }),
+    planRow({
+      id: MS("c4"),
+      title: "Write the comparison matrix",
+      order: 3,
+      human: true,
+      dependsOn: [MS("c2"), MS("c3")],
+      waitingOn: [MS("c2"), MS("c3")],
+    }),
+  ];
+
   const progress = {
     goal,
-    milestones: [],
+    milestones: flags.has("parallel") ? parallelMilestones : [],
     actors: [],
     assignments: [],
     runs: [],
     sub_aim_relations: [],
     context_candidates: [],
     completion_recap: null,
-    completed_milestones: 0,
-    total_milestones: 0,
+    completed_milestones: flags.has("parallel") ? 1 : 0,
+    total_milestones: flags.has("parallel") ? 4 : 0,
     blocked_count: 0,
     next_action: "Aim is complete.",
   };
@@ -151,7 +204,7 @@
     options: [],
   };
 
-  let passLive = !flags.has("nopass");
+  let passLive = !flags.has("nopass") && !flags.has("parallel");
 
   function currentPass() {
     if (!passLive) return null;

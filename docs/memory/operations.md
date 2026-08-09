@@ -35,7 +35,8 @@ It copies the built `out/renderer` to a temp dir, injects `apps/desktop/scripts/
 
 - `window.__harnessCalls` — every bridge call in order, as `{ name, args }`. Assert the IPC a click actually produced.
 - `window.__harnessErrors` — render failures captured before the bundle loads. **Check this first when the page is blank**; a missing fixture usually lands here (a partial `AimProgressReadModel` crashes on `progress.runs.some`).
-- Scenario flags on the query string: `/?nopass`, `/?planready`. Add more as data, not as code paths.
+- Scenario flags on the query string: `/?nopass`, `/?planready`, `/?live`, `/?question` (a blocking free-text question), `/?inbox` (pending context candidates), `/?parallel` (a diamond plan: finished root, two branches ready at once, a join waiting on both). Add more as data, not as code paths.
+- **A source file containing a raw NUL byte is invisible to code search.** `orchestrator.ts` once used a literal NUL as a map-key separator inside a template literal; grep/ripgrep classify such a file as BINARY and silently return no matches, which hid a whole store port from repo-wide searches. Write `\u0000` instead — identical at runtime, and the file stays text. If a search "finds nothing" in a file you know contains the term, check for control bytes before trusting the result.
 - The stub's fixtures are a floor, not a spec — **extend them** for whatever surface you are verifying. Its first fixture block is load-bearing: without those the app paints nothing at all.
 
 It is deliberately NOT in the verification gate above: it is an interactive tool, not an automated test. Do not use it in place of unit coverage — use it to prove the gesture.

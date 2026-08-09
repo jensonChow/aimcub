@@ -21,7 +21,8 @@ Aimcub is a universal aim-management layer: it holds the aim, routes work across
 - Evidence is append-only and idempotent; milestone completion is derived by `evaluate()`, never written directly.
 - `@aimcub/*` library packages under `packages/*` are the only place business logic lives: pure TypeScript, zero platform dependencies, unit-tested.
 - App shells under `apps/*` only perform I/O, rendering, and platform bridging.
-- Stay lean-first: jobs table plus pg_cron, linear milestones, single-table memory, no vectors until concrete triggers demand more.
+- A plan is a DAG, not a chain: `depends_on_ids` holds every prerequisite, readiness is derived (never stored), and independent work runs concurrently. Never reintroduce single-parent dependencies or order-implies-sequence.
+- Stay lean-first: jobs table plus pg_cron, single-table memory, no vectors until concrete triggers demand more.
 - Built-in local planning tools are first-party Aimcub runtime tools; MCP is the external extension boundary.
 
 ## Loading Order

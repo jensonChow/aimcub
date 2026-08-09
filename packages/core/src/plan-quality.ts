@@ -29,7 +29,8 @@ export type PlanQualityIssueCode =
   | "unsupported_auto_evaluator"
   | "weak_commit_pattern"
   | "empty_commit_pattern"
-  | "missing_dependency_shape";
+  | "missing_dependency_shape"
+  | "fully_sequential_plan";
 
 export interface PlanQualityIssue {
   code: PlanQualityIssueCode;
@@ -491,7 +492,40 @@ function critiqueDependencyShape(plan: DecompositionOutput): PlanQualityIssue[] 
       },
     ];
   }
+  // The opposite failure: a plan that is one straight chain claims NOTHING can overlap, and a
+  // needless chain makes the whole aim run one step at a time (founder, 2026-08-09).
+  //
+  // The threshold sits ABOVE the 3-7 milestone sweet spot the plan rules ask for, because short
+  // chains are routinely legitimate — "scaffold → implement → test → ship" really is sequential,
+  // and any issue (even `info`) downgrades the grade, so a lower bar would nag on correct plans.
+  // At 8+ strictly serialized milestones, full serialization stops being plausible.
+  if (plan.nodes.length >= 8 && isPureChain(plan)) {
+    return [
+      {
+        code: "fully_sequential_plan",
+        severity: "info",
+        message:
+          "Every milestone waits for the previous one. Confirm each dependency is real — work with "
+          + "no edge between it can proceed at the same time.",
+      },
+    ];
+  }
   return [];
+}
+
+/**
+ * True when the edges form a single path through every node: each node has at most one
+ * prerequisite and at most one dependent, and the edge count is exactly `nodes - 1`.
+ */
+function isPureChain(plan: DecompositionOutput): boolean {
+  if (plan.edges.length !== plan.nodes.length - 1) return false;
+  const outgoing = new Map<string, number>();
+  const incoming = new Map<string, number>();
+  for (const edge of plan.edges) {
+    outgoing.set(edge.from, (outgoing.get(edge.from) ?? 0) + 1);
+    incoming.set(edge.to, (incoming.get(edge.to) ?? 0) + 1);
+  }
+  return plan.nodes.every((node) => (outgoing.get(node.key) ?? 0) <= 1 && (incoming.get(node.key) ?? 0) <= 1);
 }
 
 function isVerificationOnlyNode(node: PlanNode): boolean {
@@ -705,6 +739,7 @@ const ISSUE_DIMENSION: Record<PlanQualityIssueCode, PlanQualityDimension> = {
   missing_context_application: "context_fit",
   missing_decomposition_contract: "context_fit",
   missing_dependency_shape: "distinctness",
+  fully_sequential_plan: "distinctness",
   missing_eval_acceptance_signal: "context_fit",
   missing_research_evidence: "context_fit",
   insufficient_research_coverage: "context_fit",
@@ -790,6 +825,7 @@ const DISTINCTNESS_CONTEXT_ISSUES: PlanQualityIssueCode[] = [
   "duplicate_acceptance_rule",
   "indistinct_acceptance_rule",
   "missing_dependency_shape",
+  "fully_sequential_plan",
 ];
 
 const RESEARCH_CONTEXT_ISSUES: PlanQualityIssueCode[] = [

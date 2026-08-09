@@ -24,6 +24,18 @@ import type { LocalAgentEvent } from "./types";
 /** First try plus one retry. Only a runtime failure classified `retryable` ever gets the retry. */
 export const DEFAULT_MAX_ATTEMPTS = 2;
 
+/**
+ * How many claimed runs may execute at once in one worker.
+ *
+ * Independent sub-aims are the whole reason a plan is a graph rather than a chain, so the drain
+ * must not serialize them (founder, 2026-08-09: "产品只会 1by1"). The cap is deliberately small:
+ * every run spawns a real local agent process with its own CPU, memory, and model quota, and
+ * they all persist through one store lock — unbounded fan-out would trade a queue for thrash.
+ * Runs that depend on each other are never both claimable, so this only ever widens work the
+ * plan already said could proceed together.
+ */
+export const DEFAULT_MAX_CONCURRENT_RUNS = 3;
+
 export interface RunQueueLiveEvent {
   goalId: string;
   runId: string;
@@ -36,6 +48,11 @@ export interface RunQueueOptions {
   onEvent?: (event: RunQueueLiveEvent) => void;
   /** Total attempts allowed per sub-aim, including the first. Defaults to {@link DEFAULT_MAX_ATTEMPTS}. */
   maxAttempts?: number;
+  /**
+   * How many runs may execute at once. Defaults to {@link DEFAULT_MAX_CONCURRENT_RUNS};
+   * values below 1 are clamped to 1 (a queue that drains nothing is not a valid setting).
+   */
+  maxConcurrentRuns?: number;
 }
 
 export interface RunQueueDrainFilter {
@@ -74,6 +91,7 @@ export function createRunQueue<TStore extends RunOrchestratorStore>(
   options: RunQueueOptions = {},
 ): RunQueue<TStore> {
   const maxAttempts = options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
+  const maxConcurrentRuns = Math.max(1, Math.floor(options.maxConcurrentRuns ?? DEFAULT_MAX_CONCURRENT_RUNS));
   const active = new Map<string, AbortController>();
   const drainsInFlight = new Map<string, Promise<DrainedRun<TStore>[]>>();
 
@@ -142,16 +160,31 @@ export function createRunQueue<TStore extends RunOrchestratorStore>(
     const drained: DrainedRun<TStore>[] = [];
     // Retries are followed by id so a `{ runId }` drain still completes its own retry chain.
     const followUps: string[] = [];
-    for (;;) {
-      const next = followUps.shift();
-      const claimed = next
-        ? await store.claimNextQueuedRun({ runId: next })
-        : await store.claimNextQueuedRun(filter);
-      if (!claimed) break;
-      const outcome = await executeOne(claimed as StoreRun<TStore>);
-      drained.push(outcome);
-      if (outcome.retriedInto) followUps.push(outcome.retriedInto);
+
+    /**
+     * One worker: claim → execute → repeat until nothing is claimable. Claiming is a single
+     * atomic store mutation, so N of these race safely and exactly one wins each run — the same
+     * property that already let the desktop and the CLI drain the same store.
+     *
+     * Each worker follows its OWN retry immediately (it pushes then shifts), so no retry chain
+     * can be stranded by another worker finishing first. Workers keep claiming until the queue
+     * answers empty rather than stopping at a first miss, so a run enqueued mid-pass is still
+     * picked up — the serial loop behaved the same way.
+     */
+    async function worker(): Promise<void> {
+      for (;;) {
+        const next = followUps.shift();
+        const claimed = next
+          ? await store.claimNextQueuedRun({ runId: next })
+          : await store.claimNextQueuedRun(filter);
+        if (!claimed) return;
+        const outcome = await executeOne(claimed as StoreRun<TStore>);
+        drained.push(outcome);
+        if (outcome.retriedInto) followUps.push(outcome.retriedInto);
+      }
     }
+
+    await Promise.all(Array.from({ length: maxConcurrentRuns }, () => worker()));
     return drained;
   }
 

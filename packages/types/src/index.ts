@@ -282,8 +282,15 @@ export const Milestone = z.object({
   description: z.string().default(""),
   status: MilestoneStatus.default("pending"),
   order_index: z.number().int().nonnegative(),
-  /** Single-parent dependency (linear / shallow tree); upgraded to a DAG edge table when goals generalize. null = no prerequisite. */
-  depends_on_id: DbId.nullable().default(null),
+  /**
+   * Every milestone that must complete before this one can start; empty = ready from the start.
+   *
+   * A plan is a DAG, so this is a LIST. The former single-parent `depends_on_id` could not hold
+   * fan-in — exactly the join where parallel branches merge — so materialization silently kept
+   * only the last edge and the plan's real shape was lost before it ever reached the product
+   * (founder, 2026-08-09: "产品只会 1by1"). Legacy rows migrate on load.
+   */
+  depends_on_ids: z.array(DbId).default([]),
   acceptance_rule: AcceptanceRule,
   /** Neutral effort/contribution weight (sums into goal progress; an input to eval weighting). Not a gamification score. */
   xp_reward: z.number().int().positive().default(10),
@@ -757,6 +764,13 @@ export const AimProgressMilestoneRead = z.object({
   evidence_count: z.number().int().nonnegative().default(0),
   completed: z.boolean().default(false),
   blocked: z.boolean().default(false),
+  /**
+   * Every prerequisite is settled, so this work could start now. Derived, never stored —
+   * like completion. Unfinished work is either `ready` or waiting on {@link waiting_on}.
+   */
+  ready: z.boolean().default(true),
+  /** Ids of the prerequisites still unfinished; empty when {@link ready}. */
+  waiting_on: z.array(DbId).default([]),
   next_action: z.string().default(""),
 });
 export type AimProgressMilestoneRead = z.infer<typeof AimProgressMilestoneRead>;

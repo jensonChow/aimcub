@@ -41,7 +41,7 @@ function milestone(input: Partial<Milestone> = {}): Milestone {
     description: "Build and test the CLI.",
     status: "pending",
     order_index: 0,
-    depends_on_id: null,
+    depends_on_ids: [],
     acceptance_rule: {
       logic: "all",
       threshold: 1,
@@ -461,7 +461,7 @@ describe("Aim OS cockpit read model", () => {
       title: "Approve local alpha scope",
       description: "Human reviews the alpha non-goals and proof.",
       order_index: 1,
-      depends_on_id: agentMilestone.id,
+      depends_on_ids: [agentMilestone.id],
       acceptance_rule: manualAcceptanceRule(),
       metadata: {
         decomposition_contract: decompositionContract({
@@ -827,5 +827,90 @@ describe("summarizeAimResearch", () => {
       memories: [memoryRow({ id: "mem1", content: "macOS user", category: "project_fact", status: "active" })],
     });
     expect(signal).toMatchObject({ status: "ready", memoryCount: 1 });
+  });
+});
+
+describe("readiness · parallel and sequential work", () => {
+  const ROOT = "00000000-0000-4000-8000-0000000000b0";
+  const BRANCH_A = "00000000-0000-4000-8000-0000000000b1";
+  const BRANCH_B = "00000000-0000-4000-8000-0000000000b2";
+  const JOIN = "00000000-0000-4000-8000-0000000000b3";
+
+  /** Diamond: root fans out to two independent branches that both gate the join. */
+  function diamond(overrides: Partial<Record<string, Partial<Milestone>>> = {}): Milestone[] {
+    return [
+      milestone({ id: ROOT, title: "Set up", order_index: 0, ...overrides[ROOT] }),
+      milestone({ id: BRANCH_A, title: "Branch A", order_index: 1, depends_on_ids: [ROOT], ...overrides[BRANCH_A] }),
+      milestone({ id: BRANCH_B, title: "Branch B", order_index: 2, depends_on_ids: [ROOT], ...overrides[BRANCH_B] }),
+      milestone({
+        id: JOIN,
+        title: "Join",
+        order_index: 3,
+        depends_on_ids: [BRANCH_A, BRANCH_B],
+        ...overrides[JOIN],
+      }),
+    ];
+  }
+
+  /** Startable = ready AND still live: a retired (skipped) row is ready but is not work. */
+  function readyIds(milestones: Milestone[]): string[] {
+    const model = buildAimProgressReadModel({ goal: goal(), milestones });
+    return model.milestones
+      .filter((row) => row.ready && !row.completed && row.milestone.status !== "skipped")
+      .map((row) => row.milestone.id);
+  }
+
+  it("reports every independently startable sub-aim, not just the first", () => {
+    // With the root done, BOTH branches are ready at once — the whole point of the plan's shape.
+    const ids = readyIds(diamond({ [ROOT]: { status: "completed" } }));
+    expect(ids).toEqual([BRANCH_A, BRANCH_B]);
+  });
+
+  it("holds a join until EVERY branch is settled", () => {
+    const oneBranchDone = diamond({ [ROOT]: { status: "completed" }, [BRANCH_A]: { status: "completed" } });
+    expect(readyIds(oneBranchDone)).toEqual([BRANCH_B]);
+
+    const model = buildAimProgressReadModel({ goal: goal(), milestones: oneBranchDone });
+    const join = model.milestones.find((row) => row.milestone.id === JOIN)!;
+    // The single-parent field kept only the last edge, so the join looked ready here.
+    expect(join.ready).toBe(false);
+    expect(join.waiting_on).toEqual([BRANCH_B]);
+    expect(join.next_action).toBe("Waiting on 1 earlier sub-aim.");
+    // Waiting is not an error state — nothing is wrong, the work just is not up yet.
+    expect(join.blocked).toBe(false);
+
+    const bothDone = diamond({
+      [ROOT]: { status: "completed" },
+      [BRANCH_A]: { status: "completed" },
+      [BRANCH_B]: { status: "completed" },
+    });
+    expect(readyIds(bothDone)).toEqual([JOIN]);
+  });
+
+  it("treats a skipped prerequisite as settled — a retired row must not stall the plan forever", () => {
+    const ids = readyIds(diamond({
+      [ROOT]: { status: "completed" },
+      [BRANCH_A]: { status: "skipped" },
+      [BRANCH_B]: { status: "completed" },
+    }));
+    expect(ids).toEqual([JOIN]);
+  });
+
+  it("keeps waiting when a prerequisite id names a row the plan no longer has", () => {
+    const orphan = [milestone({ id: JOIN, depends_on_ids: ["00000000-0000-4000-8000-0000000000ff"] })];
+    const row = buildAimProgressReadModel({ goal: goal(), milestones: orphan }).milestones[0]!;
+    expect(row.ready).toBe(false);
+  });
+
+  it("points the aim's next action at ready work rather than the first row in plan order", () => {
+    // BRANCH_A is complete, so plan order would still offer the JOIN (index 3 comes after
+    // BRANCH_B) — the headline action must name work that can actually start.
+    const model = buildAimProgressReadModel({
+      goal: goal(),
+      milestones: diamond({ [ROOT]: { status: "completed" }, [BRANCH_A]: { status: "completed" } }),
+    });
+    expect(model.next_action).toBe(
+      model.milestones.find((row) => row.milestone.id === BRANCH_B)!.next_action,
+    );
   });
 });

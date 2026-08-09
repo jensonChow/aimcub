@@ -5554,6 +5554,19 @@ kbd {
   gap: 10px;
 }
 
+/* "N ready now" — how much can move at once. The accent marks genuine capacity to act; it
+   appears only when more than one sub-aim is startable, so it never states the obvious. */
+.od-journey-planrow-ready {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  color: var(--acc);
+  font-size: var(--od-type-meta);
+  line-height: var(--od-line-meta);
+  font-weight: var(--od-font-weight-medium);
+  white-space: nowrap;
+}
+
 .od-journey-plan-band-replan {
   flex: none;
   display: inline-flex;

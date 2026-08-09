@@ -66,6 +66,7 @@ import type {
   MilestoneCompletion,
   MilestoneStatus,
   ManualEvidenceRequiredItem,
+  PlanEdge,
   PlanNode,
   Run,
   RunEvent,
@@ -881,7 +882,33 @@ function linkParentSubAim(
 }
 
 /**
- * Validate a DecompositionOutput and materialize it into linear Milestone rows.
+ * Resolve plan edges into per-node prerequisite milestone ids, keeping EVERY edge.
+ *
+ * `{from, to}` means `to` depends on `from`, and a node may legitimately have several
+ * prerequisites (the join that ends parallel branches). Collecting into a list is the whole
+ * point: the previous `Map<to, fromId>` let the last edge win and silently deleted the rest.
+ */
+function prerequisiteIdsByNodeKey(
+  edges: readonly PlanEdge[],
+  idByKey: ReadonlyMap<string, string>,
+): Map<string, string[]> {
+  const dependsOn = new Map<string, string[]>();
+  for (const edge of edges) {
+    const fromId = idByKey.get(edge.from);
+    if (!fromId) continue;
+    const current = dependsOn.get(edge.to);
+    if (current) {
+      if (!current.includes(fromId)) current.push(fromId);
+    } else {
+      dependsOn.set(edge.to, [fromId]);
+    }
+  }
+  return dependsOn;
+}
+
+/**
+ * Validate a DecompositionOutput and materialize it into Milestone rows, preserving the
+ * plan's real dependency shape (a DAG, not necessarily a chain).
  * Routes through {@link parseDecomposition} (shape + semantic gate, identical to web/desktop).
  */
 export function materialize(
@@ -895,11 +922,7 @@ export function materialize(
 
   const idByKey = new Map<string, string>();
   for (const node of plan.nodes) idByKey.set(node.key, idFactory());
-  const dependsOn = new Map<string, string>(); // to -> from id
-  for (const edge of plan.edges) {
-    const fromId = idByKey.get(edge.from);
-    if (fromId) dependsOn.set(edge.to, fromId);
-  }
+  const dependsOn = prerequisiteIdsByNodeKey(plan.edges, idByKey);
 
   return plan.nodes.map((node, i) => {
     const status = statuses[i] ?? "pending";
@@ -911,7 +934,7 @@ export function materialize(
       description: node.description,
       status,
       order_index: i,
-      depends_on_id: dependsOn.get(node.key) ?? null,
+      depends_on_ids: dependsOn.get(node.key) ?? [],
       acceptance_rule: node.acceptance_rule,
       xp_reward: node.xp_reward,
       completed_at: null,
@@ -961,11 +984,7 @@ export function mergeMilestones(
   for (const item of merged) {
     if (item.nodeKey) idByKey.set(item.nodeKey, item.existingId ?? idFactory());
   }
-  const dependsOn = new Map<string, string>(); // node key (`to`) -> prerequisite milestone id
-  for (const edge of plan.edges) {
-    const fromId = idByKey.get(edge.from);
-    if (fromId) dependsOn.set(edge.to, fromId);
-  }
+  const dependsOn = prerequisiteIdsByNodeKey(plan.edges, idByKey);
 
   const milestones: Milestone[] = [];
   merged.forEach((item, order) => {
@@ -981,7 +1000,7 @@ export function mergeMilestones(
         description: node.description,
         status: "pending",
         order_index: order,
-        depends_on_id: dependsOn.get(node.key) ?? null,
+        depends_on_ids: dependsOn.get(node.key) ?? [],
         acceptance_rule: node.acceptance_rule,
         xp_reward: node.xp_reward,
         completed_at: null,
@@ -994,7 +1013,7 @@ export function mergeMilestones(
         title: node.title,
         description: node.description,
         order_index: order,
-        depends_on_id: dependsOn.get(node.key) ?? null,
+        depends_on_ids: dependsOn.get(node.key) ?? [],
         acceptance_rule: node.acceptance_rule,
         xp_reward: node.xp_reward,
         metadata: { ...prev.metadata, ...planNodeMetadata(node) },
@@ -1004,12 +1023,12 @@ export function mergeMilestones(
       milestones.push({
         ...prev,
         order_index: order,
-        depends_on_id: item.nodeKey ? (dependsOn.get(item.nodeKey) ?? null) : null,
+        depends_on_ids: item.nodeKey ? (dependsOn.get(item.nodeKey) ?? []) : [],
         metadata: item.nodeKey ? { ...prev.metadata, plan_key: item.nodeKey } : prev.metadata,
       });
     } else if (item.action === "skip" && prev) {
       // Unfinished but dropped from the new plan — retire as a soft-deleted row.
-      milestones.push({ ...prev, status: "skipped", order_index: order, depends_on_id: null });
+      milestones.push({ ...prev, status: "skipped", order_index: order, depends_on_ids: [] });
     }
   });
 
@@ -1313,6 +1332,28 @@ function normalizeLegacyGoalDomain(goal: Goal): Goal {
   return goal;
 }
 
+/**
+ * Carry pre-DAG stores forward: a milestone written before 2026-08-09 holds one prerequisite in
+ * `depends_on_id`. Lift it into the list (a store on disk outlives the schema that wrote it, and
+ * a dropped prerequisite would silently make waiting work look ready).
+ */
+function normalizeMilestoneRow(raw: unknown): unknown {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
+  const row = raw as Record<string, unknown>;
+  if (Array.isArray(row.depends_on_ids)) return row;
+  const { depends_on_id: legacy, ...rest } = row;
+  return { ...rest, depends_on_ids: typeof legacy === "string" && legacy ? [legacy] : [] };
+}
+
+function normalizeMilestonesByGoal(raw: unknown): Record<string, Milestone[]> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const out: Record<string, Milestone[]> = {};
+  for (const [goalId, rows] of Object.entries(raw as Record<string, unknown>)) {
+    out[goalId] = Array.isArray(rows) ? (rows.map(normalizeMilestoneRow) as Milestone[]) : [];
+  }
+  return out;
+}
+
 function normalizeLocalStore(raw: unknown): LocalStore {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     throw new Error("store.json does not contain a JSON object");
@@ -1329,7 +1370,7 @@ function normalizeLocalStore(raw: unknown): LocalStore {
     aimDrafts: requireRows<unknown>(parsed.aimDrafts, "aimDrafts")
       .map(normalizeAimDraftRow)
       .filter((row): row is AimDraftRow => row !== null),
-    milestonesByGoal: parsed.milestonesByGoal ?? {},
+    milestonesByGoal: normalizeMilestonesByGoal(parsed.milestonesByGoal),
     memories: requireRows<Memory>(parsed.memories, "memories").map(normalizeMemoryRow),
     evidence: requireRows<Evidence>(parsed.evidence, "evidence"),
     completions: requireRows<MilestoneCompletion>(parsed.completions, "completions"),

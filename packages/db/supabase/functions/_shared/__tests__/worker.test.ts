@@ -54,7 +54,7 @@ function milestone(rule: AcceptanceRule, xp = 25): Milestone {
     description: "",
     status: "in_progress",
     order_index: 0,
-    depends_on_id: null,
+    depends_on_ids: [],
     acceptance_rule: rule,
     xp_reward: xp,
     completed_at: null,

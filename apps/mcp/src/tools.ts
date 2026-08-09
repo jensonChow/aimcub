@@ -152,7 +152,9 @@ export function registerAimcubTools(server: McpServer, deps: ToolDeps): void {
           title: m.title,
           status: m.status,
           orderIndex: m.order_index,
-          dependsOnId: m.depends_on_id,
+          // Every prerequisite, not just one: an external agent asking "what can I start?"
+          // needs the real join, and a truncated list reads as ready when it is not.
+          dependsOnIds: m.depends_on_ids,
           xpReward: m.xp_reward,
         })),
       });
