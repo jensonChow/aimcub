@@ -1,9 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { AuthError, bearerFromHeader, verifyAccessToken } from "./auth";
 import { makeTestSigner } from "./test-helpers";
 
 const RESOURCE = "https://mcp.aimcub.com";
 const ISSUER = "https://auth.aimcub.com";
+
+/**
+ * Pay for the RSA keypairs in a hook rather than inside whichever test happens to run first.
+ * `makeTestSigner` generates them once and caches them, but that one generation still has a
+ * multi-second tail — and a hook gets vitest's 10s budget instead of a test's 5s one.
+ */
+beforeAll(async () => {
+  await makeTestSigner();
+});
 
 describe("verifyAccessToken", () => {
   it("accepts a token with a valid signature and the correct audience", async () => {
