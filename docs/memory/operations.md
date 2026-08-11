@@ -15,6 +15,15 @@ git diff --check
 
 The project declares `pnpm@11.10.0` and Node `>=22.13`; the Codex runtime may resolve another pnpm. Prefer the `/Users/jenson/.local/node/bin` PATH prefix on this machine.
 
+**Turbo caches test results, so a repeated `pnpm test` proves nothing.** Identical durations across runs (e.g. the same `2123ms` three times) mean cache hits, not passes. To actually re-execute — the only way to chase a flake — use `TURBO_FORCE=true pnpm test`, or run `npx vitest run` inside the package.
+
+### Flaky-test triage: read the duration first
+
+A failure whose duration is ~5000ms is a **test timeout**, not a wrong assertion — vitest's defaults are `testTimeout: 5000` and `hookTimeout: 10000`, and this repo overrides neither. Two flakes diagnosed this way (2026-08-09):
+
+- **The first test in a file pays the whole module-transform cost.** `planning-checkpoint.test.ts` imports `./planning-session`, which pulls in `@aimcub/llm` + `@aimcub/local-agent`; that first import cost ~1.4s idle *inside test #1*, and under a loaded parallel run it crossed the 5s budget and timed out. Fix: warm the graph in `beforeAll` (10s budget) — test #1 went 1396ms → 16ms, and later `vi.resetModules()` re-imports reuse the cached transform. Apply the same trick to any test file whose first test is disproportionately slow.
+- **Fake timers must be scoped to what you are testing.** Bare `vi.useFakeTimers()` also fakes `setImmediate`/`Date`/`queueMicrotask`, which sits under `await import(...)` and promise plumbing, so ordinary async setup can stall until timers are advanced. Fake only the mechanism under test — e.g. `vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] })` for a coalescing window — and install it for the whole `describe` so a timer armed by one test cannot fire inside a later one and add a phantom write to shared state.
+
 Every repository-changing session must finish by running the full verification suite above, refreshing the project-root `Aimcub.app` with `pnpm desktop:pack`, updating `docs/handoff.md`, creating a focused commit, and merging completed branch work into `main`. Push only when authorized and not explicitly declined by the user. If work happens directly on `main`, record that no separate merge was needed.
 
 If pushing the default branch is blocked by permission review or requires explicit user approval, do not retry through another route. Leave the local focused commit in place, record the exact ahead/unpushed state in `docs/handoff.md`, and ask the user for explicit approval before pushing.

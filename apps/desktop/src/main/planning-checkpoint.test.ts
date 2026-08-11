@@ -10,7 +10,7 @@
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { LocalAgentDetection, LocalAgentEvent } from "@aimcub/local-agent";
 import type { PlanningSessionEvent, PlanningSessionSnapshot } from "@aimcub/llm";
@@ -117,6 +117,19 @@ vi.mock("@aimcub/local-agent", async (importOriginal) => {
   };
 });
 
+/**
+ * Pay the module graph's transform cost ONCE, in a hook rather than inside the first test.
+ *
+ * `./planning-session` pulls in `@aimcub/llm` and `@aimcub/local-agent`, and the file's first
+ * import transforms all of it — well over a second on an idle machine. Left inside test #1 that
+ * one-off cost counts against that test's 5s budget, which is how this file could time out during
+ * a loaded parallel run while passing comfortably in isolation. Hooks get a 10s budget, and the
+ * per-test `vi.resetModules()` re-imports afterwards reuse the cached transform.
+ */
+beforeAll(async () => {
+  await import("./planning-session");
+});
+
 const GOAL_ID = "82e331b1-4ed7-47f5-9a1b-18dd098d265a";
 
 /** A pass that stopped mid-flight with real history on it, as a quit would leave one. */
@@ -155,6 +168,27 @@ async function settleWrites(): Promise<void> {
   await Promise.resolve();
 }
 
+/**
+ * Virtualize the coalescing window — and ONLY that.
+ *
+ * `scheduleCheckpoint` is a `setTimeout`, so faking `setTimeout`/`clearTimeout` puts the window
+ * fully under the test's control: no assertion here depends on how fast the machine is, and a
+ * coalesce armed by one test can never fire inside a later one (these tests share `savedPasses`,
+ * so a stray real timer landing mid-test shows up as a phantom extra write).
+ *
+ * Everything else stays REAL on purpose. Faking `setImmediate`/`Date`/`queueMicrotask` — which is
+ * what the default `toFake` set does — would also intercept the plumbing behind `await import(...)`
+ * and the store's promise chain, so ordinary async setup could stall until timers were advanced.
+ */
+function useCoalesceTimers(): void {
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+}
+
+/** Mirrors `CHECKPOINT_COALESCE_MS` in `planning-session.ts` (not exported — it is internal). */
+const CHECKPOINT_COALESCE_MS = 1500;
+/** Comfortably past the window, so the coalesced write is guaranteed to have fired. */
+const PAST_COALESCE_WINDOW_MS = CHECKPOINT_COALESCE_MS + 100;
+
 async function start() {
   const module = await import("./planning-session");
   await module.startPlanningSession({ goalId: GOAL_ID, title: "我想做一个塔罗的AI产品" });
@@ -164,7 +198,9 @@ async function start() {
 
 describe("planning-pass checkpointing", () => {
   beforeEach(() => {
-    vi.useRealTimers();
+    // Every test in this block asserts on WHICH writes reached the store, so none of them may be
+    // at the mercy of a real 1.5s timer — see useCoalesceTimers.
+    useCoalesceTimers();
     vi.resetModules();
     savedPasses.length = 0;
     startRequests.length = 0;
@@ -173,6 +209,10 @@ describe("planning-pass checkpointing", () => {
     snapshot = freshSnapshot();
     canceled = false;
     resolveDone = null;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("flushes a question immediately — a pending question is what a reopened aim must show", async () => {
@@ -198,6 +238,7 @@ describe("planning-pass checkpointing", () => {
     });
     await settleWrites();
 
+    // "Immediately" means WITHOUT the coalesce window: the clock has not moved at all here.
     expect(savedPasses).toHaveLength(1);
     expect(savedPasses[0]!.goalId).toBe(GOAL_ID);
     expect(savedPasses[0]!.pass?.phase).toBe("waiting_user");
@@ -206,17 +247,28 @@ describe("planning-pass checkpointing", () => {
     expect(savedPasses[0]!.pass?.agent_id).toBe("codex");
     expect(savedPasses[0]!.pass?.model).toBe("gpt-5.6-sol");
     expect(savedPasses[0]!.pass?.stopped_reason).toBe("");
+
+    // And the flush CANCELLED the coalesce rather than racing it: letting the window elapse
+    // produces no second write of the same state.
+    await vi.advanceTimersByTimeAsync(PAST_COALESCE_WINDOW_MS);
+    await settleWrites();
+    expect(savedPasses).toHaveLength(1);
   });
 
   it("coalesces tool activity instead of writing the store per event", async () => {
-    vi.useFakeTimers();
     await start();
     for (let i = 0; i < 5; i += 1) {
       activityEvent({ type: "agent.tool.started", summary: `read ${i}`, toolName: "local.read" } as LocalAgentEvent);
     }
+    // Still inside the window: the store has not been touched.
     expect(savedPasses).toHaveLength(0);
 
-    await vi.advanceTimersByTimeAsync(1600);
+    // Halfway is still silence — the window is a real delay, not a token one.
+    await vi.advanceTimersByTimeAsync(CHECKPOINT_COALESCE_MS - 1);
+    await settleWrites();
+    expect(savedPasses).toHaveLength(0);
+
+    await vi.advanceTimersByTimeAsync(PAST_COALESCE_WINDOW_MS);
     await settleWrites();
     // Five events, one write.
     expect(savedPasses).toHaveLength(1);
@@ -321,12 +373,11 @@ describe("planning-pass checkpointing", () => {
   });
 
   it("drops an armed checkpoint when the session is canceled, so a dead pass cannot write back", async () => {
-    vi.useFakeTimers();
     const module = await start();
     activityEvent({ type: "agent.tool.started", summary: "read", toolName: "local.read" } as LocalAgentEvent);
     module.cancelPlanningSession(GOAL_ID);
 
-    await vi.advanceTimersByTimeAsync(3000);
+    await vi.advanceTimersByTimeAsync(PAST_COALESCE_WINDOW_MS * 2);
     await settleWrites();
     expect(savedPasses).toHaveLength(0);
   });
