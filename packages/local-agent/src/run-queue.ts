@@ -11,6 +11,8 @@
 import {
   enqueueMilestoneRun,
   executeQueuedRun,
+  RunInterruptedByShutdownError,
+  SHUTDOWN_ABORT_REASON,
   type EnqueueMilestoneRunInput,
   type EnqueuedRun,
   type ExecutedRun,
@@ -81,6 +83,13 @@ export interface RunQueue<TStore extends RunOrchestratorStore> {
   drain(filter?: RunQueueDrainFilter): Promise<DrainedRun<TStore>[]>;
   /** Abort an executing run. The engine settles it with failure code "canceled"; no retry follows. */
   cancel(runId: string): boolean;
+  /**
+   * Abort every executing run because the process is quitting. Unlike {@link cancel}, this does
+   * NOT settle: each row is deliberately left `running` so the next wake's reconciler continues
+   * the work — quitting is a pause, and this makes a graceful quit die the same recoverable
+   * death as a force-quit.
+   */
+  abortAllForShutdown(): void;
   /** Run ids currently executing in this process. */
   activeRunIds(): string[];
 }
@@ -178,7 +187,15 @@ export function createRunQueue<TStore extends RunOrchestratorStore>(
           ? await store.claimNextQueuedRun({ runId: next })
           : await store.claimNextQueuedRun(filter);
         if (!claimed) return;
-        const outcome = await executeOne(claimed as StoreRun<TStore>);
+        let outcome: DrainedRun<TStore>;
+        try {
+          outcome = await executeOne(claimed as StoreRun<TStore>);
+        } catch (error) {
+          // The quit path: the row was deliberately left `running` for the next wake's
+          // reconciler, and a quitting worker has nothing further to claim.
+          if (error instanceof RunInterruptedByShutdownError) return;
+          throw error;
+        }
         drained.push(outcome);
         if (outcome.retriedInto) followUps.push(outcome.retriedInto);
       }
@@ -209,6 +226,10 @@ export function createRunQueue<TStore extends RunOrchestratorStore>(
       if (!controller) return false;
       controller.abort();
       return true;
+    },
+
+    abortAllForShutdown() {
+      for (const controller of active.values()) controller.abort(SHUTDOWN_ABORT_REASON);
     },
 
     activeRunIds() {

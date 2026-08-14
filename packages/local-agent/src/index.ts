@@ -34,15 +34,29 @@ export {
   chooseMilestone,
   enqueueMilestoneRun,
   executeQueuedRun,
+  isShutdownAbort,
   milestonePrompt,
   persistedArtifactEvent,
   persistedRunEvent,
   queuedRunRequest,
   RunArtifactLedger,
+  RunInterruptedByShutdownError,
   RunRawRetention,
   RUN_EVENT_RAW_CHAR_CAP,
   RUN_RAW_CHAR_BUDGET,
+  SHUTDOWN_ABORT_REASON,
 } from "./orchestrator";
+export {
+  defaultIsProcessAlive,
+  INTERRUPTED_RUN_ERROR,
+  INTERRUPTED_RUN_SUMMARY,
+  reconcileInterruptedRuns,
+} from "./interrupted-runs";
+export type {
+  InterruptedRunReconciliation,
+  InterruptedRunStore,
+  ReconcileInterruptedRunsOptions,
+} from "./interrupted-runs";
 export { createRunQueue, DEFAULT_MAX_ATTEMPTS, DEFAULT_MAX_CONCURRENT_RUNS } from "./run-queue";
 export {
   artifactKindFromWord,

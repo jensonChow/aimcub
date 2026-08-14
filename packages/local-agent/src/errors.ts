@@ -40,8 +40,12 @@ export class RunSelectionError extends Error {
 
 /** No sub-aim qualifies: none is ready, or the requested one cannot be run. */
 export class MilestoneSelectionError extends RunSelectionError {
-  constructor(code: MilestoneSelectionErrorCode, message: string) {
+  /** The resolved sub-aim, when the refusal is about one — how a caller acts on the SAME row. */
+  readonly milestoneId: string | null;
+
+  constructor(code: MilestoneSelectionErrorCode, message: string, milestoneId: string | null = null) {
     super(code, message);
+    this.milestoneId = milestoneId;
   }
 }
 

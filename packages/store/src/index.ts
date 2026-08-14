@@ -377,6 +377,12 @@ export interface FinishRunInput {
   error?: string | null;
 }
 
+export interface SettleInterruptedRunInput {
+  runId: string;
+  summary?: string;
+  error?: string | null;
+}
+
 export interface RecordToolTraceInput {
   ownerId?: string;
   sessionId?: string | null;
@@ -472,6 +478,15 @@ export interface AimStore {
    */
   claimNextQueuedRun(filter?: ClaimQueuedRunFilter): Promise<Run | null>;
   finishRun(input: FinishRunInput): Promise<Run | null>;
+  /**
+   * Settle a run whose worker process died before it could finish: atomically flip a still-
+   * `running` row to `failed` and return it, or return `null` when the row is not `running`
+   * anymore — the same lost-a-race contract as {@link claimNextQueuedRun}, so two waking
+   * processes can both try and exactly one continues the work. This is the ONLY sanctioned way
+   * a run changes state from outside the process that claimed it; the caller decides orphanhood
+   * (dead `worker_pid`), the store only enforces the transition.
+   */
+  settleInterruptedRun(input: SettleInterruptedRunInput): Promise<Run | null>;
   /** The full run-lifecycle event stream for one aim (run events carry no goal id, so this joins run → goal). */
   listRunEvents(goalId: string): Promise<RunEvent[]>;
   recordToolTrace(input: RecordToolTraceInput): Promise<ToolTrace>;
@@ -2154,6 +2169,7 @@ export function createJsonFileStore(dataDir: string = defaultDataDir(), options:
           kind: input.actorKind === "agent" ? "agent" : "human",
           status,
           attempt,
+          worker_pid: status === "running" ? process.pid : null,
           workspace_root: input.workspaceRoot ?? null,
           sandbox: input.sandbox ?? null,
           network_enabled: input.networkEnabled ?? false,
@@ -2204,6 +2220,10 @@ export function createJsonFileStore(dataDir: string = defaultDataDir(), options:
         const now = nowIso();
         claimed.status = "running";
         claimed.started_at = now;
+        // A `running` status is a claim of process ownership, so record whose it is: this pid is
+        // how a later wake tells a run that is still being executed from one orphaned by a dead
+        // process ({@link AimStore.settleInterruptedRun}).
+        claimed.worker_pid = process.pid;
         const assignment = claimed.assignment_id
           ? store.assignments.find((row) => row.id === claimed.assignment_id)
           : null;
@@ -2293,6 +2313,39 @@ export function createJsonFileStore(dataDir: string = defaultDataDir(), options:
           type: input.status === "completed" ? "run.completed" : input.status === "cancelled" ? "run.cancelled" : "run.failed",
           summary: input.summary ?? input.error ?? "",
           payload: {},
+          created_at: now,
+        });
+        save(store);
+        return run;
+      });
+    },
+
+    async settleInterruptedRun(input: SettleInterruptedRunInput): Promise<Run | null> {
+      return withWriteLock(() => {
+        const store = load();
+        const run = store.runs.find((row) => row.id === input.runId);
+        // Only a still-`running` row can be settled as interrupted: a run the live claim path
+        // already finished (or a merely-queued one) is not an orphan, and returning null tells
+        // a racing reconciler it lost — mirroring the claim gate this settles the other side of.
+        if (!run || run.status !== "running") return null;
+        const now = nowIso();
+        run.status = "failed";
+        run.summary = input.summary ?? run.summary;
+        run.error = input.error ?? "interrupted";
+        run.finished_at = now;
+        if (!run.started_at) run.started_at = run.queued_at ?? now;
+        const assignment = run.assignment_id ? store.assignments.find((row) => row.id === run.assignment_id) : null;
+        if (assignment && assignment.status !== "completed" && assignment.status !== "cancelled") {
+          assignment.status = "blocked";
+          assignment.updated_at = now;
+        }
+        store.runEvents.push({
+          id: nextId(),
+          owner_id: run.owner_id,
+          run_id: run.id,
+          type: "run.failed",
+          summary: input.summary ?? input.error ?? "",
+          payload: { interrupted: true, worker_pid: run.worker_pid ?? null },
           created_at: now,
         });
         save(store);

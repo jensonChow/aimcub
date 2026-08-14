@@ -1,7 +1,7 @@
 import { app, BrowserWindow, nativeTheme, type Point } from "electron";
 import { join } from "node:path";
 
-import { registerIpc } from "./ipc";
+import { abortRunsForShutdown, registerIpc } from "./ipc";
 import { cancelAllPlanningSessions, checkpointAllPlanningSessions } from "./planning-session";
 import { loadContextSourceConfig } from "./context-source-settings";
 import { loadProviderConfig } from "./gateway";
@@ -178,8 +178,14 @@ app.on("window-all-closed", () => {
 // finds planning where it left off instead of an aim that looks like it was never planned. The
 // quit is deferred exactly once for that write; `checkpointAllPlanningSessions` is itself bounded,
 // so a blocked store lock cannot hold the app open.
+//
+// Executing agent runs get the same "pause" the same way but with no write at all: their child
+// processes are aborted WITHOUT settling, so each row stays `running` on disk — the durable
+// marker the next launch's reconciliation settles and continues. Settling here would record a
+// cancellation and stop the flow from resuming on reopen.
 let quitCheckpointStarted = false;
 app.on("before-quit", (event) => {
+  abortRunsForShutdown();
   if (quitCheckpointStarted) {
     cancelAllPlanningSessions();
     return;

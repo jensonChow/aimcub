@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
@@ -15,8 +15,10 @@ import {
   fileArtifactsFromChanges,
   isRecord,
   listLocalAgents,
+  reconcileInterruptedRuns,
   runLocalAgent,
   safeJsonParse,
+  INTERRUPTED_RUN_ERROR,
   RUN_EVENT_RAW_CHAR_CAP,
   RUN_RAW_CHAR_BUDGET,
   type LocalAgentAdapter,
@@ -653,5 +655,204 @@ describe("aimcub run --until-blocked", () => {
     expect(result.completions).toEqual([]);
     expect(result.progress?.milestones[0]?.latest_run?.status).toBe("completed");
     expect(await store.listRuns(goal.id)).toHaveLength(1);
+  });
+});
+
+/**
+ * Wake-time reconciliation: a `running` row whose worker process died is settled as interrupted
+ * and re-queued, so reopening the app continues the flow instead of wedging the aim behind a row
+ * nothing can cancel, finish, or re-run.
+ */
+describe("interrupted-run reconciliation", () => {
+  async function seedAimWithDataDir() {
+    const dataDir = mkdtempSync(join(tmpdir(), "aimcub-queue-store-"));
+    const store = createJsonFileStore(dataDir);
+    const workspace = mkdtempSync(join(tmpdir(), "aimcub-queue-workspace-"));
+    const { goal, milestones } = await store.createGoal({ title: "Drain a queue end to end", plan: PLAN });
+    return { dataDir, store, goal, milestones, workspace };
+  }
+
+  /** Rewrites one run row directly on disk — how a foreign worker's pid gets into a test store. */
+  function patchStoredRun(dataDir: string, runId: string, patch: Record<string, unknown>): void {
+    const path = join(dataDir, "store.json");
+    const data = JSON.parse(readFileSync(path, "utf8")) as { runs: Array<Record<string, unknown>> };
+    Object.assign(data.runs.find((row) => row.id === runId)!, patch);
+    writeFileSync(path, JSON.stringify(data), "utf8");
+  }
+
+  it("settles an orphaned run at wake and queues a continuation that then really runs", async () => {
+    const { store, goal, milestones, workspace } = await seedAimWithDataDir();
+    const queue = createRunQueue(store, queueDependencies([OK_RUN]));
+    const enqueued = await queue.enqueue({
+      goalId: goal.id,
+      milestoneRef: milestones[0]!.id,
+      workspace,
+      sandbox: "read-only",
+      network: false,
+      model: "fake-model",
+      instruction: "Keep going.",
+    });
+    // Claim as a worker would, then "die" without ever settling. The claim stamped OUR pid, and
+    // a pid equal to the reconciler's own is proof of a previous incarnation, not a live worker.
+    const claimed = await store.claimNextQueuedRun({ runId: enqueued.run.id });
+    expect(claimed?.worker_pid).toBe(process.pid);
+
+    const outcomes = await reconcileInterruptedRuns(store, queueDependencies([]));
+    expect(outcomes).toHaveLength(1);
+    expect(outcomes[0]).toMatchObject({ runId: enqueued.run.id, disposition: "continued" });
+    const continuationId = outcomes[0]!.continuationRunId!;
+
+    const runs = await store.listRuns(goal.id);
+    expect(runs.find((row) => row.id === enqueued.run.id)).toMatchObject({
+      status: "failed",
+      error: INTERRUPTED_RUN_ERROR,
+    });
+    // The continuation carries the interrupted run's recorded permission, runtime and brief.
+    expect(runs.find((row) => row.id === continuationId)).toMatchObject({
+      status: "queued",
+      milestone_id: milestones[0]!.id,
+      sandbox: "read-only",
+      network_enabled: false,
+      model: "fake-model",
+    });
+    const events = await store.listRunEvents(goal.id);
+    expect(events.find((event) => event.run_id === continuationId && event.type === "run.queued")?.payload)
+      .toMatchObject({ resumed_from: enqueued.run.id, attempt: 1, instruction: "Keep going." });
+
+    // The ordinary drain picks the continuation up: reopening the app continues the flow.
+    const drained = await queue.drain({ runId: continuationId });
+    expect(drained).toHaveLength(1);
+    expect(drained[0]!.executed.result.ok).toBe(true);
+    expect((await store.listRuns(goal.id)).find((row) => row.id === continuationId)?.status).toBe("completed");
+  });
+
+  it("leaves a running row alone while a live foreign worker owns it", async () => {
+    const { dataDir, store, goal, milestones, workspace } = await seedAimWithDataDir();
+    const queue = createRunQueue(store, queueDependencies([]));
+    const enqueued = await queue.enqueue({ goalId: goal.id, milestoneRef: milestones[0]!.id, workspace, sandbox: "read-only", network: false });
+    await store.claimNextQueuedRun({ runId: enqueued.run.id });
+    patchStoredRun(dataDir, enqueued.run.id, { worker_pid: process.pid + 1 });
+
+    const outcomes = await reconcileInterruptedRuns(store, queueDependencies([]), { isProcessAlive: () => true });
+    expect(outcomes).toEqual([]);
+    expect((await store.listRuns(goal.id)).find((row) => row.id === enqueued.run.id)?.status).toBe("running");
+  });
+
+  it("treats a pre-worker-identity running row as orphaned — the shape every pre-fix store holds", async () => {
+    const { dataDir, store, goal, milestones, workspace } = await seedAimWithDataDir();
+    const queue = createRunQueue(store, queueDependencies([]));
+    const enqueued = await queue.enqueue({ goalId: goal.id, milestoneRef: milestones[0]!.id, workspace, sandbox: "read-only", network: false });
+    await store.claimNextQueuedRun({ runId: enqueued.run.id });
+    patchStoredRun(dataDir, enqueued.run.id, { worker_pid: null });
+
+    // `isProcessAlive` says everything lives, but a row nothing can vouch for is still an orphan.
+    const outcomes = await reconcileInterruptedRuns(store, queueDependencies([]), { isProcessAlive: () => true });
+    expect(outcomes).toHaveLength(1);
+    expect(outcomes[0]?.disposition).toBe("continued");
+    expect((await store.listRuns(goal.id)).find((row) => row.id === enqueued.run.id)?.status).toBe("failed");
+  });
+
+  it("never touches a running row the queue did not create", async () => {
+    const { store, goal, milestones } = await seedAimWithDataDir();
+    // Demo seeds create `running` rows directly — no `run.queued` event, so not the queue's.
+    const demo = await store.createRun({ goalId: goal.id, milestoneId: milestones[0]!.id, actorKind: "agent", status: "running" });
+
+    const outcomes = await reconcileInterruptedRuns(store, queueDependencies([]), { isProcessAlive: () => false });
+    expect(outcomes).toEqual([]);
+    expect((await store.listRuns(goal.id)).find((row) => row.id === demo.id)?.status).toBe("running");
+  });
+
+  it("nets exactly one continuation when two orphans share a milestone", async () => {
+    const { dataDir, store, goal, milestones, workspace } = await seedAimWithDataDir();
+    const queue = createRunQueue(store, queueDependencies([]));
+    const first = await queue.enqueue({ goalId: goal.id, milestoneRef: milestones[0]!.id, workspace, sandbox: "read-only", network: false });
+    await store.claimNextQueuedRun({ runId: first.run.id });
+    // Park the first orphan as failed just long enough to get a second run past the
+    // one-active-run enqueue guard, then restore it: two `running` rows, one milestone.
+    patchStoredRun(dataDir, first.run.id, { status: "failed" });
+    const second = await queue.enqueue({ goalId: goal.id, milestoneRef: milestones[0]!.id, workspace, sandbox: "read-only", network: false });
+    await store.claimNextQueuedRun({ runId: second.run.id });
+    patchStoredRun(dataDir, first.run.id, { status: "running" });
+
+    const outcomes = await reconcileInterruptedRuns(store, queueDependencies([]));
+    expect(outcomes).toHaveLength(2);
+    const continued = outcomes.filter((outcome) => outcome.disposition === "continued");
+    expect(continued).toHaveLength(1);
+    expect(outcomes.filter((outcome) => outcome.disposition === "milestone_no_longer_runnable")).toHaveLength(1);
+
+    const runs = await store.listRuns(goal.id);
+    expect(runs.filter((row) => row.status === "queued")).toHaveLength(1);
+    expect(runs.filter((row) => row.status === "failed")).toHaveLength(2);
+  });
+
+  it("settles honestly even when no runtime is left to continue with", async () => {
+    const { store, goal, milestones, workspace } = await seedAimWithDataDir();
+    const queue = createRunQueue(store, queueDependencies([]));
+    const enqueued = await queue.enqueue({ goalId: goal.id, milestoneRef: milestones[0]!.id, workspace, sandbox: "read-only", network: false });
+    await store.claimNextQueuedRun({ runId: enqueued.run.id });
+
+    const outcomes = await reconcileInterruptedRuns(store, {
+      listLocalAgents: async () => [],
+      runLocalAgent,
+      routingOverrideForMilestone,
+    });
+    expect(outcomes).toHaveLength(1);
+    expect(outcomes[0]).toMatchObject({ disposition: "no_runtime_available", continuationRunId: null });
+    // The settle stands: an honest blocked row beats a phantom "agents are working" forever.
+    expect((await store.listRuns(goal.id)).find((row) => row.id === enqueued.run.id)?.status).toBe("failed");
+  });
+
+  it("runAimAgent reconciles an interrupted run and becomes its continuation's worker", async () => {
+    const { store, goal, milestones, workspace } = await seedAimWithDataDir();
+    // Orphan the first sub-aim: enqueue + claim, then the worker "dies" without settling.
+    const setupQueue = createRunQueue(store, queueDependencies([]));
+    const orphan = await setupQueue.enqueue({ goalId: goal.id, milestoneRef: milestones[0]!.id, workspace, sandbox: "read-only", network: false });
+    await store.claimNextQueuedRun({ runId: orphan.run.id });
+
+    // `aimcub run <m1>`: wake-time reconciliation queues the continuation, the explicit enqueue
+    // then finds the milestone already owned by that queued row — and drains it instead of failing.
+    const result = await runAimAgent(
+      store,
+      { goalId: goal.id, milestoneRef: milestones[0]!.id, workspace, readOnly: true },
+      agentDependencies([OK_RUN]),
+    );
+
+    expect(result.milestone.id).toBe(milestones[0]!.id);
+    expect(result.run.ok).toBe(true);
+    const runs = await store.listRuns(goal.id);
+    expect(runs).toHaveLength(2);
+    expect(runs.find((row) => row.id === orphan.run.id)?.status).toBe("failed");
+    expect(runs.find((row) => row.id === result.orchestrationRun.id)?.status).toBe("completed");
+    // The run this invocation executed IS the interrupted run's continuation.
+    const events = await store.listRunEvents(goal.id);
+    expect(events.find((event) => event.run_id === result.orchestrationRun.id && event.type === "run.queued")?.payload)
+      .toMatchObject({ resumed_from: orphan.run.id });
+  });
+
+  it("a shutdown abort leaves the row running, and the next wake continues it", async () => {
+    const { store, goal, milestones, workspace } = await seedAimWithDataDir();
+    let abortAll = () => {};
+    const dependencies = queueDependencies([{ hang: true }, OK_RUN], (index) => {
+      if (index === 0) abortAll();
+    });
+    const queue = createRunQueue(store, dependencies);
+    abortAll = () => queue.abortAllForShutdown();
+    const enqueued = await queue.enqueue({ goalId: goal.id, milestoneRef: milestones[0]!.id, workspace, sandbox: "read-only", network: false });
+
+    // The quit: the running child is aborted for shutdown — no settle, no retry, no evidence.
+    const drained = await queue.drain({ runId: enqueued.run.id });
+    expect(drained).toEqual([]);
+    const runs = await store.listRuns(goal.id);
+    expect(runs).toHaveLength(1);
+    expect(runs[0]).toMatchObject({ id: enqueued.run.id, status: "running" });
+    const interruptedEvents = await store.listRunEvents(goal.id);
+    expect(interruptedEvents.some((event) => event.run_id === enqueued.run.id && event.type === "evidence.reported")).toBe(false);
+
+    // The relaunch: reconcile settles it and queues the continuation; the drain finishes the work.
+    const outcomes = await reconcileInterruptedRuns(store, dependencies);
+    expect(outcomes[0]?.disposition).toBe("continued");
+    const continuationId = outcomes[0]!.continuationRunId!;
+    await queue.drain({ runId: continuationId });
+    expect((await store.listRuns(goal.id)).find((row) => row.id === continuationId)?.status).toBe("completed");
   });
 });

@@ -622,6 +622,7 @@ export const Run = z.object({
   kind: RunKind,
   status: RunStatus.default("queued"),
   attempt: z.number().int().positive().default(1),
+  worker_pid: z.number().int().nullable().default(null),
   workspace_root: z.string().nullable().default(null),
   sandbox: z.string().nullable().default(null),
   network_enabled: z.boolean().default(false),

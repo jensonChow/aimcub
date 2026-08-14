@@ -14,7 +14,14 @@ import { isAbsolute } from "node:path";
 
 import { routingOverrideForMilestone } from "@aimcub/core";
 import type { AimStore } from "@aimcub/store";
-import { createRunQueue, queuedRunRequest, type EnqueueMilestoneRunInput, type RunQueue } from "@aimcub/local-agent";
+import {
+  createRunQueue,
+  queuedRunRequest,
+  reconcileInterruptedRuns,
+  type EnqueueMilestoneRunInput,
+  type InterruptedRunReconciliation,
+  type RunQueue,
+} from "@aimcub/local-agent";
 
 import type { RunLiveEvent, RunPermissionConsent } from "../shared/ipc";
 import { listLocalAgents, runLocalAgent } from "./local-agents";
@@ -164,6 +171,21 @@ export async function cancelQueuedRun(store: AimStore, runId: string): Promise<b
     summary: "Cancelled before it ran.",
   });
   return true;
+}
+
+/**
+ * Wake-time reconciliation, desktop flavor: settle every run whose worker process died before it
+ * could finish and queue its continuation. Runs BEFORE {@link kickRunQueue} at launch so the
+ * drain that follows picks the continuations straight up — reopening the app continues the flow,
+ * because quitting (graceful or forced) is a pause, not a cancellation. Continuations above the
+ * read-only floor stay queued for the existing re-grant path, exactly like any stranded row.
+ */
+export async function reconcileDesktopRuns(store: AimStore): Promise<InterruptedRunReconciliation[]> {
+  return reconcileInterruptedRuns(store, {
+    listLocalAgents,
+    runLocalAgent,
+    routingOverrideForMilestone,
+  });
 }
 
 /**

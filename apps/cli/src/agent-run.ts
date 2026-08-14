@@ -15,7 +15,9 @@ import { routingOverrideForMilestone } from "@aimcub/core";
 import {
   createRunQueue,
   listLocalAgents,
+  MilestoneSelectionError,
   NoRunnableMilestoneError,
+  reconcileInterruptedRuns,
   runLocalAgent,
   type DrainedRun,
   type LocalAgentDetection,
@@ -97,25 +99,44 @@ function toRunResult(goalId: string, drained: DrainedRun<AimStore>): AimAgentRun
  * Enqueue one sub-aim and drain it here and now (following its retry, if the failure was
  * classified retryable). The CLI has no daemon: a run only makes progress while the invocation
  * that queued it is alive.
+ *
+ * When the explicitly requested sub-aim already has a QUEUED run — typically the continuation
+ * wake-time reconciliation just re-queued for an interrupted run — this invocation becomes that
+ * row's worker instead of failing: claiming an existing queued row by id is the same move the
+ * enqueue path itself makes, and refusing would wedge exactly the sub-aim the user asked to push
+ * forward. A row currently RUNNING under a live worker still refuses honestly.
  */
 async function enqueueAndDrain(
+  store: AimStore,
   input: AimAgentRunInput,
   queue: RunQueue<AimStore>,
   excludeMilestoneIds: readonly string[] = [],
 ): Promise<AimAgentRunResult> {
-  const enqueued = await queue.enqueue({
-    goalId: input.goalId,
-    ...(input.milestoneRef ? { milestoneRef: input.milestoneRef } : {}),
-    ...(excludeMilestoneIds.length > 0 ? { excludeMilestoneIds } : {}),
-    workspace: input.workspace,
-    sandbox: input.readOnly ? "read-only" : "workspace-write",
-    network: Boolean(input.network),
-    surface: "cli",
-    ...(input.agentId ? { agentId: input.agentId } : {}),
-    ...(input.model ? { model: input.model } : {}),
-    ...(input.reasoning ? { reasoning: input.reasoning } : {}),
-  });
-  const drained = await queue.drain({ runId: enqueued.run.id });
+  let runId: string;
+  try {
+    const enqueued = await queue.enqueue({
+      goalId: input.goalId,
+      ...(input.milestoneRef ? { milestoneRef: input.milestoneRef } : {}),
+      ...(excludeMilestoneIds.length > 0 ? { excludeMilestoneIds } : {}),
+      workspace: input.workspace,
+      sandbox: input.readOnly ? "read-only" : "workspace-write",
+      network: Boolean(input.network),
+      surface: "cli",
+      ...(input.agentId ? { agentId: input.agentId } : {}),
+      ...(input.model ? { model: input.model } : {}),
+      ...(input.reasoning ? { reasoning: input.reasoning } : {}),
+    });
+    runId = enqueued.run.id;
+  } catch (error) {
+    const queuedRun = error instanceof MilestoneSelectionError && error.code === "milestone_active_run" && error.milestoneId
+      ? (await store.listRuns(input.goalId))
+          .filter((run) => run.milestone_id === error.milestoneId && run.status === "queued")
+          .sort((a, b) => ((a.queued_at ?? "") < (b.queued_at ?? "") ? 1 : -1))[0] ?? null
+      : null;
+    if (!queuedRun) throw error;
+    runId = queuedRun.id;
+  }
+  const drained = await queue.drain({ runId });
   const last = drained[drained.length - 1];
   if (!last) throw new Error("Another Aimcub process claimed this queued run before it could start.");
   return toRunResult(input.goalId, last);
@@ -127,10 +148,13 @@ export async function runAimAgent(
   input: AimAgentRunInput,
   dependencies: AimAgentRunDependencies = defaultDependencies,
 ): Promise<AimAgentRunResult> {
+  // The CLI's wake moment: settle runs orphaned by a dead process and queue their continuations
+  // BEFORE claiming anything, so an interrupted sub-aim is runnable again instead of wedged.
+  await reconcileInterruptedRuns(store, orchestratorDependencies(dependencies));
   const queue = createRunQueue(store, orchestratorDependencies(dependencies), {
     ...(input.onEvent ? { onEvent: (live) => void input.onEvent?.(live.event) } : {}),
   });
-  return enqueueAndDrain(input, queue);
+  return enqueueAndDrain(store, input, queue);
 }
 
 /**
@@ -146,6 +170,8 @@ export async function runAimAgentUntilBlocked(
   input: AimAgentRunInput & { onRunComplete?: (result: AimAgentRunResult) => void | Promise<void> },
   dependencies: AimAgentRunDependencies = defaultDependencies,
 ): Promise<AimAgentSweepResult> {
+  // Same wake-time reconciliation as the single-run path, before the sweep claims anything.
+  await reconcileInterruptedRuns(store, orchestratorDependencies(dependencies));
   const queue = createRunQueue(store, orchestratorDependencies(dependencies), {
     ...(input.onEvent ? { onEvent: (live) => void input.onEvent?.(live.event) } : {}),
   });
@@ -154,7 +180,7 @@ export async function runAimAgentUntilBlocked(
   for (;;) {
     let result: AimAgentRunResult;
     try {
-      result = await enqueueAndDrain({ ...input, milestoneRef: undefined }, queue, attempted);
+      result = await enqueueAndDrain(store, { ...input, milestoneRef: undefined }, queue, attempted);
     } catch (error) {
       if (error instanceof NoRunnableMilestoneError) {
         return {

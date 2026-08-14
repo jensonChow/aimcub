@@ -76,6 +76,7 @@ function mkRun(o: { id: string; milestoneId: string; status: string; summary?: s
     kind: (o.actorKind ?? "agent") as never,
     status: o.status as never,
     attempt: 1,
+    worker_pid: null,
     workspace_root: null,
     sandbox: null,
     network_enabled: false,

@@ -109,6 +109,7 @@ import {
   isConsentedEscalation,
   kickRunQueue,
   logStrandedQueuedRuns,
+  reconcileDesktopRuns,
   resolveDesktopRunPermission,
 } from "./run-queue";
 import {
@@ -136,6 +137,16 @@ function broadcastRunLiveEvent(payload: RunLiveEvent): void {
 }
 
 const runQueue = createDesktopRunQueue(aimStore, broadcastRunLiveEvent);
+
+/**
+ * The quit path for executing runs: abort their child processes WITHOUT settling, so each row
+ * stays `running` — the durable "paused" marker the next launch's reconciliation turns into a
+ * queued continuation. Called from `before-quit`; a settle here would turn a pause into a
+ * cancellation and stop the flow from continuing on reopen.
+ */
+export function abortRunsForShutdown(): void {
+  runQueue.abortAllForShutdown();
+}
 
 // Embedded planning sessions broadcast the same way: they outlive navigation,
 // so there is no single originating sender to target.
@@ -929,13 +940,33 @@ export function registerIpc(): void {
     claimConsentedRun(runQueue, runId);
   });
 
-  // Anything left queued by a previous session (or by a CLI invocation that exited) resumes as
-  // soon as the handlers are live.
-  kickRunQueue(runQueue);
-  // Diagnostic only — reports what stays queued above the floor and why; claims nothing.
-  void logStrandedQueuedRuns(aimStore).catch((error: unknown) => {
-    console.error("[aimcub] stranded-run diagnostic failed:", error);
-  });
+  // Wake-time order matters: first settle any run whose worker died with a previous process and
+  // queue its continuation (quitting is a pause — reopening must continue the flow), THEN kick
+  // the drain so it picks those continuations up in the same launch. A reconciliation failure
+  // must not cost the drain: anything already queued still resumes.
+  void reconcileDesktopRuns(aimStore)
+    .then((outcomes) => {
+      for (const outcome of outcomes) {
+        console.log(
+          `[aimcub] run ${outcome.runId} was interrupted by a previous quit — ` +
+          (outcome.continuationRunId
+            ? `continuing as run ${outcome.continuationRunId}.`
+            : `settled without a continuation (${outcome.disposition}).`),
+        );
+      }
+    })
+    .catch((error: unknown) => {
+      console.error("[aimcub] interrupted-run reconciliation failed:", error);
+    })
+    .then(() => {
+      // Anything left queued by a previous session (or by a CLI invocation that exited) resumes
+      // as soon as the handlers are live.
+      kickRunQueue(runQueue);
+      // Diagnostic only — reports what stays queued above the floor and why; claims nothing.
+      void logStrandedQueuedRuns(aimStore).catch((error: unknown) => {
+        console.error("[aimcub] stranded-run diagnostic failed:", error);
+      });
+    });
 
   ipcMain.handle(IPC.confirmMilestone, async (_e, req: ConfirmMilestoneRequest): Promise<GoalDetail | null> => {
     await aimStore.confirmMilestone({

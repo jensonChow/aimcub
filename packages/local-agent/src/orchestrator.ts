@@ -61,6 +61,8 @@ export interface OrchestratorRun {
   actor_id: string | null;
   status: string;
   attempt: number;
+  /** Pid of the worker that claimed this run; optional because pre-2026-08-14 rows lack it. */
+  worker_pid?: number | null;
   workspace_root: string | null;
   sandbox: string | null;
   network_enabled: boolean;
@@ -248,19 +250,20 @@ export function chooseMilestone(
     }
     const row = rows.find((candidate) => candidate.milestone.id === milestone.id)!;
     if (row.completed || row.milestone.status === "completed" || row.milestone.status === "skipped") {
-      throw new MilestoneSelectionError("milestone_already_done", "The selected sub-aim is already complete or skipped.");
+      throw new MilestoneSelectionError("milestone_already_done", "The selected sub-aim is already complete or skipped.", milestone.id);
     }
     if (row.assignment?.actor_kind !== "agent") {
-      throw new MilestoneSelectionError("milestone_human_owned", "The selected sub-aim is routed to a human, not a local agent.");
+      throw new MilestoneSelectionError("milestone_human_owned", "The selected sub-aim is routed to a human, not a local agent.", milestone.id);
     }
     if (!dependencyReady(row, rows)) {
       throw new MilestoneSelectionError(
         "milestone_dependency_pending",
         "The selected sub-aim is waiting for a prerequisite to complete.",
+        milestone.id,
       );
     }
     if (row.latest_run?.status === "queued" || row.latest_run?.status === "running") {
-      throw new MilestoneSelectionError("milestone_active_run", "The selected sub-aim already has an active run.");
+      throw new MilestoneSelectionError("milestone_active_run", "The selected sub-aim already has an active run.", milestone.id);
     }
     return row;
   }
@@ -610,6 +613,12 @@ export interface QueuedRunRequest {
    * and nothing that claims or executes a run may require it.
    */
   surface?: RunSurface;
+  /**
+   * The interrupted run this one continues. Set only by wake-time reconciliation; an
+   * interruption does not advance `attempt`, because the retry budget is for work that FAILED,
+   * not work whose host process died under it.
+   */
+  resumed_from?: string;
 }
 
 export interface EnqueueMilestoneRunInput {
@@ -630,6 +639,8 @@ export interface EnqueueMilestoneRunInput {
   retryOf?: string;
   /** Which surface is enqueuing this run — provenance for diagnostics/timeline, not a permission. */
   surface?: RunSurface;
+  /** Set by wake-time reconciliation: the interrupted run this enqueue continues. */
+  resumedFrom?: string;
 }
 
 export interface EnqueuedRun<TStore extends RunOrchestratorStore> {
@@ -670,6 +681,7 @@ export async function enqueueMilestoneRun<TStore extends RunOrchestratorStore>(
     attempt: input.attempt ?? 1,
     ...(input.retryOf ? { retry_of: input.retryOf } : {}),
     ...(input.surface ? { surface: input.surface } : {}),
+    ...(input.resumedFrom ? { resumed_from: input.resumedFrom } : {}),
   };
   const run = await store.createRun({
     goalId: progress.goal.id,
@@ -709,6 +721,7 @@ export async function queuedRunRequest(
     ...(typeof payload.attempt === "number" ? { attempt: payload.attempt } : {}),
     ...(typeof payload.retry_of === "string" ? { retry_of: payload.retry_of } : {}),
     ...(payload.surface === "desktop" || payload.surface === "cli" ? { surface: payload.surface } : {}),
+    ...(typeof payload.resumed_from === "string" ? { resumed_from: payload.resumed_from } : {}),
   };
 }
 
@@ -721,6 +734,32 @@ export interface ExecuteQueuedRunOptions {
   onEvent?: (event: LocalAgentEvent) => void | Promise<void>;
   /** Aborting settles the engine with failure code "canceled"; the run finishes failed. */
   signal?: AbortSignal;
+}
+
+/**
+ * The abort reason that means "the process is quitting", as opposed to "the user cancelled this
+ * run". A cancel is a verdict and settles the run failed; a quit is a PAUSE — the row is
+ * deliberately left `running` so the next wake's reconciler settles it and queues its
+ * continuation, exactly the state a force-quit leaves behind. One recovery path for both deaths.
+ */
+export const SHUTDOWN_ABORT_REASON = "aimcub:shutdown";
+
+export function isShutdownAbort(signal: AbortSignal | undefined): boolean {
+  return Boolean(signal?.aborted) && signal?.reason === SHUTDOWN_ABORT_REASON;
+}
+
+/**
+ * Thrown by {@link executeQueuedRun} in place of settling when its abort carried
+ * {@link SHUTDOWN_ABORT_REASON}. Not a failure: the caller should stop working, not report.
+ */
+export class RunInterruptedByShutdownError extends Error {
+  readonly runId: string;
+
+  constructor(runId: string) {
+    super(`Run ${runId} was interrupted by shutdown; it stays claimed for the next wake to continue.`);
+    this.name = "RunInterruptedByShutdownError";
+    this.runId = runId;
+  }
 }
 
 export interface ExecutedRun<TStore extends RunOrchestratorStore> {
@@ -796,11 +835,16 @@ export async function executeQueuedRun<TStore extends RunOrchestratorStore>(
     });
     await buffer.settle();
   } catch (error) {
+    // A shutdown abort must not settle: leaving the row `running` is what hands the work to the
+    // next wake's reconciler, and every write here races the dying process anyway.
+    if (isShutdownAbort(options.signal)) throw new RunInterruptedByShutdownError(run.id);
     const message = error instanceof Error ? error.message : String(error);
     await buffer.flush();
     await store.finishRun({ runId: run.id, status: "failed", summary: message, error: message });
     throw error;
   }
+
+  if (isShutdownAbort(options.signal)) throw new RunInterruptedByShutdownError(run.id);
 
   try {
     const artifacts = buffer.artifacts();

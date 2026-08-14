@@ -197,4 +197,49 @@ describe("run queue store primitives", () => {
     const runs = await cli.listRuns(goal.id);
     expect(runs.filter((row) => row.status === "running")).toHaveLength(1);
   });
+
+  it("stamps the claiming worker's pid so a later wake can tell live from orphaned", async () => {
+    const store = createJsonFileStore(tempDataDir());
+    const { goal, milestones } = await store.createGoal({ title: "Drain a queue", plan: PLAN });
+    const queued = await store.createRun({ goalId: goal.id, milestoneId: milestones[0]!.id, actorKind: "agent", status: "queued" });
+    expect(queued.worker_pid).toBeNull();
+
+    const claimed = await store.claimNextQueuedRun();
+    expect(claimed?.worker_pid).toBe(process.pid);
+  });
+
+  it("settles a still-running row as interrupted, exactly once", async () => {
+    const store = createJsonFileStore(tempDataDir());
+    const { goal, milestones } = await store.createGoal({ title: "Drain a queue", plan: PLAN });
+    await store.createRun({ goalId: goal.id, milestoneId: milestones[0]!.id, actorKind: "agent", status: "queued" });
+    const claimed = await store.claimNextQueuedRun();
+
+    const settled = await store.settleInterruptedRun({
+      runId: claimed!.id,
+      summary: "Interrupted: the app quit while this run was executing.",
+      error: "interrupted",
+    });
+    expect(settled?.status).toBe("failed");
+    expect(settled?.error).toBe("interrupted");
+    expect(settled?.finished_at).toBeTruthy();
+
+    // Lost-a-race contract: a second settle finds the row no longer running and reports null.
+    expect(await store.settleInterruptedRun({ runId: claimed!.id })).toBeNull();
+
+    const events = await store.listRunEvents(goal.id);
+    const failed = events.find((event) => event.run_id === claimed!.id && event.type === "run.failed");
+    expect(failed?.payload).toMatchObject({ interrupted: true, worker_pid: process.pid });
+  });
+
+  it("refuses to settle a run that is merely queued or already finished", async () => {
+    const store = createJsonFileStore(tempDataDir());
+    const { goal, milestones } = await store.createGoal({ title: "Drain a queue", plan: PLAN });
+    const queued = await store.createRun({ goalId: goal.id, milestoneId: milestones[0]!.id, actorKind: "agent", status: "queued" });
+    expect(await store.settleInterruptedRun({ runId: queued.id })).toBeNull();
+
+    const claimed = await store.claimNextQueuedRun();
+    await store.finishRun({ runId: claimed!.id, status: "completed", summary: "done" });
+    expect(await store.settleInterruptedRun({ runId: claimed!.id })).toBeNull();
+    expect((await store.listRuns(goal.id)).find((row) => row.id === claimed!.id)?.status).toBe("completed");
+  });
 });

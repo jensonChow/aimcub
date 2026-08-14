@@ -1,188 +1,87 @@
 # Aimcub Handoff
 
-Last updated: 2026-08-13
-Branch: `main`, **everything PUSHED to origin/main** (founder authorized 2026-08-13:
-"refresh memory, commit push merge" — covering `09b4bb2e` focus/cursor, `10e52ad3` UA
-sweep, `4f5fb8f9` context-review + TCC fix, `5ade368d` plan-is-a-graph, the two
-test-determinism fixes `07dcda9e`/`375fce6c`, and this docs commit). Destination
-re-verified per the push protocol (`jensonChow/aimcub`, ADMIN, PRIVATE, default `main`,
-`origin` matches). Work landed directly on `main` — no separate merge needed.
+Last updated: 2026-08-14
+Branch: `main`. Pushed state on origin is `88d9ab42` (the 2026-08-13 batch); **this session's
+"runs survive the process" commit is LOCAL ONLY** — push was not authorized this session.
 
-## What shipped 2026-08-10..13: both test flakes made deterministic
+## What shipped 2026-08-14: runs survive the process (quit = pause, reopen = continue)
 
-Follow-ups to the flakes the plan-graph batch surfaced. Both turned out to be the SAME
-class — setup cost blowing vitest's 5s default testTimeout — and in BOTH the plausible
-first hypothesis (timer coalescing; JWT clock skew) was wrong. Triage rules live in
-`docs/memory/operations.md` ("Flaky-test triage: read the duration first").
+Founder screenshot + report: "重新打开，任务流并没有继续" — his aim sat at 0% with the banner
+still saying "Agents are working". Root cause: his store held a run row claimed on 2026-08-09
+whose status was still `running` five days after the process died. A `running` status was a claim
+of process ownership that no one recorded and no one reconciled, so ANY quit (forced or graceful)
+during execution orphaned the row forever: the ambient banner lied permanently, the pulsing dot
+lied, Your-move was suppressed (work "in flight"), every dependent milestone stayed waiting,
+cancel could not reach it (no in-process controller; the queued-only fallback refused), and
+re-running was refused by the active-run guard. A permanently wedged aim with no product exit.
 
-1. **`07dcda9e` — planning-checkpoint tests.** The file's first test paid the whole
-   module-transform cost (~1.4s idle, over 5s loaded). Fixed by warming the import graph
-   in `beforeAll` (10s hook budget; 1396ms → 16ms) and virtualizing the coalesce window
-   with SCOPED fake timers (`toFake: ["setTimeout", "clearTimeout"]` — the default set
-   also fakes the plumbing under `await import(...)`). The assertions got sharper: the
-   question flush is proven with the clock unmoved AND proven to cancel the coalesce;
-   the tool events are proven still silent at 1499ms.
-2. **`375fce6c` — MCP auth tests.** Every test built its own signer and `makeTestSigner`
-   generated TWO RS256 keypairs — 18 keygens, ~25s of crypto; RSA keygen measured ~1.0s
-   median / ~3.2s p90 even idle, so one unlucky test could alone approach the budget
-   (observed: two adjacent tests dying at ~5003/5031ms). Never the clock: the tokens
-   carry a 5-minute expiry. Keypairs now generate once per process (cached promise,
-   concurrent pair, warmed in `beforeAll`); the target test went 5031ms-timeout → 2–5ms
-   under 2× CPU load. No clock pinning added — it would have weakened the expired-token
-   case to solve a non-problem.
+The fix is mechanical, wake-time, and shared (durable rules in `architecture.md`, "Runs survive
+the process"):
 
-## What shipped 2026-08-09 (later): a plan is a graph, and independent work runs at once
+1. **Claims carry an owner.** `claimNextQueuedRun` stamps `Run.worker_pid` (types + store), and
+   `settleInterruptedRun` is the new atomic store gate: still-`running` → `failed`, null on a
+   lost race — the claim gate's mirror, so two waking processes settle each orphan exactly once.
+2. **Wakes reconcile before claiming.** `reconcileInterruptedRuns`
+   (`packages/local-agent/src/interrupted-runs.ts`) runs at Desktop launch (before
+   `kickRunQueue`) and at the start of every CLI run invocation: a `running` row whose pid is
+   dead, absent (every pre-fix row), or the reconciler's own is settled as `interrupted` and
+   re-queued as a continuation carrying the same recorded permission, runtime, instruction, and
+   attempt (`resumed_from` links the chain; an interruption never consumes a retry attempt).
+   The launch drain then picks continuations up at the read-only floor; above-floor
+   continuations wait for the existing re-grant path. Only queue-managed rows (those with a
+   `run.queued` event) are touched — demo-seeded `running` rows are not the queue's.
+3. **Graceful quit stops pretending.** `before-quit` now calls `abortAllForShutdown`: children
+   are killed WITHOUT settling (`SHUTDOWN_ABORT_REASON` gates the orchestrator's settle +
+   evidence writes), so a normal quit leaves the same recoverable `running` row a force-quit
+   does — one recovery path for both deaths, zero writes racing app exit.
+4. **CLI collision = become the worker.** An explicit `aimcub run <sub-aim>` that hits the
+   active-run guard because a QUEUED continuation owns the milestone drains that row by id
+   instead of failing (`MilestoneSelectionError` now carries `milestoneId`). A sweep still
+   skips continuation-queued milestones (they drain at the next Desktop launch) — deliberate.
 
-Founder: "并行、顺序的任务关系探索不够，产品只会 1by1." He chose the full scope
-(readiness + real parallel execution) over the smaller options, which RETIRES the
-`linear milestones` locked invariant in `CLAUDE.md`.
+No renderer changes: the banner/dot/Your-move all read the store, which now tells the truth.
 
-Diagnosis: the DAG existed in exactly ONE place — the brain's output schema — and four
-layers destroyed it. All four are fixed; durable rules in `docs/memory/architecture.md`
-(new "Plan Shape" section) and `design-system.md`.
-
-1. **Storage could not hold fan-in.** `Milestone.depends_on_id` was a single id and
-   materialization did `dependsOn.set(edge.to, fromId)` — the last edge won, so the join
-   where parallel branches merge lost every other prerequisite. Now `depends_on_ids`
-   (a list) in both materialize paths, with pre-2026-08-09 stores lifting their single
-   value on load. Hosted Supabase's `depends_on_id` column is deliberately untouched
-   (local-store-first) — a known divergence to reconcile at sync parity.
-2. **Plan edits flattened the graph.** `withLinearOrder` overwrote the brain's edges with
-   `n1→n2→n3…` on every merge/split/reorder. Merge now rewires both sides onto the
-   survivor, split inserts inside the original's slot, and reorder is presentation only —
-   a stable topological sort keeps the displayed order legal, so a drag can arrange
-   independent work but can no longer invert a real dependency. (A store test literally
-   encoded that bug: split m2 into Implement→Verify, then drag Verify above Implement,
-   and the old code rewrote the dependency to match.)
-3. **Nothing ever READ a dependency.** `depends_on_id` had zero consumers outside an MCP
-   tool echoing it. "Your move" was `find(first pending by order_index)`, and `blocked`
-   only ever meant "a run failed". Now `unmetPrerequisiteIds`/`milestoneIsReady` in core
-   are canonical, `AimProgressMilestoneRead` carries `ready` + `waiting_on`, the aim's
-   next action prefers ready work, and Your-move refuses waiting rows. Waiting is a quiet
-   state, never `danger`.
-4. **Execution was serial by construction.** `drainPass` was `for(;;) { claim; await
-   executeOne(); }`. Now N workers (`DEFAULT_MAX_CONCURRENT_RUNS` = 3, overridable,
-   clamped ≥1) share the same atomic claim. Dependent runs are never both claimable, so
-   this only widens what the plan already said could overlap. Drain result ORDER is no
-   longer a contract.
-
-Plus: the brain is finally ASKED for parallelism (a "Sequencing standard" in the shared
-plan rules + a rewritten `edges` schema description: an edge only for a real
-producer/consumer constraint, never for narrative order), a `fully_sequential_plan`
-quality nudge (threshold 8+ nodes, deliberately above the 3–7 sweet spot so ordinary
-short sequential plans don't nag), and the local-alpha demo seed is no longer a chain —
-it now branches so packaged QA actually shows two ready sub-aims and one waiting.
-
-**Found en route:** `packages/local-agent/src/orchestrator.ts` contained a RAW NUL byte
-(used as a template-literal separator), which makes grep/ripgrep treat the file as binary
-and silently return no matches — it hid a whole store port from repo-wide searches.
-Replaced with `\u0000`, plus a repo-wide scan; rule recorded in operations.md.
-
-**Verification:** full gate green (core 200 · desktop 415 · cli 114 · llm 204 · store 104
-· local-agent 48 · mcp 57). New harness scenario `?parallel` (diamond plan) driven live
-in light AND dark: "2 ready now" on the plan band, both branches ready, the join quiet
-with "waiting on 2 sub-aims", zero harness errors. A CLI test proves genuine overlap (the
-first run hangs; under the old serial loop the second could never start) and a companion
-test proves `maxConcurrentRuns: 1` restores strict serial. Root `Aimcub.app` repacked and
-boot-smoked from `/tmp`.
-
-**Two pre-existing test flakes** surfaced (both pass in isolation, fail under full-suite
-load): `planning-checkpoint.test.ts` (real ~1.5s debounce) and `apps/mcp/src/auth.test.ts`
-(real-clock JWT). Neither is caused by this batch; both are flagged as separate tasks.
-
-## What shipped 2026-08-09: the context inbox becomes a decision surface + the TCC fix
-
-Founder screenshot of the Context inbox ("设计不明晰…有bug…UI/UX、feature 都不好") plus a
-STUCK macOS consent dialog ("Aimcub would like to access files in your Desktop folder"
-that could be neither accepted nor closed).
-
-1. **Context review redesigned end-to-end.** Root finds: the machine-composed candidate
-   text (`Project fact: Planning assumption for "<aim>": …`) baked provenance into
-   durable content — it re-stated the category chip and origin chip, followed the row
-   into ACCEPTED memory, and made every card read broken; six metadata chips per card
-   (raw candidate id, "65% confidence", "Agent inferred"); a standing resizable editor
-   per card; ~300px × 9 cards burying the Journal. Now: core composes the bare
-   statement (`extractMemoryCandidatesFromAssumptions`), a new pure
-   `presentContextCandidateContent` strips the legacy prefix at display (inbox + Memory
-   page), and keeping stores the presented text — so his existing polluted rows come
-   clean the moment they are kept. The band is retitled "Context to review" with the
-   deal stated in the body; each candidate is one hairline row (statement · one
-   product-words provenance line · This aim | Global · Keep/Discard); editing is opt-in
-   (Escape reverts), question-shaped rows force the edit gate; the band caps at 4 rows
-   behind "Show all n". Verbs renamed accept/reject → Keep/Discard (en+zh). Durable
-   contract in design-system.md; guards in ContextInbox.test.tsx + context.test.ts.
-   NOT a bug after investigation: accept/reject/scope IPC, store dedupe
-   (`findDuplicateMemory`), and the refresh loop are all correct — verified live in the
-   harness (new `?inbox` scenario, light+dark; Keep on a legacy row stored clean text).
-2. **The stuck permission dialog, root-caused and prevented.** The repo lives on the
-   Desktop; a packaged app launched with a shell cwd inside a TCC-protected folder
-   trips the Desktop consent prompt at boot, and prior sessions' boot smokes killed the
-   app while the prompt was up — an orphaned dialog cannot be answered. Fix: packaged
-   main now `process.chdir(home)` before any fs activity (verified via lsof: cwd is
-   `/Users/jenson` even when launched from elsewhere), smokes launch from `/tmp`, and
-   the discipline is recorded in operations.md (incl. the ad-hoc-signature re-prompt
-   caveat until real signing). The founder still needs to clear the CURRENT orphan
-   himself: `killall tccd` (or log out/in), optionally
-   `tccutil reset All com.jensonchow.aimcub`.
-
-**Verification:** full gate green (core 193, desktop 413). Harness-driven on `?inbox`:
-cap + Show all, Edit autofocus + Escape revert, Keep carrying clean content + aim/global
-scope, list refresh, zero harness errors, both themes. Root `Aimcub.app` repacked and
-boot-smoked from `/tmp` (main + renderer alive; cwd verified at `$HOME`).
+**The founder's wedged aim heals itself**: his orphan (run `394265c9`, aim "我想要研究coding
+agent related router") has no `worker_pid`, so the first launch of the new build settles it and
+queues the continuation — worth watching live (below).
 
 ## Earlier arcs (durable rules live in module memories, not here)
 
-- **2026-08-08 + 2026-08-06 — web defaults stop leaking through the glass.** Pointer-focus
-  halo off text entry (fields say focused with their own accent chrome), desktop
-  cursor/selection policy (`body { cursor: default; user-select: none }`, fields +
-  `pre`/`code` stay selectable), then a same-class sweep: a late text-entry focus fallback,
-  the last inline-styled input migrated, non-button focus targets pair their ring with an
-  outline reset. Rules + guards in `design-system.md` / App.test.tsx.
-- **2026-08-02 — the desk stays clean.** No scrollbar anywhere; shadow tokens hug the card
-  (negative spread); planning-card + plan-review typography passes incl. the structural zh
-  weight relax and no-UA-700 base rules. All in `design-system.md`.
-- **2026-07-26 — planning passes are durable + honest.** The pass checkpoints to
-  `Goal.metadata.planning_session` while running (coalesced ~1.5s, hard boundaries flush);
-  quit defers once to checkpoint; re-entry shows the paused pass; Resume reopens the
-  runtime thread AND carries the pass history (`ask_user` refuses already-answered
-  questions); planning leaves Journal receipts. Mid-pass file attachments stage into a
-  directory granted at spawn; resumes re-stage from original paths. Trace tense derives
-  from position. Rules in `architecture.md` / `desktop.md` / `design-system.md`.
+- **2026-08-10..13 — both test flakes deterministic** (planning-checkpoint import warmup +
+  scoped fake timers; MCP auth per-process keypair cache). Triage rules in `operations.md`.
+- **2026-08-09 — plan is a graph** (`depends_on_ids` fan-in, graph-preserving edits, derived
+  readiness, N-worker drain) + **context review as decisions** + **packaged-app TCC fix**
+  (`process.chdir(home)`; smokes launch from `/tmp`). Rules in `architecture.md` /
+  `design-system.md` / `operations.md`.
+- **2026-07-26 — planning passes durable + honest**; **2026-07-25 — UI collapse** (Journey is
+  the one surface); **2026-07-24 — embedded planning sessions** (Claude + Codex brains).
 
 ## Verification
 
-Full gate green on the pushed tip (build 9/9 · test 17/17 tasks: core 200 · desktop 415 ·
-cli 114 · llm 204 · store 104 · local-agent 48 · mcp 57 · api 20 · db 36 — the two former
-flakes now deterministic · typecheck 17/17 · lint 11/11 · purity · `git diff --check`).
-Root `Aimcub.app` repacked from this tip and boot-smoked from `/tmp` (main + renderer
-alive, graceful quit; cwd verified parked at `$HOME` per the TCC rule).
-
-**Method (keep doing this):** a green suite is not evidence a gesture works — drive the
-real renderer with `pnpm build && pnpm desktop:harness` (usage + load-bearing fixtures in
-`operations.md`). Scenarios: `?nopass` `?planready` `?live` `?question` `?inbox`
-`?parallel`.
+Full gate green on this tip (build 9/9 · test: core 200 · desktop 415 · cli 122 · llm 204 ·
+store 107 · local-agent 48 · mcp 57 · api 20 · db 36 · eval-moat 49 · typecheck · lint ·
+purity). New coverage: store claim/settle primitives (3), reconciler e2e over a real store +
+fake runtime (7: orphan→continue→drain-to-completed, live-foreign-pid skip, pre-fix
+no-pid row, demo-row untouchable, two-orphans-one-continuation, no-runtime honest settle,
+shutdown-abort full circle), CLI becomes-the-worker (1). Root `Aimcub.app` repacked from this
+tip and boot-smoked from `/tmp`.
 
 ## Open items
 
-1. **NOT VERIFIED LIVE: the founder's drive** — one pass covering three claims that are so
-   far only unit- + renderer-verified: create an aim → attach a file mid-pass and watch the
-   brain READ it → quit mid-planning → reopen → Resume → confirm nothing already answered
-   is asked again, and the attachment survived the restart.
-2. **NOT VERIFIED LIVE: a real multi-branch plan.** The plan-graph batch is fully
-   unit/harness-verified (`?parallel`), but no real brain has yet emitted a branching plan
-   end-to-end with two agent runs genuinely overlapping on real work. Watch the first
-   real plan after this push: does the brain use the new sequencing standard, does the
-   Journey read "N ready now", do two runs actually run at once.
-3. Hosted Supabase still has the single `depends_on_id` column — deliberate divergence
-   (local-store-first) to reconcile when sync parity becomes a goal.
-4. Founder `claude /login` → first Claude-brain live smoke (Codex is the live-verified path).
-5. Settings → Brain effort/reasoning control (proposed follow-up).
-6. Online linked-source connectors actually reading content.
-7. `docs/local-agent-adapters.md` predates planning sessions entirely — it documents
-   `buildInvocation`/`parseLine` but not the optional `buildPlanningSessionInvocation`
-   capability or its new `resumeSessionId`. A third-party adapter author would not know
-   the planning path exists. Worth a section before the OSS flip.
-8. Two older commit messages (`e7da6a63`, `1054f694`) quote Chinese; pushed long ago, so a
-   rewrite is not free — founder's call whether to leave them.
-9. OSS launch checklist (license → npm org → repo settings → gitleaks → public flip) —
-   founder-owned, unchanged.
+1. **NOT VERIFIED LIVE: interrupted-run recovery on the founder's real store.** First launch of
+   the new build should log `run 394265c9 … continuing as run <id>`, flip his stuck aim's first
+   sub-aim to a genuinely executing run, and un-wedge the DAG. Watch the Journey tell the truth.
+2. **NOT VERIFIED LIVE: the founder's planning drive** — create → attach file mid-pass → quit →
+   reopen → Resume (nothing re-asked, attachment survives).
+3. **NOT VERIFIED LIVE: a real multi-branch plan** — first brain-emitted branching plan with two
+   runs genuinely overlapping.
+4. Hosted Supabase divergence: `depends_on_id` single column AND no `worker_pid` — both
+   deliberate (local-store-first), reconcile at sync parity.
+5. Founder `claude /login` → first Claude-brain live smoke (Codex is the live-verified path).
+6. Settings → Brain effort/reasoning control (proposed follow-up).
+7. Online linked-source connectors actually reading content.
+8. `docs/local-agent-adapters.md` predates planning sessions (no
+   `buildPlanningSessionInvocation` / `resumeSessionId` docs) — worth a section before OSS flip.
+9. Two older commit messages (`e7da6a63`, `1054f694`) quote Chinese — founder's call.
+10. OSS launch checklist (license → npm org → repo settings → gitleaks → public flip) —
+    founder-owned, unchanged.
