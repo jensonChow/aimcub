@@ -1,11 +1,12 @@
 # Aimcub Handoff
 
 Last updated: 2026-08-14
-Branch: `main`. Pushed state on origin is `88d9ab42` (the 2026-08-13 batch); **this session's
-four commits are LOCAL ONLY** — push was not authorized this session: `54b590e5` "runs survive
-the process", `173733d7` "a question is never a context candidate", `8f2a03b4` "the expanded
-plan row is a sentence, not a console", and its second pass (receipts fold + every incomplete
-row keeps an action).
+Branch: `main`, **everything PUSHED to origin/main** (founder authorized 2026-08-14: "refresh
+memory, commit push merge" — covering `54b590e5` runs-survive-the-process, `173733d7`
+question-never-a-candidate, the four work-detail passes `8f2a03b4` / `38412ecd` / `61dc8fa3` /
+`7f0e6a13`, and this docs commit). Destination re-verified per the push protocol
+(`jensonChow/aimcub`, ADMIN, PRIVATE, default `main`, `origin` matches). Work landed directly
+on `main` — no separate merge needed.
 
 ## What shipped 2026-08-14 (fourth polish pass): one type system in the row detail
 
