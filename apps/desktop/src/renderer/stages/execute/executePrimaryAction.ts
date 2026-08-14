@@ -63,6 +63,59 @@ export function executeBlockedDetail(row: ExecuteMilestoneRow, t: I18n["t"]): st
     || t("execute.blockedDefault");
 }
 
+function formatRunDate(value: string | null | undefined): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function runTimingLine(row: ExecuteMilestoneRow, t: I18n["t"]): string {
+  const run = row.latest_run;
+  if (!run) return "";
+  if (run.status === "queued") {
+    const queued = formatRunDate(run.queued_at);
+    return queued ? t("execute.runQueuedAt", { time: queued }) : "";
+  }
+  const started = formatRunDate(run.started_at);
+  return started ? t("execute.runStartedAt", { time: started }) : "";
+}
+
+export interface ExecuteStatusLine {
+  tone: "" | "warn" | "danger" | "success";
+  text: string;
+}
+
+/**
+ * The expanded row's ONE state sentence, in product words — or null when the row is simply
+ * ready and quiet. Replaces the old four-card machine grid + blocked banner: a failed run, an
+ * in-flight run, and the evidence verdict were three tellings of the same story, and a human
+ * needs it told once (founder, 2026-08-14: "这不是给人用的产品").
+ */
+export function executeStatusLine(row: ExecuteMilestoneRow, t: I18n["t"]): ExecuteStatusLine | null {
+  if (row.blocked) return { tone: "danger", text: executeBlockedDetail(row, t) };
+
+  const runStatus = row.latest_run?.status;
+  if (runStatus === "queued" || runStatus === "running") {
+    const label = t(runStatus === "queued" ? "execute.runStatus.queued" : "execute.runStatus.running");
+    const timing = runTimingLine(row, t);
+    return { tone: "", text: timing ? `${label} · ${timing}` : label };
+  }
+
+  const count = Math.max(row.evidence_count, row.evidence.length);
+  if (count === 0) return null;
+  const lowTrust = row.evidence.filter((item) => item.status === "low_trust").length;
+  if (lowTrust > 0) {
+    return { tone: "warn", text: t("execute.evidenceLowTrustDetail", { lowTrust, total: count }) };
+  }
+  const matched = row.evidence.filter((item) => item.status === "matched").length;
+  if (matched > 0) {
+    const trust = `${Math.round(row.eval_review.trust_score * 100)}%`;
+    return { tone: "success", text: t("execute.evidenceMatchedDetail", { matched, total: count, trust }) };
+  }
+  return { tone: "", text: t("execute.evidenceNeedsEvalDetail", { total: count }) };
+}
+
 export function executePrimaryAction(row: ExecuteMilestoneRow, t: I18n["t"]): {
   kind: ExecutePrimaryActionKind;
   label: string;

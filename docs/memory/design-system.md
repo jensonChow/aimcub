@@ -675,6 +675,19 @@ as a working agent, not as a form the user operates.
   legacy machine prefix (`presentContextCandidateContent`, also on the Memory page), and
   keeping stores the presented text — memory never learns the wrapper. Guarded in
   ContextInbox.test.tsx and context.test.ts.
+- **The expanded plan row is a sentence, not a console** (founder 2026-08-14: "充斥着大量的内容、
+  细节…这不是给人用的产品"). The detail adds ONLY what the row header cannot say: the sub-aim
+  description (plain text, no box), ONE state sentence, the primary action, quiet secondaries,
+  and default-closed disclosures. Deleted and never to return: the "Selected sub-aim" eyebrow +
+  second status pill, the repeated title, and the four-card machine grid (Local agent / Run
+  state / Produced evidence / Next human-eval action) — the header owns title/route/status, the
+  primary action's detail line owns "what next", and agent/model/workspace live inside the
+  Runtime details disclosure. The state sentence (`od-execute-status`, `executeStatusLine`) is
+  quiet text with a tone dot — never a boxed banner — and tells the story ONCE: a blocked row
+  speaks its run's own error, an in-flight row its queue/start time, evidence its verdict; a
+  ready row with no history says nothing at all. The consent console collapses to its
+  disclosure summary line ("What this run may do · Read only · Network off"); opening it is the
+  explicit act of widening a run. Guarded in App.test.tsx + executePrimaryAction.test.ts.
 - **The inbox holds statements only — a question is never a context candidate** (founder
   2026-08-14: "不应该有这样一个环节，这本质上还是multichoice问题选单应该承担的功能"). Plan-review
   gaps used to be parked in the band as "pending answer needed:" pseudo-facts behind a forced

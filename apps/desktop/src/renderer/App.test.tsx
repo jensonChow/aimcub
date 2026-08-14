@@ -426,8 +426,45 @@ describe("JourneyPlanBand work detail (the Execute stage's surface, ported home)
     expect(html).toContain("Run implementation agent");
     expect(html).toContain("Agent route");
     expect(html).toContain("Human route");
-    expect(html).toContain("Selected sub-aim");
     expect(html).toContain("Primary action");
+    // The expanded detail repeats nothing the row header already says: no eyebrow, no second
+    // title, no machine state grid (founder 2026-08-14: the old console was "不是给人用的产品").
+    expect(html).not.toContain("Selected sub-aim");
+    expect(html).not.toContain("od-execution-grid");
+    expect(html.match(/Run implementation agent/g) ?? []).toHaveLength(1);
+  });
+
+  it("tells a blocked row's story once — one status line, no banner, no state cards", () => {
+    const base = executeRow({ id: AGENT_MILESTONE, title: "Run implementation agent", owner: "agent" });
+    const html = renderExecute([
+      {
+        ...base,
+        blocked: true,
+        latest_run: base.latest_run
+          ? { ...base.latest_run, status: "failed", error: "Local agent run timed out.", finished_at: "2026-07-07T09:05:00.000Z" }
+          : null,
+      },
+    ]);
+
+    expect(html).toContain("Local agent run timed out.");
+
+    expect(html).toContain('class="od-execute-status danger"');
+    expect(html).not.toContain("od-execute-blocker");
+    expect(html).not.toContain("Run state");
+    expect(html).not.toContain("Produced evidence");
+    expect(html).not.toContain("Next human/eval action");
+  });
+
+  it("collapses the consent console to its one-line summary until opened", () => {
+    const html = renderExecute([
+      executeRow({ id: AGENT_MILESTONE, title: "Run implementation agent", owner: "agent" }),
+    ]);
+
+    expect(html).toContain('class="od-execution-secondary-details od-run-permission-disclosure"');
+    expect(html).not.toContain('od-run-permission-disclosure" open');
+    expect(html).toContain("What this run may do");
+    // The summary line states the floor the run will use as-is.
+    expect(html).toContain("Read only · Network off");
   });
 
   it("shows one dominant Run agent primary action for an agent-routed incomplete sub-aim", () => {
@@ -558,7 +595,7 @@ describe("JourneyPlanBand work detail (the Execute stage's surface, ported home)
 });
 
 describe("LocalAgentExecutionSummary", () => {
-  it("shows selected sub-aim, local agent config, low-trust evidence, activity, and next eval action", () => {
+  it("keeps only the description up front; runtime, agent, and activity live behind one closed disclosure", () => {
     const row: AimProgressReadModel["milestones"][number] = {
       milestone: {
         ...milestone,
@@ -670,29 +707,28 @@ describe("LocalAgentExecutionSummary", () => {
     );
     const css = readFileSync(new URL("./cockpit.css", import.meta.url), "utf8");
 
-    expect(html).toContain("Selected sub-aim");
-    expect(html).toContain("Implement execution skeleton");
-    expect(html).toContain("Codex CLI");
-    expect(html).toContain("Completed");
-    expect(html).toContain("Produced evidence");
-    expect(html).toContain("Next human/eval action");
+    // The detail carries only what the row header cannot: description + closed disclosures.
+    // No eyebrow, no repeated title, no machine state grid (founder, 2026-08-14).
+    expect(html).not.toContain("Selected sub-aim");
+    expect(html).not.toContain("Implement execution skeleton");
+    expect(html).not.toContain("od-execution-grid");
+    expect(html).not.toContain("Produced evidence");
+    expect(html).not.toContain("Next human/eval action");
+    expect(html).toContain("Clarify the local-agent run display without adding a durable queue.");
     expect(html).toContain("Runtime details");
+    expect(html).toContain("Codex CLI");
     expect(html).toContain("gpt-5");
     expect(html).toContain("Reasoning: high");
     expect(html).toContain("/Users/jenson/project");
     expect(html).toContain("Sandbox read-only");
     expect(html).toContain("Network off");
-    expect(html).toContain("Low-trust evidence needs review");
-    expect(html).toContain("1/1 evidence item(s) are below the trust floor.");
-    expect(html).toContain("Next human/eval action");
-    expect(html).toContain("Add trusted webhook or CI evidence");
     expect(html).toContain("Activity");
     expect(html).toContain("Started");
     expect(html).toContain("Tool started");
     expect(html).toContain('<details class="od-execution-secondary-details"><summary>');
     expect(html).not.toContain('<details class="od-execution-secondary-details" open="">');
     expect(html).not.toContain("Verbose assistant output");
-    expect(css).toMatch(/\.od-execution-grid\s*{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\);/s);
+    expect(css).not.toContain(".od-execution-grid");
     expect(css).toMatch(/\.od-execution-runtime\s*{[^}]*border-top:\s*1px solid var\(--od-border-soft\);/s);
 
     const rawOnlyRow: AimProgressReadModel["milestones"][number] = {

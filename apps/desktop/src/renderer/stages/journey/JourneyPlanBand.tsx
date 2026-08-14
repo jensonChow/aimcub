@@ -27,11 +27,11 @@ import { shortText } from "../../workflow/text";
 import { EvaluatorMatchList, EvidenceReviewList } from "../eval/EvalStage";
 import { EvidenceSubmissionForm } from "../execute/EvidenceSubmissionForm";
 import {
-  executeBlockedDetail,
   executeEvidenceLine,
   executePrimaryAction,
   executeRouteLabel,
   executeRowStatus,
+  executeStatusLine,
   executeWaitingLine,
   isHumanExecuteRoute,
   type ExecuteMilestoneRow,
@@ -45,6 +45,7 @@ import {
   DEFAULT_RUN_PERMISSION_DRAFT,
   isRunPermissionReady,
   runPermissionRequest,
+  shortWorkspacePath,
   type RunPermissionDraft,
 } from "../execute/runPermissions";
 import { StrandedRunNotice } from "../execute/StrandedRunNotice";
@@ -341,12 +342,16 @@ function PlanRowDetail(props: JourneyPlanBandProps & {
           />
         ) : (
           <>
-            {row.blocked ? (
-              <div className="od-execute-blocker">
-                <strong>{t("execute.blockedTitle")}</strong>
-                <span>{executeBlockedDetail(row, t)}</span>
-              </div>
-            ) : null}
+            {/* ONE state sentence — or the live lane when a run is streaming right now. The old
+                blocked banner + run-state card + evidence card told the same story three ways. */}
+            {!live ? (() => {
+              const status = executeStatusLine(row, t);
+              return status ? (
+                <p className={`od-execute-status${status.tone ? ` ${status.tone}` : ""}`} role="status">
+                  {status.text}
+                </p>
+              ) : null;
+            })() : null}
 
             {live ? (
               <div className="od-live-run" data-running={live.status === "running" ? "true" : "false"} role="status" aria-live="polite">
@@ -381,13 +386,33 @@ function PlanRowDetail(props: JourneyPlanBandProps & {
             ) : null}
 
             {!humanRoute && !row.completed ? (
-              <RunPermissionControl
-                draft={props.permissionDraft}
-                disabled={props.disabled}
-                pickingWorkspace={props.pickingWorkspace}
-                onChange={props.onPermissionDraft}
-                onPickWorkspace={props.onPickWorkspace}
-              />
+              // The consent console collapses to its one-line summary: the read-only, network-off
+              // floor is the calm default and needs no standing form. Opening it is the explicit
+              // act of widening (or inspecting) what the next run may do.
+              <details className="od-execution-secondary-details od-run-permission-disclosure">
+                <summary>
+                  <span>{t("runPermission.title")}</span>
+                  <small>
+                    {[
+                      t(props.permissionDraft.sandbox === "workspace-write"
+                        ? "runPermission.sandbox.workspaceWrite"
+                        : "runPermission.sandbox.readOnly"),
+                      props.permissionDraft.sandbox === "workspace-write" && props.permissionDraft.workspace
+                        ? shortWorkspacePath(props.permissionDraft.workspace)
+                        : null,
+                      t(props.permissionDraft.network ? "execute.networkOn" : "execute.networkOff"),
+                      !permissionReady ? t("runPermission.folderRequired") : null,
+                    ].filter(Boolean).join(" · ")}
+                  </small>
+                </summary>
+                <RunPermissionControl
+                  draft={props.permissionDraft}
+                  disabled={props.disabled}
+                  pickingWorkspace={props.pickingWorkspace}
+                  onChange={props.onPermissionDraft}
+                  onPickWorkspace={props.onPickWorkspace}
+                />
+              </details>
             ) : null}
 
             {showPrimary ? (

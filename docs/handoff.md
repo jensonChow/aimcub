@@ -2,8 +2,30 @@
 
 Last updated: 2026-08-14
 Branch: `main`. Pushed state on origin is `88d9ab42` (the 2026-08-13 batch); **this session's
-two commits are LOCAL ONLY** — push was not authorized this session: `54b590e5` "runs survive
-the process" and the follow-up "a question is never a context candidate".
+three commits are LOCAL ONLY** — push was not authorized this session: `54b590e5` "runs survive
+the process", `173733d7` "a question is never a context candidate", and the work-detail
+redesign.
+
+## What shipped 2026-08-14 (latest): the expanded plan row is a sentence, not a console
+
+Founder, expanding a sub-aim: "充斥着大量的内容、细节，非常的复杂，这不是给人用的产品."
+Diagnosis: the detail told one failure FOUR ways (header pill + second eyebrow pill + a
+"Run state: Failed" card + a "Blocked work" banner), repeated the title the user just clicked,
+led with a four-card machine grid whose fourth card duplicated the primary action's own detail
+line, and kept a standing permission form even at the calm read-only default. Now the detail
+adds only what the header cannot say: description → ONE state sentence (`executeStatusLine`,
+quiet text + tone dot; a blocked row speaks its run's own error, evidence speaks its verdict, a
+quiet ready row says nothing) → primary action → secondaries → default-closed disclosures
+(runtime gains the agent name; the consent console collapses to "What this run may do ·
+Read only · Network off"). 17 dead i18n keys removed. Contracts in `design-system.md` +
+`desktop.md`; guards in App.test.tsx + new executePrimaryAction.test.ts; harness-verified live
+on `?parallel` (expanded ready row + done row, zero harness errors).
+
+Also live-verified this session (open item #1): the founder's screenshot showed the runs-batch
+recovery working on his real store — orphan `394265c9` settled, its continuation actually
+executed (then failed honestly: Codex timed out twice on a research-heavy read-only run). The
+run-recovery mechanism is no longer theory; the follow-up product question is whether the
+execution timeout budget fits research-shaped sub-aims.
 
 ## What shipped 2026-08-14 (later): a question is never a context candidate
 
@@ -75,21 +97,24 @@ queues the continuation — worth watching live (below).
 
 ## Verification
 
-Full gate green on this tip (build 9/9 · test: core 197 · desktop 415 · cli 122 · llm 204 ·
+Full gate green on this tip (build 9/9 · test: core 197 · desktop 422 · cli 122 · llm 204 ·
 store 108 · local-agent 48 · mcp 57 · api 20 · db 36 · eval-moat 49 · typecheck · lint ·
 purity). Runs-batch coverage: store claim/settle primitives (3), reconciler e2e over a real
 store + fake runtime (7: orphan→continue→drain-to-completed, live-foreign-pid skip, pre-fix
 no-pid row, demo-row untouchable, two-orphans-one-continuation, no-runtime honest settle,
 shutdown-abort full circle), CLI becomes-the-worker (1). Inbox-batch coverage: the composition
 guard (question-shaped content emits nothing), load-time retirement of parked questions
-(cross-instance), accept gate re-pinned as edit-into-question refusal. Root `Aimcub.app`
-repacked from this tip and boot-smoked from `/tmp`.
+(cross-instance), accept gate re-pinned as edit-into-question refusal. Work-detail coverage:
+executeStatusLine unit suite (5), no-eyebrow/no-grid/one-story pins, consent-disclosure pin;
+harness-driven on `?parallel`. Root `Aimcub.app` repacked from this tip and boot-smoked from
+`/tmp`.
 
 ## Open items
 
-1. **NOT VERIFIED LIVE: interrupted-run recovery on the founder's real store.** First launch of
-   the new build should log `run 394265c9 … continuing as run <id>`, flip his stuck aim's first
-   sub-aim to a genuinely executing run, and un-wedge the DAG. Watch the Journey tell the truth.
+1. **Execution timeout budget vs research-shaped sub-aims.** Run recovery is now LIVE-VERIFIED
+   (the founder's orphan settled and its continuation really executed) — but that continuation
+   then timed out twice on a research-heavy read-only run and blocked honestly. Decide whether
+   the engine's execution timeout (and/or milestone sizing guidance) fits research work.
 2. **NOT VERIFIED LIVE: the founder's planning drive** — create → attach file mid-pass → quit →
    reopen → Resume (nothing re-asked, attachment survives).
 3. **NOT VERIFIED LIVE: a real multi-branch plan** — first brain-emitted branching plan with two

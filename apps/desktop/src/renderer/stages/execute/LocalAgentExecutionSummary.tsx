@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 import { routingOverrideForMilestone } from "@aimcub/core";
-import type { AimProgressReadModel, RunStatus } from "@aimcub/types";
+import type { AimProgressReadModel } from "@aimcub/types";
 
 import { useI18n, type I18n } from "../../i18n";
 
@@ -27,66 +27,6 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 function stringField(value: unknown, key: string): string | null {
   const raw = asRecord(value)?.[key];
   return typeof raw === "string" && raw.trim() ? raw.trim() : null;
-}
-
-function formatDate(value: string | null | undefined): string {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function formatTrust(value: number): string {
-  return `${Math.round(value * 100)}%`;
-}
-
-function runStatusTone(status: RunStatus | null | undefined): string {
-  if (status === "completed") return "success";
-  if (status === "failed" || status === "cancelled") return "danger";
-  if (status === "running") return "blue";
-  if (status === "queued" || status === "blocked") return "warn";
-  return "";
-}
-
-function statusLabel(row: ProgressMilestoneRow, t: I18n["t"]): string {
-  switch (row.latest_run?.status) {
-    case "queued":
-      return t("execute.runStatus.queued");
-    case "running":
-      return t("execute.runStatus.running");
-    case "blocked":
-      return t("execute.runStatus.blocked");
-    case "completed":
-      return t("execute.runStatus.completed");
-    case "failed":
-      return t("execute.runStatus.failed");
-    case "cancelled":
-      return t("execute.runStatus.cancelled");
-    default:
-      return t("execute.runStatus.notStarted");
-  }
-}
-
-function runTiming(row: ProgressMilestoneRow, t: I18n["t"]): string {
-  const run = row.latest_run;
-  if (!run) return t("execute.runNotStartedDetail");
-  if (run.status === "queued") {
-    const queued = formatDate(run.queued_at);
-    return queued ? t("execute.runQueuedAt", { time: queued }) : t("execute.runTimestampMissing");
-  }
-  if (run.status === "running" || run.status === "blocked") {
-    const started = formatDate(run.started_at);
-    return started ? t("execute.runStartedAt", { time: started }) : t("execute.runTimestampMissing");
-  }
-  const finished = formatDate(run.finished_at);
-  if (finished) return t("execute.runFinishedAt", { time: finished });
-  const started = formatDate(run.started_at);
-  return started ? t("execute.runStartedAt", { time: started }) : t("execute.runTimestampMissing");
 }
 
 function latestAgentEvidence(row: ProgressMilestoneRow): ProgressEvidenceReviewItem | null {
@@ -168,39 +108,6 @@ function permissionText(row: ProgressMilestoneRow, t: I18n["t"]): string {
   return [sandbox, network].filter(Boolean).join(" · ");
 }
 
-function evidenceState(row: ProgressMilestoneRow, t: I18n["t"]): { tone: string; title: string; detail: string } {
-  const count = Math.max(row.evidence_count, row.evidence.length);
-  const lowTrust = row.evidence.filter((item) => item.status === "low_trust").length;
-  const matched = row.evidence.filter((item) => item.status === "matched").length;
-  if (count === 0) {
-    return {
-      tone: "",
-      title: t("execute.evidenceNoneTitle"),
-      detail: row.eval_review.next_action || t("os.evidenceNoDetailsAction"),
-    };
-  }
-  if (lowTrust > 0) {
-    return {
-      tone: "warn",
-      title: t("execute.evidenceLowTrustTitle"),
-      detail: t("execute.evidenceLowTrustDetail", { lowTrust, total: count }),
-    };
-  }
-  if (matched > 0) {
-    const trust = formatTrust(row.eval_review.trust_score);
-    return {
-      tone: "success",
-      title: t("execute.evidenceMatchedTitle"),
-      detail: t("execute.evidenceMatchedDetail", { matched, total: count, trust }),
-    };
-  }
-  return {
-    tone: "",
-    title: t("execute.evidenceNeedsEvalTitle"),
-    detail: t("execute.evidenceNeedsEvalDetail", { total: count }),
-  };
-}
-
 function activityEvent(raw: unknown): ActivityEvent | null {
   const record = asRecord(raw);
   if (!record) return null;
@@ -254,47 +161,18 @@ export function LocalAgentExecutionSummary(props: {
 }) {
   const { t } = useI18n();
   const row = props.row;
-  const evidence = evidenceState(row, t);
   const activity = compactActivity(row);
-  const nextAction = row.eval_review.next_action || row.next_action || t("shell.noNextAction");
   const modelRecorded = hasModelText(row);
 
+  // The row header the user just clicked already carries the title, route, and status pill —
+  // repeating them here (plus a four-card state grid) is what made the expanded row read as a
+  // machine console (founder, 2026-08-14). The detail adds only what the header cannot: the
+  // description, the one status sentence + action (the task slot), and closed disclosures.
   return (
     <section className="od-execution-summary" aria-label={t("execute.summaryLabel")}>
-      <div className="od-execution-subaim">
-        <div className="od-execution-subaim-head">
-          <span>{t("execute.selectedSubAim")}</span>
-          <span className={`od-pill ${row.completed ? "success" : row.blocked ? "danger" : ""}`}>
-            {row.completed ? t("os.done") : row.milestone.status}
-          </span>
-        </div>
-        <strong>{row.milestone.title}</strong>
-        {row.milestone.description ? <p>{shortText(row.milestone.description, 220)}</p> : null}
-      </div>
-
-      <div className="od-execution-grid">
-        <div className="od-execution-field">
-          <span>{t("execute.localAgent")}</span>
-          <strong>{selectedAgent(row, props.actors, t)}</strong>
-          <small>{routeMeta(row, t)}</small>
-        </div>
-        <div className="od-execution-field">
-          <span>{t("execute.runState")}</span>
-          <strong>
-            <span className={`od-pill ${runStatusTone(row.latest_run?.status)}`}>{statusLabel(row, t)}</span>
-          </strong>
-          <small>{runTiming(row, t)}</small>
-        </div>
-        <div className={`od-execution-evidence${evidence.tone ? ` ${evidence.tone}` : ""}`}>
-          <span>{t("execute.producedEvidence")}</span>
-          <strong>{evidence.title}</strong>
-          <small>{evidence.detail}</small>
-        </div>
-        <div className="od-execution-next">
-          <span>{t("execute.nextHumanEvalAction")}</span>
-          <strong>{nextAction}</strong>
-        </div>
-      </div>
+      {row.milestone.description ? (
+        <p className="od-execution-desc">{shortText(row.milestone.description, 220)}</p>
+      ) : null}
 
       {props.task ? <div className="od-execute-task">{props.task}</div> : null}
 
@@ -305,6 +183,11 @@ export function LocalAgentExecutionSummary(props: {
         </summary>
         <div className="od-execution-secondary-body">
           <div className="od-execution-runtime" aria-label={t("execute.runtimeDetails")}>
+            <div className="od-execution-field">
+              <span>{t("execute.localAgent")}</span>
+              <strong>{selectedAgent(row, props.actors, t)}</strong>
+              <small>{routeMeta(row, t)}</small>
+            </div>
             <div className="od-execution-field">
               <span>{t("execute.modelReasoning")}</span>
               <strong className={!modelRecorded ? "is-placeholder" : ""}>{modelText(row, t)}</strong>

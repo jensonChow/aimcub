@@ -2923,27 +2923,43 @@ kbd {
   font-size: var(--od-type-body);
 }
 
-.od-execute-blocker {
+/* The row's one state sentence: quiet text with a tone dot, never a boxed banner. */
+.od-execute-status {
   min-width: 0;
-  display: grid;
-  gap: 4px;
-  border: 1px solid color-mix(in oklab, var(--od-danger), var(--od-bg) 72%);
-  border-radius: var(--od-radius-sm);
-  background: color-mix(in oklab, var(--od-danger), var(--od-bg) 95%);
-  padding: 10px 12px;
-}
-
-.od-execute-blocker strong {
-  color: var(--od-danger);
-  font-size: var(--od-type-body);
-  font-weight: var(--od-font-weight-strong);
-  line-height: 1.35;
-}
-
-.od-execute-blocker span {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  margin: 0;
   color: var(--od-muted);
-  font-size: var(--od-type-meta);
-  line-height: 1.4;
+  font-size: var(--od-type-body);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.od-execute-status::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--od-border);
+  align-self: center;
+}
+
+.od-execute-status.danger {
+  color: var(--od-danger);
+}
+
+.od-execute-status.danger::before {
+  background: var(--od-danger);
+}
+
+.od-execute-status.warn::before {
+  background: var(--od-warn);
+}
+
+.od-execute-status.success::before {
+  background: var(--od-success);
 }
 
 .od-execute-primary-action {
@@ -3011,13 +3027,15 @@ kbd {
   gap: 12px;
 }
 
-.od-execution-subaim {
-  min-width: 0;
-  display: grid;
-  gap: 5px;
+/* The sub-aim description: the one thing the row header cannot say. Plain text, no box. */
+.od-execution-desc {
+  max-width: 680px;
+  margin: 0;
+  color: var(--od-muted);
+  font-size: var(--od-type-body);
+  line-height: 1.45;
 }
 
-.od-execution-subaim-head,
 .od-execution-activity-head,
 .od-execution-runtime-head {
   display: flex;
@@ -3026,43 +3044,16 @@ kbd {
   gap: 10px;
 }
 
-.od-execution-subaim-head > span:first-child,
 .od-execution-activity-head span,
 .od-execution-runtime-head span,
-.od-execution-field span,
-.od-execution-evidence span,
-.od-execution-next span {
+.od-execution-field span {
   color: var(--od-muted);
   font-size: var(--od-type-meta);
   font-weight: var(--od-font-weight-semibold);
   line-height: 1.35;
 }
 
-.od-execution-subaim > strong {
-  min-width: 0;
-  color: var(--od-fg);
-  font-size: var(--od-type-title);
-  font-weight: var(--od-font-weight-strong);
-  line-height: 1.35;
-}
-
-.od-execution-subaim p {
-  max-width: 680px;
-  margin: 0;
-  color: var(--od-muted);
-  font-size: var(--od-type-body);
-  line-height: 1.45;
-}
-
-.od-execution-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.od-execution-field,
-.od-execution-evidence,
-.od-execution-next {
+.od-execution-field {
   min-width: 0;
   display: grid;
   gap: 4px;
@@ -3073,8 +3064,6 @@ kbd {
 }
 
 .od-execution-field strong,
-.od-execution-evidence strong,
-.od-execution-next strong,
 .od-execution-activity li strong {
   min-width: 0;
   color: var(--od-fg);
@@ -3090,23 +3079,12 @@ kbd {
 }
 
 .od-execution-field small,
-.od-execution-evidence small,
 .od-execution-activity-head small {
   min-width: 0;
   color: var(--od-muted);
   font-size: var(--od-type-meta);
   line-height: 1.4;
   overflow-wrap: anywhere;
-}
-
-.od-execution-evidence.warn {
-  border-color: color-mix(in oklab, var(--od-warn), var(--od-bg) 68%);
-  background: color-mix(in oklab, var(--od-warn), var(--od-bg) 94%);
-}
-
-.od-execution-evidence.success {
-  border-color: color-mix(in oklab, var(--od-success), var(--od-bg) 72%);
-  background: color-mix(in oklab, var(--od-success), var(--od-bg) 95%);
 }
 
 .od-execution-secondary-details {
@@ -3182,10 +3160,15 @@ kbd {
 
 .od-execution-runtime {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 8px;
   border-top: 1px solid var(--od-border-soft);
   padding-top: 10px;
+}
+
+/* The consent console lives behind its disclosure; give the opened panel breathing room. */
+.od-run-permission-disclosure > .od-run-permission {
+  margin-top: 8px;
 }
 
 .od-execution-runtime .od-execution-field {
@@ -4986,7 +4969,6 @@ kbd {
   .od-work-detail-grid,
   .od-execute-layout,
   .od-execute-primary-action,
-  .od-execution-grid,
   .od-execution-runtime,
   .od-execution-activity li,
   .od-plan-contract-card,
