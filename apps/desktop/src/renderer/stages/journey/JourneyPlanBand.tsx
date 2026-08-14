@@ -24,7 +24,7 @@ import {
   type EvidenceSubmissionDraft,
 } from "../../workflow/evidenceSubmission";
 import { shortText } from "../../workflow/text";
-import { EvaluatorMatchList, EvidenceReviewList } from "../eval/EvalStage";
+import { EvalReceipts } from "../execute/EvalReceipts";
 import { EvidenceSubmissionForm } from "../execute/EvidenceSubmissionForm";
 import {
   executeEvidenceLine,
@@ -471,8 +471,6 @@ function PlanRowDetail(props: JourneyPlanBandProps & {
               ) : null}
             </div>
 
-            {row.assignment?.reason ? <div className="od-work-note">{shortText(row.assignment.reason, 220)}</div> : null}
-
             {row.child_relations.length ? (
               <div className="od-work-note">
                 <strong>{t("os.childBreakdown", { n: row.child_relations.length })}</strong>
@@ -481,22 +479,20 @@ function PlanRowDetail(props: JourneyPlanBandProps & {
             ) : null}
 
             {hasReceipts ? (
-              <div className="od-eval-detail-list">
-                <details className="od-eval-detail-section" open={primaryAction.kind === "review_eval" || undefined}>
-                  <summary>
-                    <span>{t("os.evalEvidenceReview")}</span>
-                    <span className="od-pill">{t("os.evidenceCount", { n: row.evidence_count })}</span>
-                  </summary>
-                  <EvidenceReviewList row={row} />
-                </details>
-                <details className="od-eval-detail-section">
-                  <summary>
-                    <span>{t("os.evalEvaluatorMatches")}</span>
-                    <span className="od-pill">{String(row.evaluator_results.length)}</span>
-                  </summary>
-                  <EvaluatorMatchList row={row} />
-                </details>
-              </div>
+              // ONE closed disclosure for the whole eval story — the header meta and the status
+              // line already carry the signal, so the receipts never auto-open into a ledger.
+              <details className="od-execution-secondary-details" data-od-id="eval-receipts" open={row.completed || undefined}>
+                <summary>
+                  <span>{t("os.evalEvidenceReview")}</span>
+                  <small>
+                    {[
+                      t("os.evidenceCount", { n: row.evidence_count }),
+                      row.evaluator_results.length ? `${t("os.evalEvaluatorMatches")} ${row.evaluator_results.length}` : null,
+                    ].filter(Boolean).join(" · ")}
+                  </small>
+                </summary>
+                <EvalReceipts row={row} />
+              </details>
             ) : null}
 
             <RunTimelinePanel

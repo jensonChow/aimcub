@@ -559,7 +559,8 @@ describe("JourneyPlanBand (the plan as the object, Collapse Stage 1)", () => {
       requires_human_confirmation: false,
     }] as AimProgressMilestoneRead["evaluator_results"];
     const html = renderBand([done], { selectedMilestoneId: "m1" });
-    expect(html).toContain("od-eval-detail-section");
+    // One receipts disclosure, open for a completed row — its receipts are the content.
+    expect(html).toContain('data-od-id="eval-receipts" open');
     expect(html).toContain("Confirmed by you.");
     expect(html).not.toContain("od-execute-primary-action");
   });

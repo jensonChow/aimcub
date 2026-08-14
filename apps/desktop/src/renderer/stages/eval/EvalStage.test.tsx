@@ -7,7 +7,8 @@ import type { AimProgressReadModel } from "@aimcub/core";
 import type { Evidence, Goal, Memory, Milestone } from "@aimcub/types";
 
 import { I18nProvider } from "../../i18n";
-import { CompletionRecapPanel, EvaluatorMatchList, EvidenceReviewList } from "./EvalStage";
+import { EvalReceipts } from "../execute/EvalReceipts";
+import { CompletionRecapPanel } from "./EvalStage";
 
 const OWNER = "00000000-0000-4000-8000-000000000001";
 const GOAL = "00000000-0000-4000-8000-000000000010";
@@ -231,16 +232,13 @@ function renderReceipts(progressModel: AimProgressReadModel): string {
   const row = progressModel.milestones[0]!;
   return renderToStaticMarkup(
     <I18nProvider>
-      <div>
-        <EvidenceReviewList row={row} />
-        <EvaluatorMatchList row={row} />
-      </div>
+      <EvalReceipts row={row} />
     </I18nProvider>,
   );
 }
 
 describe("Eval receipts + completion recap (the Eval stage collapsed into the Journey)", () => {
-  it("renders the evidence review with rule matches, trust, and honest review notes", () => {
+  it("folds receipts to one verdict line and one hairline row per item — no per-card repetition", () => {
     const html = renderReceipts(progress({ contextCandidates: [], firstEvidenceMatched: true }));
     const matchedTime = new Date(matchedEvidence.occurred_at).toLocaleString(undefined, {
       month: "short",
@@ -249,16 +247,21 @@ describe("Eval receipts + completion recap (the Eval stage collapsed into the Jo
       minute: "2-digit",
     });
 
+    // ONE shared verdict, spoken once for the whole set.
+    expect(html.match(/below the auto-verification trust floor/g) ?? []).toHaveLength(1);
+    // One row per evidence item: its own summary, its time, its status pill.
     expect(html).toContain("Desktop eval evidence row rendered");
-    expect(html).toContain("git commit");
+    expect(html).toContain("Agent self-report needs trusted proof");
     expect(html).toContain(matchedTime);
-    expect(html).toContain("trust 92%");
-    expect(html).toContain("Rules: #1 commit_pattern");
     expect(html).toContain("matched");
-    expect(html).toContain("Matches rule 1 (commit_pattern).");
-    expect(html).toContain("#1 commit_pattern");
     expect(html).toContain("low trust");
-    expect(html).toContain("Trust is below the 80% floor");
+    // One row per evaluator, with its explanation inline.
+    expect(html).toContain("commit_pattern — commit_pattern has not received sufficient matching evidence.");
+    // The old ledger's machine dialect stays out: no kind labels, no per-row trust math,
+    // no per-card repeat of the same explainer sentence.
+    expect(html).not.toContain("git commit");
+    expect(html).not.toContain("trust 92%");
+    expect(html).not.toContain("Rules: #1");
   });
 
   it("keeps the completion recap factual with no inbox duplication", () => {
@@ -283,11 +286,12 @@ describe("Eval receipts + completion recap (the Eval stage collapsed into the Jo
     expect(html).not.toContain("No pending context candidates.");
   });
 
-  it("keeps the receipt disclosures styled as closed bordered sections", () => {
+  it("keeps the folded receipts styled as quiet hairline rows, and the old ledger CSS gone", () => {
     const css = readFileSync(new URL("../../cockpit.css", import.meta.url), "utf8");
 
-    expect(css).toMatch(/\.od-eval-detail-section\s*{[^}]*border:\s*1px solid var\(--od-border-soft\);/s);
-    expect(css).toMatch(/\.od-eval-detail-section summary\s*{[^}]*cursor:\s*pointer;/s);
-    expect(css).toMatch(/\.od-eval-detail-section > \.od-evidence-review,\s*[\r\n\s]*\.od-eval-detail-section > \.od-evaluator-list/s);
+    expect(css).toMatch(/\.od-eval-receipts-list li\s*{[^}]*border-top:\s*1px solid var\(--od-border-soft\);/s);
+    expect(css).not.toContain(".od-eval-detail-section");
+    expect(css).not.toContain(".od-evidence-review");
+    expect(css).not.toContain(".od-evaluator-list");
   });
 });

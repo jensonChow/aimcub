@@ -2,9 +2,25 @@
 
 Last updated: 2026-08-14
 Branch: `main`. Pushed state on origin is `88d9ab42` (the 2026-08-13 batch); **this session's
-three commits are LOCAL ONLY** — push was not authorized this session: `54b590e5` "runs survive
-the process", `173733d7` "a question is never a context candidate", and the work-detail
-redesign.
+four commits are LOCAL ONLY** — push was not authorized this session: `54b590e5` "runs survive
+the process", `173733d7` "a question is never a context candidate", `8f2a03b4` "the expanded
+plan row is a sentence, not a console", and its second pass (receipts fold + every incomplete
+row keeps an action).
+
+## What shipped 2026-08-14 (second polish pass): receipts fold; no row without a move
+
+Founder, on the new detail with receipts open: "展开后还是有太多乱七八糟的东西." Three finds:
+(1) the eval receipts were still a ledger — two stacked disclosures of bordered cards, each
+repeating the sub-aim title, the machine kind, per-row trust math, and the SAME two explainer
+sentences per card, auto-opened; (2) a standing machine-dialect routing-rationale line under
+the buttons; (3) a real functional hole — a blocked row with low-trust evidence offered
+NOTHING but Break down (needsEval suppressed the primary, `!row.blocked` suppressed both
+secondaries). Now: `EvalReceipts` renders ONE closed disclosure (open only on completed rows)
+with one shared verdict sentence + one hairline row per evidence item and evaluator;
+`executePrimaryAction` gives every INCOMPLETE row its route's action (blocked agent rows get
+"Run agent · Try the run again"); the routing rationale moved into the Runtime details
+disclosure; `EvidenceReviewList`/`EvaluatorMatchList` and ~35 orphaned CSS blocks deleted.
+Contracts updated in `design-system.md` + `desktop.md`.
 
 ## What shipped 2026-08-14 (latest): the expanded plan row is a sentence, not a console
 
@@ -106,8 +122,10 @@ shutdown-abort full circle), CLI becomes-the-worker (1). Inbox-batch coverage: t
 guard (question-shaped content emits nothing), load-time retirement of parked questions
 (cross-instance), accept gate re-pinned as edit-into-question refusal. Work-detail coverage:
 executeStatusLine unit suite (5), no-eyebrow/no-grid/one-story pins, consent-disclosure pin;
-harness-driven on `?parallel`. Root `Aimcub.app` repacked from this tip and boot-smoked from
-`/tmp`.
+receipts pass re-pins: one-verdict-once + hairline rows + no machine dialect (EvalStage.test),
+completed-open/incomplete-closed + low-trust-keeps-its-action (App.test), orphaned ledger CSS
+proven gone; harness-driven on `?parallel`. Root `Aimcub.app` repacked from this tip and
+boot-smoked from `/tmp`.
 
 ## Open items
 

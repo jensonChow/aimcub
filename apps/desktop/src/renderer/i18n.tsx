@@ -299,6 +299,7 @@ export const STRINGS = {
   "execute.primaryActionLabel": { en: "Primary action", zh: "主要动作" },
   "execute.reviewInEval": { en: "Review in Eval", zh: "进入评估审查" },
   "execute.primaryRunDetail": { en: "Run the selected local agent for this incomplete sub-aim.", zh: "为这个未完成子目标运行已选本地 agent。" },
+  "execute.primaryRunRetryDetail": { en: "Try the run again — the last attempt did not finish.", zh: "再试一次——上次运行没有完成。" },
   "execute.primaryProofDetail": { en: "Submit human proof with the required evidence checklist.", zh: "提交人工凭证，并勾选所需证据。" },
   "execute.primaryReviewDetail": { en: "Review evidence and evaluator details in Eval.", zh: "在评估阶段查看证据和评估细节。" },
   "execute.blockedDefault": { en: "Resolve the blocker before this sub-aim can continue.", zh: "先解决阻塞项，然后才能继续这个子目标。" },

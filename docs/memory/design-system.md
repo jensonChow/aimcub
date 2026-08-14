@@ -688,6 +688,16 @@ as a working agent, not as a form the user operates.
   ready row with no history says nothing at all. The consent console collapses to its
   disclosure summary line ("What this run may do · Read only · Network off"); opening it is the
   explicit act of widening a run. Guarded in App.test.tsx + executePrimaryAction.test.ts.
+  Second pass, same day ("展开后还是有太多乱七八糟的东西"): eval receipts fold to ONE closed
+  disclosure (`EvalReceipts`, `data-od-id="eval-receipts"`) — one shared verdict sentence, then
+  one hairline row per evidence item (summary with the repeated sub-aim title stripped · time ·
+  status pill) and per evaluator (name — explanation · pill); no kind labels, no per-row trust
+  math, no per-card explainer repetition, and it never auto-opens on an incomplete row (open
+  only on completed rows, where receipts ARE the content). Every INCOMPLETE row keeps its
+  route's primary action — blocked and low-trust rows offer Run agent / Submit proof (the old
+  rules left them nothing but Break down); `review_eval`-suppresses-the-button applies to
+  completed rows alone. The standing routing-rationale line is gone — assignment reason lives
+  in the Runtime details disclosure.
 - **The inbox holds statements only — a question is never a context candidate** (founder
   2026-08-14: "不应该有这样一个环节，这本质上还是multichoice问题选单应该承担的功能"). Plan-review
   gaps used to be parked in the band as "pending answer needed:" pseudo-facts behind a forced

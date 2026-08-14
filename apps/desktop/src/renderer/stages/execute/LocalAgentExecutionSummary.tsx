@@ -186,7 +186,8 @@ export function LocalAgentExecutionSummary(props: {
             <div className="od-execution-field">
               <span>{t("execute.localAgent")}</span>
               <strong>{selectedAgent(row, props.actors, t)}</strong>
-              <small>{routeMeta(row, t)}</small>
+              {/* The routing rationale is runtime metadata, not a standing line in the flow. */}
+              <small>{row.assignment?.reason ? shortText(row.assignment.reason, 140) : routeMeta(row, t)}</small>
             </div>
             <div className="od-execution-field">
               <span>{t("execute.modelReasoning")}</span>

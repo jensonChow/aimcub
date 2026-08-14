@@ -493,7 +493,7 @@ describe("JourneyPlanBand work detail (the Execute stage's surface, ported home)
     expect(html).not.toContain('<button class="od-aim-secondary" type="button">Run agent</button>');
   });
 
-  it("shows eval receipts inline for completed and low-trust work — no Eval-stage hop, no primary button", () => {
+  it("completed work shows open receipts and no button; low-trust incomplete work keeps its action", () => {
     const completedHtml = renderExecute([
       executeRow({ id: COMPLETE_MILESTONE, title: "Review completed proof", owner: "agent", completed: true }),
     ]);
@@ -501,13 +501,14 @@ describe("JourneyPlanBand work detail (the Execute stage's surface, ported home)
       executeRow({ id: LOW_TRUST_MILESTONE, title: "Inspect low-trust report", owner: "agent", lowTrust: true }),
     ]);
 
+    // Completed: the receipts ARE the content — open disclosure, nothing to press.
     expect(completedHtml).not.toContain("od-execute-primary-button");
-    expect(lowTrustHtml).not.toContain("od-execute-primary-button");
-    expect(completedHtml).toContain("od-eval-detail-section");
-    expect(lowTrustHtml).toContain("od-eval-detail-section");
-    expect(lowTrustHtml).toContain('class="od-evidence-review');
-    // The review note now IS the inline receipt — the collapse shows it in place.
-    expect(lowTrustHtml).toContain("Trust is below the floor.");
+    expect(completedHtml).toContain('data-od-id="eval-receipts" open');
+    // Low-trust but INCOMPLETE: the human still has a move (re-run); receipts stay closed —
+    // the old rules left this row with nothing to press but Break down (founder, 2026-08-14).
+    expect(lowTrustHtml).toContain("od-execute-primary-button");
+    expect(lowTrustHtml).toContain('data-od-id="eval-receipts"');
+    expect(lowTrustHtml).not.toContain('data-od-id="eval-receipts" open');
   });
 
   it("keeps Break Down secondary and raw agent deltas hidden", () => {

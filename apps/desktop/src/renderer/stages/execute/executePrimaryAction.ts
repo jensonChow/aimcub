@@ -121,19 +121,15 @@ export function executePrimaryAction(row: ExecuteMilestoneRow, t: I18n["t"]): {
   label: string;
   detail: string;
 } {
-  if (executeRowNeedsEval(row)) {
+  // Receipts replace the button only on a COMPLETED row. An incomplete row always offers its
+  // route's action: a blocked or low-trust row's next human move is trying again (or proving
+  // it by hand), and the status line already says what went wrong — the old rules left a
+  // blocked low-trust row with nothing to press but Break down (founder, 2026-08-14).
+  if (row.completed) {
     return {
       kind: "review_eval",
       label: t("execute.reviewInEval"),
       detail: row.eval_review.next_action || row.next_action || t("execute.primaryReviewDetail"),
-    };
-  }
-
-  if (row.blocked) {
-    return {
-      kind: "blocked",
-      label: t("os.blocked"),
-      detail: executeBlockedDetail(row, t),
     };
   }
 
@@ -148,6 +144,6 @@ export function executePrimaryAction(row: ExecuteMilestoneRow, t: I18n["t"]): {
   return {
     kind: "run_agent",
     label: t("os.runAgent"),
-    detail: t("execute.primaryRunDetail"),
+    detail: row.blocked ? t("execute.primaryRunRetryDetail") : t("execute.primaryRunDetail"),
   };
 }
