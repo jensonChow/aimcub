@@ -943,16 +943,48 @@ describe("createJsonFileStore · memories/context", () => {
     expect(accepted?.confidence).toBe(0.75);
   });
 
-  it("requires prompt-like context candidates to be edited into actual answers", async () => {
-    const store = freshStore();
-    const candidate = await store.addMemoryCandidate({
+  it("retires machine-parked question candidates on load — questions are not inbox rows", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "aimcub-store-"));
+    const store = createJsonFileStore(dir);
+    // Pre-2026-08-14 stores hold rows like this (source defaults to agent_inferred): a plan
+    // review gap parked as a pseudo-fact. The composition path is gone; existing rows retire
+    // the first time any process loads the store.
+    const parkedQuestion = await store.addMemoryCandidate({
       content:
         'Eval signal: For "Context aim", pending answer needed: Ask what would make this aim count as genuinely complete.',
       category: "eval_signal",
       confidence: 0.6,
     });
+    const statement = await store.addMemoryCandidate({
+      content: "Preference: User prefers CLI-first workflows.",
+      category: "preference",
+      source: "evidence_derived",
+    });
 
-    await expect(store.acceptMemoryCandidate({ id: candidate.id })).rejects.toThrow(/actual answer/i);
+    const reopened = createJsonFileStore(dir);
+    const pending = await reopened.listMemoryCandidates();
+    expect(pending.map((m) => m.id)).not.toContain(parkedQuestion.id);
+    expect(pending.map((m) => m.id)).toContain(statement.id);
+    // Retired, not resurrectable: the row is no longer acceptable either.
+    expect(await reopened.acceptMemoryCandidate({ id: parkedQuestion.id })).toBeNull();
+  });
+
+  it("refuses to accept a candidate edited into a question instead of an answer", async () => {
+    const store = freshStore();
+    const candidate = await store.addMemoryCandidate({
+      content: "Eval signal: The user has not defined completion yet.",
+      category: "eval_signal",
+      source: "evidence_derived",
+      confidence: 0.6,
+    });
+
+    await expect(
+      store.acceptMemoryCandidate({
+        id: candidate.id,
+        content:
+          'Eval signal: For "Context aim", pending answer needed: Ask what would make this aim count as genuinely complete.',
+      }),
+    ).rejects.toThrow(/actual answer/i);
     expect((await store.listMemoryCandidates()).map((m) => m.id)).toContain(candidate.id);
 
     const accepted = await store.acceptMemoryCandidate({
@@ -965,7 +997,7 @@ describe("createJsonFileStore · memories/context", () => {
     expect(accepted?.content).toBe("Eval signal: Done means tests pass and screenshots prove the flow.");
   });
 
-  it("requires unapplied-context review prompts to be edited before accept", async () => {
+  it("retires legacy confirm-whether review prompts on load, like every parked question", async () => {
     const store = freshStore();
     const candidate = await store.addMemoryCandidate({
       content:
@@ -974,8 +1006,10 @@ describe("createJsonFileStore · memories/context", () => {
       confidence: 0.6,
     });
 
-    await expect(store.acceptMemoryCandidate({ id: candidate.id })).rejects.toThrow(/actual answer/i);
-    expect((await store.listMemoryCandidates()).map((m) => m.id)).toContain(candidate.id);
+    // The next load (any mutation or a fresh instance) retires the row: it cannot be listed
+    // or accepted — the clarify question flow, not the inbox, owns open questions.
+    expect(await store.acceptMemoryCandidate({ id: candidate.id })).toBeNull();
+    expect((await store.listMemoryCandidates()).map((m) => m.id)).not.toContain(candidate.id);
   });
 
   it("can promote a scoped context candidate to global context on accept", async () => {

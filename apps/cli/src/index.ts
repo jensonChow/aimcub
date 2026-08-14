@@ -53,7 +53,6 @@ import {
   buildAimIntakeReport,
   planningContextReportsFromGoals,
   recordAssumptionContextCandidatesForStore,
-  recordReviewContextCandidatesForStore,
   recordSedimentationAimContextForStore,
   recordSedimentationMemoryCandidatesForStore,
   reviewDecompositionStrategyForStore,
@@ -791,7 +790,6 @@ async function runClarify(title: string, description: string | undefined, opts: 
       ...(await recordSedimentationAimContextForStore(store, saved.goal, contextSedimentation)),
       ...(await recordSedimentationMemoryCandidatesForStore(store, contextSedimentation)),
       ...(await recordAssumptionContextCandidatesForStore(store, saved.goal, assumptions)),
-      ...(await recordReviewContextCandidatesForStore(store, saved.goal, review)),
     ];
   }
 
@@ -847,13 +845,11 @@ async function runNew(title: string, description: string | undefined, json: bool
       planning_context: planning.report,
     },
   });
-  const contextCandidates = await recordReviewContextCandidatesForStore(store, goal, review);
   if (json) {
-    out(JSON.stringify({ goal, milestones, quality: result.quality, qualityRetry, review, intake, contextIntakeProgress: intakeProgress, contextSedimentation, planningContext: planning.report, lineageLearning, decompositionLearning: decompositionLearningReport, decompositionStrategy: decompositionStrategyReport, contextCandidates }, null, 2));
+    out(JSON.stringify({ goal, milestones, quality: result.quality, qualityRetry, review, intake, contextIntakeProgress: intakeProgress, contextSedimentation, planningContext: planning.report, lineageLearning, decompositionLearning: decompositionLearningReport, decompositionStrategy: decompositionStrategyReport }, null, 2));
     return;
   }
   out(`Created aim ${goal.id}`);
-  if (contextCandidates.length > 0) out(`context candidates: ${contextCandidates.length} pending`);
   out("");
   out(formatPlanPretty(result.output, result.quality ?? undefined, review, planning.report, intake));
 }
@@ -1183,17 +1179,14 @@ async function runReplan(
       planning_context: planning.report,
     },
   });
-  const contextCandidates = await recordReviewContextCandidatesForStore(store, res.goal, review);
-
   if (json) {
-    out(JSON.stringify({ goal: res.goal, milestones: res.milestones, merge: merged, quality: result.quality, qualityRetry, review, intake, contextIntakeProgress: intakeProgress, contextSedimentation, planningContext: planning.report, lineageLearning, decompositionLearning: decompositionLearningReport, decompositionStrategy: decompositionStrategyReport, contextCandidates }, null, 2));
+    out(JSON.stringify({ goal: res.goal, milestones: res.milestones, merge: merged, quality: result.quality, qualityRetry, review, intake, contextIntakeProgress: intakeProgress, contextSedimentation, planningContext: planning.report, lineageLearning, decompositionLearning: decompositionLearningReport, decompositionStrategy: decompositionStrategyReport }, null, 2));
     return;
   }
   out(formatMergeSummary(merged));
   if (result.quality) out(`quality: ${result.quality.grade} (${result.quality.score}/100)`);
   out(`intake: ${intake.readiness.replace(/_/g, "-")} (${intake.score}/100)`);
   out(`context: ${review.context.applied.length} applied · ${review.context.unapplied.length} unapplied`);
-  if (contextCandidates.length > 0) out(`context candidates: ${contextCandidates.length} pending`);
   out("");
   out(formatGoalDetail(res.goal, res.milestones));
 }

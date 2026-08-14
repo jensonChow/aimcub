@@ -1,7 +1,6 @@
 import {
   contextCaptureFulfillmentFromLineage,
   extractMemoryCandidatesFromAssumptions,
-  extractMemoryCandidatesFromReview,
   reviewAimIntake,
   reviewContextLineage,
   reviewDecompositionStrategy,
@@ -438,15 +437,6 @@ async function recordContextCandidates(
     if (memory.status === "pending") saved.push(memory);
   }
   return saved;
-}
-
-export async function recordReviewContextCandidatesForStore(
-  store: Pick<ContextWorkflowStore, "addMemoryCandidate">,
-  goal: Goal,
-  review: PlanReviewReport | null | undefined,
-): Promise<Memory[]> {
-  if (!review) return [];
-  return recordContextCandidates(store, goal, extractMemoryCandidatesFromReview({ goal, review }));
 }
 
 export async function recordAssumptionContextCandidatesForStore(

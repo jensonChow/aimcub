@@ -2,7 +2,24 @@
 
 Last updated: 2026-08-14
 Branch: `main`. Pushed state on origin is `88d9ab42` (the 2026-08-13 batch); **this session's
-"runs survive the process" commit is LOCAL ONLY** — push was not authorized this session.
+two commits are LOCAL ONLY** — push was not authorized this session: `54b590e5` "runs survive
+the process" and the follow-up "a question is never a context candidate".
+
+## What shipped 2026-08-14 (later): a question is never a context candidate
+
+Founder, on seeing his inbox full of "pending answer needed:" rows: "不应该有这样一个环节，
+这本质上还是multichoice问题选单应该承担的功能." He is right twice over: the clarify flow
+ALREADY turns high-priority `review.context.gaps` into askable questions (`clarify.ts`), so
+`extractMemoryCandidatesFromReview` was a second consumer of the same gaps that dressed them
+as pseudo-facts behind a forced edit gate. Deleted at the source (core composer + llm recorder
++ desktop/CLI call sites), with three mechanical layers so the class cannot return: the shared
+composition sink drops prompt-like content, the store accept gate still refuses question-shaped
+edits, and store load retires legacy parked-question rows — the founder's five polluted rows
+vanish the first time the new build opens his store, with the gap content still durable in the
+landed plan's `decomposition_contract.context_gaps`. Renderer/CLI prompt-like checks survive
+only as input validation. Durable rules: `architecture.md` (Evidence And Eval) +
+`design-system.md` (context band). Coverage moved from pinning the old composition to pinning
+the guard + the load retirement (core 197 · store 108; llm/cli/desktop green).
 
 ## What shipped 2026-08-14: runs survive the process (quit = pause, reopen = continue)
 
@@ -58,13 +75,15 @@ queues the continuation — worth watching live (below).
 
 ## Verification
 
-Full gate green on this tip (build 9/9 · test: core 200 · desktop 415 · cli 122 · llm 204 ·
-store 107 · local-agent 48 · mcp 57 · api 20 · db 36 · eval-moat 49 · typecheck · lint ·
-purity). New coverage: store claim/settle primitives (3), reconciler e2e over a real store +
-fake runtime (7: orphan→continue→drain-to-completed, live-foreign-pid skip, pre-fix
+Full gate green on this tip (build 9/9 · test: core 197 · desktop 415 · cli 122 · llm 204 ·
+store 108 · local-agent 48 · mcp 57 · api 20 · db 36 · eval-moat 49 · typecheck · lint ·
+purity). Runs-batch coverage: store claim/settle primitives (3), reconciler e2e over a real
+store + fake runtime (7: orphan→continue→drain-to-completed, live-foreign-pid skip, pre-fix
 no-pid row, demo-row untouchable, two-orphans-one-continuation, no-runtime honest settle,
-shutdown-abort full circle), CLI becomes-the-worker (1). Root `Aimcub.app` repacked from this
-tip and boot-smoked from `/tmp`.
+shutdown-abort full circle), CLI becomes-the-worker (1). Inbox-batch coverage: the composition
+guard (question-shaped content emits nothing), load-time retirement of parked questions
+(cross-instance), accept gate re-pinned as edit-into-question refusal. Root `Aimcub.app`
+repacked from this tip and boot-smoked from `/tmp`.
 
 ## Open items
 

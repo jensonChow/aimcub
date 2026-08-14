@@ -32,7 +32,6 @@ import {
   contextIntakeSignalsFromPlanningToolEvents,
   planningContextReportsFromGoals,
   recordAssumptionContextCandidatesForStore,
-  recordReviewContextCandidatesForStore,
   recordSedimentationAimContextForStore,
   recordSedimentationMemoryCandidatesForStore,
   reviewDecompositionStrategyForStore,
@@ -494,18 +493,22 @@ type SavedGoalSynthesis = Awaited<ReturnType<typeof synthesizeSavedGoalMetadata>
 
 /**
  * Record the pending context candidates a persisted aim seeds (sedimented aim context + durable
- * memory candidates, clarify assumptions, plan-review candidates). Shared by save + update; store
- * candidate writes dedupe by normalized content, so re-running on a re-plan is idempotent-safe.
+ * memory candidates, clarify assumptions). Shared by save + update; store candidate writes dedupe
+ * by normalized content, so re-running on a re-plan is idempotent-safe.
+ *
+ * Deliberately NOT recorded: the plan review's open context gaps. Those are questions, and
+ * questions belong to the clarify question flow (which already turns high-priority gaps into
+ * askable questions) — never to the context inbox, which holds statements only (founder,
+ * 2026-08-14).
  */
 async function recordSavedGoalContextCandidates(
   goal: Goal,
-  input: { contextSedimentation: SavedGoalSynthesis["contextSedimentation"]; assumptions?: SaveRequest["assumptions"]; review?: SaveRequest["review"] },
+  input: { contextSedimentation: SavedGoalSynthesis["contextSedimentation"]; assumptions?: SaveRequest["assumptions"] },
 ) {
   return [
     ...(await recordSedimentationAimContextForStore(aimStore, goal, input.contextSedimentation)),
     ...(await recordSedimentationMemoryCandidatesForStore(aimStore, input.contextSedimentation)),
     ...(await recordAssumptionContextCandidatesForStore(aimStore, goal, input.assumptions ?? [])),
-    ...(await recordReviewContextCandidatesForStore(aimStore, goal, input.review)),
   ];
 }
 
@@ -1007,7 +1010,6 @@ export function registerIpc(): void {
     const contextCandidates = await recordSavedGoalContextCandidates(saved.goal, {
       contextSedimentation: synthesis.contextSedimentation,
       assumptions: req.assumptions,
-      review: req.review,
     });
     if (req.draftId) await aimStore.discardAimDraft(req.draftId);
     return {
@@ -1129,7 +1131,6 @@ export function registerIpc(): void {
       contextCandidates = await recordSavedGoalContextCandidates(updated.goal, {
         contextSedimentation: synthesis.contextSedimentation,
         assumptions: req.assumptions,
-        review: req.review,
       });
       answerImpact = synthesis.answerImpact;
     }

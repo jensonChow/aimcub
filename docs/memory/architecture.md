@@ -32,6 +32,8 @@ Agent runs may record low-trust evidence with attribution, but should not auto-c
 
 Execution progress read models must expose evidence review details from core, not UI-only state: each milestone row carries evidence items, trust, matched acceptance rule indexes/evaluators, pass/fail reasoning, and the next review action.
 
+A question is never a context candidate (2026-08-14, founder: the parked-question inbox row "本质上还是multichoice问题选单应该承担的功能"). The context inbox holds statements only; unanswered plan gaps belong to the clarify question flow, which already turns high-priority `review.context.gaps` into askable questions — `extractMemoryCandidatesFromReview` double-consumed the same gaps into "pending answer needed:" pseudo-facts and is deleted. Three mechanical layers keep the class dead: the shared composition sink (`addUnique` in `packages/core/src/context.ts`) drops `isPromptLikeContextCandidate` content so no extractor can emit a question; the store's accept gate still refuses question-shaped content (now guarding only a user who EDITS a candidate into a question); and store load retires legacy pending `agent_inferred` prompt-like rows (`normalizeMemoryRow`) — pre-2026-08-14 stores come clean the first time any process opens them. Plan gaps themselves stay durable in the landed plan's `decomposition_contract.context_gaps`, so nothing is lost by not parking them.
+
 ## Lean Defaults
 
 Stay lean until concrete triggers demand more: use a jobs table plus pg_cron and single-table memory rather than vector infrastructure.

@@ -669,13 +669,20 @@ as a working agent, not as a form the user operates.
   This aim | Global (recommendation marked, meaning in the pill tooltips — no per-row helper
   line) and Keep / Discard. Machine fields stay structured and NEVER render raw: no candidate
   ids, no confidence percentages, no "Agent inferred", no "From aim" chip on the aim's own
-  Journey. Editing is opt-in (quiet Edit action, Escape reverts); a question-shaped candidate
-  opens editing with the "still a question" warning and a blocked Keep. The band shows at most
+  Journey. Editing is opt-in (quiet Edit action, Escape reverts). The band shows at most
   4 rows plus one "Show all n" control so a big extraction never buries the Journal. Candidate
   CONTENT carries no provenance: core composes the bare statement, presentation strips the
   legacy machine prefix (`presentContextCandidateContent`, also on the Memory page), and
   keeping stores the presented text — memory never learns the wrapper. Guarded in
   ContextInbox.test.tsx and context.test.ts.
+- **The inbox holds statements only — a question is never a context candidate** (founder
+  2026-08-14: "不应该有这样一个环节，这本质上还是multichoice问题选单应该承担的功能"). Plan-review
+  gaps used to be parked in the band as "pending answer needed:" pseudo-facts behind a forced
+  edit gate; that whole class is deleted. Questions belong to the clarify question flow (which
+  already turns high-priority plan gaps into askable questions); the mechanics are three layers
+  in `architecture.md` (composition guard, accept gate, load-time retirement of legacy rows).
+  The renderer's prompt-like check survives ONLY as input validation for a user who edits a
+  candidate INTO a question — a stored row can never be question-shaped again.
 - **No standing input on a watching surface** (same feedback: "doesn't need an input box").
   The mid-research note composer is closed at rest and opens from a quiet "Add a note" action
   (Escape closes, send closes, a non-empty draft keeps it open). The interjection CHANNEL

@@ -7,7 +7,6 @@ import type {
   Milestone,
   MilestoneCompletion,
 } from "@aimcub/types";
-import type { PlanContextUse, PlanReviewReport } from "./plan-quality";
 
 export interface ContextCandidate {
   content: string;
@@ -30,11 +29,6 @@ export interface ExtractMemoryCandidatesInput {
   milestones?: readonly Pick<Milestone, "id" | "title">[];
   evidence: Evidence;
   completions?: readonly Pick<MilestoneCompletion, "decided_by" | "milestone_id">[];
-}
-
-export interface ExtractMemoryCandidatesFromReviewInput {
-  goal: Pick<Goal, "id" | "title">;
-  review: Pick<PlanReviewReport, "actions" | "context">;
 }
 
 export interface ContextAssumption {
@@ -176,32 +170,18 @@ function labelStatement(label: string, text: string): string {
 function addUnique(candidates: ContextCandidate[], candidate: ContextCandidate): void {
   const content = cleanText(candidate.content);
   if (!content) return;
+  // A question is never a context candidate: unanswered questions belong to the clarify
+  // question flow, which already turns high-priority plan gaps into askable questions
+  // (founder, 2026-08-14: the review inbox must hold statements only). Every composer funnels
+  // through here, so no future extractor can park a question in the inbox again.
+  if (isPromptLikeContextCandidate(content)) return;
   const key = content.toLowerCase();
   if (candidates.some((c) => c.content.toLowerCase() === key)) return;
   candidates.push({ ...candidate, content });
 }
 
-function unlabeledContext(content: string): string {
-  return cleanText(content).replace(/^[a-z_ ]+:\s*/i, "");
-}
-
-function isHighImpactContext(row: PlanContextUse): boolean {
-  return row.category === "constraint" || row.category === "procedure" || row.category === "eval_signal";
-}
-
 function isExistingContextAssumption(assumption: ContextAssumption): boolean {
   return cleanText(assumption.statement).toLowerCase().startsWith("answered from known ");
-}
-
-function labelForCategory(category: ContextCategory): string {
-  switch (category) {
-    case "eval_signal":
-      return "Eval signal";
-    case "project_fact":
-      return "Project fact";
-    default:
-      return category.charAt(0).toUpperCase() + category.slice(1).replace(/_/g, " ");
-  }
 }
 
 export function recommendContextScope(input: Pick<Memory, "category" | "goal_id">): ContextScopeRecommendation {
@@ -269,41 +249,6 @@ export function extractMemoryCandidatesFromEvidence(input: ExtractMemoryCandidat
       source: "evidence_derived",
       confidence: 0.65,
       reason: "manual_check",
-    });
-  }
-
-  return candidates;
-}
-
-export function extractMemoryCandidatesFromReview(input: ExtractMemoryCandidatesFromReviewInput): ContextCandidate[] {
-  const shouldReviewUnapplied = input.review.actions.some((action) => action.code === "refine_with_unapplied_context");
-  const candidates: ContextCandidate[] = [];
-
-  if (shouldReviewUnapplied) {
-    for (const row of input.review.context.unapplied) {
-      if (!isHighImpactContext(row)) continue;
-      if (typeof row.confidence === "number" && row.confidence < 0.6) continue;
-      addUnique(candidates, {
-        content: `Eval signal: For "${input.goal.title}", confirm whether this ${row.category} context should shape the aim: ${unlabeledContext(row.content)}`,
-        kind: "semantic",
-        category: "eval_signal",
-        source: "agent_inferred",
-        confidence: 0.6,
-        reason: "plan_review.unapplied_context",
-      });
-    }
-  }
-
-  for (const gap of input.review.context.gaps ?? []) {
-    if (gap.priority === "low") continue;
-    const label = labelForCategory(gap.category);
-    addUnique(candidates, {
-      content: `${label}: For "${input.goal.title}", pending answer needed: ${gap.prompt}`,
-      kind: gap.category === "procedure" ? "procedural" : "semantic",
-      category: gap.category,
-      source: "agent_inferred",
-      confidence: 0.6,
-      reason: "plan_review.context_gap",
     });
   }
 

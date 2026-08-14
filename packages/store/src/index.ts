@@ -1308,10 +1308,15 @@ function defaultCategoryForMemory(content: string, kind: MemoryKind): ContextCat
 
 function normalizeMemoryRow(row: Memory): Memory {
   const memory = row as Memory & { category?: ContextCategory };
-  return {
-    ...memory,
-    category: memory.category ?? defaultCategoryForMemory(memory.content, memory.kind),
-  };
+  const category = memory.category ?? defaultCategoryForMemory(memory.content, memory.kind);
+  // Pre-2026-08-14 stores parked plan-review QUESTIONS in the context inbox as pending
+  // candidates ("pending answer needed: …"). Questions belong to the clarify question flow,
+  // never to the inbox (which holds statements only), so these machine-composed rows retire
+  // on load — the same discard the reviewer would have to click, applied mechanically.
+  if (memory.status === "pending" && memory.source === "agent_inferred" && isPromptLikeContextCandidate(memory.content)) {
+    return { ...memory, category, status: "deleted" };
+  }
+  return { ...memory, category };
 }
 
 function normalizeAimDraftRow(row: unknown): AimDraftRow | null {

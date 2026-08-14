@@ -1,18 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import type { DecompositionOutput, Evidence, Goal, Milestone, MilestoneCompletion } from "@aimcub/types";
+import type { Evidence, Goal, Milestone, MilestoneCompletion } from "@aimcub/types";
 
 import {
   extractMemoryCandidatesFromAssumptions,
   extractMemoryCandidatesFromEvidence,
-  extractMemoryCandidatesFromReview,
   isPromptLikeContextCandidate,
   presentContextCandidateContent,
   recommendContextScope,
   reviewContextHealth,
   reviewContextProfile,
 } from "./context";
-import { reviewPlan } from "./plan-quality";
 
 const goal = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -152,183 +150,25 @@ describe("isPromptLikeContextCandidate", () => {
   });
 });
 
-describe("extractMemoryCandidatesFromReview", () => {
-  it("turns unapplied high-impact context into pending review candidates", () => {
-    const candidates = extractMemoryCandidatesFromReview({
+describe("question-shaped content never becomes a context candidate", () => {
+  it("drops prompt-like content at the composition layer — questions belong to the clarify flow", () => {
+    // The plan review's open gaps used to be parked in the inbox as pseudo-facts
+    // ("pending answer needed: ..."). That composition path is deleted, and this shared guard
+    // makes the class unrepeatable: no extractor can emit a question-shaped candidate.
+    const candidates = extractMemoryCandidatesFromEvidence({
       goal,
-      review: {
-        actions: [
-          {
-            code: "refine_with_unapplied_context",
-            priority: "high",
-            title: "Refine with unapplied context",
-            reason: "1 high-impact context row did not appear in the plan.",
-          },
-        ],
-        context: {
-          total: 2,
-          applied: [],
-          unapplied: [
-            {
-              content: "Constraint: Keep @core packages platform-free.",
-              category: "constraint",
-              confidence: 1,
-              applied: false,
-              matchedKeywords: [],
-            },
-            {
-              content: "Preference: Prefer concise output.",
-              category: "preference",
-              confidence: 1,
-              applied: false,
-              matchedKeywords: [],
-            },
+      milestones: [milestone],
+      evidence: evidence({
+        payload: {
+          constraints: [
+            'Constraint: For "Ship Aimcub CLI", pending answer needed: Ask for non-negotiable constraints.',
           ],
-          ignoredLowConfidence: [],
-          gaps: [],
+          preference: "User prefers CLI-first workflows.",
         },
-      },
+      }),
     });
 
-    expect(candidates).toHaveLength(1);
-    expect(candidates[0]!.content).toContain("confirm whether this constraint context should shape the aim");
-    expect(candidates[0]!.content).toContain("Keep @core packages platform-free.");
-    expect(candidates[0]!.category).toBe("eval_signal");
-    expect(candidates[0]!.source).toBe("agent_inferred");
-    expect(candidates[0]!.reason).toBe("plan_review.unapplied_context");
-  });
-
-  it("stays quiet when the review has no refine-with-context action", () => {
-    const candidates = extractMemoryCandidatesFromReview({
-      goal,
-      review: {
-        actions: [{ code: "accept_plan", priority: "low", title: "Accept plan", reason: "Looks clean." }],
-        context: {
-          total: 1,
-          applied: [],
-          unapplied: [
-            {
-              content: "Constraint: Keep @core packages platform-free.",
-              category: "constraint",
-              confidence: 1,
-              applied: false,
-              matchedKeywords: [],
-            },
-          ],
-          ignoredLowConfidence: [],
-          gaps: [],
-        },
-      },
-    });
-
-    expect(candidates).toEqual([]);
-  });
-
-  it("turns high-value context gaps into pending candidates", () => {
-    const candidates = extractMemoryCandidatesFromReview({
-      goal,
-      review: {
-        actions: [{ code: "accept_plan", priority: "low", title: "Accept plan", reason: "Looks clean." }],
-        context: {
-          total: 1,
-          applied: [],
-          unapplied: [],
-          ignoredLowConfidence: [],
-          gaps: [
-            {
-              category: "eval_signal",
-              priority: "medium",
-              reason: "missing_personalized_eval",
-              prompt: "Ask what would make this aim count as genuinely complete.",
-            },
-            {
-              category: "constraint",
-              priority: "medium",
-              reason: "missing_constraints",
-              prompt: "Ask for non-negotiable constraints.",
-            },
-            {
-              category: "procedure",
-              priority: "low",
-              reason: "missing_proven_workflow",
-              prompt: "Ask whether there is an existing workflow.",
-            },
-          ],
-        },
-      },
-    });
-
-    expect(candidates.map((c) => c.category)).toEqual(["eval_signal", "constraint"]);
-    expect(candidates.map((c) => c.reason)).toEqual(["plan_review.context_gap", "plan_review.context_gap"]);
-    expect(candidates[0]).toMatchObject({
-      content:
-        'Eval signal: For "Ship Aimcub CLI", pending answer needed: Ask what would make this aim count as genuinely complete.',
-      source: "agent_inferred",
-      confidence: 0.6,
-    });
-    expect(candidates[1]!.content).toContain("Constraint: For \"Ship Aimcub CLI\"");
-  });
-
-  it("turns issue-aware decomposition gaps into pending candidates", () => {
-    const plan = {
-      goal_summary: "Ship Aimcub CLI.",
-      domain: "software",
-      rationale: "Split implementation and verification.",
-      nodes: [
-        {
-          key: "core",
-          title: "Implement context review",
-          description: "Add core context review.",
-          est_effort: "xl",
-          xp_reward: 20,
-          acceptance_rule: {
-            logic: "all",
-            threshold: 1,
-            completion_mode: "auto_then_confirm",
-            clauses: [
-              {
-                evaluator: "commit_pattern",
-                auto_verifiable: true,
-                match: { path_glob: "packages/core/**", min_files: 1, message_pattern: "context review" },
-              },
-            ],
-          },
-        },
-        {
-          key: "publish",
-          title: "Publish context review",
-          description: "Expose the review path.",
-          est_effort: "m",
-          xp_reward: 20,
-          acceptance_rule: {
-            logic: "any",
-            threshold: 1,
-            completion_mode: "auto_then_confirm",
-            clauses: [
-              {
-                evaluator: "commit_pattern",
-                auto_verifiable: true,
-                match: { path_glob: "packages/core/**", min_files: 1, message_pattern: "context review" },
-              },
-              {
-                evaluator: "ci_status",
-                auto_verifiable: true,
-                match: { workflow: "test", conclusion: "success" },
-              },
-            ],
-          },
-        },
-      ],
-      edges: [],
-    } as unknown as DecompositionOutput;
-    const review = reviewPlan({ plan, context: [] });
-
-    const candidates = extractMemoryCandidatesFromReview({ goal, review });
-
-    expect(candidates.map((c) => c.category)).toEqual(["eval_signal", "procedure", "constraint"]);
-    expect(candidates[0]!.content).toContain("separate milestones");
-    expect(candidates[0]!.content).toContain("one event cannot complete unrelated work");
-    expect(candidates[1]!.content).toContain("shared verification");
+    expect(candidates.map((c) => c.content)).toEqual(["Preference: User prefers CLI-first workflows."]);
   });
 });
 

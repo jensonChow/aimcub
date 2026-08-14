@@ -130,7 +130,6 @@ export {
   contextIntakeSignalsFromPlanningToolEvents,
   planningContextReportsFromGoals,
   recordAssumptionContextCandidatesForStore,
-  recordReviewContextCandidatesForStore,
   recordSedimentationAimContextForStore,
   recordSedimentationMemoryCandidatesForStore,
   reviewDecompositionStrategyForStore,
