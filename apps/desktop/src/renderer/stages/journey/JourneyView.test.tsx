@@ -526,7 +526,7 @@ describe("JourneyPlanBand (the plan as the object, Collapse Stage 1)", () => {
     );
     expect(html).toContain("journey-planrow-detail");
     expect(html).toContain("od-run-permission");
-    expect(html).toContain("od-execute-primary-action");
+    expect(html).toContain("od-execute-actions");
   });
 
   it("shows the proof form in place of the normal detail when the row's proof is active", () => {

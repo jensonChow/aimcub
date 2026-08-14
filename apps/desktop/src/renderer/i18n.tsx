@@ -296,7 +296,6 @@ export const STRINGS = {
   "execute.waitingOnOne": { en: "waiting on {title}", zh: "等待:{title}" },
   "execute.waitingOnMany": { en: "waiting on {n} sub-aims", zh: "等待 {n} 个子目标" },
   "execute.readyNow": { en: "{n} ready now", zh: "{n} 项可同时进行" },
-  "execute.primaryActionLabel": { en: "Primary action", zh: "主要动作" },
   "execute.reviewInEval": { en: "Review in Eval", zh: "进入评估审查" },
   "execute.primaryRunDetail": { en: "Run the selected local agent for this incomplete sub-aim.", zh: "为这个未完成子目标运行已选本地 agent。" },
   "execute.primaryRunRetryDetail": { en: "Try the run again — the last attempt did not finish.", zh: "再试一次——上次运行没有完成。" },

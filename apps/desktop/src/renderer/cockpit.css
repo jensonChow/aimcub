@@ -2962,52 +2962,14 @@ kbd {
   background: var(--od-success);
 }
 
-.od-execute-primary-action {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px;
-  align-items: center;
-  border: 1px solid color-mix(in oklab, var(--od-accent), var(--od-bg) 78%);
-  border-radius: var(--od-radius-sm);
-  background: color-mix(in oklab, var(--od-accent), var(--od-bg) 96%);
-  padding: 12px;
-}
-
-.od-execute-primary-action > div {
-  min-width: 0;
-  display: grid;
-  gap: 4px;
-}
-
-.od-execute-primary-action span {
-  color: var(--od-accent);
-  font-size: var(--od-type-meta);
-  font-weight: var(--od-font-weight-strong);
-  line-height: 1.35;
-}
-
-.od-execute-primary-action strong {
-  min-width: 0;
-  color: var(--od-fg);
-  font-size: var(--od-type-body);
-  font-weight: var(--od-font-weight-medium);
-  line-height: 1.4;
-  overflow-wrap: anywhere;
-}
-
-.od-execute-primary-button {
-  margin-top: 0;
-  white-space: nowrap;
-}
-
 .od-execute-task {
   min-width: 0;
   display: grid;
   gap: 12px;
 }
 
-.od-execute-secondary-actions {
+/* One start-aligned action row: the primary button plus its quiet alternates, one height. */
+.od-execute-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -3015,10 +2977,16 @@ kbd {
   justify-content: flex-start;
 }
 
-.od-execute-secondary-actions .od-aim-secondary {
+.od-execute-actions .od-aim-primary,
+.od-execute-actions .od-aim-secondary {
   min-height: 34px;
-  padding: 0 12px;
+  padding: 0 14px;
   font-size: var(--od-type-body);
+  white-space: nowrap;
+}
+
+.od-execute-primary-button {
+  margin-top: 0;
 }
 
 .od-execution-summary {
@@ -4817,7 +4785,6 @@ kbd {
   .od-work-card,
   .od-work-detail-grid,
   .od-execute-layout,
-  .od-execute-primary-action,
   .od-execution-runtime,
   .od-execution-activity li,
   .od-plan-contract-card,
@@ -4862,8 +4829,8 @@ kbd {
   }
 
   .od-work-actions .od-aim-secondary,
-  .od-execute-secondary-actions .od-aim-secondary,
-  .od-execute-primary-button,
+  .od-execute-actions .od-aim-primary,
+  .od-execute-actions .od-aim-secondary,
   .od-proof-actions .od-aim-primary,
   .od-proof-actions .od-aim-secondary {
     width: 100%;

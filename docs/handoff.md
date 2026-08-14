@@ -7,6 +7,17 @@ the process", `173733d7` "a question is never a context candidate", `8f2a03b4` "
 plan row is a sentence, not a console", and its second pass (receipts fold + every incomplete
 row keeps an action).
 
+## What shipped 2026-08-14 (fourth polish pass): one type system in the row detail
+
+Founder: "字体、字重、字号、对齐、空白等等都太乱了." The last dialect standing was the accent
+"Primary action" card — blue eyebrow, bold guidance sentence (which repeated the status line),
+right-floated button, its own borders and fill. Deleted: actions now render as ONE
+start-aligned row (`od-execute-actions`, primary button first, quiet alternates after, one
+height); the guidance sentence lives on the Your-move card only; the consent disclosure moved
+down to sit with the other disclosure lines, so the detail reads description → status →
+actions → three identical hairline disclosure rows. `execute.primaryActionLabel` removed.
+Harness-verified on `?parallel`.
+
 ## What shipped 2026-08-14 (third polish pass): the run timeline is deleted
 
 Founder, on the second-pass detail: "runtime line 就没有任何的意义." The standing Run timeline

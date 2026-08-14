@@ -426,7 +426,7 @@ describe("JourneyPlanBand work detail (the Execute stage's surface, ported home)
     expect(html).toContain("Run implementation agent");
     expect(html).toContain("Agent route");
     expect(html).toContain("Human route");
-    expect(html).toContain("Primary action");
+    expect(html).toContain('class="od-execute-actions"');
     // The expanded detail repeats nothing the row header already says: no eyebrow, no second
     // title, no machine state grid (founder 2026-08-14: the old console was "不是给人用的产品").
     expect(html).not.toContain("Selected sub-aim");
@@ -475,7 +475,7 @@ describe("JourneyPlanBand work detail (the Execute stage's surface, ported home)
 
     expect(html.match(/class="od-aim-primary od-execute-primary-button"/g) ?? []).toHaveLength(1);
     expect(html).toContain('<button class="od-aim-primary od-execute-primary-button" type="button">Run agent</button>');
-    expect(html).toContain('class="od-execute-secondary-actions"');
+    expect(html).toContain('class="od-execute-actions"');
     expect(html).toContain('<button class="od-aim-secondary" type="button">Submit proof</button>');
     expect(html).toContain('<button class="od-aim-secondary" type="button">Break down</button>');
     expect(html).not.toContain('class="od-aim-primary od-execute-primary-button" type="button">Break down</button>');
@@ -488,7 +488,8 @@ describe("JourneyPlanBand work detail (the Execute stage's surface, ported home)
 
     expect(html.match(/class="od-aim-primary od-execute-primary-button"/g) ?? []).toHaveLength(1);
     expect(html).toContain('<button class="od-aim-primary od-execute-primary-button" type="button">Submit proof</button>');
-    expect(html).toContain("Submit human proof with the required evidence checklist.");
+    // The action's guidance sentence lives on the Your-move card, not repeated inside the row.
+    expect(html).not.toContain("Submit human proof with the required evidence checklist.");
     expect(html).toContain('<button class="od-aim-secondary" type="button">Break down</button>');
     expect(html).not.toContain('<button class="od-aim-secondary" type="button">Run agent</button>');
   });
@@ -516,7 +517,7 @@ describe("JourneyPlanBand work detail (the Execute stage's surface, ported home)
       executeRow({ id: LOW_TRUST_MILESTONE, title: "Inspect low-trust report", owner: "agent", lowTrust: true }),
     ]);
 
-    expect(html).toContain('class="od-execute-secondary-actions"');
+    expect(html).toContain('class="od-execute-actions"');
     expect(html).toContain('<button class="od-aim-secondary" type="button">Break down</button>');
     expect(html).not.toContain('class="od-aim-primary od-execute-primary-button" type="button">Break down</button>');
     expect(html).toContain("Activity");

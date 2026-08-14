@@ -701,7 +701,15 @@ as a working agent, not as a form the user operates.
   the standing per-row Run timeline is DELETED (component, helper, CSS, i18n) — run history is
   the Journal's job, and the one honest fact the ledger carried folds into the status
   sentence: a blocked row with retries reads "… · {n} attempts" (`execute.statusAttempts`).
-  Never reintroduce a standing per-run ledger inside a plan row.
+  Never reintroduce a standing per-run ledger inside a plan row. Fourth pass, same day
+  ("字体、字重、字号、对齐、空白都太乱"): ONE type system in the detail — body size everywhere,
+  two colors (fg for content, muted for meta), semibold only on disclosure labels. The accent
+  "Primary action" card is DELETED (its blue eyebrow + bold sentence were a third dialect and
+  repeated the status line); actions render as ONE start-aligned row (`od-execute-actions`):
+  primary button first, quiet alternates after, one 34px height. The action's guidance sentence
+  lives on the Your-move card only. Order inside the detail: description → status sentence →
+  action row → the disclosure group (consent · receipts · runtime/activity), all identical
+  hairline summary rows.
 - **The inbox holds statements only — a question is never a context candidate** (founder
   2026-08-14: "不应该有这样一个环节，这本质上还是multichoice问题选单应该承担的功能"). Plan-review
   gaps used to be parked in the band as "pending answer needed:" pseudo-facts behind a forced

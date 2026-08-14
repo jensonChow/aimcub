@@ -383,10 +383,61 @@ function PlanRowDetail(props: JourneyPlanBandProps & {
               />
             ) : null}
 
+            {/* ONE action row, start-aligned: the primary button plus its quiet alternates. The
+                old accent-boxed "Primary action" card spoke its own type dialect and repeated
+                the status sentence (founder, 2026-08-14: "字体、字重、字号、对齐、空白都太乱").
+                A button says what it does; the status line above says why. */}
+            {showPrimary || showSecondaryRun || showSecondaryProof || (!row.completed && props.onBreakDown) ? (
+              <div className="od-execute-actions" aria-label={t("execute.secondaryActionsLabel")}>
+                {showPrimary ? (
+                  <button
+                    className="od-aim-primary od-execute-primary-button"
+                    type="button"
+                    ref={primaryAction.kind === "submit_proof" ? props.proofTriggerRef : undefined}
+                    disabled={props.disabled || (primaryAction.kind === "run_agent" && !permissionReady)}
+                    onClick={() => props.onPrimary(primaryAction.kind)}
+                  >
+                    {primaryAction.label}
+                  </button>
+                ) : null}
+                {showSecondaryRun ? (
+                  <button
+                    className="od-aim-secondary"
+                    type="button"
+                    disabled={props.disabled || !permissionReady}
+                    onClick={props.onStartRun}
+                  >
+                    {t("os.runAgent")}
+                  </button>
+                ) : null}
+                {showSecondaryProof ? (
+                  <button
+                    ref={showPrimary && primaryAction.kind === "submit_proof" ? undefined : props.proofTriggerRef}
+                    className="od-aim-secondary"
+                    type="button"
+                    disabled={props.disabled}
+                    onClick={props.onOpenProof}
+                  >
+                    {t("os.submitProof")}
+                  </button>
+                ) : null}
+                {!row.completed && props.onBreakDown ? (
+                  <button
+                    className="od-aim-secondary"
+                    type="button"
+                    disabled={props.disabled}
+                    onClick={() => props.onBreakDown?.(row.milestone)}
+                  >
+                    {t("os.breakDown")}
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+
             {!humanRoute && !row.completed ? (
-              // The consent console collapses to its one-line summary: the read-only, network-off
-              // floor is the calm default and needs no standing form. Opening it is the explicit
-              // act of widening (or inspecting) what the next run may do.
+              // The consent console collapses to its one-line summary and sits with the other
+              // disclosure lines: the read-only, network-off floor is the calm default and
+              // needs no standing form. Opening it is the explicit act of widening a run.
               <details className="od-execution-secondary-details od-run-permission-disclosure">
                 <summary>
                   <span>{t("runPermission.title")}</span>
@@ -412,62 +463,6 @@ function PlanRowDetail(props: JourneyPlanBandProps & {
                 />
               </details>
             ) : null}
-
-            {showPrimary ? (
-              <div className="od-execute-primary-action">
-                <div>
-                  <span>{t("execute.primaryActionLabel")}</span>
-                  <strong>{primaryAction.detail}</strong>
-                </div>
-                <button
-                  className="od-aim-primary od-execute-primary-button"
-                  type="button"
-                  ref={primaryAction.kind === "submit_proof" ? props.proofTriggerRef : undefined}
-                  disabled={
-                    props.disabled
-                    || primaryAction.kind === "blocked"
-                    || (primaryAction.kind === "run_agent" && !permissionReady)
-                  }
-                  onClick={() => props.onPrimary(primaryAction.kind)}
-                >
-                  {primaryAction.label}
-                </button>
-              </div>
-            ) : null}
-
-            <div className="od-execute-secondary-actions" aria-label={t("execute.secondaryActionsLabel")}>
-              {showSecondaryRun ? (
-                <button
-                  className="od-aim-secondary"
-                  type="button"
-                  disabled={props.disabled || !permissionReady}
-                  onClick={props.onStartRun}
-                >
-                  {t("os.runAgent")}
-                </button>
-              ) : null}
-              {showSecondaryProof ? (
-                <button
-                  ref={props.proofTriggerRef}
-                  className="od-aim-secondary"
-                  type="button"
-                  disabled={props.disabled}
-                  onClick={props.onOpenProof}
-                >
-                  {t("os.submitProof")}
-                </button>
-              ) : null}
-              {!row.completed && props.onBreakDown ? (
-                <button
-                  className="od-aim-secondary"
-                  type="button"
-                  disabled={props.disabled}
-                  onClick={() => props.onBreakDown?.(row.milestone)}
-                >
-                  {t("os.breakDown")}
-                </button>
-              ) : null}
-            </div>
 
             {row.child_relations.length ? (
               <div className="od-work-note">
