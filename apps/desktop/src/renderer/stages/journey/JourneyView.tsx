@@ -548,7 +548,6 @@ export function JourneyView(props: JourneyViewProps) {
       {progress.total_milestones > 0 ? (
         <JourneyPlanBand
           progress={progress}
-          runEvents={props.runEvents}
           disabled={Boolean(props.disabled)}
           liveRun={props.liveRun}
           sessionRunIds={props.sessionRunIds}

@@ -12,7 +12,7 @@
  * form disables switching rows and — via the parent — blocks normal navigation until submit or
  * cancel, exactly like the old Execute stage.
  */
-import type { AimProgressReadModel, Milestone, RunEvent } from "@aimcub/core";
+import type { AimProgressReadModel, Milestone } from "@aimcub/core";
 import { useEffect, useRef, useState, type RefObject } from "react";
 
 import type { ConfirmMilestoneRequest, RunPermissionConsent } from "../../../shared/ipc";
@@ -40,7 +40,6 @@ import {
 import { LocalAgentExecutionSummary } from "../execute/LocalAgentExecutionSummary";
 import { liveRunForMilestone, type LiveRunState } from "../execute/liveRun";
 import { RunPermissionControl } from "../execute/RunPermissionControl";
-import { RunTimelinePanel } from "../execute/RunTimelinePanel";
 import {
   DEFAULT_RUN_PERMISSION_DRAFT,
   isRunPermissionReady,
@@ -63,7 +62,6 @@ export function planRowIsLive(row: ExecuteMilestoneRow, live: LiveRunState | nul
 
 export interface JourneyPlanBandProps {
   progress: AimProgressReadModel;
-  runEvents?: readonly RunEvent[];
   disabled: boolean;
   /** The run currently streaming from the main-process worker, if it belongs to this aim. */
   liveRun?: LiveRunState | null;
@@ -494,15 +492,9 @@ function PlanRowDetail(props: JourneyPlanBandProps & {
                 <EvalReceipts row={row} />
               </details>
             ) : null}
-
-            <RunTimelinePanel
-              milestoneId={row.milestone.id}
-              runEvents={props.runEvents ?? []}
-              runs={props.progress.runs}
-              liveEvents={live?.events ?? []}
-              liveRunId={live?.runId ?? null}
-              liveEventsDropped={live ? live.eventCount - live.events.length : 0}
-            />
+            {/* No standing run timeline: the status line carries the latest state (with the
+                attempt count), and run history is the Journal's job (founder, 2026-08-14:
+                "runtime line 就没有任何的意义"). */}
           </>
         )}
       />

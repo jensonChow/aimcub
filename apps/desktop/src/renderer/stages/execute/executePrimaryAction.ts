@@ -93,7 +93,13 @@ export interface ExecuteStatusLine {
  * needs it told once (founder, 2026-08-14: "这不是给人用的产品").
  */
 export function executeStatusLine(row: ExecuteMilestoneRow, t: I18n["t"]): ExecuteStatusLine | null {
-  if (row.blocked) return { tone: "danger", text: executeBlockedDetail(row, t) };
+  if (row.blocked) {
+    // The attempt count is the one honest fact the deleted run-timeline ledger carried:
+    // "tried 3 times" changes what a human does next, three cards of step counts did not.
+    const attempt = row.latest_run?.attempt ?? 1;
+    const attempts = attempt > 1 ? ` · ${t("execute.statusAttempts", { n: attempt })}` : "";
+    return { tone: "danger", text: `${executeBlockedDetail(row, t)}${attempts}` };
+  }
 
   const runStatus = row.latest_run?.status;
   if (runStatus === "queued" || runStatus === "running") {

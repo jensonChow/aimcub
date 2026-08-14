@@ -697,7 +697,11 @@ as a working agent, not as a form the user operates.
   route's primary action — blocked and low-trust rows offer Run agent / Submit proof (the old
   rules left them nothing but Break down); `review_eval`-suppresses-the-button applies to
   completed rows alone. The standing routing-rationale line is gone — assignment reason lives
-  in the Runtime details disclosure.
+  in the Runtime details disclosure. Third pass, same day ("runtime line 就没有任何的意义"):
+  the standing per-row Run timeline is DELETED (component, helper, CSS, i18n) — run history is
+  the Journal's job, and the one honest fact the ledger carried folds into the status
+  sentence: a blocked row with retries reads "… · {n} attempts" (`execute.statusAttempts`).
+  Never reintroduce a standing per-run ledger inside a plan row.
 - **The inbox holds statements only — a question is never a context candidate** (founder
   2026-08-14: "不应该有这样一个环节，这本质上还是multichoice问题选单应该承担的功能"). Plan-review
   gaps used to be parked in the band as "pending answer needed:" pseudo-facts behind a forced

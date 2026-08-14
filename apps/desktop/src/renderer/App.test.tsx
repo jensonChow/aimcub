@@ -548,12 +548,22 @@ describe("JourneyPlanBand work detail (the Execute stage's surface, ported home)
     expect(html).not.toContain('aria-label="What this run may do"');
   });
 
-  it("shows a per-run timeline built from persisted run events", () => {
-    const html = renderExecute([
-      executeRow({ id: AGENT_MILESTONE, title: "Run implementation agent", owner: "agent" }),
+  it("keeps the standing run-timeline ledger out of the row — history is the Journal's job", () => {
+    const base = executeRow({ id: AGENT_MILESTONE, title: "Run implementation agent", owner: "agent" });
+    const blockedHtml = renderExecute([
+      {
+        ...base,
+        blocked: true,
+        latest_run: base.latest_run
+          ? { ...base.latest_run, status: "failed", error: "Local agent run timed out.", attempt: 3 }
+          : null,
+      },
     ]);
-    expect(html).toContain('data-od-id="run-timeline"');
-    expect(html).toContain("Run timeline");
+
+    expect(blockedHtml).not.toContain('data-od-id="run-timeline"');
+    expect(blockedHtml).not.toContain("Run timeline");
+    // The one honest fact the ledger carried survives in the status sentence.
+    expect(blockedHtml).toContain("Local agent run timed out. · 3 attempts");
   });
 
   it("gives the live run its own Glass row instead of reusing the work-note style", () => {

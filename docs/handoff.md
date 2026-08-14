@@ -7,6 +7,17 @@ the process", `173733d7` "a question is never a context candidate", `8f2a03b4` "
 plan row is a sentence, not a console", and its second pass (receipts fold + every incomplete
 row keeps an action).
 
+## What shipped 2026-08-14 (third polish pass): the run timeline is deleted
+
+Founder, on the second-pass detail: "runtime line 就没有任何的意义." The standing Run timeline
+block (three bordered cards of "Sandbox read-only · Network off · 47 step(s) · Attempt 3 ·
+Queued by Desktop") is deleted outright — component, pure helper, tests, ~23 CSS blocks, 26
+i18n keys. Run history is the Journal's job; the one honest fact the ledger carried folds into
+the status sentence (a blocked row with retries reads "Local agent run timed out. · 3
+attempts"). The expanded row is now: description → status sentence → consent line → primary →
+Break down → two closed disclosure lines (Evidence review · Runtime details/Activity). Desktop
+suite 402 (net −20 from the deletion).
+
 ## What shipped 2026-08-14 (second polish pass): receipts fold; no row without a move
 
 Founder, on the new detail with receipts open: "展开后还是有太多乱七八糟的东西." Three finds:
