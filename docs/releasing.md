@@ -91,8 +91,7 @@ against any commit to sanity-check the build.
   extra step.
 - **`npm publish` is intentionally not wired up anywhere** — the release
   workflow has a clearly-commented placeholder step instead of a real publish
-  call. It's blocked on choosing an OSS license for the repo and registering
-  the `@aimcub` npm org.
+  call. It's blocked on registering the `@aimcub` npm org.
 - **First public version target is `0.1.0`.** Until then, treat `0.0.x`
   bumps as internal/dry-run traffic — nothing is published anywhere it can
   be publicly installed from.

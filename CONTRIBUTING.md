@@ -6,11 +6,8 @@ monorepo is organized, and the conventions we follow.
 
 ## License Notice
 
-Aimcub is source-available in this repository during pre-release. An
-open-source license has not yet been chosen; until a `LICENSE` file lands, all
-rights are reserved and external contributions may be held until the license
-decision is made. See the note in [`README.md`](README.md) ("License choice is
-intentionally undecided before public release").
+Aimcub is open source under the [MIT License](LICENSE). By contributing, you
+agree that your contributions are licensed under the same terms.
 
 ## Requirements
 

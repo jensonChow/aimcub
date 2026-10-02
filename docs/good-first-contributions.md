@@ -3,9 +3,7 @@
 > Status: reflects the repository as of 2026-07-22. Curated by hand against the
 > current code, not auto-generated from an issue tracker.
 
-Aimcub is source-available during pre-release — no open-source license has landed
-yet, so PRs may be held pending that decision (see
-[Contributing & Community](../README.md#contributing--community) in the README).
+Aimcub is open source under the MIT License (see [`LICENSE`](../LICENSE)).
 These items become issues you can actually open and claim once the repository is
 public. Until then, treat this page as a map of real, currently-open work for
 anyone reading the code today — none of it is hypothetical, and none of it is

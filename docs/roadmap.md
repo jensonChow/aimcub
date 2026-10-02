@@ -73,10 +73,8 @@ The furthest-out stage: breaking the aim out of a single organization's boundary
 A few decisions are intentionally not made yet, because making them early would lock
 in choices before the local harness itself has proven out. None of these are dated:
 
-- **License.** Aimcub is source-available in this repository during pre-release. No
-  open-source license has been chosen yet; until a `LICENSE` file lands, all rights
-  are reserved and external contributions may be held pending that decision. See
-  [`CONTRIBUTING.md`](../CONTRIBUTING.md).
+- **License.** Aimcub is open source under the MIT License (see
+  [`LICENSE`](../LICENSE)).
 - **Package publishing.** Nothing is published to npm yet.
 - **Distribution.** No signed/notarized build distribution channel (e.g. Homebrew,
   `npx`) exists yet; today the only way to run Aimcub is from a source checkout.
