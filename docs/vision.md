@@ -38,8 +38,7 @@ The brand strategy is deliberately split:
   sync, permissioned sharing, managed infrastructure, and the future Aim Share
   network require hosted surfaces.
 
-The license is intentionally undecided until the business/community boundary is
-explicit.
+The repository is open source under the MIT License (see `LICENSE`).
 
 ## The AI-Native test
 

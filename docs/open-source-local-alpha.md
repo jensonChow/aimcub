@@ -181,8 +181,7 @@ AIMCUB_HOME=/tmp/aimcub-local-alpha-demo pnpm desktop
   improve later decompositions is still an active v1 gate.
 - Supabase parity for newer local Aim OS orchestration entities is future online
   platform work.
-- Public release readiness still needs the license decision (and the
-  founder-owned launch checklist in `docs/handoff.md`); `CONTRIBUTING.md`,
+- The repository is public and MIT-licensed (2026-10-02); `CONTRIBUTING.md`,
   `SECURITY.md`, and the secrets audit are done.
 
 ## Non-Goals

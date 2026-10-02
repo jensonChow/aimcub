@@ -157,15 +157,11 @@ or run the local alpha path.
 - v2 is the online multiplayer Aim platform.
 - v3 is Aim Share.
 
-License choice is intentionally undecided before public release — see
-[Contributing & Community](#contributing--community).
+Aimcub is released under the [MIT License](LICENSE).
 
 ## Contributing & Community
 
-Aimcub is source-available in this repository during pre-release. An
-open-source license has not yet been chosen; until a `LICENSE` file lands, all
-rights are reserved and external contributions may be held until the license
-decision is made.
+Aimcub is open source under the [MIT License](LICENSE).
 
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) covers setup, the verification gate, and
   contribution conventions.
